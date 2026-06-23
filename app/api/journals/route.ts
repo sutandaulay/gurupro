@@ -1,0 +1,235 @@
+import { query, logAudit } from "@/lib/db";
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+
+async function getUserId() {
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get("gurupro_session")?.value;
+  if (!sessionCookie) {
+    throw new Error("Unauthorized");
+  }
+  const session = JSON.parse(sessionCookie);
+  return session.id;
+}
+
+export async function GET(req: Request) {
+  try {
+    const userId = await getUserId();
+    const { searchParams } = new URL(req.url);
+    const schoolId = searchParams.get("school_id");
+
+    if (!schoolId) {
+      // Return all journals for this teacher
+      const journals = await query(
+        `SELECT tj.*, c.nama_kelas, sb.nama_mapel, u.nama_lengkap as nama_guru, us.nama_lengkap as nama_supervisor,
+                s.nama_sekolah
+         FROM teacher_journals tj
+         JOIN classes c ON tj.class_id = c.id
+         JOIN subjects sb ON tj.subject_id = sb.id
+         JOIN users u ON tj.teacher_id = u.id
+         JOIN schools s ON tj.school_id = s.id
+         LEFT JOIN users us ON tj.supervisor_id = us.id
+         WHERE tj.teacher_id = $1 OR tj.supervisor_id = $1
+         ORDER BY tj.tanggal DESC, tj.created_at DESC`,
+        [userId]
+      );
+      return NextResponse.json(journals.rows);
+    }
+
+    // Get school owner
+    const schoolOwnerRes = await query("SELECT user_id FROM schools WHERE id = $1", [schoolId]);
+    if (schoolOwnerRes.rows.length === 0) {
+      return NextResponse.json({ error: "Sekolah tidak ditemukan" }, { status: 404 });
+    }
+    const isOwner = schoolOwnerRes.rows[0].user_id === userId;
+
+    // Fetch journals. Teachers can see their own journals, owners and admins can see all.
+    let journals;
+    if (isOwner) {
+      journals = await query(
+        `SELECT tj.*, c.nama_kelas, sb.nama_mapel, u.nama_lengkap as nama_guru, us.nama_lengkap as nama_supervisor,
+                (SELECT JSON_BUILD_OBJECT('catatan', js.catatan_supervisi, 'rekomendasi', js.rekomendasi, 'status', js.status_persetujuan, 'created_at', js.created_at) 
+                 FROM journal_supervisions js 
+                 WHERE js.journal_id = tj.id 
+                 ORDER BY js.created_at DESC LIMIT 1) as ulasan,
+                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Sakit'), 0) as sakit_count,
+                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Izin'), 0) as izin_count,
+                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Alfa'), 0) as alfa_count,
+                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Hadir'), 0) as hadir_count
+         FROM teacher_journals tj
+         JOIN classes c ON tj.class_id = c.id
+         JOIN subjects sb ON tj.subject_id = sb.id
+         JOIN users u ON tj.teacher_id = u.id
+         LEFT JOIN users us ON tj.supervisor_id = us.id
+         WHERE tj.school_id = $1
+         ORDER BY tj.tanggal DESC, tj.created_at DESC`,
+        [schoolId]
+      );
+    } else {
+      journals = await query(
+        `SELECT tj.*, c.nama_kelas, sb.nama_mapel, u.nama_lengkap as nama_guru, us.nama_lengkap as nama_supervisor,
+                (SELECT JSON_BUILD_OBJECT('catatan', js.catatan_supervisi, 'rekomendasi', js.rekomendasi, 'status', js.status_persetujuan, 'created_at', js.created_at) 
+                 FROM journal_supervisions js 
+                 WHERE js.journal_id = tj.id 
+                 ORDER BY js.created_at DESC LIMIT 1) as ulasan,
+                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Sakit'), 0) as sakit_count,
+                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Izin'), 0) as izin_count,
+                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Alfa'), 0) as alfa_count,
+                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Hadir'), 0) as hadir_count
+         FROM teacher_journals tj
+         JOIN classes c ON tj.class_id = c.id
+         JOIN subjects sb ON tj.subject_id = sb.id
+         JOIN users u ON tj.teacher_id = u.id
+         LEFT JOIN users us ON tj.supervisor_id = us.id
+         WHERE tj.school_id = $1 AND (tj.teacher_id = $2 OR tj.supervisor_id = $2)
+         ORDER BY tj.tanggal DESC, tj.created_at DESC`,
+        [schoolId, userId]
+      );
+    }
+
+    return NextResponse.json(journals.rows);
+  } catch (error: any) {
+    console.error("Journals GET error:", error);
+    const status = error.message === "Unauthorized" ? 401 : 500;
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const userId = await getUserId();
+    const body = await req.json();
+    const {
+      id,
+      school_id,
+      schedule_id,
+      class_id,
+      subject_id,
+      tanggal,
+      materi_pembelajaran,
+      tujuan_pembelajaran,
+      aktivitas_pembelajaran,
+      media_pembelajaran,
+      asesmen_pembelajaran,
+      refleksi_guru,
+      tindak_lanjut,
+      evidensi,
+      custom_values,
+      status,
+      supervisor_id,
+    } = body;
+
+    if (!school_id || !class_id || !subject_id || !tanggal || !materi_pembelajaran || !tujuan_pembelajaran || !aktivitas_pembelajaran) {
+      return NextResponse.json({ error: "Field wajib (sekolah, kelas, mapel, tanggal, materi, tujuan, aktivitas) harus diisi" }, { status: 400 });
+    }
+
+    const evidensiJson = JSON.stringify(evidensi || []);
+    const customValuesJson = JSON.stringify(custom_values || {});
+
+    if (id) {
+      // Verify journal belongs to teacher
+      const check = await query("SELECT teacher_id FROM teacher_journals WHERE id = $1", [id]);
+      if (check.rows.length === 0) {
+        return NextResponse.json({ error: "Jurnal tidak ditemukan" }, { status: 404 });
+      }
+      if (check.rows[0].teacher_id !== userId) {
+        return NextResponse.json({ error: "Forbidden: Hanya pembuat jurnal yang dapat mengubah data" }, { status: 403 });
+      }
+
+      const res = await query(
+        `UPDATE teacher_journals 
+         SET schedule_id = $1, class_id = $2, subject_id = $3, tanggal = $4, materi_pembelajaran = $5, 
+             tujuan_pembelajaran = $6, aktivitas_pembelajaran = $7, media_pembelajaran = $8, 
+             asesmen_pembelajaran = $9, refleksi_guru = $10, tindak_lanjut = $11, evidensi = $12, 
+             custom_values = $13, status = $14, supervisor_id = $15, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $16
+         RETURNING *`,
+        [
+          schedule_id || null,
+          class_id,
+          subject_id,
+          tanggal,
+          materi_pembelajaran.trim(),
+          tujuan_pembelajaran.trim(),
+          aktivitas_pembelajaran.trim(),
+          media_pembelajaran ? media_pembelajaran.trim() : null,
+          asesmen_pembelajaran ? asesmen_pembelajaran.trim() : null,
+          refleksi_guru ? refleksi_guru.trim() : null,
+          tindak_lanjut ? tindak_lanjut.trim() : null,
+          evidensiJson,
+          customValuesJson,
+          status || "Draft",
+          supervisor_id || null,
+          id
+        ]
+      );
+      await logAudit(userId, "UPDATE_JOURNAL", `Memperbarui dokumen jurnal kelas: ${materi_pembelajaran}`);
+      return NextResponse.json(res.rows[0]);
+    } else {
+      // Insert new
+      const res = await query(
+        `INSERT INTO teacher_journals (
+          teacher_id, school_id, schedule_id, class_id, subject_id, tanggal, materi_pembelajaran, 
+          tujuan_pembelajaran, aktivitas_pembelajaran, media_pembelajaran, asesmen_pembelajaran, 
+          refleksi_guru, tindak_lanjut, evidensi, custom_values, status, supervisor_id
+        ) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) 
+        RETURNING *`,
+        [
+          userId,
+          school_id,
+          schedule_id || null,
+          class_id,
+          subject_id,
+          tanggal,
+          materi_pembelajaran.trim(),
+          tujuan_pembelajaran.trim(),
+          aktivitas_pembelajaran.trim(),
+          media_pembelajaran ? media_pembelajaran.trim() : null,
+          asesmen_pembelajaran ? asesmen_pembelajaran.trim() : null,
+          refleksi_guru ? refleksi_guru.trim() : null,
+          tindak_lanjut ? tindak_lanjut.trim() : null,
+          evidensiJson,
+          customValuesJson,
+          status || "Draft",
+          supervisor_id || null
+        ]
+      );
+      await logAudit(userId, "CREATE_JOURNAL", `Membuat dokumen jurnal kelas baru: ${materi_pembelajaran}`);
+      return NextResponse.json(res.rows[0]);
+    }
+  } catch (error: any) {
+    console.error("Journals POST error:", error);
+    const status = error.message === "Unauthorized" ? 401 : 500;
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const userId = await getUserId();
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "id is required" }, { status: 400 });
+    }
+
+    const check = await query("SELECT teacher_id FROM teacher_journals WHERE id = $1", [id]);
+    if (check.rows.length === 0) {
+      return NextResponse.json({ error: "Jurnal tidak ditemukan" }, { status: 404 });
+    }
+
+    if (check.rows[0].teacher_id !== userId) {
+      return NextResponse.json({ error: "Forbidden: Hanya pembuat jurnal yang dapat menghapus" }, { status: 403 });
+    }
+
+    await query("DELETE FROM teacher_journals WHERE id = $1", [id]);
+    await logAudit(userId, "DELETE_JOURNAL", `Menghapus dokumen jurnal kelas dengan ID: ${id}`);
+    return NextResponse.json({ success: true, message: "Jurnal berhasil dihapus" });
+  } catch (error: any) {
+    console.error("Journals DELETE error:", error);
+    const status = error.message === "Unauthorized" ? 401 : 500;
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+  }
+}

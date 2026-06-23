@@ -1,0 +1,160 @@
+import { query } from "@/lib/db";
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+
+async function verifySchoolOwner(schoolId: string, userId: string) {
+  const check = await query(
+    "SELECT id FROM schools WHERE id = $1 AND user_id = $2",
+    [schoolId, userId]
+  );
+  if (check.rows.length === 0) {
+    throw new Error("Forbidden");
+  }
+}
+
+async function verifyScheduleOwner(scheduleId: string, userId: string) {
+  const check = await query(
+    `SELECT sc.id FROM schedules sc 
+     JOIN schools s ON sc.school_id = s.id 
+     WHERE sc.id = $1 AND s.user_id = $2`,
+    [scheduleId, userId]
+  );
+  if (check.rows.length === 0) {
+    throw new Error("Forbidden");
+  }
+}
+
+async function getUserId() {
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get("gurupro_session")?.value;
+  if (!sessionCookie) {
+    throw new Error("Unauthorized");
+  }
+  const session = JSON.parse(sessionCookie);
+  return session.id;
+}
+
+export async function GET(req: Request) {
+  try {
+    const userId = await getUserId();
+    const { searchParams } = new URL(req.url);
+    const type = searchParams.get("type");
+
+    if (type === "teacher") {
+      const schoolId = searchParams.get("school_id");
+      if (!schoolId) {
+        return NextResponse.json({ error: "school_id is required" }, { status: 400 });
+      }
+
+      await verifySchoolOwner(schoolId, userId);
+
+      const logs = await query(
+        "SELECT * FROM teacher_attendance WHERE user_id = $1 AND school_id = $2 ORDER BY tanggal DESC",
+        [userId, schoolId]
+      );
+      return NextResponse.json(logs.rows);
+    } 
+    
+    if (type === "student") {
+      const scheduleId = searchParams.get("schedule_id");
+      const tanggal = searchParams.get("tanggal");
+
+      if (!scheduleId || !tanggal) {
+        return NextResponse.json({ error: "schedule_id dan tanggal wajib diisi" }, { status: 400 });
+      }
+
+      await verifyScheduleOwner(scheduleId, userId);
+
+      const logs = await query(
+        `SELECT sa.*, s.nama_siswa, s.nomor_absen 
+         FROM student_attendance sa
+         JOIN students s ON sa.student_id = s.id
+         WHERE sa.schedule_id = $1 AND sa.tanggal = $2
+         ORDER BY s.nomor_absen ASC, s.nama_siswa ASC`,
+        [scheduleId, tanggal]
+      );
+      return NextResponse.json(logs.rows);
+    }
+
+    return NextResponse.json({ error: "Invalid type parameter" }, { status: 400 });
+  } catch (error: any) {
+    console.error("Attendance GET error:", error);
+    const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const userId = await getUserId();
+    const body = await req.json();
+    const { type } = body;
+
+    if (type === "teacher") {
+      const { school_id, tanggal, status, catatan } = body;
+
+      if (!school_id || !tanggal || !status) {
+        return NextResponse.json({ error: "school_id, tanggal, dan status wajib diisi" }, { status: 400 });
+      }
+
+      await verifySchoolOwner(school_id, userId);
+
+      // Delete existing record for user, school, date to prevent duplicates
+      await query(
+        "DELETE FROM teacher_attendance WHERE user_id = $1 AND school_id = $2 AND tanggal = $3",
+        [userId, school_id, tanggal]
+      );
+
+      // Insert new log
+      const res = await query(
+        `INSERT INTO teacher_attendance (user_id, school_id, tanggal, status, catatan)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [userId, school_id, tanggal, status, catatan || null]
+      );
+      return NextResponse.json(res.rows[0]);
+    }
+
+    if (type === "student") {
+      const { schedule_id, tanggal, records } = body;
+
+      if (!schedule_id || !tanggal || !Array.isArray(records)) {
+        return NextResponse.json({ error: "schedule_id, tanggal, dan records wajib diisi" }, { status: 400 });
+      }
+
+      await verifyScheduleOwner(schedule_id, userId);
+
+      await query("BEGIN");
+      try {
+        // Delete existing logs for this schedule on this date
+        await query(
+          "DELETE FROM student_attendance WHERE schedule_id = $1 AND tanggal = $2",
+          [schedule_id, tanggal]
+        );
+
+        // Batch insert student attendance
+        for (const rec of records) {
+          if (!rec.student_id || !rec.status) continue;
+          await query(
+            `INSERT INTO student_attendance (schedule_id, student_id, tanggal, status, catatan)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [schedule_id, rec.student_id, tanggal, rec.status, rec.catatan || null]
+          );
+        }
+
+        await query("COMMIT");
+      } catch (dbErr: any) {
+        await query("ROLLBACK");
+        throw dbErr;
+      }
+
+      return NextResponse.json({ success: true, message: "Absensi siswa berhasil disimpan" });
+    }
+
+    return NextResponse.json({ error: "Invalid type parameter" }, { status: 400 });
+  } catch (error: any) {
+    console.error("Attendance POST error:", error);
+    const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+  }
+}
