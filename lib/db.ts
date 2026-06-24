@@ -293,6 +293,8 @@ const initDb = async () => {
     `);
 
     // 20. Alter users table to support password and OTP auth
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(80)');
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique ON users (LOWER(username)) WHERE username IS NOT NULL');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_code VARCHAR(10)');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMP');
@@ -492,4 +494,4 @@ export const logAudit = async (userId: string | null, aksi: string, deskripsi: s
   }
 };
 
-initDb();
+initDb();

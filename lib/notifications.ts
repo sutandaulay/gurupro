@@ -167,22 +167,27 @@ export async function sendEventNotification(
       ...variables
     };
 
-    // Send Email if enabled
+    const jobs: Promise<any>[] = [];
+
     if (template.email_enabled && user.email) {
       const subject = interpolate(template.email_subject, mergeVars);
       const htmlBody = interpolate(template.email_body, mergeVars);
-      sendEmailNotification(user.email, subject, htmlBody).catch(err =>
-        console.error(`Deferred email send failed for event ${event}:`, err)
-      );
+      jobs.push(sendEmailNotification(user.email, subject, htmlBody));
     }
 
-    // Send WhatsApp if enabled
     if (template.wa_enabled && user.whatsapp) {
       const waMsg = interpolate(template.wa_message, mergeVars);
-      sendWhatsAppNotification(user.whatsapp, waMsg).catch(err =>
-        console.error(`Deferred WA send failed for event ${event}:`, err)
-      );
+      jobs.push(sendWhatsAppNotification(user.whatsapp, waMsg));
     }
+
+    const results = await Promise.allSettled(jobs);
+    results.forEach((result) => {
+      if (result.status === "rejected") {
+        console.error(`Notification send failed for event ${event}:`, result.reason);
+      }
+    });
+
+    return results;
   } catch (error) {
     console.error(`Error dispatching event notification ${event}:`, error);
   }

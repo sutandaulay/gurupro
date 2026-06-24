@@ -412,6 +412,7 @@ export default function Dashboard() {
 
   // Profil States
   const [profNama, setProfNama] = useState<string>("");
+  const [profUsername, setProfUsername] = useState<string>("");
   const [profSekolah, setProfSekolah] = useState<string>("");
   const [profBankName, setProfBankName] = useState<string>("");
   const [profBankAccountNumber, setProfBankAccountNumber] = useState<string>("");
@@ -2094,6 +2095,7 @@ export default function Dashboard() {
           const parsed = JSON.parse(cached);
           setCurrentUser(parsed);
           setProfNama(parsed.nama_lengkap || "");
+          setProfUsername(parsed.username || "");
           setProfSekolah(parsed.nama_sekolah || "");
           setProfBankName(parsed.bank_name || "");
           setProfBankAccountNumber(parsed.bank_account_number || "");
@@ -2108,6 +2110,7 @@ export default function Dashboard() {
         const data = await response.json();
         setCurrentUser(data);
         setProfNama(data.nama_lengkap || "");
+        setProfUsername(data.username || "");
         setProfSekolah(data.nama_sekolah || "");
         setProfBankName(data.bank_name || "");
         setProfBankAccountNumber(data.bank_account_number || "");
@@ -2393,7 +2396,7 @@ export default function Dashboard() {
   };
 
   const handleLogout = async () => {
-    document.cookie = "gurupro_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+    await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
   };
 
@@ -2676,8 +2679,9 @@ export default function Dashboard() {
       const response = await fetch("/api/user/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          nama_lengkap: profNama, 
+        body: JSON.stringify({
+          nama_lengkap: profNama,
+          username: profUsername,
           nama_sekolah: profSekolah,
           bank_name: profBankName,
           bank_account_number: profBankAccountNumber,
@@ -3732,6 +3736,20 @@ export default function Dashboard() {
         </div>
 
         <div className="bg-slate-50 border border-slate-200/60 rounded-3xl p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-bold text-slate-600 block mb-1">Username (untuk Login)</label>
+            <div className="relative">
+              <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">@</span>
+              <input
+                type="text"
+                value={profUsername}
+                onChange={(e) => setProfUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ""))}
+                placeholder="username"
+                className="w-full pl-7 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-500 focus:outline-none bg-white font-medium text-slate-800"
+              />
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1 font-medium">Huruf kecil, angka, titik, garis bawah, atau strip. Minimal 3 karakter. Kosongkan jika tidak ingin menggunakan username.</p>
+          </div>
           <div>
             <label className="text-xs font-bold text-slate-600 block mb-1">Nama Lengkap &amp; Gelar</label>
             <input 

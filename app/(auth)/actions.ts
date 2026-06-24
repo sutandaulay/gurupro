@@ -6,33 +6,45 @@ import { redirect } from 'next/navigation';
 import { hashPassword } from '@/lib/auth';
 import { sendEventNotification } from '@/lib/notifications';
 
+type AuthUser = {
+  id: string;
+  email: string;
+  username?: string | null;
+  whatsapp: string;
+  nama_lengkap?: string;
+  role?: string | null;
+  password_hash?: string | null;
+  is_active?: boolean | null;
+};
+
 export async function handleAuth(formData: FormData) {
   const authMode = formData.get('auth_mode')?.toString() || 'login';
-  const email = formData.get('email')?.toString().trim().toLowerCase();
+  const loginId = formData.get('email')?.toString().trim().toLowerCase();
   const whatsapp = formData.get('whatsapp')?.toString().trim();
   const namaLengkap = formData.get('nama_lengkap')?.toString().trim() || 'Guru Mandiri';
   const password = formData.get('password')?.toString();
   const checkoutPlan = formData.get('checkout_plan')?.toString();
 
-  if (!email || !password) {
-    return { error: 'Email dan Password wajib diisi!' };
+  if (!loginId || !password) {
+    return { error: 'Email/Username dan Password wajib diisi!' };
   }
 
+  let user: AuthUser | null = null;
+
   try {
-    let user;
 
     if (authMode === 'login') {
       // 1. LOGIN FLOW
       const userRes = await query(
-        'SELECT id, email, whatsapp, role, password_hash, is_active FROM users WHERE email = $1',
-        [email]
+        'SELECT id, email, username, whatsapp, role, password_hash, is_active FROM users WHERE LOWER(email) = $1 OR LOWER(username) = $1',
+        [loginId]
       );
 
       if (userRes.rows.length === 0) {
         return { error: 'Email atau Password salah!' };
       }
 
-      user = userRes.rows[0];
+      user = userRes.rows[0] as AuthUser;
 
       if (user.is_active === false) {
         return { error: 'Akun Anda dinonaktifkan oleh Admin. Silakan hubungi Customer Service.' };
@@ -51,6 +63,8 @@ export async function handleAuth(formData: FormData) {
         return { error: 'Email atau Password salah!' };
       }
     } else {
+      const email = loginId;
+
       // 2. REGISTER FLOW
       if (!whatsapp) {
         return { error: 'Nomor WhatsApp wajib diisi untuk pendaftaran!' };
@@ -64,6 +78,20 @@ export async function handleAuth(formData: FormData) {
 
       if (existingUser.rows.length > 0) {
         return { error: 'Email atau Nomor WhatsApp sudah terdaftar! Silakan Masuk.' };
+      }
+
+      const usernameRaw = formData.get('username')?.toString().trim().toLowerCase() || '';
+      if (usernameRaw) {
+        if (!/^[a-z0-9._-]{3,80}$/.test(usernameRaw)) {
+          return { error: 'Username hanya boleh huruf kecil, angka, titik, garis bawah, atau strip, minimal 3 karakter.' };
+        }
+        const usernameTaken = await query(
+          'SELECT id FROM users WHERE LOWER(username) = $1',
+          [usernameRaw]
+        );
+        if (usernameTaken.rows.length > 0) {
+          return { error: 'Username sudah digunakan. Silakan pilih yang lain.' };
+        }
       }
 
       const referralCode = formData.get("referral_code")?.toString().trim().toUpperCase() || null;
@@ -93,12 +121,12 @@ export async function handleAuth(formData: FormData) {
       const hashed = hashPassword(password);
 
       const newUser = await query(
-        `INSERT INTO users (email, whatsapp, nama_lengkap, token_limit, referral_code, referred_by, password_hash, subscription_start, subscription_end, status_langganan, is_active) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 'free', TRUE) 
+        `INSERT INTO users (username, email, whatsapp, nama_lengkap, token_limit, referral_code, referred_by, password_hash, subscription_start, subscription_end, status_langganan, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 'free', TRUE)
          RETURNING id, email, whatsapp, role`,
-        [email, whatsapp, namaLengkap, 5 + refereeTokenBonus, selfRefCode, referredByUserId, hashed]
+        [usernameRaw || null, email, whatsapp, namaLengkap, 5 + refereeTokenBonus, selfRefCode, referredByUserId, hashed]
       );
-      user = newUser.rows[0];
+      user = newUser.rows[0] as AuthUser;
 
       if (referredByUserId) {
         // Record referral
@@ -117,13 +145,14 @@ export async function handleAuth(formData: FormData) {
       );
 
       // Trigger Welcome Notifications (Welcome Email & WhatsApp)
-      await sendEventNotification("register", user, {
+      await sendEventNotification("register", { ...user, nama_lengkap: user.nama_lengkap || namaLengkap }, {
         referral_code: selfRefCode
       });
     }
 
     // Set Session Cookie
-    const sessionData = JSON.stringify({ id: user.id, role: user.role });
+    const sessionRole = user.role || 'guru';
+    const sessionData = JSON.stringify({ id: user.id, role: sessionRole });
     (await cookies()).set('gurupro_session', sessionData, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -131,13 +160,15 @@ export async function handleAuth(formData: FormData) {
       path: '/',
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Auth Error:', err);
     return { error: 'Terjadi masalah koneksi pada database lokal Anda.' };
   }
 
   // Redirect
-  if (checkoutPlan) {
+  if (user?.role === 'admin') {
+    redirect('/admin');
+  } else if (checkoutPlan) {
     redirect(`/dashboard?checkout=${checkoutPlan}`);
   } else {
     redirect('/dashboard');

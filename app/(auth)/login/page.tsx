@@ -3,21 +3,161 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { handleAuth } from '../actions';
+import { signIn } from 'next-auth/react';
+import {
+  IconMail,
+  IconLock,
+  IconEye,
+  IconEyeOff,
+  IconLoader2,
+  IconBolt,
+  IconShieldCheck,
+  IconSchool,
+  IconUser,
+  IconPhone,
+  IconIdBadge2,
+  IconKey,
+  IconArrowLeft,
+  IconArrowRight,
+  IconAlertCircle,
+  IconCircleCheck,
+} from '@tabler/icons-react';
+
+/* ============================ Sub-components ============================ */
+
+/** Official 4-color Google "G" logo */
+function GoogleIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+    </svg>
+  );
+}
+
+/** Simple SVG illustration of a teacher at a chalkboard */
+function TeacherIllustration() {
+  return (
+    <svg viewBox="0 0 400 280" className="w-full max-w-xs mx-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="200" cy="140" r="120" fill="rgba(255,255,255,0.05)" />
+      {/* chalkboard */}
+      <rect x="70" y="40" width="190" height="115" rx="10" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.25)" strokeWidth="2" />
+      <line x1="92" y1="68" x2="180" y2="68" stroke="rgba(196,181,253,0.7)" strokeWidth="4" strokeLinecap="round" />
+      <line x1="92" y1="88" x2="220" y2="88" stroke="rgba(196,181,253,0.5)" strokeWidth="4" strokeLinecap="round" />
+      <rect x="92" y="105" width="36" height="28" rx="4" fill="rgba(196,181,253,0.35)" />
+      <rect x="138" y="105" width="36" height="28" rx="4" fill="rgba(196,181,253,0.2)" />
+      {/* teacher */}
+      <circle cx="305" cy="120" r="20" fill="rgba(255,255,255,0.95)" />
+      <path d="M286 118 Q286 96 305 96 Q324 96 324 118 Q318 108 305 108 Q292 108 286 118 Z" fill="rgba(167,139,250,0.7)" />
+      <path d="M272 205 Q272 158 305 158 Q338 158 338 205 Z" fill="rgba(255,255,255,0.9)" />
+      <path d="M282 172 Q250 160 218 128" stroke="rgba(255,255,255,0.9)" strokeWidth="9" strokeLinecap="round" />
+      {/* desk */}
+      <rect x="250" y="210" width="120" height="7" rx="2" fill="rgba(255,255,255,0.3)" />
+      <line x1="262" y1="217" x2="262" y2="248" stroke="rgba(255,255,255,0.2)" strokeWidth="3" />
+      <line x1="358" y1="217" x2="358" y2="248" stroke="rgba(255,255,255,0.2)" strokeWidth="3" />
+      <rect x="290" y="196" width="28" height="14" rx="2" fill="rgba(196,181,253,0.5)" />
+      {/* accents */}
+      <circle cx="55" cy="210" r="5" fill="rgba(196,181,253,0.45)" />
+      <circle cx="365" cy="70" r="7" fill="rgba(196,181,253,0.35)" />
+      <circle cx="345" cy="255" r="4" fill="rgba(196,181,253,0.55)" />
+    </svg>
+  );
+}
+
+type TablerIcon = React.ComponentType<{ size?: number; stroke?: number; className?: string }>;
+
+function FeatureBullet({ icon: Icon, title, desc }: { icon: TablerIcon; title: string; desc: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex-shrink-0 w-10 h-10 rounded-button bg-white/10 border border-white/15 flex items-center justify-center">
+        <Icon size={20} stroke={1.75} className="text-violet-100" />
+      </div>
+      <div>
+        <p className="text-sm font-bold text-white">{title}</p>
+        <p className="text-xs text-violet-200/90 leading-relaxed">{desc}</p>
+      </div>
+    </div>
+  );
+}
+
+/** Reusable input with icon, error state, disabled state, and optional right element */
+function TextField({
+  label,
+  icon: Icon,
+  error,
+  disabled,
+  rightElement,
+  className = '',
+  inputClassName = '',
+  ...props
+}: {
+  label?: string;
+  icon?: TablerIcon;
+  error?: string | null;
+  disabled?: boolean;
+  rightElement?: React.ReactNode;
+  className?: string;
+  inputClassName?: string;
+} & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <div className={className}>
+      {label && (
+        <label className="block text-xs font-bold text-slate-700 mb-1.5">{label}</label>
+      )}
+      <div className="relative">
+        {Icon && (
+          <Icon
+            size={18}
+            stroke={1.75}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          />
+        )}
+        <input
+          disabled={disabled}
+          className={`w-full rounded-button border bg-white py-2.5 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition-all duration-150
+            ${Icon ? 'pl-10' : 'pl-3.5'} ${rightElement ? 'pr-11' : 'pr-3.5'}
+            ${error
+              ? 'border-error-400 focus:border-error-500 focus:ring-2 focus:ring-error-500/20'
+              : 'border-slate-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20'
+            }
+            ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''}
+            ${inputClassName}`}
+          {...props}
+        />
+        {rightElement && (
+          <div className="absolute right-1.5 top-1/2 -translate-y-1/2">{rightElement}</div>
+        )}
+      </div>
+      {error && <p className="mt-1 text-xs font-medium text-error-600">{error}</p>}
+    </div>
+  );
+}
+
+/* ============================ Main content ============================ */
 
 function LoginContent() {
   const searchParams = useSearchParams();
   const [isRegister, setIsRegister] = useState(false);
-  
+
   // Forgot password flow states: 'none' | 'request_otp' | 'verify_otp'
   const [forgotStep, setForgotStep] = useState<'none' | 'request_otp' | 'verify_otp'>('none');
   const [forgotEmail, setForgotEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  
+
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [refCode, setRefCode] = useState("");
+  const [refCode, setRefCode] = useState('');
+
+  // New UI states
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   // Auto-switch to register mode if URL has mode=register or ref code
   useEffect(() => {
@@ -34,13 +174,33 @@ function LoginContent() {
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setError(null);
     setSuccess(null);
+    setEmailError(null);
+    setPasswordError(null);
+
+    // Client-side validation (login mode only)
+    if (!isRegister) {
+      const form = e.currentTarget;
+      const emailVal = (form.elements.namedItem('email') as HTMLInputElement)?.value?.trim();
+      const passVal = (form.elements.namedItem('password') as HTMLInputElement)?.value?.trim();
+      let valid = true;
+      if (!emailVal) {
+        setEmailError('Email atau username wajib diisi.');
+        valid = false;
+      }
+      if (!passVal) {
+        setPasswordError('Password wajib diisi.');
+        valid = false;
+      }
+      if (!valid) return;
+    }
+
     setLoading(true);
-    
     const formData = new FormData(e.currentTarget);
     const result = await handleAuth(formData);
-    
+
     if (result?.error) {
       setError(result.error);
       setLoading(false);
@@ -51,7 +211,7 @@ function LoginContent() {
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!forgotEmail) {
-      setError("Email wajib diisi!");
+      setError('Email atau username wajib diisi!');
       return;
     }
     setError(null);
@@ -59,20 +219,20 @@ function LoginContent() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/otp/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: forgotEmail })
+      const res = await fetch('/api/auth/otp/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login: forgotEmail }),
       });
       const data = await res.json();
       if (res.ok) {
         setSuccess(data.message);
         setForgotStep('verify_otp');
       } else {
-        setError(data.error || "Gagal mengirim OTP.");
+        setError(data.error || 'Gagal mengirim OTP.');
       }
     } catch (err) {
-      setError("Masalah koneksi jaringan.");
+      setError('Masalah koneksi jaringan.');
     } finally {
       setLoading(false);
     }
@@ -82,7 +242,7 @@ function LoginContent() {
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otpCode || !newPassword) {
-      setError("Kode OTP dan Password Baru wajib diisi!");
+      setError('Kode OTP dan Password Baru wajib diisi!');
       return;
     }
     setError(null);
@@ -90,14 +250,14 @@ function LoginContent() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/otp/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/auth/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: forgotEmail,
           otp: otpCode,
-          password: newPassword
-        })
+          password: newPassword,
+        }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -106,245 +266,361 @@ function LoginContent() {
         setOtpCode('');
         setNewPassword('');
       } else {
-        setError(data.error || "Gagal verifikasi OTP.");
+        setError(data.error || 'Gagal verifikasi OTP.');
       }
     } catch (err) {
-      setError("Masalah koneksi jaringan.");
+      setError('Masalah koneksi jaringan.');
     } finally {
       setLoading(false);
     }
   };
 
+  // Password show/hide toggle button
+  const passwordToggle = (show: boolean, setShow: (v: boolean) => void) => (
+    <button
+      type="button"
+      onClick={() => setShow(!show)}
+      tabIndex={-1}
+      className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+      aria-label={show ? 'Sembunyikan password' : 'Tampilkan password'}
+    >
+      {show ? <IconEyeOff size={18} stroke={1.75} /> : <IconEye size={18} stroke={1.75} />}
+    </button>
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-tr from-indigo-50/50 via-slate-50 to-emerald-50/30 flex flex-col justify-center items-center p-4">
-      <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-xl shadow-slate-100/50 relative overflow-hidden transition-all duration-300">
-        
-        {/* Top visual accents */}
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 via-indigo-600 to-emerald-500" />
-        
-        {/* LOGO & HEADER */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-black tracking-tight text-indigo-600 font-sans">
-            Guru<span className="text-slate-800">PRO</span>
+    <div className="min-h-screen flex">
+      {/* ============ LEFT PANEL — desktop only ============ */}
+      <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-12 bg-gradient-to-br from-violet-700 via-violet-800 to-violet-950 overflow-hidden">
+        <div className="absolute top-0 right-0 w-72 h-72 bg-violet-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-violet-400/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Logo */}
+        <div className="relative z-10">
+          <h1 className="text-2xl font-black tracking-tight text-white">
+            Guru<span className="text-violet-200">PRO</span>
           </h1>
-          <p className="text-xs text-slate-500 mt-1.5 font-medium uppercase tracking-wide">
-            Asisten AI & Administrasi Guru Indonesia
+        </div>
+
+        {/* Illustration + tagline */}
+        <div className="relative z-10 flex flex-col items-center text-center">
+          <TeacherIllustration />
+          <h2 className="mt-6 text-2xl font-bold text-white leading-snug">
+            Platform Administrasi<br />Guru Berbasis AI
+          </h2>
+          <p className="mt-2 text-sm text-violet-200/90 max-w-xs">
+            Satu aplikasi untuk semua kebutuhan administrasi mengajar Anda.
           </p>
         </div>
 
-        {/* NOTIFICATION MESSAGES */}
-        {error && (
-          <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 text-rose-600 rounded-2xl text-xs font-semibold flex items-start gap-2 animate-fadeIn">
-            <span>⚠️</span>
-            <p className="leading-normal">{error}</p>
-          </div>
-        )}
-        {success && (
-          <div className="mb-5 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl text-xs font-semibold flex items-start gap-2 animate-fadeIn">
-            <span>✅</span>
-            <p className="leading-normal">{success}</p>
-          </div>
-        )}
+        {/* Feature bullets */}
+        <div className="relative z-10 space-y-4">
+          <FeatureBullet icon={IconBolt} title="Pembuat Soal AI" desc="Generate soal, RPP, dan materi dalam hitungan detik." />
+          <FeatureBullet icon={IconShieldCheck} title="Keamanan Terjamin" desc="Data sekolah dan siswa terlindungi enkripsi." />
+          <FeatureBullet icon={IconSchool} title="Administrasi Terpadu" desc="Jurnal, presensi, dan nilai dalam satu platform." />
+        </div>
+      </div>
 
-        {/* 1. FORGOT PASSWORD: REQUEST OTP SCREEN */}
-        {forgotStep === 'request_otp' && (
-          <form onSubmit={handleRequestOtp} className="flex flex-col gap-4">
-            <div className="mb-2">
-              <h2 className="text-base font-bold text-slate-800 font-sans">Lupa Password Akun</h2>
-              <p className="text-xs text-slate-500 mt-1">Masukkan alamat email terdaftar Anda. Kami akan mengirimkan 6-digit kode OTP untuk mereset password Anda.</p>
+      {/* ============ RIGHT PANEL — form ============ */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center bg-gray-50 px-6 py-12 sm:px-12">
+        <div className="w-full max-w-md">
+          {/* Mobile logo */}
+          <div className="lg:hidden mb-8 text-center">
+            <h1 className="text-2xl font-black tracking-tight text-violet-600">
+              Guru<span className="text-slate-800">PRO</span>
+            </h1>
+          </div>
+
+          {/* Title + subtitle */}
+          <div className="mb-6">
+            {forgotStep === 'none' && !isRegister && (
+              <>
+                <h2 className="text-2xl font-bold text-slate-900">Selamat Datang Kembali</h2>
+                <p className="text-sm text-slate-500 mt-1">Masuk ke akun GuruPRO Anda</p>
+              </>
+            )}
+            {forgotStep === 'none' && isRegister && (
+              <>
+                <h2 className="text-2xl font-bold text-slate-900">Daftar Akun Baru</h2>
+                <p className="text-sm text-slate-500 mt-1">Buat akun GuruPRO dalam hitungan menit</p>
+              </>
+            )}
+            {forgotStep === 'request_otp' && (
+              <>
+                <h2 className="text-2xl font-bold text-slate-900">Lupa Password</h2>
+                <p className="text-sm text-slate-500 mt-1">Kami akan mengirim kode OTP ke email Anda</p>
+              </>
+            )}
+            {forgotStep === 'verify_otp' && (
+              <>
+                <h2 className="text-2xl font-bold text-slate-900">Verifikasi OTP</h2>
+                <p className="text-sm text-slate-500 mt-1">Masukkan kode OTP dan password baru Anda</p>
+              </>
+            )}
+          </div>
+
+          {/* Error banner */}
+          {error && (
+            <div className="mb-5 p-3.5 bg-error-50 border border-error-200 text-error-700 rounded-button text-xs font-semibold flex items-start gap-2.5">
+              <IconAlertCircle size={18} stroke={1.75} className="flex-shrink-0 mt-px" />
+              <p className="leading-normal">{error}</p>
             </div>
-            
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">Alamat Email Terdaftar</label>
-              <input 
-                type="email" 
-                required 
+          )}
+          {/* Success banner */}
+          {success && (
+            <div className="mb-5 p-3.5 bg-success-50 border border-success-200 text-success-700 rounded-button text-xs font-semibold flex items-start gap-2.5">
+              <IconCircleCheck size={18} stroke={1.75} className="flex-shrink-0 mt-px" />
+              <p className="leading-normal">{success}</p>
+            </div>
+          )}
+
+          {/* ===== FORGOT: REQUEST OTP ===== */}
+          {forgotStep === 'request_otp' && (
+            <form onSubmit={handleRequestOtp} className="flex flex-col gap-4">
+              <TextField
+                label="Email / Username Terdaftar"
+                icon={IconMail}
+                type="text"
+                required
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
-                placeholder="nama@email.com" 
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 font-medium text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-none transition duration-200" 
+                placeholder="nama@email.com atau username"
+                disabled={loading}
               />
-            </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm rounded-button shadow-md shadow-violet-200 transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {loading ? <IconLoader2 size={18} stroke={2} className="animate-spin" /> : 'Kirim Kode OTP'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setForgotStep('none'); setError(null); setSuccess(null); }}
+                className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer mt-1"
+              >
+                <IconArrowLeft size={14} stroke={2} /> Kembali ke Halaman Masuk
+              </button>
+            </form>
+          )}
 
-            <button 
-              type="submit" 
-              disabled={loading} 
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-100 transition cursor-pointer"
-            >
-              {loading ? "Memproses..." : "Kirim Kode OTP"}
-            </button>
-
-            <button 
-              type="button" 
-              onClick={() => { setForgotStep('none'); setError(null); }}
-              className="text-xs font-bold text-indigo-600 hover:underline text-center mt-2 cursor-pointer"
-            >
-              Kembali ke Halaman Masuk
-            </button>
-          </form>
-        )}
-
-        {/* 2. FORGOT PASSWORD: VERIFY OTP SCREEN */}
-        {forgotStep === 'verify_otp' && (
-          <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
-            <div className="mb-2">
-              <h2 className="text-base font-bold text-slate-800 font-sans">Verifikasi Kode OTP</h2>
-              <p className="text-xs text-slate-500 mt-1">Masukkan kode OTP 6-digit yang kami kirimkan ke email/WA Anda, beserta kata sandi baru Anda.</p>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">Kode OTP (6 Digit)</label>
-              <input 
-                type="text" 
-                required 
+          {/* ===== FORGOT: VERIFY OTP ===== */}
+          {forgotStep === 'verify_otp' && (
+            <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
+              <TextField
+                label="Kode OTP (6 Digit)"
+                type="text"
+                required
                 maxLength={6}
                 value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
-                placeholder="Contoh: 123456" 
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 text-center font-bold tracking-widest text-indigo-600 focus:bg-white focus:border-indigo-500 focus:outline-none transition duration-200" 
+                onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="123456"
+                disabled={loading}
+                inputClassName="text-center tracking-[0.3em] font-bold"
               />
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">Kata Sandi Baru</label>
-              <input 
-                type="password" 
-                required 
+              <TextField
+                label="Kata Sandi Baru"
+                icon={IconLock}
+                type={showNewPassword ? 'text' : 'password'}
+                required
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Minimal 6 karakter" 
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 font-medium text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-none transition duration-200" 
+                placeholder="Minimal 6 karakter"
+                disabled={loading}
+                rightElement={passwordToggle(showNewPassword, setShowNewPassword)}
               />
-            </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-success-600 hover:bg-success-700 text-white font-bold text-sm rounded-button shadow-md shadow-success-200 transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {loading ? <IconLoader2 size={18} stroke={2} className="animate-spin" /> : 'Perbarui Kata Sandi'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setForgotStep('request_otp'); setError(null); }}
+                className="flex items-center justify-center gap-1.5 text-xs font-bold text-violet-600 hover:text-violet-700 transition-colors cursor-pointer mt-1"
+              >
+                <IconArrowLeft size={14} stroke={2} /> Kirim Ulang Kode OTP
+              </button>
+            </form>
+          )}
 
-            <button 
-              type="submit" 
-              disabled={loading} 
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-100 transition cursor-pointer"
-            >
-              {loading ? "Memverifikasi..." : "Perbarui Kata Sandi"}
-            </button>
-
-            <button 
-              type="button" 
-              onClick={() => { setForgotStep('request_otp'); setError(null); }}
-              className="text-xs font-bold text-indigo-600 hover:underline text-center mt-2 cursor-pointer"
-            >
-              Kirim Ulang Kode OTP
-            </button>
-          </form>
-        )}
-
-        {/* 3. LOGIN & REGISTER SCREEN */}
-        {forgotStep === 'none' && (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <input type="hidden" name="auth_mode" value={isRegister ? "register" : "login"} />
-            
-            {searchParams.get('checkout') && (
-              <input type="hidden" name="checkout_plan" value={searchParams.get('checkout') || ""} />
-            )}
-
-            {isRegister && (
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">Nama Lengkap &amp; Gelar</label>
-                <input 
-                  type="text" 
-                  name="nama_lengkap" 
-                  required 
-                  placeholder="Contoh: Andi Wijaya, S.Pd." 
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 font-medium text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-none transition duration-200" 
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">Alamat Email Aktif</label>
-              <input 
-                type="email" 
-                name="email" 
-                required 
-                placeholder="nama@email.com" 
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 font-medium text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-none transition duration-200" 
-              />
-            </div>
-
-            {isRegister && (
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">No. WhatsApp Aktif</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-2.5 text-xs text-slate-400 font-bold">+62</span>
-                  <input 
-                    type="tel" 
-                    name="whatsapp" 
-                    required 
-                    placeholder="81234567xx" 
-                    className="w-full pl-14 pr-4 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 font-medium text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-none transition duration-200" 
-                  />
-                </div>
-                <p className="text-[9px] text-slate-400 mt-1 font-medium">Digunakan untuk menerima notifikasi, OTP, dan info pencairan.</p>
-              </div>
-            )}
-
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block">Kata Sandi (Password)</label>
-                {!isRegister && (
-                  <button 
-                    type="button" 
-                    onClick={() => { setForgotStep('request_otp'); setError(null); }}
-                    className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
-                  >
-                    Lupa Sandi?
-                  </button>
+          {/* ===== LOGIN / REGISTER ===== */}
+          {forgotStep === 'none' && (
+            <>
+              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <input type="hidden" name="auth_mode" value={isRegister ? 'register' : 'login'} />
+                {searchParams.get('checkout') && (
+                  <input type="hidden" name="checkout_plan" value={searchParams.get('checkout') || ''} />
                 )}
-              </div>
-              <input 
-                type="password" 
-                name="password" 
-                required 
-                placeholder="••••••••" 
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 font-medium text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-none transition duration-200" 
-              />
-            </div>
 
-            {isRegister && (
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">Kode Referral (Opsional)</label>
-                <input
-                  type="text"
-                  name="referral_code"
-                  value={refCode}
-                  onChange={(e) => setRefCode(e.target.value.toUpperCase())}
-                  placeholder="Contoh: GPRO-ABCDE"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs uppercase bg-slate-50 font-bold text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-none transition duration-200"
+                {isRegister && (
+                  <TextField
+                    label="Nama Lengkap & Gelar"
+                    icon={IconUser}
+                    type="text"
+                    name="nama_lengkap"
+                    required
+                    placeholder="Contoh: Andi Wijaya, S.Pd."
+                    disabled={loading}
+                  />
+                )}
+
+                <TextField
+                  label={isRegister ? 'Alamat Email Aktif' : 'Email / Username'}
+                  icon={IconMail}
+                  type={isRegister ? 'email' : 'text'}
+                  name="email"
+                  required
+                  placeholder={isRegister ? 'nama@email.com' : 'nama@email.com atau username'}
+                  error={emailError}
+                  disabled={loading}
                 />
-                <p className="text-[9px] text-slate-400 mt-1 font-medium">Masukkan kode milik teman Anda untuk mendapatkan bonus tambahan +10 Token kuota.</p>
-              </div>
-            )}
 
-            <button 
-              type="submit" 
-              disabled={loading} 
-              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-100 transition mt-2 cursor-pointer"
-            >
-              {loading ? "Memproses..." : (isRegister ? "Daftar Akun GuruPRO" : "Masuk ke Dashboard")}
-            </button>
-          </form>
-        )}
+                {isRegister && (
+                  <TextField
+                    label="Username (Opsional)"
+                    icon={IconIdBadge2}
+                    type="text"
+                    name="username"
+                    placeholder="username unik untuk login"
+                    disabled={loading}
+                  />
+                )}
 
-        {/* TOGGLE PERALIHAN LOGIN / REGISTER */}
-        {forgotStep === 'none' && (
-          <div className="mt-8 text-center text-xs border-t border-slate-100 pt-6">
-            <button 
-              type="button" 
-              onClick={() => { setIsRegister(!isRegister); setError(null); setSuccess(null); }} 
-              className="text-indigo-600 font-bold hover:underline cursor-pointer"
-            >
-              {isRegister ? "Sudah punya akun? Masuk Sekarang" : "Belum punya akun? Daftar Sekarang"}
-            </button>
-          </div>
-        )}
+                {isRegister && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">No. WhatsApp Aktif</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-bold pointer-events-none">+62</span>
+                      <input
+                        type="tel"
+                        name="whatsapp"
+                        required
+                        placeholder="81234567xx"
+                        disabled={loading}
+                        className="w-full rounded-button border border-slate-200 bg-white py-2.5 pl-12 pr-3.5 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition-all duration-150 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                    <p className="mt-1 text-[10px] text-slate-400 font-medium">Untuk notifikasi, OTP, dan info pencairan.</p>
+                  </div>
+                )}
 
+                {/* Password */}
+                <TextField
+                  label="Kata Sandi"
+                  icon={IconLock}
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  required
+                  placeholder="••••••••"
+                  error={passwordError}
+                  disabled={loading}
+                  rightElement={passwordToggle(showPassword, setShowPassword)}
+                />
+
+                {isRegister && (
+                  <TextField
+                    label="Kode Referral (Opsional)"
+                    icon={IconKey}
+                    type="text"
+                    name="referral_code"
+                    value={refCode}
+                    onChange={(e) => setRefCode(e.target.value.toUpperCase())}
+                    placeholder="GPRO-ABCDE"
+                    disabled={loading}
+                    inputClassName="uppercase font-bold"
+                  />
+                )}
+
+                {/* Remember me + Forgot password (login only) */}
+                {!isRegister && (
+                  <div className="flex items-center justify-between -mt-1">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 cursor-pointer"
+                      />
+                      <span className="text-xs font-medium text-slate-600">Ingat saya</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { setForgotStep('request_otp'); setError(null); setSuccess(null); }}
+                      className="text-xs font-bold text-violet-600 hover:text-violet-700 transition-colors cursor-pointer"
+                    >
+                      Lupa password?
+                    </button>
+                  </div>
+                )}
+
+                {/* Submit button */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm rounded-button shadow-md shadow-violet-200 transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer mt-1"
+                >
+                  {loading ? (
+                    <IconLoader2 size={18} stroke={2} className="animate-spin" />
+                  ) : (
+                    <>
+                      <span>{isRegister ? 'Daftar Akun GuruPRO' : 'Masuk'}</span>
+                      {!isRegister && <IconArrowRight size={18} stroke={2} />}
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Divider + Google button (login only) */}
+              {!isRegister && (
+                <>
+                  <div className="flex items-center gap-3 my-6">
+                    <div className="flex-1 h-px bg-slate-200" />
+                    <span className="text-xs font-medium text-slate-400">atau masuk dengan</span>
+                    <div className="flex-1 h-px bg-slate-200" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+                    className="w-full flex items-center justify-center gap-2.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-sm font-semibold text-slate-700 rounded-button transition-colors duration-150 cursor-pointer"
+                  >
+                    <GoogleIcon size={18} />
+                    <span>Masuk dengan Google</span>
+                  </button>
+                </>
+              )}
+
+              {/* Toggle login / register */}
+              <p className="mt-6 text-center text-sm text-slate-500">
+                {isRegister ? (
+                  <>
+                    Sudah punya akun?{' '}
+                    <button
+                      type="button"
+                      onClick={() => { setIsRegister(false); setError(null); setSuccess(null); setEmailError(null); setPasswordError(null); }}
+                      className="font-bold text-violet-600 hover:text-violet-700 transition-colors cursor-pointer"
+                    >
+                      Masuk sekarang
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    Belum punya akun?{' '}
+                    <button
+                      type="button"
+                      onClick={() => { setIsRegister(true); setError(null); setSuccess(null); setEmailError(null); setPasswordError(null); }}
+                      className="font-bold text-violet-600 hover:text-violet-700 transition-colors cursor-pointer"
+                    >
+                      Daftar sekarang
+                    </button>
+                  </>
+                )}
+              </p>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -352,7 +628,13 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center text-sm font-semibold text-slate-500">Memuat Halaman...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <IconLoader2 size={32} stroke={2} className="animate-spin text-violet-500" />
+        </div>
+      }
+    >
       <LoginContent />
     </Suspense>
   );

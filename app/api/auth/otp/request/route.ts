@@ -4,18 +4,19 @@ import { sendEventNotification } from "@/lib/notifications";
 
 export async function POST(req: Request) {
   try {
-    const { email } = await req.json();
+    const { email, login } = await req.json();
+    const loginId = (login || email || "").toString();
 
-    if (!email) {
-      return NextResponse.json({ error: "Email wajib diisi!" }, { status: 400 });
+    if (!loginId) {
+      return NextResponse.json({ error: "Email atau username wajib diisi!" }, { status: 400 });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanLogin = loginId.trim().toLowerCase();
 
     // Find user
     const userRes = await query(
-      "SELECT id, email, whatsapp, nama_lengkap FROM users WHERE email = $1",
-      [cleanEmail]
+      "SELECT id, email, whatsapp, nama_lengkap FROM users WHERE LOWER(email) = $1 OR LOWER(username) = $1",
+      [cleanLogin]
     );
 
     if (userRes.rows.length === 0) {
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
       success: true, 
-      message: "Kode OTP berhasil dikirim ke Email & WhatsApp Anda!" 
+      message: "Kode OTP berhasil dikirim ke email akun Anda!" 
     });
   } catch (error: any) {
     console.error("OTP request error:", error);

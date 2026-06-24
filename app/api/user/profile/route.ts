@@ -16,7 +16,7 @@ export async function GET() {
     const userId = session.id;
 
     const userRes = await query(
-      `SELECT id, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, 
+      `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, 
               bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at 
        FROM users WHERE id = $1`,
       [userId]
@@ -58,28 +58,58 @@ export async function POST(req: Request) {
     const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
-    const { nama_lengkap, nama_sekolah, role, bank_name, bank_account_number, bank_account_name } = await req.json();
+    const body = await req.json();
+    const { nama_lengkap, nama_sekolah, username, bank_name, bank_account_number, bank_account_name } = body;
 
     if (!nama_lengkap) {
       return NextResponse.json({ error: "Nama lengkap wajib diisi." }, { status: 400 });
     }
 
-    const targetRole = role || session.role || 'guru';
+    const sets: string[] = ["nama_lengkap = $1", "nama_sekolah = $2"];
+    const values: (string | null)[] = [nama_lengkap.trim(), nama_sekolah ? nama_sekolah.trim() : null];
+    let idx = 3;
 
+    if (username !== undefined) {
+      const cleanUsername = username && username.toString().trim() !== "" ? username.toString().trim().toLowerCase() : null;
+      if (cleanUsername) {
+        if (!/^[a-z0-9._-]{3,80}$/.test(cleanUsername)) {
+          return NextResponse.json({ error: "Username hanya boleh huruf kecil, angka, titik, garis bawah, atau strip, minimal 3 karakter." }, { status: 400 });
+        }
+        const existingUsername = await query(
+          "SELECT id FROM users WHERE LOWER(username) = $1 AND id <> $2",
+          [cleanUsername, userId]
+        );
+        if (existingUsername.rows.length > 0) {
+          return NextResponse.json({ error: "Username sudah digunakan pengguna lain." }, { status: 409 });
+        }
+      }
+      sets.push(`username = $${idx}`);
+      values.push(cleanUsername);
+      idx++;
+    }
+
+    if (bank_name !== undefined) {
+      sets.push(`bank_name = $${idx}`);
+      values.push(bank_name ? bank_name.trim() : null);
+      idx++;
+    }
+    if (bank_account_number !== undefined) {
+      sets.push(`bank_account_number = $${idx}`);
+      values.push(bank_account_number ? bank_account_number.trim() : null);
+      idx++;
+    }
+    if (bank_account_name !== undefined) {
+      sets.push(`bank_account_name = $${idx}`);
+      values.push(bank_account_name ? bank_account_name.trim() : null);
+      idx++;
+    }
+
+    const targetRole = session.role || 'guru';
+
+    values.push(userId);
     await query(
-      `UPDATE users 
-       SET nama_lengkap = $1, nama_sekolah = $2, role = $3, 
-           bank_name = $4, bank_account_number = $5, bank_account_name = $6
-       WHERE id = $7`,
-      [
-        nama_lengkap.trim(), 
-        nama_sekolah ? nama_sekolah.trim() : null, 
-        targetRole, 
-        bank_name ? bank_name.trim() : null,
-        bank_account_number ? bank_account_number.trim() : null,
-        bank_account_name ? bank_account_name.trim() : null,
-        userId
-      ]
+      `UPDATE users SET ${sets.join(", ")} WHERE id = $${idx}`,
+      values
     );
 
     // Update session cookie with the new role
@@ -92,7 +122,7 @@ export async function POST(req: Request) {
     });
 
     const updatedUser = await query(
-      `SELECT id, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, 
+      `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, 
               bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at 
        FROM users WHERE id = $1`,
       [userId]

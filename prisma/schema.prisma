@@ -280,6 +280,7 @@ model transactions {
 
 model users {
   id                                                     String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  username                                               String?                @unique @db.VarChar(80)
   email                                                  String                 @unique @db.VarChar(255)
   whatsapp                                               String                 @unique @db.VarChar(20)
   nama_lengkap                                           String                 @db.VarChar(255)

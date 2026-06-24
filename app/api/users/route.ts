@@ -11,7 +11,7 @@ export async function GET() {
     }
 
     const users = await query(
-      "SELECT id, email, nama_lengkap, role FROM users ORDER BY nama_lengkap ASC"
+      "SELECT id, username, email, nama_lengkap, role FROM users ORDER BY nama_lengkap ASC"
     );
     return NextResponse.json(users.rows);
   } catch (error: any) {

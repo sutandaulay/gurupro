@@ -68,8 +68,9 @@ export default function AdminPage() {
 
   // Edit User States
   const [editingUserId, setEditingUserId] = useState<any>(null);
+  const [editUsername, setEditUsername] = useState<string>("");
   const [editTokenLimit, setEditTokenLimit] = useState<number>(0);
-  const [editRole, setEditRole] = useState<string>("user");
+  const [editRole, setEditRole] = useState<string>("guru");
   const [editSubStart, setEditSubStart] = useState<string>("");
   const [editSubEnd, setEditSubEnd] = useState<string>("");
   const [editSubStatus, setEditSubStatus] = useState<string>("free");
@@ -161,10 +162,16 @@ export default function AdminPage() {
     fetchTransactions(txSearch);
   };
 
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  };
+
   const startEditUser = (user: any) => {
     setEditingUserId(user.id);
+    setEditUsername(user.username || "");
     setEditTokenLimit(user.token_limit || 0);
-    setEditRole(user.role || "user");
+    setEditRole(user.role || "guru");
     setEditSubStatus(user.status_langganan || "free");
     setEditIsActive(user.is_active !== false);
     setEditNewPassword("");
@@ -192,6 +199,7 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           userId, 
+          username: editUsername || null,
           token_limit: editTokenLimit, 
           role: editRole,
           subscription_start: editSubStart || null,
@@ -667,6 +675,13 @@ export default function AdminPage() {
           >
             Buka Dashboard Guru
           </a>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="px-4 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 text-xs font-bold rounded-2xl transition cursor-pointer"
+          >
+            Keluar
+          </button>
         </div>
       </header>
 
@@ -767,7 +782,7 @@ export default function AdminPage() {
                 type="text"
                 value={userSearch}
                 onChange={(e) => setUserSearch(e.target.value)}
-                placeholder="Cari email, nama, whatsapp..."
+                placeholder="Cari username, email, nama, whatsapp..."
                 className="px-3.5 py-1.5 border border-slate-200 rounded-xl text-xs outline-none bg-white font-medium text-slate-800 w-full sm:w-60"
               />
               <button
@@ -813,7 +828,7 @@ export default function AdminPage() {
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
                     <tr>
                       <th className="px-5 py-3.5">Nama & Sekolah</th>
-                      <th className="px-5 py-3.5">Email & WA</th>
+                      <th className="px-5 py-3.5">Username, Email & WA</th>
                       <th className="px-5 py-3.5 text-center">Langganan</th>
                       <th className="px-5 py-3.5">Masa Berlangganan</th>
                       <th className="px-5 py-3.5 text-center">Peran</th>
@@ -831,7 +846,24 @@ export default function AdminPage() {
                             <p className="text-[10px] text-slate-400 font-semibold">{user.nama_sekolah || "(Belum Mengisi Sekolah)"}</p>
                           </td>
                           <td className="px-5 py-4">
-                            <p className="text-slate-700 font-semibold">{user.email}</p>
+                            {isEditing ? (
+                              <div className="flex flex-col gap-1 w-44">
+                                <label className="text-[9px] text-slate-400 font-bold uppercase">Username</label>
+                                <input
+                                  type="text"
+                                  value={editUsername}
+                                  onChange={(e) => setEditUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ""))}
+                                  placeholder="username"
+                                  className="px-2 py-0.5 border border-slate-200 rounded text-[10px] font-bold outline-none bg-white text-slate-800"
+                                />
+                                <p className="text-[10px] text-slate-500 font-semibold">{user.email}</p>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-slate-800 font-bold">@{user.username || "-"}</p>
+                                <p className="text-slate-700 font-semibold">{user.email}</p>
+                              </>
+                            )}
                             <p className="text-[10px] text-slate-400 font-mono">+{user.whatsapp}</p>
                           </td>
                           <td className="px-5 py-4 text-center">
@@ -914,7 +946,10 @@ export default function AdminPage() {
                                   onChange={(e) => setEditRole(e.target.value)}
                                   className="px-1.5 py-0.5 border border-slate-200 bg-white rounded text-[10px] font-bold outline-none"
                                 >
-                                  <option value="user">User</option>
+                                  <option value="guru">Guru</option>
+                                  <option value="operator">Operator</option>
+                                  <option value="kepala_sekolah">Kepala Sekolah</option>
+                                  <option value="pengawas">Pengawas</option>
                                   <option value="admin">Admin</option>
                                 </select>
                                 <label className="text-[9px] text-slate-400 font-bold uppercase text-left mt-1">Status</label>
@@ -931,7 +966,7 @@ export default function AdminPage() {
                               <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
                                 user.role === 'admin' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
                               }`}>
-                                {user.role === 'admin' ? 'ADMIN' : 'USER'}
+                                {(user.role || 'guru').replace("_", " ").toUpperCase()}
                               </span>
                             )}
                           </td>
@@ -947,7 +982,7 @@ export default function AdminPage() {
                                 />
                                 <label className="text-[9px] text-slate-400 font-bold uppercase mt-1">Reset Sandi</label>
                                 <input
-                                  type="text"
+                                  type="password"
                                   placeholder="Sandi baru"
                                   value={editNewPassword}
                                   onChange={(e) => setEditNewPassword(e.target.value)}

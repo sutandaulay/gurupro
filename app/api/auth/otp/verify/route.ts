@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     const userRes = await query(
       `SELECT id, otp_code, otp_expires_at 
        FROM users 
-       WHERE email = $1`,
+       WHERE LOWER(email) = $1 OR LOWER(username) = $1`,
       [cleanEmail]
     );
 

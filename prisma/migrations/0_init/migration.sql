@@ -1,4 +1,4 @@
-﻿-- CreateSchema
+-- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 
 -- CreateTable
@@ -286,6 +286,7 @@ CREATE TABLE "transactions" (
 -- CreateTable
 CREATE TABLE "users" (
     "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "username" VARCHAR(80),
     "email" VARCHAR(255) NOT NULL,
     "whatsapp" VARCHAR(20) NOT NULL,
     "nama_lengkap" VARCHAR(255) NOT NULL,
@@ -312,6 +313,7 @@ CREATE TABLE "users" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "transactions_external_id_key" ON "transactions"("external_id");
+CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
