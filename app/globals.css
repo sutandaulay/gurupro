@@ -1,45 +1,60 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-
-  /* ===== Primary palette ===== */
-  --color-primary: #7c3aed;
-  --color-primary-light: #ede9fe;
-  --color-primary-dark: #5b21b6;
-
-  /* ===== Radius ===== */
-  --radius-card: 12px;
-  --radius-button: 8px;
-
-  /* ===== Transition ===== */
-  --transition-base: 150ms ease;
-}
+/* ─── GuruPRO Design System ─── */
+/* Tailwind v4 CSS-based configuration */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: "Plus Jakarta Sans", "Inter", var(--font-geist-sans), sans-serif;
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), Inter, system-ui, sans-serif;
+  --font-display: var(--font-display), "Plus Jakarta Sans", var(--font-inter),
+    Inter, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "Cascadia Code", monospace;
+
+  --color-background: #ffffff;
+  --color-foreground: #0f172a;
+  --color-muted: #64748b;
 }
 
 @theme {
-  /* ===== Brand: Violet (primary #7C3AED = 600) ===== */
-  --color-violet-50: #f5f3ff;
-  --color-violet-100: #ede9fe;
-  --color-violet-200: #ddd6fe;
-  --color-violet-300: #c4b5fd;
-  --color-violet-400: #a78bfa;
-  --color-violet-500: #8b5cf6;
-  --color-violet-600: #7c3aed;
-  --color-violet-700: #6d28d9;
-  --color-violet-800: #5b21b6;
-  --color-violet-900: #4c1d95;
-  --color-violet-950: #2e1065;
+  /* ── Primary: Violet (#7C3AED) ── */
+  --color-primary-50: #f5f3ff;
+  --color-primary-100: #ede9fe;
+  --color-primary-200: #ddd6fe;
+  --color-primary-300: #c4b5fd;
+  --color-primary-400: #a78bfa;
+  --color-primary-500: #8b5cf6;
+  --color-primary-600: #7c3aed;
+  --color-primary-700: #6d28d9;
+  --color-primary-800: #5b21b6;
+  --color-primary-900: #4c1d95;
+  --color-primary-950: #2e1065;
 
-  /* ===== Semantic: Success (green, #22c55e = 500) ===== */
+  /* ── Secondary: Amber (#F59E0B) ── */
+  --color-secondary-50: #fffbeb;
+  --color-secondary-100: #fef3c7;
+  --color-secondary-200: #fde68a;
+  --color-secondary-300: #fcd34d;
+  --color-secondary-400: #fbbf24;
+  --color-secondary-500: #f59e0b;
+  --color-secondary-600: #d97706;
+  --color-secondary-700: #b45309;
+  --color-secondary-800: #92400e;
+  --color-secondary-900: #78350f;
+  --color-secondary-950: #451a03;
+
+  /* ── Neutral: Slate ── */
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #f1f5f9;
+  --color-neutral-200: #e2e8f0;
+  --color-neutral-300: #cbd5e1;
+  --color-neutral-400: #94a3b8;
+  --color-neutral-500: #64748b;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1e293b;
+  --color-neutral-900: #0f172a;
+  --color-neutral-950: #020617;
+
+  /* ── Semantic ── */
   --color-success-50: #f0fdf4;
   --color-success-100: #dcfce7;
   --color-success-200: #bbf7d0;
@@ -52,7 +67,6 @@
   --color-success-900: #14532d;
   --color-success-950: #052e16;
 
-  /* ===== Semantic: Warning (amber, #f59e0b = 500) ===== */
   --color-warning-50: #fffbeb;
   --color-warning-100: #fef3c7;
   --color-warning-200: #fde68a;
@@ -65,7 +79,6 @@
   --color-warning-900: #78350f;
   --color-warning-950: #451a03;
 
-  /* ===== Semantic: Error (red, #ef4444 = 500) ===== */
   --color-error-50: #fef2f2;
   --color-error-100: #fee2e2;
   --color-error-200: #fecaca;
@@ -78,7 +91,6 @@
   --color-error-900: #7f1d1d;
   --color-error-950: #450a0a;
 
-  /* ===== Semantic: Info (blue, #3b82f6 = 500) ===== */
   --color-info-50: #eff6ff;
   --color-info-100: #dbeafe;
   --color-info-200: #bfdbfe;
@@ -91,41 +103,36 @@
   --color-info-900: #1e3a8a;
   --color-info-950: #172554;
 
-  /* ===== Border Radius ===== */
-  --radius-card: 12px;
-  --radius-button: 8px;
-  --radius-pill: 9999px;
+  /* ── Spacing & Radius ── */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 24px;
 
-  /* ===== Box Shadow ===== */
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.10);
+  /* ── Shadows ── */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.1);
   --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.15);
+  --shadow-dropdown: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-/* ===== Base styles ===== */
+/* ── Base Styles ── */
 * {
   box-sizing: border-box;
 }
 
 body {
-  background-color: #f9fafb;
-  color: var(--foreground);
-  font-family: "Plus Jakarta Sans", "Inter", var(--font-geist-sans), Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ===== Custom scrollbar (thin, light violet) ===== */
+/* ── Custom Scrollbar ── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #c4b5fd transparent;
+  scrollbar-color: var(--color-primary-300) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -138,37 +145,193 @@ body {
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: #c4b5fd;
+  background-color: var(--color-primary-300);
   border-radius: 9999px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background-color: #a78bfa;
+  background-color: var(--color-primary-400);
 }
 
-/* ===== Component utilities ===== */
-@layer components {
-  .card {
-    @apply bg-white shadow-card rounded-card p-6;
-  }
+/* ── Form fields ── */
+@utility input-field {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-xl);
+  font-size: 0.75rem;
+  outline: none;
+  background-color: white;
+  font-weight: 600;
+  color: var(--color-neutral-800);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input-field:focus {
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 1px var(--color-primary-500);
+}
 
-  .btn-primary {
-    @apply inline-flex items-center justify-center bg-violet-600 text-white rounded-button px-4 py-2 font-medium transition-colors duration-150 ease-in-out hover:bg-violet-700;
-  }
+/* ── Utility Classes ── */
+@utility heading {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
 
-  .btn-secondary {
-    @apply inline-flex items-center justify-center border border-violet-600 text-violet-600 rounded-button px-4 py-2 font-medium transition-colors duration-150 ease-in-out hover:bg-violet-50;
-  }
+@utility text-balance {
+  text-wrap: balance;
+}
 
-  .btn-ghost {
-    @apply inline-flex items-center justify-center text-gray-600 rounded-button px-4 py-2 font-medium transition-colors duration-150 ease-in-out hover:bg-gray-100;
-  }
+@utility container-page {
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
 
-  .input-base {
-    @apply w-full border border-gray-200 rounded-md px-3 py-2 outline-none transition-colors duration-150 focus:ring-2 focus:ring-violet-500 focus:border-violet-500;
-  }
+/* ── Smooth Scroll ── */
+html {
+  scroll-behavior: smooth;
+}
 
-  .badge {
-    @apply inline-flex items-center rounded-pill text-xs font-medium px-2 py-0.5;
+/* ── Animations ── */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
   }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@utility animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@utility animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* ── Shimmer / Pulse for Skeleton ── */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@utility animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-gray-200) 25%,
+    var(--color-gray-100) 50%,
+    var(--color-gray-200) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* ── Blog Article Content ── */
+@utility blog-content {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: var(--color-neutral-700);
+}
+.blog-content h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--color-neutral-900);
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.02em;
+}
+.blog-content h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.blog-content p {
+  margin-bottom: 1rem;
+}
+.blog-content ul, .blog-content ol {
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+.blog-content li {
+  margin-bottom: 0.25rem;
+}
+.blog-content a {
+  color: var(--color-primary-600);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.blog-content a:hover {
+  color: var(--color-primary-700);
+}
+.blog-content blockquote {
+  border-left: 4px solid var(--color-primary-300);
+  padding-left: 1rem;
+  margin: 1.5rem 0;
+  color: var(--color-neutral-500);
+  font-style: italic;
+}
+.blog-content img {
+  border-radius: var(--radius-xl);
+  margin: 1.5rem 0;
+  max-width: 100%;
+  height: auto;
+}
+.blog-content pre {
+  background: var(--color-neutral-900);
+  color: var(--color-neutral-100);
+  padding: 1rem;
+  border-radius: var(--radius-xl);
+  overflow-x: auto;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  margin: 1.5rem 0;
+}
+.blog-content code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  background: var(--color-neutral-100);
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}
+.blog-content pre code {
+  background: transparent;
+  padding: 0;
 }

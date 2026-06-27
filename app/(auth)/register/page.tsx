@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { handleAuth } from "../actions";
 import { signIn } from "next-auth/react";
 import {
   IconMail,
@@ -230,11 +230,34 @@ function PasswordStrength({ password }: { password: string }) {
   );
 }
 
+/* ============================ Submit button with loading state ============================ */
+
+function SubmitBtn({ label, icon: Icon, loading }: { label: string; icon?: React.ComponentType<{ size?: number; stroke?: number }>; loading?: boolean }) {
+  return (
+    <button
+      type="submit"
+      disabled={loading}
+      className="w-full flex items-center justify-center gap-2 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm rounded-button shadow-md shadow-violet-200 transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer mt-1"
+    >
+      {loading ? (
+        <IconLoader2 size={18} stroke={2} className="animate-spin" />
+      ) : (
+        <>
+          <span>{label}</span>
+          {Icon && <Icon size={18} stroke={2} />}
+        </>
+      )}
+    </button>
+  );
+}
+
 /* ============================ Main content ============================ */
 
 function RegisterContent() {
-  const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   // UI states
   const [showPassword, setShowPassword] = useState(false);
@@ -266,6 +289,16 @@ function RegisterContent() {
   const passwordsMatch = confirmPassword.length > 0 && confirmPassword === password;
   const passwordsMismatch = confirmPassword.length > 0 && confirmPassword !== password;
 
+  // Read error from URL (returned by route handler redirect)
+  useEffect(() => {
+    const err = searchParams.get('error');
+    if (err) {
+      setError(decodeURIComponent(err));
+      const newPath = window.location.pathname;
+      window.history.replaceState(null, '', newPath);
+    }
+  }, [searchParams]);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
@@ -276,8 +309,9 @@ function RegisterContent() {
     setTermsError(null);
 
     const form = e.currentTarget;
-    const nameVal = (form.elements.namedItem("nama_lengkap") as HTMLInputElement)?.value?.trim();
-    const emailVal = (form.elements.namedItem("email") as HTMLInputElement)?.value?.trim();
+    const formData = new FormData(form);
+    const nameVal = formData.get("nama_lengkap")?.toString().trim();
+    const emailVal = formData.get("email")?.toString().trim();
 
     let valid = true;
     if (!nameVal) {
@@ -306,14 +340,32 @@ function RegisterContent() {
       setTermsError("Anda harus menyetujui Syarat & Ketentuan.");
       valid = false;
     }
-    if (!valid) return;
+    if (!valid) {
+      return;
+    }
 
+    // Submit via fetch API
     setLoading(true);
-    const formData = new FormData(e.currentTarget);
-    const result = await handleAuth(formData);
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: formData,
+      });
 
-    if (result?.error) {
-      setError(result.error);
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        router.push(data.redirectUrl);
+      } else {
+        setError(data.error || 'Terjadi kesalahan. Silakan coba lagi.');
+      }
+    } catch (err) {
+      console.error('Register Error:', err);
+      setError('Masalah koneksi jaringan. Silakan coba lagi.');
+    } finally {
       setLoading(false);
     }
   };
@@ -339,7 +391,7 @@ function RegisterContent() {
             Bergabung dengan ribuan<br />guru Indonesia
           </h2>
           <p className="mt-2 text-sm text-violet-200/90 max-w-xs">
-            Mulai perjalanan mengajar yang lebih cerdas bersama GuruPRO.
+            Mulai perjalanan mengajar yang lebih cerdas bersama GuruPRO AI.
           </p>
         </div>
 
@@ -376,7 +428,6 @@ function RegisterContent() {
           )}
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <input type="hidden" name="auth_mode" value="register" />
 
             {/* Nama Lengkap */}
             <TextField
@@ -385,7 +436,7 @@ function RegisterContent() {
               type="text"
               name="nama_lengkap"
               required
-              placeholder="Contoh: Andi Wijaya, S.Pd."
+              placeholder="Contoh: ElHanum, S.Pd."
               error={nameError}
               disabled={loading}
             />
@@ -397,7 +448,7 @@ function RegisterContent() {
               type="email"
               name="email"
               required
-              placeholder="nama@email.com"
+              placeholder="email"
               error={emailError}
               disabled={loading}
             />
@@ -495,11 +546,12 @@ function RegisterContent() {
                 <input
                   type="checkbox"
                   checked={agreed}
+                  disabled={loading}
                   onChange={(e) => {
                     setAgreed(e.target.checked);
                     setTermsError(null);
                   }}
-                  className="w-4 h-4 mt-0.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500 cursor-pointer"
+                  className="w-4 h-4 mt-0.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500 cursor-pointer disabled:opacity-50"
                 />
                 <span className="text-xs text-slate-600 leading-relaxed">
                   Saya setuju dengan{" "}
@@ -516,20 +568,11 @@ function RegisterContent() {
             </div>
 
             {/* Submit button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm rounded-button shadow-md shadow-violet-200 transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer mt-1"
-            >
-              {loading ? (
-                <IconLoader2 size={18} stroke={2} className="animate-spin" />
-              ) : (
-                <>
-                  <span>Daftar Sekarang</span>
-                  <IconArrowRight size={18} stroke={2} />
-                </>
-              )}
-            </button>
+            <SubmitBtn
+              label="Daftar Sekarang"
+              icon={IconArrowRight}
+              loading={loading}
+            />
           </form>
 
           {/* Divider + Google button */}
@@ -541,7 +584,8 @@ function RegisterContent() {
           <button
             type="button"
             onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-            className="w-full flex items-center justify-center gap-2.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-sm font-semibold text-slate-700 rounded-button transition-colors duration-150 cursor-pointer"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-sm font-semibold text-slate-700 rounded-button transition-colors duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <GoogleIcon size={18} />
             <span>Daftar dengan Google</span>

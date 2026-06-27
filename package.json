@@ -6,18 +6,28 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "init:payload": "npx tsx scripts/init-payload.ts",
+    "push:payload": "npx payload push"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@google/generative-ai": "^0.24.1",
+    "@payloadcms/db-postgres": "^3.85.1",
+    "@payloadcms/next": "^3.85.1",
+    "@payloadcms/richtext-lexical": "^3.85.1",
     "@prisma/client": "^6.19.3",
     "@tabler/icons-react": "^3.44.0",
     "next": "16.2.9",
     "next-auth": "^4.24.14",
     "nodemailer": "^9.0.1",
+    "payload": "^3.85.1",
     "pg": "^8.22.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -30,6 +40,7 @@
     "eslint-config-next": "16.2.9",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
+    "tsx": "^4.7.0",
     "typescript": "^5"
   }
 }

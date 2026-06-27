@@ -26,7 +26,8 @@ export async function GET() {
        FROM referrals r
        JOIN users u1 ON r.referrer_id = u1.id
        JOIN users u2 ON r.referee_id = u2.id
-       ORDER BY r.created_at DESC`
+       ORDER BY r.created_at DESC
+       LIMIT 100`
     );
     return NextResponse.json(referrals.rows);
   } catch (error: any) {

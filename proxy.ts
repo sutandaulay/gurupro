@@ -1,63 +1,54 @@
+import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
 
-// Routes that require authentication
-const protectedPaths = ["/dashboard", "/settings", "/profile", "/admin"];
+const publicAdminPaths = ["/admin/login", "/admin/register"];
+const protectedPaths = ["/dashboard", "/settings", "/profile"];
+const authPaths = ["/login", "/register"];
 
-// Auth routes — redirect to dashboard if already logged in
-const authRoutes = ["/login", "/register"];
+export async function proxy(request: NextRequest) {
+  const { pathname, origin } = request.nextUrl;
 
-export async function proxy(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  if (publicAdminPaths.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
 
-  // 1. Check NextAuth JWT token (Google OAuth users)
-  const nextAuthToken = await getToken({
-    req,
+  if (pathname.startsWith("/admin")) {
+    const sessionCookie = request.cookies.get("gurupro_session")?.value;
+    if (!sessionCookie) {
+      const loginUrl = new URL("/login", origin);
+      loginUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    return NextResponse.next();
+  }
+
+  const token = await getToken({
+    req: request,
     secret: process.env.NEXTAUTH_SECRET,
   });
+  const isNextAuth = !!token;
+  const guruproSession = request.cookies.get("gurupro_session")?.value;
+  const isAuthenticated = isNextAuth || !!guruproSession;
 
-  // 2. Check custom gurupro_session cookie (email/password users)
-  const guruproSession = req.cookies.get("gurupro_session")?.value;
-  let customSession: { id: string; role: string } | null = null;
-  if (guruproSession) {
-    try {
-      customSession = JSON.parse(guruproSession);
-    } catch {
-      // Invalid cookie format — treat as not authenticated
-    }
+  if (isAuthenticated && authPaths.some((p) => pathname.startsWith(p))) {
+    return NextResponse.redirect(new URL("/dashboard", origin));
   }
 
-  const isAuthenticated = !!nextAuthToken || !!customSession;
-  const isAdmin = customSession?.role === "admin";
-
-  const isProtectedRoute = protectedPaths.some((p) => pathname.startsWith(p));
-  const isAuthRoute = authRoutes.some((p) => pathname.startsWith(p));
-
-  // Protected route + not authenticated → redirect to login with callbackUrl
-  if (isProtectedRoute && !isAuthenticated) {
-    const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("callbackUrl", req.url);
+  if (
+    !isAuthenticated &&
+    protectedPaths.some((p) => pathname.startsWith(p))
+  ) {
+    const loginUrl = new URL("/login", origin);
+    loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
-  }
-
-  // Admin route + authenticated but not admin → redirect to dashboard
-  if (pathname.startsWith("/admin") && isAuthenticated && !isAdmin) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
-  }
-
-  // Auth route (login/register) + already authenticated → redirect to dashboard/admin
-  if (isAuthRoute && isAuthenticated) {
-    const target = isAdmin ? "/admin" : "/dashboard";
-    return NextResponse.redirect(new URL(target, req.url));
   }
 
   return NextResponse.next();
 }
 
-// Exclude: api/auth, _next, static files (png, jpg, ico, svg, etc.)
 export const config = {
   matcher: [
-    "/((?!api/auth|_next|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|ico|svg)).*)",
+    "/((?!api/auth|_next|.*\\.(?:png|jpg|jpeg|ico|svg|css|js|woff2?|ttf|webp|gif)).*)",
   ],
 };

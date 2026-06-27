@@ -42,9 +42,10 @@ export async function GET(req: Request) {
            OR t.external_id ILIKE $1
       `;
       params.push(`%${q}%`);
+      txQuery += " ORDER BY t.created_at DESC LIMIT 100";
+    } else {
+      txQuery += " ORDER BY t.created_at DESC LIMIT 100";
     }
-
-    txQuery += " ORDER BY t.created_at DESC";
 
     const txRes = await query(txQuery, params);
     return NextResponse.json(txRes.rows);

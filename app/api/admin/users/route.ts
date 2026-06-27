@@ -38,9 +38,10 @@ export async function GET(req: Request) {
            OR whatsapp ILIKE $1
       `;
       params.push(`%${q}%`);
+      usersQuery += " ORDER BY created_at DESC LIMIT 100";
+    } else {
+      usersQuery += " ORDER BY created_at DESC LIMIT 100";
     }
-
-    usersQuery += " ORDER BY created_at DESC";
 
     const usersRes = await query(usersQuery, params);
     return NextResponse.json(usersRes.rows);

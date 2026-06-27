@@ -13,6 +13,20 @@ export async function getSystemSetting<T = any>(key: string): Promise<T | null> 
   }
 }
 
+export async function getAllSystemSettings(): Promise<Record<string, any>> {
+  try {
+    const res = await query("SELECT key, value FROM system_settings");
+    const map: Record<string, any> = {};
+    for (const row of res.rows) {
+      map[row.key] = row.value;
+    }
+    return map;
+  } catch (error) {
+    console.error("Error getting all system settings:", error);
+    return {};
+  }
+}
+
 export async function updateSystemSetting(key: string, value: any): Promise<boolean> {
   try {
     await query(
@@ -204,6 +218,7 @@ export interface PricingPlan {
   price: number;
   tokens: number;
   duration_days: number;
+  features: string[];
 }
 
 export interface PricingConfig {
@@ -215,14 +230,54 @@ export interface PricingConfig {
 
 export async function getPricingConfig(): Promise<PricingConfig> {
   const defaults: PricingConfig = {
-    free: { price: 0, tokens: 10, duration_days: 30 },
-    three_month: { price: 120000, tokens: 500, duration_days: 90 },
-    six_month: { price: 220000, tokens: 1100, duration_days: 180 },
-    one_year: { price: 400000, tokens: 2500, duration_days: 365 }
+    free: {
+      price: 0, tokens: 10, duration_days: 30,
+      features: [
+        "10 Token Kuota Sekali",
+        "Masa Aktif 30 Hari",
+        "Generator Soal (LOTS C1-C3)",
+        "Dukungan Kurikulum Merdeka",
+      ],
+    },
+    three_month: {
+      price: 120000, tokens: 500, duration_days: 90,
+      features: [
+        "500 Token Kuota Utama",
+        "Masa Aktif 90 Hari",
+        "Generator Soal HOTS (C4-C6)",
+        "Cetak Lembar Jawaban Resmi",
+        "Server Prioritas & CS Terpadu",
+      ],
+    },
+    six_month: {
+      price: 220000, tokens: 1100, duration_days: 180,
+      features: [
+        "1100 Token Kuota Utama",
+        "Masa Aktif 180 Hari",
+        "Generator Soal HOTS (C4-C6)",
+        "Cetak Lembar Jawaban Resmi",
+        "Server Prioritas & CS Prioritas",
+      ],
+    },
+    one_year: {
+      price: 400000, tokens: 2500, duration_days: 365,
+      features: [
+        "2500 Token Kuota Utama",
+        "Masa Aktif 365 Hari",
+        "Generator Soal HOTS (C4-C6)",
+        "Cetak Lembar Jawaban Resmi",
+        "CS VIP 24/7 & Backup Riwayat",
+      ],
+    },
   };
   const val = await getSystemSetting<PricingConfig>("pricing_config");
   if (val && val.free && val.three_month && val.six_month && val.one_year) {
-    return val;
+    return {
+      free: { ...defaults.free, ...val.free, features: val.free.features || defaults.free.features },
+      three_month: { ...defaults.three_month, ...val.three_month, features: val.three_month.features || defaults.three_month.features },
+      six_month: { ...defaults.six_month, ...val.six_month, features: val.six_month.features || defaults.six_month.features },
+      one_year: { ...defaults.one_year, ...val.one_year, features: val.one_year.features || defaults.one_year.features },
+    };
   }
   return defaults;
 }
@@ -245,5 +300,207 @@ export async function getAppBrandingConfig(): Promise<AppBrandingConfig> {
   };
   const val = await getSystemSetting<AppBrandingConfig>("app_branding");
   return val ? { ...defaults, ...val } : defaults;
+}
+
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
+
+export interface ReferralBenefit {
+  icon: string;
+  title: string;
+  description: string;
+}
+
+export interface ReferralConfig {
+  badge: string;
+  title: string;
+  description: string;
+  benefits: ReferralBenefit[];
+  ctaText: string;
+  ctaLink: string;
+}
+
+export async function getFaqConfig(): Promise<FaqItem[]> {
+  const defaults: FaqItem[] = [
+    {
+      question: "Bagaimana cara kerja perhitungan Token kuota?",
+      answer: "Setiap kali Anda menekan tombol generate paket butir soal baru, sistem akan memotong 1 Token dari sisa batas limit token Anda. Token ini akan otomatis diperbarui setiap masa tagihan bulanan berjalan.",
+    },
+    {
+      question: "Apakah metode pembayaran mendukung e-Wallet lokal?",
+      answer: "Ya! Pembayaran SaaS GuruPRO sangat fleksibel terintegrasi menggunakan QRIS, GoPay, OVO, Dana, serta transfer Virtual Account bank terkemuka di Indonesia.",
+    },
+  ];
+  const val = await getSystemSetting<FaqItem[]>("faq_config");
+  if (val && Array.isArray(val) && val.length > 0) return val;
+  return defaults;
+}
+
+export async function getReferralConfig(): Promise<ReferralConfig> {
+  const defaults: ReferralConfig = {
+    badge: "🎁 Program Kemitraan Guru",
+    title: "Bagikan GuruPro, Dapatkan Cashback & Token!",
+    description: "Dapatkan cashback senilai Rp10.000 tunai dan +20 Token kuota untuk setiap guru yang mendaftar dan berlangganan menggunakan kode referral unik Anda! Teman Anda juga akan mendapatkan bonus +10 Token saat mendaftar.",
+    benefits: [
+      {
+        icon: "💰",
+        title: "Cashback Saldo Dompet",
+        description: "Saldo cashback sebesar Rp10.000 ditambahkan ke dompet akun Anda setiap kali teman Anda meng-upgrade status akun menjadi PRO. Saldo ini dapat dicairkan langsung ke rekening bank.",
+      },
+      {
+        icon: "⚡",
+        title: "Token Kuota Tambahan",
+        description: "Dapatkan +20 Token kuota ekstra gratis untuk generator soal Anda, sementara teman Anda mendapatkan +10 Token kuota tambahan saat mendaftar!",
+      },
+    ],
+    ctaText: "Mulai Undang Teman",
+    ctaLink: "",
+  };
+  const val = await getSystemSetting<ReferralConfig>("referral_config");
+  return val ? { ...defaults, ...val, benefits: val.benefits || defaults.benefits } : defaults;
+}
+
+// --- Defaults & resolve helpers (for batch query) ---
+
+const defaultPaymentGateway: PaymentGatewayConfig = {
+  default_gateway: "mock",
+  xendit: { api_key: "", verification_token: "", is_sandbox: true },
+  midtrans: { merchant_id: "", client_key: "", server_key: "", is_sandbox: true },
+  duitku: { merchant_code: "", api_key: "", is_sandbox: true }
+};
+
+const defaultEmailSender: EmailSenderConfig = {
+  provider: "none",
+  active: false,
+  smtp: { host: "smtp.mailtrap.io", port: 2525, secure: false, user: "", pass: "" },
+  sender_name: "GuruPRO Support",
+  sender_email: "no-reply@gurupro.id"
+};
+
+const defaultWASender: WASenderConfig = {
+  provider: "none",
+  active: false,
+  fonnte: { token: "", sender_number: "" },
+  ruangwa: { token: "", sender_number: "" }
+};
+
+const defaultNotificationTemplates: NotificationTemplates = {
+  register: { email_enabled: true, wa_enabled: true, email_subject: "Selamat Datang di GuruPRO!", email_body: "", wa_message: "" },
+  forgot_password: { email_enabled: true, wa_enabled: true, email_subject: "Kode OTP Masuk GuruPRO", email_body: "", wa_message: "" },
+  payout_approved: { email_enabled: true, wa_enabled: true, email_subject: "Pencairan Cashback GuruPRO Berhasil!", email_body: "", wa_message: "" },
+  payout_rejected: { email_enabled: true, wa_enabled: true, email_subject: "Pencairan Cashback GuruPRO Ditolak", email_body: "", wa_message: "" },
+  payment_success: { email_enabled: true, wa_enabled: true, email_subject: "Pembayaran Langganan GuruPRO Berhasil", email_body: "", wa_message: "" }
+};
+
+const defaultAIConfig: AIConfig = {
+  default_vendor: "mock",
+  gemini: { api_key: "", model_name: "gemini-2.5-flash" },
+  openai: { api_key: "", model_name: "gpt-4o-mini" },
+  claude: { api_key: "", model_name: "claude-3-5-sonnet-20241022" },
+  deepseek: { api_key: "", model_name: "deepseek-chat" }
+};
+
+const defaultPricingConfig: PricingConfig = {
+  free: { price: 0, tokens: 10, duration_days: 30, features: ["10 Token Kuota Sekali", "Masa Aktif 30 Hari", "Generator Soal (LOTS C1-C3)", "Dukungan Kurikulum Merdeka"] },
+  three_month: { price: 120000, tokens: 500, duration_days: 90, features: ["500 Token Kuota Utama", "Masa Aktif 90 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Terpadu"] },
+  six_month: { price: 220000, tokens: 1100, duration_days: 180, features: ["1100 Token Kuota Utama", "Masa Aktif 180 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Prioritas"] },
+  one_year: { price: 400000, tokens: 2500, duration_days: 365, features: ["2500 Token Kuota Utama", "Masa Aktif 365 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "CS VIP 24/7 & Backup Riwayat"] },
+};
+
+const defaultBranding: AppBrandingConfig = {
+  app_name: "GuruPRO",
+  app_logo: "",
+  accent_color: "#4f46e5",
+  contact_email: "support@gurupro.id",
+  contact_whatsapp: ""
+};
+
+const defaultFaq: FaqItem[] = [
+  { question: "Bagaimana cara kerja perhitungan Token kuota?", answer: "Setiap kali Anda menekan tombol generate paket butir soal baru, sistem akan memotong 1 Token dari sisa batas limit token Anda." },
+  { question: "Apakah metode pembayaran mendukung e-Wallet lokal?", answer: "Ya! Pembayaran SaaS GuruPRO sangat fleksibel terintegrasi menggunakan QRIS, GoPay, OVO, Dana, serta transfer Virtual Account bank terkemuka di Indonesia." },
+];
+
+const defaultReferral: ReferralConfig = {
+  badge: "🎁 Program Kemitraan Guru",
+  title: "Bagikan GuruPro, Dapatkan Cashback & Token!",
+  description: "Dapatkan cashback senilai Rp10.000 tunai dan +20 Token kuota untuk setiap guru yang mendaftar.",
+  benefits: [
+    { icon: "💰", title: "Cashback Saldo Dompet", description: "Saldo cashback sebesar Rp10.000 ditambahkan ke dompet akun Anda." },
+    { icon: "⚡", title: "Token Kuota Tambahan", description: "Dapatkan +20 Token kuota ekstra gratis untuk generator soal Anda." },
+  ],
+  ctaText: "Mulai Undang Teman",
+  ctaLink: "",
+};
+
+function readSetting<T>(map: Record<string, any>, key: string, defaults: T): T {
+  const raw = map[key];
+  if (raw === undefined || raw === null) return defaults;
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return { ...defaults, ...parsed };
+  } catch {
+    return defaults;
+  }
+}
+
+export function resolvePaymentGatewayConfig(cache: Record<string, any>): PaymentGatewayConfig {
+  return readSetting(cache, "payment_gateway", defaultPaymentGateway);
+}
+
+export function resolveEmailSenderConfig(cache: Record<string, any>): EmailSenderConfig {
+  return readSetting(cache, "email_sender", defaultEmailSender);
+}
+
+export function resolveWASenderConfig(cache: Record<string, any>): WASenderConfig {
+  return readSetting(cache, "wa_sender", defaultWASender);
+}
+
+export function resolveNotificationTemplates(cache: Record<string, any>): NotificationTemplates {
+  return readSetting(cache, "notification_templates", defaultNotificationTemplates);
+}
+
+export function resolveAIConfig(cache: Record<string, any>): AIConfig {
+  return readSetting(cache, "ai_config", defaultAIConfig);
+}
+
+export function resolvePricingConfig(cache: Record<string, any>): PricingConfig {
+  const raw = cache["pricing_config"];
+  if (!raw) return defaultPricingConfig;
+  try {
+    const val = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (val && val.free && val.three_month && val.six_month && val.one_year) {
+      return {
+        free: { ...defaultPricingConfig.free, ...val.free, features: val.free.features || defaultPricingConfig.free.features },
+        three_month: { ...defaultPricingConfig.three_month, ...val.three_month, features: val.three_month.features || defaultPricingConfig.three_month.features },
+        six_month: { ...defaultPricingConfig.six_month, ...val.six_month, features: val.six_month.features || defaultPricingConfig.six_month.features },
+        one_year: { ...defaultPricingConfig.one_year, ...val.one_year, features: val.one_year.features || defaultPricingConfig.one_year.features },
+      };
+    }
+    return defaultPricingConfig;
+  } catch {
+    return defaultPricingConfig;
+  }
+}
+
+export function resolveAppBrandingConfig(cache: Record<string, any>): AppBrandingConfig {
+  return readSetting(cache, "app_branding", defaultBranding);
+}
+
+export function resolveFaqConfig(cache: Record<string, any>): FaqItem[] {
+  const raw = cache["faq_config"];
+  if (!raw) return defaultFaq;
+  try {
+    const val = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (Array.isArray(val) && val.length > 0) return val;
+    return defaultFaq;
+  } catch {
+    return defaultFaq;
+  }
+}
+
+export function resolveReferralConfig(cache: Record<string, any>): ReferralConfig {
+  return readSetting(cache, "referral_config", defaultReferral);
 }
 

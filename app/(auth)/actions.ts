@@ -17,7 +17,10 @@ type AuthUser = {
   is_active?: boolean | null;
 };
 
-export async function handleAuth(formData: FormData) {
+export async function handleAuth(
+  prevState: { error: string | null } | null,
+  formData: FormData
+) {
   const authMode = formData.get('auth_mode')?.toString() || 'login';
   const loginId = formData.get('email')?.toString().trim().toLowerCase();
   const whatsapp = formData.get('whatsapp')?.toString().trim();
@@ -165,7 +168,6 @@ export async function handleAuth(formData: FormData) {
     return { error: 'Terjadi masalah koneksi pada database lokal Anda.' };
   }
 
-  // Redirect
   if (user?.role === 'admin') {
     redirect('/admin');
   } else if (checkoutPlan) {

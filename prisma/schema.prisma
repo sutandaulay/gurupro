@@ -95,14 +95,17 @@ model journal_supervisions {
 }
 
 model payout_requests {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id    String    @db.Uuid
-  tipe       String    @db.VarChar(50)
-  jumlah     Int
-  status     String    @default("PENDING") @db.VarChar(50)
-  catatan    String?
-  created_at DateTime? @default(now()) @db.Timestamp(6)
-  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id             String    @db.Uuid
+  tipe                String    @db.VarChar(50)
+  jumlah              Int
+  status              String    @default("PENDING") @db.VarChar(50)
+  catatan             String?
+  bank_name           String?   @db.VarChar(100)
+  bank_account_number String?   @db.VarChar(50)
+  bank_account_name   String?   @db.VarChar(150)
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  users               users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model question_banks {
@@ -313,6 +316,63 @@ model users {
   transactions                                           transactions[]
   users                                                  users?                 @relation("usersTousers", fields: [referred_by], references: [id], onUpdate: NoAction)
   other_users                                            users[]                @relation("usersTousers")
+}
+
+model hero_sections {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String    @db.VarChar(255)
+  subtitle    String?   @db.Text
+  button_text String?   @db.VarChar(100)
+  media_url   String?   @db.VarChar(500)
+  media_type  String    @default("image") @db.VarChar(20)
+  is_active   Boolean?  @default(true)
+  sort_order  Int?      @default(0)
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  updated_at  DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model features {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String    @db.VarChar(255)
+  description String?   @db.Text
+  icon        String?   @db.VarChar(100)
+  is_active   Boolean?  @default(true)
+  sort_order  Int?      @default(0)
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  updated_at  DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model pricing_plans {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  package_name  String    @db.VarChar(50)
+  price         Decimal   @db.Decimal(12, 2)
+  duration_days Int
+  features      Json
+  is_active     Boolean?  @default(true)
+  sort_order    Int?      @default(0)
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
+  updated_at    DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model landing_page_settings {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hero_badge       String?   @db.VarChar(255)
+  youtube_url      String?   @db.VarChar(500)
+  cs_contact       String?   @db.VarChar(100)
+  cs_whatsapp      String?   @db.VarChar(20)
+  chatbot_active   Boolean?  @default(true)
+  chatbot_welcome  String?   @db.Text
+  faq              Json?
+  referral_terms   String?   @db.Text
+  footer_copyright String?   @db.VarChar(255)
+  footer_desc      String?   @db.Text
+  footer_terms     String?   @db.VarChar(500)
+  footer_privacy   String?   @db.VarChar(500)
+  footer_contact      String?   @db.VarChar(255)
+  min_payout_cashback Int?      @default(50000)
+  cashback_to_token_rate Int?   @default(1000)
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  updated_at          DateTime? @default(now()) @db.Timestamp(6)
 }
 
 model GeminiCache {

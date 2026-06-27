@@ -1,13 +1,16 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { 
-  getPaymentGatewayConfig, 
-  getEmailSenderConfig, 
-  getWASenderConfig, 
-  getNotificationTemplates,
-  getAIConfig,
-  getPricingConfig,
-  getAppBrandingConfig,
+  getAllSystemSettings,
+  resolvePaymentGatewayConfig,
+  resolveEmailSenderConfig,
+  resolveWASenderConfig,
+  resolveNotificationTemplates,
+  resolveAIConfig,
+  resolvePricingConfig,
+  resolveAppBrandingConfig,
+  resolveFaqConfig,
+  resolveReferralConfig,
   updateSystemSetting
 } from "@/lib/settings";
 import { sendEmailNotification, sendWhatsAppNotification } from "@/lib/notifications";
@@ -30,13 +33,17 @@ export async function GET() {
   try {
     await verifyAdmin();
 
-    const paymentGateway = await getPaymentGatewayConfig();
-    const emailSender = await getEmailSenderConfig();
-    const waSender = await getWASenderConfig();
-    const templates = await getNotificationTemplates();
-    const aiConfig = await getAIConfig();
-    const pricingConfig = await getPricingConfig();
-    const appBranding = await getAppBrandingConfig();
+    // Batch query: 1 round-trip instead of 9
+    const allSettings = await getAllSystemSettings();
+    const paymentGateway = resolvePaymentGatewayConfig(allSettings);
+    const emailSender = resolveEmailSenderConfig(allSettings);
+    const waSender = resolveWASenderConfig(allSettings);
+    const templates = resolveNotificationTemplates(allSettings);
+    const aiConfig = resolveAIConfig(allSettings);
+    const pricingConfig = resolvePricingConfig(allSettings);
+    const appBranding = resolveAppBrandingConfig(allSettings);
+    const faqConfig = resolveFaqConfig(allSettings);
+    const referralConfig = resolveReferralConfig(allSettings);
 
     return NextResponse.json({
       paymentGateway,
@@ -45,7 +52,9 @@ export async function GET() {
       templates,
       aiConfig,
       pricingConfig,
-      appBranding
+      appBranding,
+      faqConfig,
+      referralConfig,
     });
   } catch (error: any) {
     console.error("GET Admin Settings error:", error);
@@ -109,6 +118,18 @@ export async function POST(req: Request) {
       const success = await updateSystemSetting("app_branding", data);
       if (!success) throw new Error("Database update failed");
       return NextResponse.json({ success: true, message: "Pengaturan Branding Aplikasi berhasil diperbarui!" });
+    }
+
+    if (action === "update_faq_config") {
+      const success = await updateSystemSetting("faq_config", data);
+      if (!success) throw new Error("Database update failed");
+      return NextResponse.json({ success: true, message: "FAQ berhasil diperbarui!" });
+    }
+
+    if (action === "update_referral_config") {
+      const success = await updateSystemSetting("referral_config", data);
+      if (!success) throw new Error("Database update failed");
+      return NextResponse.json({ success: true, message: "Pengaturan Program Referral berhasil diperbarui!" });
     }
 
     if (action === "test_email") {

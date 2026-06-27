@@ -3756,7 +3756,7 @@ export default function Dashboard() {
               type="text" 
               value={profNama} 
               onChange={(e) => setProfNama(e.target.value)}
-              placeholder="Contoh: Andi Wijaya, S.Pd."
+              placeholder="Contoh: ElHanum, S.Pd."
               className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-500 focus:outline-none bg-white font-medium text-slate-800"
             />
           </div>
@@ -3801,7 +3801,7 @@ export default function Dashboard() {
                 type="text" 
                 value={profBankAccountName} 
                 onChange={(e) => setProfBankAccountName(e.target.value)}
-                placeholder="Contoh: Andi Wijaya"
+                placeholder="Contoh: ElHanum"
                 className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-500 focus:outline-none bg-white font-medium text-slate-800"
               />
             </div>
@@ -4079,7 +4079,7 @@ export default function Dashboard() {
                     type="text"
                     value={payoutBankAccountName}
                     onChange={(e) => setPayoutBankAccountName(e.target.value)}
-                    placeholder="Contoh: Andi Wijaya"
+                    placeholder="Contoh: ElHanum"
                     className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-medium text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                     required
                   />
@@ -7749,7 +7749,7 @@ const renderJurnalModule = () => {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
           <div>
-            <h3 className="text-lg font-bold text-slate-900">Asisten Administrasi Kelas (AI Generator)</h3>
+            <h3 className="text-lg font-bold text-slate-900">Asisten Administrasi Kelas (Guru AI Asisten)</h3>
             <p className="text-xs text-slate-500 mt-1">Buat Silabus, RPP K13, atau Modul Ajar Kurikulum Merdeka instan menggunakan AI.</p>
           </div>
         </div>
@@ -8082,204 +8082,169 @@ const renderJurnalModule = () => {
     const totalTasks = ceklisTasks.length;
     const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
+    const getGreeting = () => {
+      const hour = new Date().getHours();
+      if (hour < 12) return "Selamat pagi";
+      if (hour < 15) return "Selamat siang";
+      if (hour < 19) return "Selamat sore";
+      return "Selamat malam";
+    };
+
+    const recentActivities = [
+      { icon: "📝", desc: "Soal Matematika dibuat", time: "2 jam lalu" },
+      { icon: "📚", desc: "RPP baru tersimpan", time: "4 jam lalu" },
+      { icon: "📊", desc: "Nilai Kelas X IPA 1 diinput", time: "6 jam lalu" },
+      { icon: "📓", desc: "Jurnal hari ini diperbarui", time: "8 jam lalu" },
+      { icon: "🏫", desc: "Presensi siswa tercatat", time: "10 jam lalu" },
+    ];
+
+    const stats = [
+      { icon: "👥", label: "Total Siswa", value: "128", trend: "+5%", trendUp: true, bgColor: "bg-blue-50", iconColor: "text-blue-600" },
+      { icon: "📄", label: "RPP Bulan Ini", value: "12", trend: "+3", trendUp: true, bgColor: "bg-green-50", iconColor: "text-green-600" },
+      { icon: "📈", label: "Rata-rata Nilai", value: "82.5", trend: "+2.1", trendUp: true, bgColor: "bg-violet-50", iconColor: "text-violet-600" },
+      { icon: "⏳", label: "Tugas Belum Dinilai", value: "8", trend: "", trendUp: false, bgColor: "bg-amber-50", iconColor: "text-amber-600", badge: true },
+    ];
+
+    const quickActions = [
+      { icon: "📚", label: "Buat RPP Baru", onClick: () => { setCurrentModule("administrasi"); setAdminDocType("rpp"); } },
+      { icon: "📊", label: "Input Nilai", onClick: () => { setCurrentModule("nilai"); } },
+      { icon: "📝", label: "Buat Soal", onClick: () => { setCurrentModule("soal"); } },
+      { icon: "📋", label: "Laporan Kelas", onClick: () => { setCurrentModule("sekolah"); setTabSekolah("presensi"); } },
+    ];
+
     return (
-      <div className="space-y-6 animate-fadeIn">
-        <div className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-800 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/10 rounded-full blur-2xl -ml-16 -mb-16 pointer-events-none"></div>
-          
-          <div className="space-y-2 relative z-10">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-[10px] font-extrabold uppercase tracking-wider">
-              ⚡ Pusat Tugas Harian
-            </div>
-            <h3 className="text-xl sm:text-2xl font-black tracking-tight">Selamat Datang Kembali, {currentUser?.nama_lengkap || "Guru"}!</h3>
-            <p className="text-xs text-indigo-100 max-w-lg font-medium leading-relaxed">
-              Semua menu penting yang Anda gunakan setiap hari dikelompokkan di sini untuk mempercepat aktivitas mengajar dan administrasi Anda.
+      <div className="space-y-6 animate-fadeIn px-4 sm:px-6 py-6">
+        {/* Bagian 1 — Greeting */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {getGreeting()}, {currentUser?.nama_lengkap?.split(" ")[0] || "Guru"}! 👋
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Berikut ringkasan aktivitas mengajar Anda hari ini
             </p>
           </div>
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 text-center md:text-left min-w-[150px] relative z-10 shrink-0">
-            <span className="text-[10px] text-indigo-100 font-bold block uppercase tracking-wider">Sisa Kuota AI</span>
-            <span className="text-2xl font-black mt-1 block">{currentUser?.token_limit !== undefined ? currentUser.token_limit : 0} Token</span>
-            <span className="text-[9px] text-indigo-200 mt-1 block font-medium">Paket Aktif: {currentUser?.status_langganan?.toUpperCase() || "FREE"}</span>
+          <div className="flex items-center gap-3">
+            <div className="bg-violet-50 border border-violet-100 text-violet-700 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5">
+              <span>⚡</span>
+              <span>{currentUser?.token_limit !== undefined ? `${currentUser.token_limit} Token` : "Memuat..."}</span>
+            </div>
+            <div className="bg-gray-50 border border-gray-200 text-gray-700 font-bold px-3.5 py-2 rounded-xl text-xs">
+              {currentUser?.status_langganan?.toUpperCase() || "FREE"}
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-sans">Menu Harian Tercepat</h4>
-              <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-full">Akses Instan</span>
+        {/* Bagian 2 — Stat Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat, i) => (
+            <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 shadow-card">
+              <div className="flex items-center justify-between mb-3">
+                <div className={`w-10 h-10 rounded-lg ${stat.bgColor} flex items-center justify-center text-lg`}>
+                  {stat.icon}
+                </div>
+                {stat.badge && (
+                  <span className="w-2 h-2 bg-red-500 rounded-full" />
+                )}
+              </div>
+              <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{stat.label}</p>
+              {stat.trend && (
+                <p className={`text-xs font-medium mt-1 ${stat.trendUp ? 'text-green-600' : 'text-red-600'}`}>
+                  {stat.trendUp ? '↑' : '↓'} {stat.trend} vs bulan lalu
+                </p>
+              )}
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button 
-                onClick={() => {
-                  setCurrentModule("sekolah");
-                  setTabSekolah("presensi");
-                }}
-                className="bg-white hover:bg-slate-50 border border-slate-200/80 hover:border-indigo-400 hover:shadow-[0_8px_30px_rgb(99,102,241,0.06)] rounded-3xl p-5 text-left transition duration-300 group flex gap-4 cursor-pointer"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition duration-300">
-                  🏫
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 transition">Presensi Kehadiran Siswa</span>
-                    <span className="text-[9px] bg-blue-100 text-blue-700 font-extrabold px-2 py-0.5 rounded-full uppercase">Harian</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-                    Input kehadiran siswa per jam pelajaran dan hubungkan dengan agenda jurnal kelas.
-                  </p>
-                </div>
-              </button>
+          ))}
+        </div>
 
-              <button 
-                onClick={() => {
-                  setCurrentModule("jurnal");
-                  setJournalSubTab("tulis");
-                }}
-                className="bg-white hover:bg-slate-50 border border-slate-200/80 hover:border-indigo-400 hover:shadow-[0_8px_30px_rgb(99,102,241,0.06)] rounded-3xl p-5 text-left transition duration-300 group flex gap-4 cursor-pointer"
+        {/* Bagian 3 — Quick Actions */}
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Aksi Cepat</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {quickActions.map((action, i) => (
+              <button
+                key={i}
+                onClick={action.onClick}
+                className="bg-white border border-gray-200 rounded-xl p-4 text-left hover:-translate-y-0.5 hover:shadow-card-hover transition-all duration-200 cursor-pointer group"
               >
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition duration-300">
-                  📓
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 transition">Tulis Jurnal Kelas</span>
-                    <span className="text-[9px] bg-emerald-100 text-emerald-700 font-extrabold px-2 py-0.5 rounded-full uppercase">Selesai Kelas</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-                    Tulis materi, capaian belajar, media ajar, dan kirim supervisi ke Kepala Sekolah.
-                  </p>
-                </div>
+                <div className="text-2xl mb-2">{action.icon}</div>
+                <p className="text-sm font-semibold text-gray-800 group-hover:text-violet-600 transition-colors">{action.label}</p>
+                <span className="text-xs text-violet-600 font-medium mt-2 inline-block">Mulai →</span>
               </button>
+            ))}
+          </div>
+        </div>
 
-              <button 
-                onClick={() => {
-                  setCurrentModule("nilai");
-                }}
-                className="bg-white hover:bg-slate-50 border border-slate-200/80 hover:border-indigo-400 hover:shadow-[0_8px_30px_rgb(99,102,241,0.06)] rounded-3xl p-5 text-left transition duration-300 group flex gap-4 cursor-pointer"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition duration-300">
-                  📊
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 transition">Buku Nilai &amp; Remedial</span>
-                    <span className="text-[9px] bg-purple-100 text-purple-700 font-extrabold px-2 py-0.5 rounded-full uppercase">Asesmen</span>
+        {/* Bagian 4 — Aktivitas Terbaru + Checklist */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-3">
+            <h2 className="text-sm font-semibold text-gray-700">Aktivitas Terbaru</h2>
+            <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
+              {recentActivities.map((activity, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3">
+                  <span className="text-lg">{activity.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-700 truncate">{activity.desc}</p>
+                    <p className="text-xs text-gray-400">{activity.time}</p>
                   </div>
-                  <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-                    Input nilai tugas/ujian, kelayakan lulus KKM, dan masukkan nilai perbaikan remedial.
-                  </p>
                 </div>
-              </button>
-
-              <button 
-                onClick={() => {
-                  setCurrentModule("soal");
-                }}
-                className="bg-white hover:bg-slate-50 border border-slate-200/80 hover:border-indigo-400 hover:shadow-[0_8px_30px_rgb(99,102,241,0.06)] rounded-3xl p-5 text-left transition duration-300 group flex gap-4 cursor-pointer"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition duration-300">
-                  📝
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 transition">Pembuat Soal AI</span>
-                    <span className="text-[9px] bg-indigo-100 text-indigo-700 font-extrabold px-2 py-0.5 rounded-full uppercase">AI Copilot</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-                    Buat naskah soal ujian otomatis dari kisi-kisi atau materi belajar dalam hitungan detik.
-                  </p>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => {
-                  setCurrentModule("administrasi");
-                  setAdminDocType("rpp");
-                }}
-                className="bg-white hover:bg-slate-50 border border-slate-200/80 hover:border-indigo-400 hover:shadow-[0_8px_30px_rgb(99,102,241,0.06)] rounded-3xl p-5 text-left transition duration-300 group flex gap-4 cursor-pointer md:col-span-2"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition duration-300">
-                  📚
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 transition">Buat RPP / Modul Ajar</span>
-                    <span className="text-[9px] bg-amber-100 text-amber-700 font-extrabold px-2 py-0.5 rounded-full uppercase">Administrasi</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-                    Rancang Rencana Pembelajaran atau Modul Ajar Kurikulum Merdeka yang tervalidasi instan.
-                  </p>
-                </div>
-              </button>
+              ))}
             </div>
+            <button className="text-sm font-medium text-violet-600 hover:text-violet-700 transition-colors">
+              Lihat Semua →
+            </button>
           </div>
 
-          <div className="space-y-4 font-sans">
+          {/* Checklist (existing) */}
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-sans">Ceklis Harian Guru</h4>
-              <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full">
-                {progressPercent}% Selesai
+              <h3 className="text-sm font-semibold text-gray-700">Ceklis Harian</h3>
+              <span className="text-xs bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full">
+                {progressPercent}%
               </span>
             </div>
-
-            <div className="bg-white border border-slate-200/80 rounded-3xl p-5 space-y-4 shadow-sm">
-              <div className="space-y-1.5">
-                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                  <div 
-                    className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${progressPercent}%` }}
-                  ></div>
-                </div>
-                <div className="flex justify-between text-[10px] text-slate-400 font-bold">
-                  <span>{completedTasks} dari {totalTasks} Tugas</span>
-                  <span>{progressPercent}%</span>
-                </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+              <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${progressPercent}%` }}
+                />
               </div>
-
-              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+              <div className="space-y-1 max-h-[200px] overflow-y-auto">
                 {ceklisTasks.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-6 font-medium">Belum ada tugas hari ini. Tambahkan di bawah!</p>
+                  <p className="text-xs text-gray-400 text-center py-4">Belum ada tugas</p>
                 ) : (
                   ceklisTasks.map((task) => (
-                    <div key={task.id} className="flex items-center justify-between gap-3 p-2 bg-slate-50 hover:bg-slate-100/50 rounded-xl transition group">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <input 
-                          type="checkbox" 
+                    <div key={task.id} className="flex items-center justify-between gap-2 py-1.5 group">
+                      <label className="flex items-center gap-2 min-w-0 cursor-pointer">
+                        <input
+                          type="checkbox"
                           checked={task.completed}
                           onChange={() => toggleTask(task.id)}
-                          className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 focus:outline-none cursor-pointer shrink-0"
+                          className="w-3.5 h-3.5 rounded border-gray-300 text-violet-600 focus:ring-violet-500 cursor-pointer"
                         />
-                        <span className={`text-xs font-semibold truncate ${task.completed ? 'line-through text-slate-400 font-normal' : 'text-slate-700'}`}>
+                        <span className={`text-xs truncate ${task.completed ? 'line-through text-gray-400' : 'text-gray-700'}`}>
                           {task.text}
                         </span>
-                      </div>
-                      <button
-                        onClick={() => removeTask(task.id)}
-                        className="text-slate-300 hover:text-red-500 transition p-1 cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
-                      >
-                        🗑️
+                      </label>
+                      <button onClick={() => removeTask(task.id)} className="text-gray-300 hover:text-red-500 text-xs opacity-0 group-hover:opacity-100 transition cursor-pointer">
+                        ✕
                       </button>
                     </div>
                   ))
                 )}
               </div>
-
-              <div className="border-t border-slate-100 pt-4 flex gap-2">
-                <input 
+              <div className="flex gap-2 pt-2 border-t border-gray-100">
+                <input
                   type="text"
                   value={newCeklisTask}
                   onChange={(e) => setNewCeklisTask(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') addTask(); }}
-                  placeholder="Tambahkan tugas baru..."
-                  className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50/50 focus:border-indigo-500 focus:bg-white focus:outline-none font-medium text-slate-800 placeholder-slate-400"
+                  placeholder="Tambah tugas..."
+                  className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-violet-500 focus:outline-none"
                 />
-                <button
-                  onClick={addTask}
-                  className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-indigo-100 hover:shadow-lg transition cursor-pointer"
-                >
+                <button onClick={addTask} className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium rounded-lg transition cursor-pointer">
                   Tambah
                 </button>
               </div>
@@ -8788,7 +8753,7 @@ const renderJurnalModule = () => {
             )}
             <div>
               <h1 className="text-base font-black text-slate-900 tracking-tight">{brandingConfig?.app_name || "GuruPRO"}</h1>
-              <p className="text-[10px] text-indigo-600 font-bold tracking-wider uppercase">SaaS Dashboard</p>
+              <p className="text-[10px] text-indigo-600 font-bold tracking-wider uppercase"></p>
             </div>
           </div>
         </div>
@@ -8797,33 +8762,33 @@ const renderJurnalModule = () => {
         <nav className="flex flex-wrap items-center justify-center bg-slate-100 p-1.5 rounded-2xl gap-0.5">
           {[
             ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
-              { id: "soal", label: "📝 AI Soal", icon: "📝" }
+              { id: "soal", label: "📝 Soal Ai", icon: "" }
             ] : []),
             ...(currentUser?.role === 'admin' || currentUser?.role === 'operator' || currentUser?.role === 'guru' || currentUser?.role === 'kepala_sekolah' || !currentUser?.role ? [
-              { id: "sekolah", label: "🏫 Sekolah", icon: "🏫" }
+              { id: "sekolah", label: "🏫 Master Data", icon: "" }
             ] : []),
             ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
-              { id: "administrasi", label: "📚 RPP / Silabus", icon: "📚" }
+              { id: "administrasi", label: "📚 RPP / Silabus", icon: "" }
             ] : []),
             ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || currentUser?.role === 'kepala_sekolah' || !currentUser?.role ? [
-              { id: "jurnal", label: "📓 Jurnal & Ceklis", icon: "📓" }
+              { id: "jurnal", label: "📓 Jurnal & Ceklis", icon: "" }
             ] : []),
             ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
-              { id: "nilai", label: "📊 Buku Nilai", icon: "📊" }
+              { id: "nilai", label: "📊 Buku Nilai", icon: "" }
             ] : []),
             ...(currentUser?.role === 'admin' || currentUser?.role === 'operator' ? [
-              { id: "kalender", label: "📅 Kalender", icon: "📅" }
+              { id: "kalender", label: "📅 Kalender", icon: "" }
             ] : []),
             ...(currentUser?.role === 'admin' || currentUser?.role === 'kepala_sekolah' || currentUser?.role === 'pengawas' ? [
-              { id: "supervisi_analitik", label: "🛡️ Supervisi & Analitik", icon: "🛡️" }
+              { id: "supervisi_analitik", label: "🛡️ Supervisi & Analitik", icon: "" }
             ] : []),
             ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
-              { id: "keuangan", label: "💰 Keuangan", icon: "💰" }
+              { id: "keuangan", label: "💰 Keuangan", icon: "" }
             ] : []),
-            { id: "tugas_harian", label: "⚡ Tugas Harian", icon: "⚡" },
-            { id: "storage_saya", label: "📂 Storage Saya", icon: "📂" },
-            { id: "scheduler", label: "⏰ Pengingat", icon: "⏰" },
-            { id: "profil", label: "👤 Profil", icon: "👤" },
+            { id: "tugas_harian", label: "⚡ Tugas Harian", icon: "" },
+            { id: "storage_saya", label: "📂 Storage Saya", icon: "" },
+            { id: "scheduler", label: "⏰ Pengingat", icon: "" },
+            { id: "profil", label: "👤 Profil", icon: "" },
           ].map((tab) => {
             const isActive = currentModule === tab.id;
             return (
@@ -9003,7 +8968,7 @@ const renderJurnalModule = () => {
                 <div className="w-10 h-10 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600 text-lg shrink-0">⚡</div>
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-800 font-sans">Akun Anda berstatus Uji Coba Gratis (Free Trial)</h4>
-                  <p className="text-xs text-indigo-600/90 mt-0.5">Upgrade ke GuruPRO Premium untuk menghilangkan batas kuota pembuatan soal AI dan mengakses modul ajar tanpa batas.</p>
+                  <p className="text-xs text-indigo-600/90 mt-0.5">Upgrade ke GuruPRO AI Premium untuk menghilangkan batas kuota pembuatan soal AI dan mengakses modul ajar tanpa batas.</p>
                 </div>
               </div>
               <button

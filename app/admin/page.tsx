@@ -1,29 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import CmsLandingEditor from "@/components/admin/CmsLandingEditor";
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"users" | "transactions" | "cms" | "referrals" | "settings" | "pricing">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "transactions" | "cms" | "referrals" | "settings">("users");
   
   // Data States
   const [users, setUsers] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   
-  // CMS States
-  const [heroBadge, setHeroBadge] = useState("");
-  const [heroTitle, setHeroTitle] = useState("");
-  const [heroSubtitle, setHeroSubtitle] = useState("");
-  const [featuresList, setFeaturesList] = useState<{ icon: string; title: string; desc: string }[]>([]);
-  const [faqList, setFaqList] = useState<{ question: string; answer: string }[]>([]);
-  const [referralTerms, setReferralTerms] = useState("");
-  // Footer CMS states
-  const [footerCopyright, setFooterCopyright] = useState("");
-  const [footerDesc, setFooterDesc] = useState("");
-  const [footerTerms, setFooterTerms] = useState("");
-  const [footerPrivacy, setFooterPrivacy] = useState("");
-  const [footerContact, setFooterContact] = useState("");
-  const [isLoadingCms, setIsLoadingCms] = useState(true);
-  const [isSavingCms, setIsSavingCms] = useState(false);
+  // CMS States (managed by CmsLandingEditor component)
 
   // Referrals State
   const [referralsList, setReferralsList] = useState<any[]>([]);
@@ -33,9 +20,7 @@ export default function AdminPage() {
   const [isProcessingPayout, setIsProcessingPayout] = useState<{ [key: string]: boolean }>({});
   const [isProcessingAdminPayout, setIsProcessingAdminPayout] = useState<{ [key: string]: boolean }>({});
 
-  // CMS Configurable limits
-  const [minPayoutCashback, setMinPayoutCashback] = useState<number>(50000);
-  const [cashbackToTokenRate, setCashbackToTokenRate] = useState<number>(1000);
+  // CMS Configurable limits (managed by CmsLandingEditor)
 
   // System Settings States
   const [pgConfig, setPgConfig] = useState<any>(null);
@@ -90,28 +75,36 @@ export default function AdminPage() {
   useEffect(() => {
     fetchUsers();
     fetchTransactions();
-    fetchCmsConfig();
     fetchReferralsList();
     fetchPayoutRequestsList();
     fetchSettings();
   }, []);
 
+  const pollingCancelled = useRef(false);
   useEffect(() => {
     const fetchNotifications = async () => {
+      const controller = new AbortController();
       try {
-        const res = await fetch("/api/admin/notifications");
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const res = await fetch("/api/admin/notifications", { signal: controller.signal });
+        clearTimeout(timeoutId);
         if (res.ok) {
           const data = await res.json();
           setAdminNotifications(data);
         }
-      } catch (e) {
-        console.error("Gagal memuat notifikasi admin:", e);
+      } catch {
+        // silent
       }
     };
 
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 15000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (!pollingCancelled.current) fetchNotifications();
+    }, 60000);
+    return () => {
+      pollingCancelled.current = true;
+      clearInterval(interval);
+    };
   }, []);
 
   const fetchUsers = async (queryStr = "") => {
@@ -281,70 +274,6 @@ export default function AdminPage() {
     }
   };
 
-  const fetchCmsConfig = async () => {
-    setIsLoadingCms(true);
-    try {
-      const res = await fetch("/api/admin/cms");
-      if (res.ok) {
-        const data = await res.json();
-        setHeroBadge(data.hero_badge || "");
-        setHeroTitle(data.hero_title || "");
-        setHeroSubtitle(data.hero_subtitle || "");
-        setFeaturesList(data.features || []);
-        setFaqList(data.faq || []);
-        setReferralTerms(data.referral_terms || "");
-        setFooterCopyright(data.footer_copyright || "");
-        setFooterDesc(data.footer_desc || "");
-        setFooterTerms(data.footer_terms || "");
-        setFooterPrivacy(data.footer_privacy || "");
-        setFooterContact(data.footer_contact || "");
-        setMinPayoutCashback(data.min_payout_cashback !== undefined ? Number(data.min_payout_cashback) : 50000);
-        setCashbackToTokenRate(data.cashback_to_token_rate !== undefined ? Number(data.cashback_to_token_rate) : 1000);
-      }
-    } catch (e) {
-      console.error("Gagal memuat CMS:", e);
-    } finally {
-      setIsLoadingCms(false);
-    }
-  };
-
-  const saveCmsConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSavingCms(true);
-    try {
-      const res = await fetch("/api/admin/cms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hero_badge: heroBadge,
-          hero_title: heroTitle,
-          hero_subtitle: heroSubtitle,
-          features: featuresList,
-          faq: faqList,
-          referral_terms: referralTerms,
-          min_payout_cashback: minPayoutCashback,
-          cashback_to_token_rate: cashbackToTokenRate,
-          footer_copyright: footerCopyright,
-          footer_desc: footerDesc,
-          footer_terms: footerTerms,
-          footer_privacy: footerPrivacy,
-          footer_contact: footerContact,
-        }),
-      });
-      if (res.ok) {
-        setSuccessMsg("Konfigurasi Landing Page & Referral berhasil diperbarui!");
-      } else {
-        const err = await res.json();
-        setErrorMsg(err.error || "Gagal memperbarui CMS");
-      }
-    } catch (e) {
-      console.error(e);
-      setErrorMsg("Koneksi gagal saat memperbarui CMS");
-    } finally {
-      setIsSavingCms(false);
-    }
-  };
-
   const fetchSettings = async () => {
     setIsLoadingSettings(true);
     try {
@@ -495,34 +424,6 @@ export default function AdminPage() {
     } finally {
       setTestAiLoading(false);
     }
-  };
-
-  const handleFeatureChange = (index: number, key: 'icon' | 'title' | 'desc', val: string) => {
-    const updated = [...featuresList];
-    updated[index] = { ...updated[index], [key]: val };
-    setFeaturesList(updated);
-  };
-
-  const addFeature = () => {
-    setFeaturesList([...featuresList, { icon: "✨", title: "Fitur Baru", desc: "Deskripsi fitur baru..." }]);
-  };
-
-  const removeFeature = (index: number) => {
-    setFeaturesList(featuresList.filter((_, i) => i !== index));
-  };
-
-  const handleFaqChange = (index: number, key: 'question' | 'answer', val: string) => {
-    const updated = [...faqList];
-    updated[index] = { ...updated[index], [key]: val };
-    setFaqList(updated);
-  };
-
-  const addFaq = () => {
-    setFaqList([...faqList, { question: "Pertanyaan Baru?", answer: "Jawaban baru..." }]);
-  };
-
-  const removeFaq = (index: number) => {
-    setFaqList(faqList.filter((_, i) => i !== index));
   };
 
   const fetchReferralsList = async () => {
@@ -744,6 +645,7 @@ export default function AdminPage() {
             >
               🌐 CMS Landing Page
             </button>
+
             <button
               onClick={() => setActiveTab("referrals")}
               className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
@@ -757,14 +659,7 @@ export default function AdminPage() {
                 </span>
               )}
             </button>
-            <button
-              onClick={() => { setActiveTab("pricing"); fetchSettings(); }}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-                activeTab === "pricing" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              💰 Manajemen Paket
-            </button>
+
             <button
               onClick={() => { setActiveTab("settings"); fetchSettings(); }}
               className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
@@ -810,7 +705,7 @@ export default function AdminPage() {
             </form>
           ) : (
             <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-              {activeTab === "cms" ? "Landing Page Content Editor" : activeTab === "pricing" ? "Package Pricing & Tokens Manager" : "Referral & Cashback Payout Center"}
+              {activeTab === "cms" ? "Landing Page Editor" : "Referral & Cashback Payout Center"}
             </div>
           )}
         </div>
@@ -1114,277 +1009,7 @@ export default function AdminPage() {
               )}
             </div>
           ) : activeTab === "cms" ? (
-            <div className="max-w-4xl mx-auto bg-slate-50 border border-slate-200 rounded-3xl p-6 sm:p-8">
-              {isLoadingCms ? (
-                <div className="text-center py-20 text-slate-400 font-semibold">Memuat konfigurasi CMS...</div>
-              ) : (
-                <form onSubmit={saveCmsConfig} className="space-y-8">
-                  {/* Hero Copy */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-black text-slate-900 border-b border-slate-200 pb-2">🚀 Hero Copy &amp; Header</h3>
-                    <div className="grid grid-cols-1 gap-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase">Hero Badge Text</label>
-                        <input
-                          type="text"
-                          value={heroBadge}
-                          onChange={(e) => setHeroBadge(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-xs outline-none bg-white font-semibold text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
-                          placeholder="Contoh: ✨ Next-Gen AI Edu-Platform..."
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase font-sans">Hero Title (Gunakan \n untuk baris baru)</label>
-                        <textarea
-                          value={heroTitle}
-                          onChange={(e) => setHeroTitle(e.target.value)}
-                          rows={2}
-                          className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-xs outline-none bg-white font-semibold text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
-                          placeholder="Contoh: Pangkas Waktu Administrasi,\nBuat Soal Ujian Otomatis dengan AI"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase">Hero Subtitle</label>
-                        <textarea
-                          value={heroSubtitle}
-                          onChange={(e) => setHeroSubtitle(e.target.value)}
-                          rows={3}
-                          className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-xs outline-none bg-white font-semibold text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
-                          placeholder="Deskripsi platform..."
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Features List */}
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                      <h3 className="text-sm font-black text-slate-900">🧠 Fitur Utama</h3>
-                      <button
-                        type="button"
-                        onClick={addFeature}
-                        className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-                      >
-                        ➕ Tambah Fitur
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4">
-                      {featuresList.map((feat, idx) => (
-                        <div key={idx} className="bg-white border border-slate-200 rounded-3xl p-5 relative space-y-3 shadow-sm">
-                          <button
-                            type="button"
-                            onClick={() => removeFeature(idx)}
-                            className="absolute top-4 right-4 text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-100 px-2.5 py-1.5 rounded-xl transition cursor-pointer"
-                          >
-                            Hapus
-                          </button>
-                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                            <div>
-                              <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase">Emoji Icon</label>
-                              <input
-                                type="text"
-                                value={feat.icon}
-                                onChange={(e) => handleFeatureChange(idx, "icon", e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none bg-slate-50 font-bold text-slate-800 focus:bg-white"
-                                required
-                              />
-                            </div>
-                            <div className="sm:col-span-3">
-                              <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase">Nama Fitur</label>
-                              <input
-                                type="text"
-                                value={feat.title}
-                                onChange={(e) => handleFeatureChange(idx, "title", e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none bg-slate-50 font-bold text-slate-800 focus:bg-white"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase">Deskripsi Fitur</label>
-                            <textarea
-                              value={feat.desc}
-                              onChange={(e) => handleFeatureChange(idx, "desc", e.target.value)}
-                              rows={2}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none bg-slate-50 font-bold text-slate-800 focus:bg-white"
-                              required
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* FAQ List */}
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                      <h3 className="text-sm font-black text-slate-900">❓ FAQ (Tanya Jawab)</h3>
-                      <button
-                        type="button"
-                        onClick={addFaq}
-                        className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-                      >
-                        ➕ Tambah FAQ
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4">
-                      {faqList.map((item, idx) => (
-                        <div key={idx} className="bg-white border border-slate-200 rounded-3xl p-5 relative space-y-3 shadow-sm">
-                          <button
-                            type="button"
-                            onClick={() => removeFaq(idx)}
-                            className="absolute top-4 right-4 text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-100 px-2.5 py-1.5 rounded-xl transition cursor-pointer"
-                          >
-                            Hapus
-                          </button>
-                          <div>
-                            <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase">Pertanyaan FAQ</label>
-                            <input
-                              type="text"
-                              value={item.question}
-                              onChange={(e) => handleFaqChange(idx, "question", e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none bg-slate-50 font-bold text-slate-800 focus:bg-white"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase">Jawaban FAQ</label>
-                            <textarea
-                              value={item.answer}
-                              onChange={(e) => handleFaqChange(idx, "answer", e.target.value)}
-                              rows={2}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none bg-slate-50 font-bold text-slate-800 focus:bg-white"
-                              required
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Referral & Token Configuration */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-black text-slate-900 border-b border-slate-200 pb-2">⚙️ Aturan &amp; Batas Kemitraan</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase">Batas Minimum Pencairan Cashback (Rp)</label>
-                        <input
-                          type="number"
-                          value={minPayoutCashback}
-                          onChange={(e) => setMinPayoutCashback(Number(e.target.value) || 0)}
-                          className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-xs outline-none bg-white font-semibold text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase">Nilai Tukar Cashback ke Token (Rp/Token)</label>
-                        <input
-                          type="number"
-                          value={cashbackToTokenRate}
-                          onChange={(e) => setCashbackToTokenRate(Number(e.target.value) || 0)}
-                          className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-xs outline-none bg-white font-semibold text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Referral Terms */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-black text-slate-900 border-b border-slate-200 pb-2">🎁 Ketentuan Referral</h3>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase font-sans">Referral Terms &amp; Rules Description</label>
-                      <textarea
-                        value={referralTerms}
-                        onChange={(e) => setReferralTerms(e.target.value)}
-                        rows={3}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-xs outline-none bg-white font-semibold text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
-                        placeholder="Ketentuan bonus, token, saldo, dll..."
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Footer Section */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-black text-slate-900 border-b border-slate-200 pb-2">📋 Pengaturan Footer Landing Page</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase">Teks Copyright</label>
-                        <input
-                          type="text"
-                          value={footerCopyright}
-                          onChange={(e) => setFooterCopyright(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-xs outline-none bg-white font-semibold text-slate-800 focus:border-indigo-500 transition"
-                          placeholder="Contoh: GuruPRO Ecosystem © 2026"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase">Deskripsi Singkat Footer</label>
-                        <input
-                          type="text"
-                          value={footerDesc}
-                          onChange={(e) => setFooterDesc(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-xs outline-none bg-white font-semibold text-slate-800 focus:border-indigo-500 transition"
-                          placeholder="Solusi Cerdas Pendidikan Efektif Digital Modern."
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase">Teks / Tautan Ketentuan Layanan (Terms &amp; Conditions)</label>
-                        <input
-                          type="text"
-                          value={footerTerms}
-                          onChange={(e) => setFooterTerms(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-xs outline-none bg-white font-semibold text-slate-800 focus:border-indigo-500 transition"
-                          placeholder="Terms &amp; Conditions..."
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase">Teks / Tautan Kebijakan Privasi (Privacy Policy)</label>
-                        <input
-                          type="text"
-                          value={footerPrivacy}
-                          onChange={(e) => setFooterPrivacy(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-xs outline-none bg-white font-semibold text-slate-800 focus:border-indigo-500 transition"
-                          placeholder="Privacy Policy..."
-                          required
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase">Kontak &amp; Dukungan Pelanggan (Contact Info)</label>
-                        <input
-                          type="text"
-                          value={footerContact}
-                          onChange={(e) => setFooterContact(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-xs outline-none bg-white font-semibold text-slate-800 focus:border-indigo-500 transition"
-                          placeholder="Email: support@gurupro.id | Telp: +62 812 3456 789"
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Submit Button */}
-                  <div className="pt-4 flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={isSavingCms}
-                      className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-2xl shadow-lg shadow-indigo-100 hover:shadow-indigo-200 transition duration-200 cursor-pointer disabled:opacity-50"
-                    >
-                      {isSavingCms ? "Menyimpan..." : "💾 Simpan Perubahan Landing Page"}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
+            <CmsLandingEditor />
           ) : activeTab === "referrals" ? (
             <div className="space-y-8">
               {/* Metrics cards */}
@@ -1562,210 +1187,6 @@ export default function AdminPage() {
                     </table>
                   )}
                 </div>
-              </div>
-            </div>
-          ) : activeTab === "pricing" ? (
-            <div className="p-6 space-y-8 animate-fadeIn">
-              <div className="border-b border-slate-100 pb-4">
-                <h2 className="text-lg font-black text-slate-800 font-sans">💰 Manajemen Paket &amp; Token</h2>
-                <p className="text-xs text-slate-400 mt-1">Konfigurasikan tarif berlangganan, kuota token, dan masa aktif untuk paket Bulanan dan Tahunan GuruPRO.</p>
-              </div>
-
-              {isLoadingSettings ? (
-                <div className="text-center py-12 text-slate-400 font-semibold text-xs">Memuat konfigurasi paket...</div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Free Plan Card */}
-                  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                      <span>⚡</span> Paket Free
-                    </h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Harga Langganan (Rp)</label>
-                        <input
-                          type="number"
-                          value={pricingConfig?.free?.price ?? 0}
-                          onChange={(e) => setPricingConfig({
-                            ...pricingConfig,
-                            free: { ...pricingConfig.free, price: parseInt(e.target.value) || 0 }
-                          })}
-                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:border-indigo-500 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Kuota Token (Token)</label>
-                        <input
-                          type="number"
-                          value={pricingConfig?.free?.tokens ?? 0}
-                          onChange={(e) => setPricingConfig({
-                            ...pricingConfig,
-                            free: { ...pricingConfig.free, tokens: parseInt(e.target.value) || 0 }
-                          })}
-                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:border-indigo-500 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Masa Aktif Paket (Hari)</label>
-                        <input
-                          type="number"
-                          value={pricingConfig?.free?.duration_days ?? 0}
-                          onChange={(e) => setPricingConfig({
-                            ...pricingConfig,
-                            free: { ...pricingConfig.free, duration_days: parseInt(e.target.value) || 0 }
-                          })}
-                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:border-indigo-500 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 3 Month Plan Card */}
-                  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                      <span>📅</span> Paket 3 Bulan
-                    </h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Harga Langganan (Rp)</label>
-                        <input
-                          type="number"
-                          value={pricingConfig?.three_month?.price ?? 0}
-                          onChange={(e) => setPricingConfig({
-                            ...pricingConfig,
-                            three_month: { ...pricingConfig.three_month, price: parseInt(e.target.value) || 0 }
-                          })}
-                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:border-indigo-500 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Kuota Token (Token)</label>
-                        <input
-                          type="number"
-                          value={pricingConfig?.three_month?.tokens ?? 0}
-                          onChange={(e) => setPricingConfig({
-                            ...pricingConfig,
-                            three_month: { ...pricingConfig.three_month, tokens: parseInt(e.target.value) || 0 }
-                          })}
-                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:border-indigo-500 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Masa Aktif Paket (Hari)</label>
-                        <input
-                          type="number"
-                          value={pricingConfig?.three_month?.duration_days ?? 0}
-                          onChange={(e) => setPricingConfig({
-                            ...pricingConfig,
-                            three_month: { ...pricingConfig.three_month, duration_days: parseInt(e.target.value) || 0 }
-                          })}
-                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:border-indigo-500 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 6 Month Plan Card */}
-                  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                      <span>🥈</span> Paket 6 Bulan
-                    </h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Harga Langganan (Rp)</label>
-                        <input
-                          type="number"
-                          value={pricingConfig?.six_month?.price ?? 0}
-                          onChange={(e) => setPricingConfig({
-                            ...pricingConfig,
-                            six_month: { ...pricingConfig.six_month, price: parseInt(e.target.value) || 0 }
-                          })}
-                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:border-indigo-500 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Kuota Token (Token)</label>
-                        <input
-                          type="number"
-                          value={pricingConfig?.six_month?.tokens ?? 0}
-                          onChange={(e) => setPricingConfig({
-                            ...pricingConfig,
-                            six_month: { ...pricingConfig.six_month, tokens: parseInt(e.target.value) || 0 }
-                          })}
-                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:border-indigo-500 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Masa Aktif Paket (Hari)</label>
-                        <input
-                          type="number"
-                          value={pricingConfig?.six_month?.duration_days ?? 0}
-                          onChange={(e) => setPricingConfig({
-                            ...pricingConfig,
-                            six_month: { ...pricingConfig.six_month, duration_days: parseInt(e.target.value) || 0 }
-                          })}
-                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:border-indigo-500 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 1 Year Plan Card */}
-                  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                      <span>🏆</span> Paket 1 Tahun
-                    </h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Harga Langganan (Rp)</label>
-                        <input
-                          type="number"
-                          value={pricingConfig?.one_year?.price ?? 0}
-                          onChange={(e) => setPricingConfig({
-                            ...pricingConfig,
-                            one_year: { ...pricingConfig.one_year, price: parseInt(e.target.value) || 0 }
-                          })}
-                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:border-indigo-500 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Kuota Token (Token)</label>
-                        <input
-                          type="number"
-                          value={pricingConfig?.one_year?.tokens ?? 0}
-                          onChange={(e) => setPricingConfig({
-                            ...pricingConfig,
-                            one_year: { ...pricingConfig.one_year, tokens: parseInt(e.target.value) || 0 }
-                          })}
-                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:border-indigo-500 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Masa Aktif Paket (Hari)</label>
-                        <input
-                          type="number"
-                          value={pricingConfig?.one_year?.duration_days ?? 0}
-                          onChange={(e) => setPricingConfig({
-                            ...pricingConfig,
-                            one_year: { ...pricingConfig.one_year, duration_days: parseInt(e.target.value) || 0 }
-                          })}
-                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:border-indigo-500 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => handleSaveSetting("update_pricing_config", pricingConfig)}
-                  disabled={isSavingSettings}
-                  className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black transition cursor-pointer shadow-lg shadow-indigo-100 disabled:opacity-50"
-                >
-                  {isSavingSettings ? "Menyimpan..." : "💾 Simpan Paket & Harga"}
-                </button>
               </div>
             </div>
           ) : (

@@ -24,7 +24,8 @@ export async function GET() {
               u.nama_lengkap AS user_name, u.email AS user_email, u.whatsapp AS user_wa, u.cashback_balance AS user_current_balance
        FROM payout_requests pr
        JOIN users u ON pr.user_id = u.id
-       ORDER BY pr.created_at DESC`
+       ORDER BY pr.created_at DESC
+       LIMIT 100`
     );
 
     return NextResponse.json(payoutRequests.rows);

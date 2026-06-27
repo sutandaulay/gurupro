@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { handleAuth } from '../actions';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import {
   IconMail,
@@ -135,10 +134,32 @@ function TextField({
   );
 }
 
+/* ============================ Submit button with loading state ============================ */
+
+function SubmitBtn({ label, icon: Icon, loading }: { label: string; icon?: React.ComponentType<{ size?: number; stroke?: number }>; loading?: boolean }) {
+  return (
+    <button
+      type="submit"
+      disabled={loading}
+      className="w-full flex items-center justify-center gap-2 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm rounded-button shadow-md shadow-violet-200 transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer mt-1"
+    >
+      {loading ? (
+        <IconLoader2 size={18} stroke={2} className="animate-spin" />
+      ) : (
+        <>
+          <span>{label}</span>
+          {Icon && <Icon size={18} stroke={2} />}
+        </>
+      )}
+    </button>
+  );
+}
+
 /* ============================ Main content ============================ */
 
 function LoginContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [isRegister, setIsRegister] = useState(false);
 
   // Forgot password flow states: 'none' | 'request_otp' | 'verify_otp'
@@ -148,14 +169,13 @@ function LoginContent() {
   const [newPassword, setNewPassword] = useState('');
 
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
   const [refCode, setRefCode] = useState('');
 
   // New UI states
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
@@ -173,36 +193,63 @@ function LoginContent() {
     }
   }, [searchParams]);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  // Read error from URL (returned by route handler redirect)
+  useEffect(() => {
+    const err = searchParams.get('error');
+    if (err) {
+      setError(decodeURIComponent(err));
+      const newPath = window.location.pathname;
+      window.history.replaceState(null, '', newPath);
+    }
+  }, [searchParams]);
+
+  const clearErrors = () => {
     setError(null);
-    setSuccess(null);
     setEmailError(null);
     setPasswordError(null);
+  };
 
-    // Client-side validation (login mode only)
-    if (!isRegister) {
-      const form = e.currentTarget;
-      const emailVal = (form.elements.namedItem('email') as HTMLInputElement)?.value?.trim();
-      const passVal = (form.elements.namedItem('password') as HTMLInputElement)?.value?.trim();
-      let valid = true;
-      if (!emailVal) {
-        setEmailError('Email atau username wajib diisi.');
-        valid = false;
-      }
-      if (!passVal) {
-        setPasswordError('Password wajib diisi.');
-        valid = false;
-      }
-      if (!valid) return;
+  // Handle login/register form submission via fetch API
+  const handleLoginSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError(null);
+    setEmailError(null);
+    setPasswordError(null);
+    setLoading(true);
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    // Add checkout_plan if present in URL
+    const checkoutPlan = searchParams.get('checkout');
+    if (checkoutPlan) {
+      formData.set('checkout_plan', checkoutPlan);
     }
 
-    setLoading(true);
-    const formData = new FormData(e.currentTarget);
-    const result = await handleAuth(formData);
+    const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
 
-    if (result?.error) {
-      setError(result.error);
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        // Redirect to dashboard or admin based on response
+        router.push(data.redirectUrl);
+      } else {
+        // Show error message
+        setError(data.error || 'Terjadi kesalahan. Silakan coba lagi.');
+      }
+    } catch (err) {
+      console.error('Login/Register Error:', err);
+      setError('Masalah koneksi jaringan. Silakan coba lagi.');
+    } finally {
       setLoading(false);
     }
   };
@@ -336,13 +383,13 @@ function LoginContent() {
             {forgotStep === 'none' && !isRegister && (
               <>
                 <h2 className="text-2xl font-bold text-slate-900">Selamat Datang Kembali</h2>
-                <p className="text-sm text-slate-500 mt-1">Masuk ke akun GuruPRO Anda</p>
+                <p className="text-sm text-slate-500 mt-1">Masuk ke akun GuruPRO AI Anda</p>
               </>
             )}
             {forgotStep === 'none' && isRegister && (
               <>
                 <h2 className="text-2xl font-bold text-slate-900">Daftar Akun Baru</h2>
-                <p className="text-sm text-slate-500 mt-1">Buat akun GuruPRO dalam hitungan menit</p>
+                <p className="text-sm text-slate-500 mt-1">Buat akun GuruPRO AI dalam hitungan menit</p>
               </>
             )}
             {forgotStep === 'request_otp' && (
@@ -384,7 +431,7 @@ function LoginContent() {
                 required
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
-                placeholder="nama@email.com atau username"
+                placeholder="email atau username"
                 disabled={loading}
               />
               <button
@@ -449,8 +496,7 @@ function LoginContent() {
           {/* ===== LOGIN / REGISTER ===== */}
           {forgotStep === 'none' && (
             <>
-              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                <input type="hidden" name="auth_mode" value={isRegister ? 'register' : 'login'} />
+              <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
                 {searchParams.get('checkout') && (
                   <input type="hidden" name="checkout_plan" value={searchParams.get('checkout') || ''} />
                 )}
@@ -462,7 +508,7 @@ function LoginContent() {
                     type="text"
                     name="nama_lengkap"
                     required
-                    placeholder="Contoh: Andi Wijaya, S.Pd."
+                    placeholder="Contoh: ElHanum, S.Pd."
                     disabled={loading}
                   />
                 )}
@@ -473,7 +519,7 @@ function LoginContent() {
                   type={isRegister ? 'email' : 'text'}
                   name="email"
                   required
-                  placeholder={isRegister ? 'nama@email.com' : 'nama@email.com atau username'}
+                  placeholder={isRegister ? 'email' : 'email atau username'}
                   error={emailError}
                   disabled={loading}
                 />
@@ -534,18 +580,10 @@ function LoginContent() {
                   />
                 )}
 
-                {/* Remember me + Forgot password (login only) */}
+                {/* Forgot password (login only) */}
                 {!isRegister && (
                   <div className="flex items-center justify-between -mt-1">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 cursor-pointer"
-                      />
-                      <span className="text-xs font-medium text-slate-600">Ingat saya</span>
-                    </label>
+                    <div />
                     <button
                       type="button"
                       onClick={() => { setForgotStep('request_otp'); setError(null); setSuccess(null); }}
@@ -557,20 +595,11 @@ function LoginContent() {
                 )}
 
                 {/* Submit button */}
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm rounded-button shadow-md shadow-violet-200 transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer mt-1"
-                >
-                  {loading ? (
-                    <IconLoader2 size={18} stroke={2} className="animate-spin" />
-                  ) : (
-                    <>
-                      <span>{isRegister ? 'Daftar Akun GuruPRO' : 'Masuk'}</span>
-                      {!isRegister && <IconArrowRight size={18} stroke={2} />}
-                    </>
-                  )}
-                </button>
+                <SubmitBtn
+                  label={isRegister ? 'Daftar Akun GuruPRO AI' : 'Masuk'}
+                  icon={!isRegister ? IconArrowRight : undefined}
+                  loading={loading}
+                />
               </form>
 
               {/* Divider + Google button (login only) */}

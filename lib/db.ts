@@ -292,6 +292,11 @@ const initDb = async () => {
       )
     `);
 
+    // Ensure payout_requests has bank columns (added after initial creation)
+    await pool.query('ALTER TABLE payout_requests ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100)');
+    await pool.query('ALTER TABLE payout_requests ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(50)');
+    await pool.query('ALTER TABLE payout_requests ADD COLUMN IF NOT EXISTS bank_account_name VARCHAR(150)');
+
     // 20. Alter users table to support password and OTP auth
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(80)');
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique ON users (LOWER(username)) WHERE username IS NOT NULL');
@@ -314,6 +319,7 @@ const initDb = async () => {
       )
     `);
     await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS plan_id VARCHAR(50)');
+    await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT');
 
     // 21. Create system_settings table
     await pool.query(`
