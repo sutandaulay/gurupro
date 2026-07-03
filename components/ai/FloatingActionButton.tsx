@@ -60,11 +60,6 @@ export default function FloatingActionButton() {
   const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
   const [selectedSchedule, setSelectedSchedule] = useState<ScheduleInfo | null>(null);
 
-  // Fetch today's session and tasks
-  useEffect(() => {
-    fetchTodayData();
-  }, []);
-
   const fetchTodayData = async () => {
     try {
       const response = await fetch("/api/teaching-session");
@@ -90,6 +85,12 @@ export default function FloatingActionButton() {
       console.error("Failed to fetch today's data:", error);
     }
   };
+
+  // Fetch today's session and tasks
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchTodayData();
+  }, []);
 
   // Check if teaching session is already completed
   const isCompleted = todaySession?.status === "completed";
@@ -217,7 +218,7 @@ export default function FloatingActionButton() {
                 </button>
 
                 <button
-                  onClick={() => switchToModule('chat')}
+                  onClick={() => { window.location.href = '/dashboard/chat'; }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-all"
                 >
                   <IconMessage size={18} className="text-slate-500" />

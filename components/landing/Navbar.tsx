@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { IconSparklesFilled, IconMenu2, IconX } from "@tabler/icons-react";
@@ -39,10 +40,12 @@ export default function Navbar({
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 group shrink-0">
           {brandingConfig?.app_logo ? ( // CMS: app logo
-            <img
+            <Image
               src={brandingConfig.app_logo}
               alt={appName}
-              className="h-9 object-contain"
+              width={36}
+              height={36}
+              className="object-contain"
             />
           ) : (
             <span className="w-9 h-9 bg-primary-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-primary-200 group-hover:shadow-lg group-hover:shadow-primary-300 transition-shadow">

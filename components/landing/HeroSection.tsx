@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export interface HeroStat {
@@ -108,7 +109,7 @@ export default function HeroSection({
             <div className="relative w-full max-w-lg">
               {ogImage ? (
                 <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-neutral-200/60">
-                  <img src={ogImage} alt={headline} className="w-full h-auto object-cover" />
+                  <Image src={ogImage} alt={headline} width={0} height={0} sizes="100vw" className="w-full h-auto object-cover" />
                   <div className="absolute -top-6 -right-6 w-28 h-28 bg-gradient-to-br from-primary-500 to-purple-600 rounded-3xl shadow-lg shadow-primary-200 -z-10" />
                   <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-gradient-to-br from-purple-400 to-primary-500 rounded-2xl shadow-lg shadow-purple-200 -z-10" />
                 </div>

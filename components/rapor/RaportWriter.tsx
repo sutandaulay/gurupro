@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   IconSparkles,
   IconCheck,
@@ -56,14 +56,6 @@ export default function RaportWriter({
   const [editedDescription, setEditedDescription] = useState("");
   const [editedSaran, setEditedSaran] = useState("");
   const [copied, setCopied] = useState(false);
-
-  // Reset when student changes
-  useEffect(() => {
-    if (student) {
-      setStudentId(student.id);
-      setGenerated(null);
-    }
-  }, [student]);
 
   const handleGenerate = async () => {
     if (!studentId || !subjectId || nilai === "") {

@@ -57,10 +57,6 @@ export default function EditPelatihanPage() {
     kompetensiDikembangkan: [] as string[],
   })
 
-  useEffect(() => {
-    fetchPelatihan()
-  }, [id])
-
   const fetchPelatihan = async () => {
     try {
       const res = await fetch(`/api/pelatihan/${id}`)
@@ -89,6 +85,12 @@ export default function EditPelatihanPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchPelatihan()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

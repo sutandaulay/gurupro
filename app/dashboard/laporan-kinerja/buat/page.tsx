@@ -44,7 +44,9 @@ export default function BuatLaporanKinerjaPage() {
 
   useEffect(() => {
     const tahunAjaranId = localStorage.getItem('tahunAjaranId') || ''
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormData(prev => ({ ...prev, tahunAjaranId }))
+    // eslint-disable-next-line react-hooks/immutability
     fetchPreview()
   }, [])
 

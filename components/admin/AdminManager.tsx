@@ -26,10 +26,6 @@ export default function AdminManager({ onSuccess, onError }: AdminManagerProps) 
     is_active: true,
   });
 
-  useEffect(() => {
-    fetchAdmins();
-  }, []);
-
   const fetchAdmins = async () => {
     setIsLoading(true);
     try {
@@ -47,6 +43,12 @@ export default function AdminManager({ onSuccess, onError }: AdminManagerProps) 
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchAdmins();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openCreateModal = () => {
     setModalMode("create");

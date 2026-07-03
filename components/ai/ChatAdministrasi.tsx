@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   IconSend,
   IconSparkles,
   IconUser,
   IconTrash,
   IconX,
+  IconArrowLeft,
   IconBook,
   IconFileText,
   IconMessage,
@@ -14,6 +15,10 @@ import {
   IconUsers,
   IconPhone,
 } from "@tabler/icons-react";
+
+interface ChatAdministrasiProps {
+  onBack?: () => void;
+}
 
 interface ChatMessage {
   id: string;
@@ -72,22 +77,12 @@ const quickActions: QuickAction[] = [
   },
 ];
 
-export default function ChatAdministrasi() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputMessage, setInputMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string>("");
-  const [error, setError] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  // Initial welcome message
-  useEffect(() => {
-    setMessages([
-      {
-        id: "welcome",
-        role: "assistant",
-        content: `Selamat datang! 👋
+export default function ChatAdministrasi({ onBack }: ChatAdministrasiProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: "welcome",
+      role: "assistant",
+      content: `Selamat datang! 👋
 
 Saya adalah asisten AI GuruPRO yang siap membantu Anda dalam administrasi sekolah.
 
@@ -100,10 +95,15 @@ Saya adalah asisten AI GuruPRO yang siap membantu Anda dalam administrasi sekola
 - 📄 Membuat deskripsi rapor
 
 Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
-        timestamp: new Date(),
-      },
-    ]);
-  }, []);
+      timestamp: new Date(),
+    },
+  ]);
+  const [inputMessage, setInputMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -207,47 +207,47 @@ Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 rounded-2xl overflow-hidden">
+    <div className="flex flex-col h-full bg-slate-50 rounded-none sm:rounded-2xl overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-3">
+      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-2 sm:px-4 py-2.5 sm:py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-              <IconSparkles className="text-white" size={18} />
+            {onBack && (
+              <button onClick={onBack} className="text-white/80 hover:text-white p-1 -ml-1">
+                <IconArrowLeft size={20} />
+              </button>
+            )}
+            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-white/20 rounded-lg flex items-center justify-center">
+              <IconSparkles className="text-white" size={16} />
             </div>
             <div>
-              <h3 className="font-bold text-white text-sm">AI Chat Administrasi</h3>
+              <h3 className="font-bold text-white text-sm">AI Chat</h3>
               <p className="text-[10px] text-white/80">Tanyakan apa saja</p>
             </div>
           </div>
-          <button
-            onClick={handleClearChat}
-            className="text-white/80 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition"
-            title="Hapus Percakapan"
-          >
-            <IconTrash size={16} />
-          </button>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="px-4 py-2 bg-white border-b border-slate-100">
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {quickActions.map((action, index) => (
+          <div className="flex items-center gap-1">
             <button
-              key={index}
-              onClick={() => handleQuickAction(action.prompt)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 ${action.color} text-white rounded-full text-xs font-medium whitespace-nowrap hover:opacity-90 transition`}
+              onClick={handleClearChat}
+              className="text-white/80 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition"
+              title="Hapus Percakapan"
             >
-              {action.icon}
-              <span>{action.label}</span>
+              <IconTrash size={16} />
             </button>
-          ))}
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="text-white/80 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition sm:hidden"
+                title="Tutup"
+              >
+                <IconX size={18} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -318,8 +318,24 @@ Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Quick Actions */}
+      <div className="px-2 sm:px-4 py-2 bg-white border-t border-slate-100">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {quickActions.map((action, index) => (
+            <button
+              key={index}
+              onClick={() => handleQuickAction(action.prompt)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 ${action.color} text-white rounded-full text-xs font-medium whitespace-nowrap hover:opacity-90 transition shrink-0`}
+            >
+              {action.icon}
+              <span>{action.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Input */}
-      <div className="p-4 bg-white border-t border-slate-100">
+      <div className="p-2 sm:p-4 bg-white border-t border-slate-100">
         <div className="flex gap-2">
           <textarea
             ref={inputRef}

@@ -37,7 +37,7 @@ interface SelesaiMengajarModalProps {
 
 type ModalStep = 'select' | 'input' | 'processing' | 'result';
 
-export default function SelesaiMengajarModal({
+function SelesaiMengajarModalContent({
   isOpen,
   onClose,
   preselectedSchedule,
@@ -45,7 +45,7 @@ export default function SelesaiMengajarModal({
   onComplete,
 }: SelesaiMengajarModalProps) {
   // State
-  const [step, setStep] = useState<ModalStep>('select');
+  const [step, setStep] = useState<ModalStep>(preselectedSchedule ? 'input' : 'select');
   const [schedules, setSchedules] = useState<ScheduleInfo[]>([]);
   const [selectedSchedule, setSelectedSchedule] = useState<ScheduleInfo | null>(
     preselectedSchedule || null
@@ -68,32 +68,6 @@ export default function SelesaiMengajarModal({
   const [result, setResult] = useState<SelesaiMengajarResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load schedules on mount
-  useEffect(() => {
-    if (isOpen) {
-      fetchSchedules();
-      // If preselected or only 1 schedule, skip to input
-      if (preselectedSchedule) {
-        setSelectedSchedule(preselectedSchedule);
-        setStep('input');
-      }
-    }
-  }, [isOpen, preselectedSchedule]);
-
-  // Reset on close
-  useEffect(() => {
-    if (!isOpen) {
-      setStep('select');
-      setSelectedSchedule(null);
-      setTopik('');
-      setAttendance({ hadir: 32, izin: 0, sakit: 0, alpha: 0, total: 32 });
-      setCatatan('');
-      setProgress([]);
-      setResult(null);
-      setError(null);
-    }
-  }, [isOpen]);
-
   const fetchSchedules = async () => {
     try {
       const response = await fetch('/api/selesai-mengajar');
@@ -110,6 +84,11 @@ export default function SelesaiMengajarModal({
       console.error('Failed to fetch schedules:', err);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchSchedules();
+  }, []);
 
   const handleSelectSchedule = (schedule: ScheduleInfo) => {
     setSelectedSchedule(schedule);
@@ -580,4 +559,8 @@ export default function SelesaiMengajarModal({
       `}</style>
     </>
   );
+}
+
+export default function SelesaiMengajarModal(props: SelesaiMengajarModalProps) {
+  return props.isOpen ? <SelesaiMengajarModalContent {...props} /> : null;
 }

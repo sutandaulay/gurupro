@@ -48,7 +48,7 @@ interface GeneratedContent {
   followup?: string;
 }
 
-export default function SelesaiMengajarModal({
+function SelesaiMengajarModalContent({
   isOpen,
   onClose,
   schedule,
@@ -64,17 +64,6 @@ export default function SelesaiMengajarModal({
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState("");
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent>({});
-
-  // Reset state when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setStep("confirm");
-      setError(null);
-      setGeneratedContent({});
-      setMateriInput("");
-      setCatatanGuru("");
-    }
-  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -468,4 +457,8 @@ export default function SelesaiMengajarModal({
       `}</style>
     </div>
   );
+}
+
+export default function SelesaiMengajarModal(props: SelesaiMengajarModalProps) {
+  return props.isOpen ? <SelesaiMengajarModalContent {...props} /> : null;
 }

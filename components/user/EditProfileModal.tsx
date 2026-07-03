@@ -33,7 +33,6 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
 
   useEffect(() => {
     if (isOpen && currentUser) {
-      setIsLoading(true);
       // Ambil data user terbaru dari session/server
       fetch('/api/user/profile')
         .then(res => res.json())

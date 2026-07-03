@@ -42,12 +42,7 @@ export default function SelesaiMengajarFAB({ className = '' }: SelesaiMengajarFA
   const [schedules, setSchedules] = useState<ScheduleInfo[]>([]);
   const [currentSchedule, setCurrentSchedule] = useState<ScheduleInfo | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  // Check visibility based on teaching hours
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [mounted, setMounted] = useState(true);
 
   useEffect(() => {
     if (!mounted) return;
@@ -87,12 +82,13 @@ export default function SelesaiMengajarFAB({ className = '' }: SelesaiMengajarFA
 
   // Update visibility based on teaching hours
   useEffect(() => {
-    if (!mounted || schedules.length === 0) {
-      setIsVisible(false);
-      return;
-    }
+    if (!mounted) return;
 
     const checkVisibility = () => {
+      if (schedules.length === 0) {
+        setIsVisible(false);
+        return;
+      }
       const now = new Date();
       const shouldShow = isJamMengajar(schedules, now, 30);
       setIsVisible(shouldShow && !isCompleted);

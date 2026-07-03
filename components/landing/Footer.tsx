@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { IconSparklesFilled } from "@tabler/icons-react";
 
 export interface FooterLink {
@@ -165,10 +166,12 @@ export default function Footer({
             {/* Logo */}
             <div className="flex items-center gap-2 mb-4">
               {appLogo ? (
-                <img
+                <Image
                   src={appLogo}
                   alt={appName}
-                  className="h-9 object-contain brightness-0 invert"
+                  width={36}
+                  height={36}
+                  className="object-contain brightness-0 invert"
                 />
               ) : (
                 <span className="w-9 h-9 bg-primary-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-primary-800/30">

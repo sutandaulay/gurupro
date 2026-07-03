@@ -93,16 +93,22 @@ Kami dari GuruPRO ingin mengingatkan bahwa pembayaran untuk paket premium Anda:
 
 Terima kasih 🙏`;
 
-      setEmailSubject(defaultEmailSubject);
-      setEmailBody(defaultEmailBody);
-      setWaMessage(defaultWaMessage);
+      const timer = setTimeout(() => {
+        setEmailSubject(defaultEmailSubject);
+        setEmailBody(defaultEmailBody);
+        setWaMessage(defaultWaMessage);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [transaction]);
 
   // Reset result when modal opens
   useEffect(() => {
     if (isOpen) {
-      setResult(null);
+      const timer = setTimeout(() => {
+        setResult(null);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen]);
 

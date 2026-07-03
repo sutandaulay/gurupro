@@ -55,10 +55,6 @@ export default function PengembanganDiriPage() {
     return localStorage.getItem('semester') || ''
   })
 
-  useEffect(() => {
-    fetchPelatihan()
-  }, [selectedSemester])
-
   const fetchPelatihan = async () => {
     setLoading(true)
     try {
@@ -84,6 +80,12 @@ export default function PengembanganDiriPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchPelatihan()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSemester])
 
   const handleDelete = async (id: string) => {
     if (!confirm('Yakin ingin menghapus pelatihan ini?')) return

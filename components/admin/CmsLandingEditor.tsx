@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState, useCallback } from "react";
 import {
   IconFileText, IconStar, IconThumbUp, IconSchool, IconPointer,
@@ -257,6 +258,7 @@ export default function CmsLandingEditor() {
       }
 
       // Load blog data
+      // eslint-disable-next-line react-hooks/immutability
       await fetchBlogData();
 
       // Load FAQ & Referral & Legal from settings
@@ -276,6 +278,7 @@ export default function CmsLandingEditor() {
     };
 
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchBlogData = async () => {
@@ -779,7 +782,7 @@ export default function CmsLandingEditor() {
               <div className="flex items-center gap-3">
                 {hero.ogImage ? (
                   <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-neutral-200 flex-shrink-0">
-                    <img src={hero.ogImage as string} alt="OG Preview" className="w-full h-full object-cover" />
+                    <Image src={hero.ogImage as string} alt="OG Preview" fill className="object-cover" />
                     <button onClick={() => setHero({ ...hero, ogImage: null })}
                       className="absolute top-0.5 right-0.5 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center cursor-pointer hover:bg-rose-600">×</button>
                   </div>

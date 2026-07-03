@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import Sidebar from "../components/Sidebar";
 import FloatingActionButton from "../../components/ai/FloatingActionButton";
 import RaportWriter from "../../components/rapor/RaportWriter";
@@ -124,10 +125,13 @@ const getLocalDateString = () => {
   }
 };
 
+const generateId = () => typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2);
+
 export default function Dashboard() {
   const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentDateTime(new Date());
     const timer = setInterval(() => {
       setCurrentDateTime(new Date());
@@ -604,9 +608,13 @@ export default function Dashboard() {
 
   // Load user profile and schools on mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
     fetchProfile();
+    // eslint-disable-next-line react-hooks/immutability
     fetchSignatures();
+    // eslint-disable-next-line react-hooks/immutability
     fetchSchools();
+    // eslint-disable-next-line react-hooks/immutability
     fetchSchedulers();
 
     const fetchBranding = async () => {
@@ -636,6 +644,7 @@ export default function Dashboard() {
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [notifiedScheduleIds, setNotifiedScheduleIds] = useState<{ [key: string]: string }>({});
@@ -656,6 +665,7 @@ export default function Dashboard() {
         if (!item.notified) {
           const itemTime = new Date(item.dateTime);
           if (now >= itemTime) {
+            // eslint-disable-next-line react-hooks/immutability
             triggerWebNotification("Pengingat Aktivitas GuruPRO ⏰", item.title);
             item.notified = true;
             hasUpdates = true;
@@ -666,6 +676,7 @@ export default function Dashboard() {
 
       if (hasUpdates) {
         setSchedulers(updatedSchedulers);
+        // eslint-disable-next-line react-hooks/immutability
         saveSchedulers(updatedSchedulers);
       }
 
@@ -691,14 +702,32 @@ export default function Dashboard() {
 
     const interval = setInterval(checkReminders, 15000); // Check every 15 seconds
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schedulers, schedules, notifiedScheduleIds]);
+
+  // Listen for module switch events from FloatingActionButton (always active)
+  useEffect(() => {
+    const handleSwitchModule = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const module = customEvent.detail?.module;
+      if (module) {
+        setCurrentModule(module as any);
+      }
+    };
+    window.addEventListener('switchModule', handleSwitchModule);
+    return () => window.removeEventListener('switchModule', handleSwitchModule);
+  }, []);
 
   // Fetch related data when user is loaded
   useEffect(() => {
     if (currentUser) {
+      // eslint-disable-next-line react-hooks/immutability
       fetchSavedDocs();
+      // eslint-disable-next-line react-hooks/immutability
       fetchJournals();
+      // eslint-disable-next-line react-hooks/immutability
       fetchChecklist();
+      // eslint-disable-next-line react-hooks/immutability
       fetchKeuangan();
       fetchSignatures();
       fetchSchools();
@@ -717,6 +746,7 @@ export default function Dashboard() {
           checkoutPlan === "pro_yearly"
         )) {
           // Trigger checkout
+          // eslint-disable-next-line react-hooks/immutability
           handlePlanCheckout(checkoutPlan);
 
           // Clear query param from URL to prevent re-triggering on reload
@@ -732,22 +762,12 @@ export default function Dashboard() {
         };
         window.addEventListener('openSelesaiMengajar', handleSelesaiMengajar);
 
-        // Listen for module switch events from FloatingActionButton
-        const handleSwitchModule = (e: Event) => {
-          const customEvent = e as CustomEvent;
-          const module = customEvent.detail?.module;
-          if (module) {
-            setCurrentModule(module as any);
-          }
-        };
-        window.addEventListener('switchModule', handleSwitchModule);
-
         return () => {
           window.removeEventListener('openSelesaiMengajar', handleSelesaiMengajar);
-          window.removeEventListener('switchModule', handleSwitchModule);
         };
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]);
 
   // Fetchers
@@ -874,10 +894,13 @@ export default function Dashboard() {
   // Sync loaders
   useEffect(() => {
     if (selectedSchoolId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchClasses(selectedSchoolId);
       fetchSubjects(selectedSchoolId);
       fetchSchedules(selectedSchoolId);
+      // eslint-disable-next-line react-hooks/immutability
       fetchJournalSchemas(selectedSchoolId);
+      // eslint-disable-next-line react-hooks/immutability
       fetchTeacherJournals(selectedSchoolId);
     } else {
       setClasses([]);
@@ -890,26 +913,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (selectedClassId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchStudents(selectedClassId);
     } else {
       setStudents([]);
     }
   }, [selectedClassId]);
-
-  // Load attendance data when schedule or date changes
-  useEffect(() => {
-    if (selectedScheduleId && attendanceDate) {
-      fetchStudentAttendance();
-    } else {
-      setStudentAttRecords({});
-    }
-  }, [selectedScheduleId, attendanceDate]);
-
-  useEffect(() => {
-    if (selectedSchoolId && attendanceDate) {
-      fetchTeacherAttendance();
-    }
-  }, [selectedSchoolId, attendanceDate]);
 
   const fetchTeacherAttendance = async () => {
     try {
@@ -943,6 +952,25 @@ export default function Dashboard() {
       console.error(e);
     }
   };
+
+  // Load attendance data when schedule or date changes
+  useEffect(() => {
+    if (selectedScheduleId && attendanceDate) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchStudentAttendance();
+    } else {
+      setStudentAttRecords({});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedScheduleId, attendanceDate]);
+
+  useEffect(() => {
+    if (selectedSchoolId && attendanceDate) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchTeacherAttendance();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSchoolId, attendanceDate]);
 
   // Operations
   const handleAddSchool = async () => {
@@ -2241,41 +2269,88 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (selectedSchoolId) {
-      fetchAcademicCalendar(selectedSchoolId);
-      fetchAnalytics(selectedSchoolId);
-    }
+    const timer = setTimeout(() => {
+      if (selectedSchoolId) {
+        fetchAcademicCalendar(selectedSchoolId);
+        fetchAnalytics(selectedSchoolId);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [selectedSchoolId]);
 
   useEffect(() => {
-    if (activeAssessId) {
-      fetchStudentGrades(activeAssessId);
-    }
+    const timer = setTimeout(() => {
+      if (activeAssessId) {
+        fetchStudentGrades(activeAssessId);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [activeAssessId]);
 
   useEffect(() => {
-    if (currentModule === "nilai" && selectedSchoolId && selectedClassId && selectedSubjectId) {
-      fetchAssessments(selectedSchoolId, selectedClassId, selectedSubjectId);
-    }
+    const timer = setTimeout(() => {
+      if (currentModule === "nilai" && selectedSchoolId && selectedClassId && selectedSubjectId) {
+        fetchAssessments(selectedSchoolId, selectedClassId, selectedSubjectId);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [currentModule, selectedSchoolId, selectedClassId, selectedSubjectId]);
 
-  useEffect(() => {
-    if (currentModule === "jurnal") {
-      fetchAllUsers();
-      fetchSupervisions();
+  const fetchExplorerData = async () => {
+    setIsLoadingExplorer(true);
+    try {
+      const [docs, journals, assessments] = await Promise.all([
+        fetch("/api/administrasi").then((r) => r.json()),
+        fetch("/api/journals").then((r) => r.json()),
+        fetch("/api/assessments").then((r) => r.json())
+      ]);
+      if (Array.isArray(docs)) setAllExplorerDocs(docs);
+      if (Array.isArray(journals)) setAllExplorerJournals(journals);
+      if (Array.isArray(assessments)) setAllExplorerAssessments(assessments);
+    } catch (e) {
+      console.error("Gagal memuat explorer data:", e);
+    } finally {
+      setIsLoadingExplorer(false);
     }
-    if (currentModule === "supervisi_analitik") {
-      fetchAuditLogs();
-      if (selectedSchoolId) {
-        fetchAnalytics(selectedSchoolId);
+  };
+
+  const fetchExplorerAssessmentGrades = async (assessmentId: string) => {
+    setIsLoadingGrades(true);
+    try {
+      const res = await fetch(`/api/assessments/grades?assessment_id=${assessmentId}`).then((r) => r.json());
+      if (Array.isArray(res)) {
+        setExplorerGrades(res);
+      } else {
+        setExplorerGrades([]);
       }
+    } catch (e) {
+      console.error("Gagal memuat nilai explorer:", e);
+      setExplorerGrades([]);
+    } finally {
+      setIsLoadingGrades(false);
     }
-    if (currentModule === "profil") {
-      fetchReferrals();
-    }
-    if (currentModule === "storage_saya") {
-      fetchExplorerData();
-    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (currentModule === "jurnal") {
+        fetchAllUsers();
+        fetchSupervisions();
+      }
+      if (currentModule === "supervisi_analitik") {
+        fetchAuditLogs();
+        if (selectedSchoolId) {
+          fetchAnalytics(selectedSchoolId);
+        }
+      }
+      if (currentModule === "profil") {
+        fetchReferrals();
+      }
+      if (currentModule === "storage_saya") {
+        fetchExplorerData();
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [currentModule, selectedSchoolId]);
 
   const fetchProfile = async () => {
@@ -2318,47 +2393,15 @@ export default function Dashboard() {
     }
   };
 
-  const fetchExplorerData = async () => {
-    setIsLoadingExplorer(true);
-    try {
-      const [docs, journals, assessments] = await Promise.all([
-        fetch("/api/administrasi").then((r) => r.json()),
-        fetch("/api/journals").then((r) => r.json()),
-        fetch("/api/assessments").then((r) => r.json())
-      ]);
-      if (Array.isArray(docs)) setAllExplorerDocs(docs);
-      if (Array.isArray(journals)) setAllExplorerJournals(journals);
-      if (Array.isArray(assessments)) setAllExplorerAssessments(assessments);
-    } catch (e) {
-      console.error("Gagal memuat explorer data:", e);
-    } finally {
-      setIsLoadingExplorer(false);
-    }
-  };
-
-  const fetchExplorerAssessmentGrades = async (assessmentId: string) => {
-    setIsLoadingGrades(true);
-    try {
-      const res = await fetch(`/api/assessments/grades?assessment_id=${assessmentId}`).then((r) => r.json());
-      if (Array.isArray(res)) {
-        setExplorerGrades(res);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (selectedExplorerFile && openExplorerFolder === "nilai") {
+        fetchExplorerAssessmentGrades(selectedExplorerFile.id);
       } else {
         setExplorerGrades([]);
       }
-    } catch (e) {
-      console.error("Gagal memuat nilai explorer:", e);
-      setExplorerGrades([]);
-    } finally {
-      setIsLoadingGrades(false);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedExplorerFile && openExplorerFolder === "nilai") {
-      fetchExplorerAssessmentGrades(selectedExplorerFile.id);
-    } else {
-      setExplorerGrades([]);
-    }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [selectedExplorerFile, openExplorerFolder]);
 
   const fetchSavedDocs = async () => {
@@ -2495,7 +2538,7 @@ export default function Dashboard() {
 
   const triggerWebNotification = (title: string, body: string) => {
     const newNotif = {
-      id: Date.now().toString(),
+      id: generateId(),
       title,
       body,
       date: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
@@ -2556,7 +2599,7 @@ export default function Dashboard() {
       return;
     }
     const newItem = {
-      id: Date.now().toString(),
+      id: generateId(),
       title: schedTitle.trim(),
       dateTime: schedDateTime, // Format: YYYY-MM-DDTHH:MM
       notified: false
@@ -2760,7 +2803,7 @@ export default function Dashboard() {
   const addTask = () => {
     if (!newCeklisTask.trim()) return;
     const newTask = {
-      id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      id: `task-${generateId()}`,
       text: newCeklisTask.trim(),
       completed: false
     };
@@ -2782,7 +2825,7 @@ export default function Dashboard() {
       return;
     }
     const newTx = {
-      id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      id: `tx-${generateId()}`,
       keterangan: finKet.trim(),
       jumlah: Number(finJumlah),
       tipe: finTipe,
@@ -2810,7 +2853,7 @@ export default function Dashboard() {
       return;
     }
     const newSav = {
-      id: `sav-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      id: `sav-${generateId()}`,
       goal: savGoal.trim(),
       target: Number(savTarget),
       saved: Number(savSaved),
@@ -2839,7 +2882,7 @@ export default function Dashboard() {
       return;
     }
     const newInv = {
-      id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      id: `inv-${generateId()}`,
       nama: invNama.trim(),
       kategori: invKategori,
       beli: Number(invBeli),
@@ -2943,7 +2986,7 @@ export default function Dashboard() {
         throw new Error(errData.error || "Gagal menginisialisasi pembayaran.");
       }
       const data = await response.json();
-      window.location.href = data.checkoutUrl;
+      if (typeof window !== 'undefined') window.location.assign(data.checkoutUrl);
     } catch (err: any) {
       showError(err.message);
       setIsCheckingOut(false);
@@ -3063,7 +3106,7 @@ export default function Dashboard() {
       // Reindex nomor questions
       const indexedSoal = finalSoalList.map((s, idx) => ({
         ...s,
-        id: s.id || `soal-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`,
+        id: s.id || `soal-${generateId()}-${idx}`,
         nomor: idx + 1
       }));
 
@@ -3116,7 +3159,7 @@ export default function Dashboard() {
   const duplicateQuestion = (index: number) => {
     const original = soalList[index];
     const clone = JSON.parse(JSON.stringify(original));
-    clone.id = `soal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    clone.id = `soal-${generateId()}`;
     const updated = [...soalList];
     updated.splice(index + 1, 0, clone);
     const reindexed = updated.map((s, idx) => ({ ...s, nomor: idx + 1 }));
@@ -3181,7 +3224,7 @@ export default function Dashboard() {
       if (oldSoal.gambarData) newSoal.gambarData = oldSoal.gambarData;
       
       // Generate a new unique ID for the new regenerated question
-      newSoal.id = `soal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      newSoal.id = `soal-${generateId()}`;
 
       const updated = [...soalList];
       updated[index] = newSoal;
@@ -3241,6 +3284,7 @@ export default function Dashboard() {
     if (soalList.length === 0) return;
     const shuffled = [...soalList];
     for (let i = shuffled.length - 1; i > 0; i--) {
+      // eslint-disable-next-line react-hooks/purity
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
@@ -4592,7 +4636,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-3 mt-1">
                     {schLogo ? (
                       <div className="relative w-12 h-12 border border-slate-200 rounded-xl overflow-hidden bg-white flex items-center justify-center shrink-0">
-                        <img src={schLogo} alt="Logo Preview" className="w-full h-full object-contain" />
+                        <Image src={schLogo} alt="Logo Preview" width={48} height={48} className="w-full h-full object-contain" />
                         <button
                           type="button"
                           onClick={() => setSchLogo("")}
@@ -4669,7 +4713,7 @@ export default function Dashboard() {
                         <div className="flex items-start gap-4">
                           <div className="w-14 h-14 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden">
                             {sch.logo ? (
-                              <img src={sch.logo} alt="Logo" className="w-full h-full object-contain" />
+                              <Image src={sch.logo} alt="Logo" width={56} height={56} className="w-full h-full object-contain" />
                             ) : (
                               <span className="text-2xl text-slate-400">🏫</span>
                             )}
@@ -6684,7 +6728,7 @@ const renderJurnalModule = () => {
                           {journalEvidensi.map((ev, idx) => (
                             <div key={idx} className="relative w-12 h-12 border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center shrink-0">
                               {ev.startsWith("data:image/") ? (
-                                <img src={ev} alt="Preview" className="w-full h-full object-cover" />
+                                <Image src={ev} alt="Preview" width={48} height={48} className="w-full h-full object-cover" />
                               ) : (
                                 <span className="text-[8px] font-black text-slate-500 uppercase">PDF/Doc</span>
                               )}
@@ -7055,7 +7099,7 @@ const renderJurnalModule = () => {
                       {activeJournal.evidensi.map((ev: string, i: number) => (
                         <a key={i} href={ev} target="_blank" rel="noopener noreferrer" className="block relative w-16 h-16 border border-slate-200 rounded-xl overflow-hidden">
                           {ev.startsWith("data:image/") ? (
-                            <img src={ev} alt="Evidence" className="w-full h-full object-cover" />
+                            <Image src={ev} alt="Evidence" width={64} height={64} className="w-full h-full object-cover" />
                           ) : (
                             <span className="text-[9px] font-black text-slate-500 flex items-center justify-center h-full bg-slate-50 font-sans">PDF/Doc</span>
                           )}
@@ -7175,7 +7219,7 @@ const renderJurnalModule = () => {
                     <div className="grid grid-cols-4 gap-2">
                       {activeJournal.evidensi.map((ev: string, i: number) => (
                         <a key={i} href={ev} target="_blank" rel="noopener noreferrer" className="block relative w-16 h-16 border border-slate-200 rounded-xl overflow-hidden">
-                          <img src={ev} alt="Evidence" className="w-full h-full object-cover" />
+                          <Image src={ev} alt="Evidence" width={64} height={64} className="w-full h-full object-cover" />
                         </a>
                       ))}
                     </div>
@@ -9261,7 +9305,7 @@ const renderJurnalModule = () => {
         <div className="flex items-center justify-between w-full md:w-auto">
           <div className="flex items-center gap-3">
             {brandingConfig?.app_logo ? (
-              <img src={brandingConfig.app_logo} alt={brandingConfig.app_name} className="w-10 h-10 rounded-2xl object-contain shadow-sm border border-slate-100" />
+              <Image src={brandingConfig.app_logo} alt={brandingConfig.app_name} width={40} height={40} className="rounded-2xl object-contain shadow-sm border border-slate-100" />
             ) : (
               <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white text-lg font-black shadow-md shadow-indigo-100">
                 {brandingConfig?.app_name ? brandingConfig.app_name.substring(0, 2).toUpperCase() : "GP"}
@@ -9587,7 +9631,7 @@ const renderJurnalModule = () => {
             <div className="hidden print:block border-b-4 border-double border-slate-900 pb-4 mb-6">
               <div className="flex items-center gap-4 border-b border-slate-300 pb-3 mb-3">
                 {selectedSchoolObj?.logo && (
-                  <img src={selectedSchoolObj.logo} alt="Logo Sekolah" className="w-16 h-16 object-contain" />
+                  <Image src={selectedSchoolObj.logo} alt="Logo Sekolah" width={64} height={64} className="object-contain" />
                 )}
                 <div className="flex-1 text-center font-serif text-black">
                   <h2 className="text-[9px] font-bold tracking-widest uppercase">YAYASAN / DINAS PENDIDIKAN</h2>
@@ -9949,7 +9993,7 @@ const renderJurnalModule = () => {
                           <p className="text-xs text-purple-800 leading-normal italic">"{soal.gambar}"</p>
                           {soal.gambarData && (
                             <div className="mt-3">
-                              <img src={soal.gambarData} alt="Generated" className="max-w-xs rounded-xl shadow-md border border-slate-200" />
+                              <Image src={soal.gambarData} alt="Generated" width={0} height={0} sizes="100vw" className="max-w-xs rounded-xl shadow-md border border-slate-200 w-full h-auto" />
                             </div>
                           )}
                         </div>

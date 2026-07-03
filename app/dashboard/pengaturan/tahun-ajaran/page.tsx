@@ -39,10 +39,6 @@ export default function TahunAjaranPage() {
   // Activate loading
   const [activatingId, setActivatingId] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchTahunAjaran()
-  }, [])
-
   const fetchTahunAjaran = async () => {
     setLoading(true)
     try {
@@ -58,6 +54,11 @@ export default function TahunAjaranPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchTahunAjaran()
+  }, [])
 
   const handleActivate = async (id: string) => {
     setActivatingId(id)

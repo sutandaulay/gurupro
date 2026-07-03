@@ -132,6 +132,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    if (!result.success) {
+      return NextResponse.json({
+        error: result.error || 'Gagal mendapatkan respons AI',
+      }, { status: 500 });
+    }
+
     // Calculate cost
     const cost = result.usage ? estimateCost(result.usage) : { totalCost: 0 };
 

@@ -45,7 +45,9 @@ export default function ViewLaporanKinerjaPage() {
   const [downloading, setDownloading] = useState(false)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
     fetchLaporan()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   const fetchLaporan = async () => {

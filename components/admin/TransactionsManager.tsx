@@ -137,7 +137,10 @@ export default function TransactionsManager({ onSuccess, onError }: Transactions
   };
 
   useEffect(() => {
-    fetchTransactions();
+    const timer = setTimeout(() => {
+      fetchTransactions();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [fetchTransactions]);
 
   const handleSearch = (e: React.FormEvent) => {

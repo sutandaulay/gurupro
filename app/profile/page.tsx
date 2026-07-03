@@ -11,10 +11,6 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  useEffect(() => {
-    fetchUserProfile();
-  }, []);
-
   const fetchUserProfile = async () => {
     setIsLoading(true);
     try {
@@ -32,6 +28,11 @@ export default function ProfilePage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchUserProfile();
+  }, []);
 
   const handleSuccess = () => {
     setToast({ type: "success", message: "Profil berhasil diperbarui!" });

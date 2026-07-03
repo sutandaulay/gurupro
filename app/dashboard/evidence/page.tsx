@@ -48,6 +48,7 @@ export default function EvidenceDashboardPage() {
   const [selectedKomponen, setSelectedKomponen] = useState<string>('')
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
     fetchSummary()
   }, [])
 

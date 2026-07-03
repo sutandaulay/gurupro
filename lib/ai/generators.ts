@@ -6,36 +6,38 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 
 // Initialize Gemini AI
-const genAI = process.env.GOOGLE_AI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY)
-  : null;
+const googleAIKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || '';
+const genAI = googleAIKey ? new GoogleGenerativeAI(googleAIKey) : null;
 
 // Get Gemini model
-function getModel() {
+function getModel(apiVersion?: string) {
   if (!genAI) {
     throw new Error('Google AI API key not configured');
   }
-  return genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    safetySettings: [
-      {
-        category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-      },
-      {
-        category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-      },
-      {
-        category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-      },
-      {
-        category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-      },
-    ],
-  });
+  return genAI.getGenerativeModel(
+    {
+      model: 'gemini-2.5-flash',
+      safetySettings: [
+        {
+          category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        },
+        {
+          category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        },
+        {
+          category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        },
+        {
+          category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        },
+      ],
+    },
+    apiVersion ? { apiVersion } : undefined,
+  );
 }
 
 export interface GenerationResult<T = any> {
@@ -61,7 +63,7 @@ export async function generateAIContent<T>(
   }
 ): Promise<GenerationResult<T>> {
   try {
-    const model = getModel();
+    const model = getModel('v1');
 
     const generationConfig = {
       temperature: options?.temperature ?? 0.7,
@@ -356,10 +358,43 @@ User: ${params.userMessage}
 ## Respons:
 `;
 
-  return generateAIContent(fullPrompt, {
-    response: 'Maaf, saya sedang tidak bisa memproses permintaan Anda saat ini.',
-    suggestions: [],
-  }, { temperature: 0.8 });
+  try {
+    const model = getModel('v1');
+
+    const generationConfig = {
+      temperature: 0.8,
+      maxOutputTokens: 2048,
+    };
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+      generationConfig,
+    });
+
+    const response = result.response;
+    const text = response.text();
+
+    const usage = {
+      inputTokens: response.usageMetadata?.promptTokenCount || 0,
+      outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
+      totalTokens: response.usageMetadata?.totalTokenCount || 0,
+    };
+
+    return {
+      success: true,
+      data: {
+        response: text,
+        suggestions: [],
+      },
+      usage,
+    };
+  } catch (error: any) {
+    console.error('AI Chat Generation Error:', error);
+    return {
+      success: false,
+      error: error?.message || 'Failed to generate chat response',
+    };
+  }
 }
 
 /**
