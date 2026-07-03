@@ -56,8 +56,11 @@ export async function GET() {
       pricingConfig
     });
   } catch (error: any) {
-    console.error("Profile GET API error:", error);
-    return NextResponse.json({ error: error.message || "Gagal memuat profil." }, { status: 500 });
+    console.error("Profile GET API error:", error?.stack || error?.message || error);
+    return NextResponse.json(
+      { error: error?.message || "Gagal memuat profil." },
+      { status: 500 }
+    );
   }
 }
 

@@ -2399,8 +2399,8 @@ export default function Dashboard() {
           localStorage.setItem("gurupro_cached_profile", JSON.stringify(data));
         }
       } else {
-        const errData = await response.json().catch(() => ({}));
-        console.error(`Gagal memuat profil dari server (${response.status}):`, errData);
+        const text = await response.text().catch(() => "");
+        console.error(`Gagal memuat profil dari server (${response.status}):`, text || "(empty body)");
       }
     } catch (err) {
       console.error("Gagal memuat profil:", err);
