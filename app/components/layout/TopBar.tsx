@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import {
   IconMenu2,
@@ -20,8 +20,29 @@ interface TopBarProps {
 export default function TopBar({ onToggleSidebar }: TopBarProps) {
   const { data: session } = useSession();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showNotif, setShowNotif] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [profile, setProfile] = useState<any>(null);
+  const [notifications, setNotifications] = useState<any[]>([
+    { id: "welcome", title: "Selamat Datang!", body: "Terima kasih telah bergabung dengan GuruPRO.", time: "Baru saja", read: false },
+  ]);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch("/api/user/profile")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.id) setProfile(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const markAllRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -31,15 +52,24 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
       ) {
         setShowDropdown(false);
       }
+      if (
+        notifRef.current &&
+        !notifRef.current.contains(e.target as Node)
+      ) {
+        setShowNotif(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const initials = session?.user?.name
-    ? session.user.name
+  const displayName = profile?.nama_lengkap || session?.user?.name || "Pengguna";
+  const displayEmail = profile?.email || session?.user?.email || "";
+
+  const initials = displayName
+    ? displayName
         .split(" ")
-        .map((n) => n[0])
+        .map((n: string) => n[0])
         .join("")
         .toUpperCase()
         .slice(0, 2)
@@ -48,7 +78,7 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
   const avatarContent = session?.user?.image ? (
     <img
       src={session.user.image}
-      alt={session.user.name || "User"}
+      alt={displayName}
       className="w-8 h-8 rounded-full object-cover"
     />
   ) : (
@@ -97,10 +127,53 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
 
         {/* Right */}
         <div className="flex items-center gap-3">
-          <button className="relative p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100">
-            <IconBell size={22} stroke={1.5} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-          </button>
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={() => { setShowNotif(!showNotif); setShowDropdown(false); }}
+              className="relative p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 cursor-pointer"
+            >
+              <IconBell size={22} stroke={1.5} />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+              )}
+            </button>
+
+            {showNotif && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-dropdown py-2 animate-fade-in z-50">
+                <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-700 uppercase">Notifikasi</span>
+                  {unreadCount > 0 && (
+                    <button onClick={markAllRead} className="text-[10px] text-violet-600 hover:text-violet-700 font-semibold cursor-pointer">
+                      Tandai dibaca
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-gray-400">Tidak ada notifikasi</div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        className={`px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer ${!n.read ? "bg-violet-50/30" : ""}`}
+                        onClick={() => setNotifications((prev) => prev.map((x) => x.id === n.id ? { ...x, read: true } : x))}
+                      >
+                        <p className="text-xs font-semibold text-gray-800">{n.title}</p>
+                        <p className="text-[11px] text-gray-500 mt-0.5">{n.body}</p>
+                        <p className="text-[9px] text-gray-400 mt-1">{n.time}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <a
+                  href="/dashboard"
+                  className="block px-4 py-2.5 text-center text-xs font-semibold text-violet-600 hover:bg-gray-50 border-t border-gray-100"
+                >
+                  Lihat Semua →
+                </a>
+              </div>
+            )}
+          </div>
 
           <div className="relative" ref={dropdownRef}>
             <button
@@ -114,10 +187,10 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
               <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-dropdown py-2 animate-fade-in">
                 <div className="px-4 py-3 border-b border-gray-100">
                   <p className="text-sm font-semibold text-gray-900 truncate">
-                    {session?.user?.name || "Pengguna"}
+                    {displayName}
                   </p>
                   <p className="text-xs text-gray-500 truncate">
-                    {session?.user?.email || "user@gurupro.id"}
+                    {displayEmail}
                   </p>
                 </div>
                 <div className="py-1">
@@ -136,7 +209,9 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
                     Pengaturan
                   </a>
                   <a
-                    href="#"
+                    href="https://wa.me/6281283960337"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                   >
                     <IconHelp size={18} stroke={1.5} className="text-gray-400" />

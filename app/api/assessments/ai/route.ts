@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const { mapel, kelas, materi_capaian } = await req.json();
+    const { mapel, kelas, materi_capaian, kurikulum } = await req.json();
 
     if (!mapel || !kelas || !materi_capaian) {
       return NextResponse.json({ error: "mapel, kelas, dan materi_capaian wajib diisi" }, { status: 400 });
@@ -32,9 +32,16 @@ export async function POST(req: Request) {
       }, { status: 403 });
     }
 
+    const kurikulumLabel = kurikulum === "merdeka" ? "Kurikulum Merdeka"
+      : kurikulum === "k13" ? "Kurikulum 2013 (K13)"
+      : kurikulum === "kbc" ? "Kurikulum Berbasis Cinta (KBC)"
+      : kurikulum === "hybrid" ? "Kurikulum Hybrid (Gabungan)"
+      : "Kurikulum Merdeka";
+
     const prompt = `
-Anda adalah asisten AI kurikulum sekolah Indonesia (Kurikulum Merdeka / K13). 
+Anda adalah asisten AI kurikulum sekolah Indonesia. 
 Tugas Anda adalah membuat rubrik penilaian, kisi-kisi asesmen, bank soal, dan saran pedagogis berdasarkan data berikut:
+- Kurikulum: ${kurikulumLabel}
 - Mata Pelajaran: ${mapel}
 - Kelas: ${kelas}
 - Capaian Pembelajaran / Materi Utama: ${materi_capaian}

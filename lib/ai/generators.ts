@@ -216,6 +216,8 @@ export async function generateRaportDescription(params: {
   semester: string;
   tahun_ajaran: string;
   nilai_sebelumnya?: number;
+  kurikulum?: string;
+  kurikulumLabel?: string;
 }): Promise<GenerationResult<{
   deskripsi: string;
   saran: string;
@@ -231,6 +233,8 @@ export async function generateRaportDescription(params: {
     semester: params.semester,
     tahun_ajaran: params.tahun_ajaran,
     nilai_sebelumnya: params.nilai_sebelumnya,
+    kurikulum: params.kurikulum,
+    kurikulumLabel: params.kurikulumLabel,
   });
 
   return generateAIContent(prompt, {

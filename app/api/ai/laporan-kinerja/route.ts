@@ -25,7 +25,14 @@ export async function POST(req: Request) {
   const guruId = sessionData.id
 
   const body = await req.json()
-  const { tahunAjaranId, semester, catatanTambahan } = body
+  const { tahunAjaranId, semester, catatanTambahan, kurikulum = 'merdeka' } = body
+
+  const kurikulumLabel: Record<string, string> = {
+    merdeka: 'Kurikulum Merdeka',
+    k13: 'Kurikulum 2013 (K13)',
+    kbc: 'Kurikulum Berbasis Cinta (KBC)',
+    hybrid: 'Kurikulum Hybrid (Gabungan)',
+  }
 
   if (!tahunAjaranId || !semester) {
     return NextResponse.json(
@@ -74,6 +81,7 @@ export async function POST(req: Request) {
           evidenceSummary,
           semester,
           catatanTambahan,
+          kurikulum: kurikulumLabel[kurikulum] || 'Kurikulum Merdeka',
         })
 
         send({ step: 'generating', message: 'AI menyusun narasi laporan...' })
@@ -275,10 +283,11 @@ interface LaporanPromptData {
   evidenceSummary: any
   semester: string
   catatanTambahan?: string
+  kurikulum?: string
 }
 
 function buildLaporanPrompt(data: LaporanPromptData): string {
-  const { guru, sekolah, pelatihan, evidenceSummary, semester, catatanTambahan } = data
+  const { guru, sekolah, pelatihan, evidenceSummary, semester, catatanTambahan, kurikulum } = data
   const tahunAjaran = '2024/2025' // Should come from params
 
   return `
@@ -293,6 +302,7 @@ DATA GURU:
 - NPSN: ${sekolah?.npsn || '-'}
 - Alamat: ${sekolah?.alamat || '-'}
 - Periode: Semester ${semester === 'ganjil' ? 'Ganjil' : 'Genap'} TP ${tahunAjaran}
+- Kurikulum: ${kurikulum || 'Kurikulum Merdeka'}
 
 BUKTI AKTIVITAS MENGAJAR (data nyata dari sistem):
 - Total aktivitas mengajar tercatat: ${evidenceSummary.total_pembelajaran || 0}

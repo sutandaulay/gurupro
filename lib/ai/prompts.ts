@@ -198,6 +198,8 @@ export interface RaportGenerateInput {
   tahun_ajaran: string;
   aspek_kompetensi?: string;
   nilai_sebelumnya?: number;
+  kurikulum?: string;
+  kurikulumLabel?: string;
 }
 
 export function generateRaportPrompt(input: RaportGenerateInput): string {
@@ -220,6 +222,7 @@ export function generateRaportPrompt(input: RaportGenerateInput): string {
 - Tahun Ajaran: ${input.tahun_ajaran}
 ${input.aspek_kompetensi ? `- Aspek Kompetensi: ${input.aspek_kompetensi}` : ''}
 ${trend ? `- Trend Nilai: ${trend} dari semester sebelumnya` : ''}
+- Kurikulum: ${input.kurikulumLabel || 'Kurikulum Merdeka'}
 
 ## Format Output:
 {

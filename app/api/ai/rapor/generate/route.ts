@@ -45,8 +45,16 @@ export async function POST(request: NextRequest) {
       nilai,
       semester = '1',
       tahun_ajaran,
+      kurikulum = 'merdeka',
       save = true,
     } = body;
+
+    const kurikulumLabel: Record<string, string> = {
+      merdeka: 'Kurikulum Merdeka',
+      k13: 'Kurikulum 2013 (K13)',
+      kbc: 'Kurikulum Berbasis Cinta (KBC)',
+      hybrid: 'Kurikulum Hybrid (Gabungan)',
+    };
 
     // Validate required fields
     if (!student_id || !subject_id || nilai === undefined) {
@@ -109,6 +117,8 @@ export async function POST(request: NextRequest) {
       semester,
       tahun_ajaran: tahun_ajaran || `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`,
       nilai_sebelumnya: nilaiSebelumnya,
+      kurikulum,
+      kurikulumLabel: kurikulumLabel[kurikulum] || 'Kurikulum Merdeka',
     });
 
     if (!result.success) {

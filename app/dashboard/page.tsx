@@ -323,6 +323,7 @@ export default function Dashboard() {
   const [journalAktivitas, setJournalAktivitas] = useState<string>("");
   const [journalMedia, setJournalMedia] = useState<string>("");
   const [journalAsesmen, setJournalAsesmen] = useState<string>("");
+  const [journalKurikulum, setJournalKurikulum] = useState<string>("merdeka");
   const [journalRefleksi, setJournalRefleksi] = useState<string>("");
   const [journalTindakLanjut, setJournalTindakLanjut] = useState<string>("");
   const [journalEvidensi, setJournalEvidensi] = useState<string[]>([]); // array of base64
@@ -366,6 +367,7 @@ export default function Dashboard() {
   const [docReviewComment, setDocReviewComment] = useState<string>("");
   const [isGeneratingAssessRubric, setIsGeneratingAssessRubric] = useState<boolean>(false);
   const [assessAILearningGoal, setAssessAILearningGoal] = useState<string>("");
+  const [assessAIKurikulum, setAssessAIKurikulum] = useState<string>("merdeka");
   const [activeSupervisionTab, setActiveSupervisionTab] = useState<"nilai" | "jurnal_doc" | "audit">("nilai");
 
   // Raport Writer State
@@ -1998,6 +2000,7 @@ export default function Dashboard() {
           tujuan: journalTujuan,
           kelas: selClass,
           mapel: selMapel,
+          kurikulum: journalKurikulum,
         }),
       });
       const data = await res.json();
@@ -2261,7 +2264,8 @@ export default function Dashboard() {
         body: JSON.stringify({
           mapel: mapelName,
           kelas: kelasName,
-          materi_capaian: assessAILearningGoal
+          materi_capaian: assessAILearningGoal,
+          kurikulum: assessAIKurikulum,
         })
       });
       const data = await res.json();
@@ -2450,8 +2454,8 @@ export default function Dashboard() {
   const fetchChecklist = async () => {
     try {
       const res = await fetch("/api/administrasi?tipe=ceklis").then((r) => r.json());
-      if (Array.isArray(res) && res.length > 0) {
-        setCeklisTasks(res[0].konten?.tasks || []);
+      if (Array.isArray(res) && res.length > 0 && res[0].konten?.tasks?.length > 0) {
+        setCeklisTasks(res[0].konten.tasks);
       } else {
         setCeklisTasks([
           { id: "1", text: "Mengisi Absensi Presensi Kelas", completed: false },
@@ -6552,6 +6556,19 @@ const renderJurnalModule = () => {
                       ))}
                     </select>
                   </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block mb-1">Kurikulum</label>
+                    <select
+                      value={journalKurikulum}
+                      onChange={(e) => setJournalKurikulum(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800"
+                    >
+                      <option value="merdeka">Kurikulum Merdeka</option>
+                      <option value="k13">K13 (Kurikulum 2013)</option>
+                      <option value="kbc">KBC (Madrasah)</option>
+                      <option value="hybrid">Hybrid (Gabungan)</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -7430,6 +7447,19 @@ const renderJurnalModule = () => {
                     className="w-full p-3 border border-indigo-700/50 rounded-xl text-xs bg-white/10 text-white placeholder-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-400"
                   />
                 </div>
+                <div>
+                  <label className="text-[10px] font-bold text-indigo-300 block mb-1">Kurikulum</label>
+                  <select
+                    value={assessAIKurikulum}
+                    onChange={(e) => setAssessAIKurikulum(e.target.value)}
+                    className="w-full px-3 py-2 border border-indigo-700/50 rounded-xl text-xs bg-white/10 text-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  >
+                    <option value="merdeka">Kurikulum Merdeka</option>
+                    <option value="k13">K13 (Kurikulum 2013)</option>
+                    <option value="kbc">KBC (Madrasah)</option>
+                    <option value="hybrid">Hybrid (Gabungan)</option>
+                  </select>
+                </div>
                 <button
                   type="button"
                   onClick={handleGenerateAIAssessment}
@@ -8257,7 +8287,9 @@ const renderJurnalModule = () => {
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none bg-white"
               >
                 <option value="merdeka">Kurikulum Merdeka</option>
-                <option value="k13">Kurikulum 2013 (K13)</option>
+                <option value="k13">K13 (Kurikulum 2013)</option>
+                <option value="kbc">KBC (Madrasah)</option>
+                <option value="hybrid">Hybrid (Gabungan)</option>
               </select>
             </div>
 
@@ -8576,19 +8608,47 @@ const renderJurnalModule = () => {
       return "Selamat malam";
     };
 
-    const recentActivities = [
-      { icon: "📝", desc: "Soal Matematika dibuat", time: "2 jam lalu" },
-      { icon: "📚", desc: "RPP baru tersimpan", time: "4 jam lalu" },
-      { icon: "📊", desc: "Nilai Kelas X IPA 1 diinput", time: "6 jam lalu" },
-      { icon: "📓", desc: "Jurnal hari ini diperbarui", time: "8 jam lalu" },
-      { icon: "🏫", desc: "Presensi siswa tercatat", time: "10 jam lalu" },
-    ];
+    const formatRelativeTime = (dateStr: string) => {
+      if (!dateStr) return "";
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) return "Baru saja";
+      if (diffMins < 60) return `${diffMins} menit lalu`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours} jam lalu`;
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays < 7) return `${diffDays} hari lalu`;
+      return date.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+    };
+
+    const statusIconMap: Record<string, string> = {
+      Approved: "✅",
+      Submitted: "📤",
+      Draft: "📝",
+    };
+
+    const recentActivities = analyticsData?.recent_activity?.length > 0
+      ? analyticsData.recent_activity.map((act: any) => ({
+          icon: statusIconMap[act.status] || "📓",
+          desc: act.materi_pembelajaran
+            ? `${act.materi_pembelajaran} — ${act.nama_kelas}, ${act.nama_mapel}`
+            : `Jurnal ${act.status?.toLowerCase() || "baru"} — ${act.nama_kelas}`,
+          time: formatRelativeTime(act.tanggal),
+        }))
+      : [{ icon: "📭", desc: "Belum ada aktivitas tercatat", time: "" }];
+
+    const totalStudents = analyticsData?.summary?.total_students ?? 0;
+    const rppThisMonth = analyticsData?.summary?.rpp_this_month ?? 0;
+    const avgGrade = analyticsData?.summary?.avg_grade ?? 0;
+    const ungradedTasks = analyticsData?.summary?.ungraded_tasks ?? 0;
 
     const stats = [
-      { icon: "👥", label: "Total Siswa", value: "128", trend: "+5%", trendUp: true, bgColor: "bg-blue-50", iconColor: "text-blue-600" },
-      { icon: "📄", label: "RPP Bulan Ini", value: "12", trend: "+3", trendUp: true, bgColor: "bg-green-50", iconColor: "text-green-600" },
-      { icon: "📈", label: "Rata-rata Nilai", value: "82.5", trend: "+2.1", trendUp: true, bgColor: "bg-violet-50", iconColor: "text-violet-600" },
-      { icon: "⏳", label: "Tugas Belum Dinilai", value: "8", trend: "", trendUp: false, bgColor: "bg-amber-50", iconColor: "text-amber-600", badge: true },
+      { icon: "👥", label: "Total Siswa", value: String(totalStudents), trend: "", trendUp: true, bgColor: "bg-blue-50", iconColor: "text-blue-600" },
+      { icon: "📄", label: "RPP Bulan Ini", value: String(rppThisMonth), trend: "", trendUp: true, bgColor: "bg-green-50", iconColor: "text-green-600" },
+      { icon: "📈", label: "Rata-rata Nilai", value: avgGrade > 0 ? String(avgGrade) : "—", trend: "", trendUp: true, bgColor: "bg-violet-50", iconColor: "text-violet-600" },
+      { icon: "⏳", label: "Tugas Belum Dinilai", value: String(ungradedTasks), trend: "", trendUp: false, bgColor: "bg-amber-50", iconColor: "text-amber-600", badge: ungradedTasks > 0 },
     ];
 
     const quickActions = [
@@ -8615,9 +8675,11 @@ const renderJurnalModule = () => {
               <span>⚡</span>
               <span>{currentUser?.token_limit !== undefined ? `${currentUser.token_limit} Token` : "0 Token"}</span>
             </div>
-            <div className="bg-gray-50 border border-gray-200 text-gray-700 font-bold px-3.5 py-2 rounded-xl text-xs">
-              {currentUser?.status_langganan?.toUpperCase() || "FREE"}
-            </div>
+            {currentUser?.status_langganan && currentUser.status_langganan !== 'free' && currentUser.subscription_end ? (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold px-3 py-1.5 rounded-xl text-xs whitespace-nowrap">
+                ⏱ {getSubscriptionCountdown()}
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -8772,7 +8834,10 @@ const renderJurnalModule = () => {
                 </div>
               ))}
             </div>
-            <button className="text-sm font-medium text-violet-600 hover:text-violet-700 transition-colors">
+            <button
+              onClick={() => setCurrentModule("supervisi_analitik")}
+              className="text-sm font-medium text-violet-600 hover:text-violet-700 transition-colors cursor-pointer"
+            >
               Lihat Semua →
             </button>
           </div>

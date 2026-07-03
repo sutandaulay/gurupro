@@ -11,6 +11,7 @@ export default function BuatLaporanKinerjaPage() {
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState('')
   const [catatanTambahan, setCatatanTambahan] = useState('')
+  const [kurikulum, setKurikulum] = useState("merdeka")
 
   interface StatCards {
     total_pembelajaran: number
@@ -85,6 +86,7 @@ export default function BuatLaporanKinerjaPage() {
           tahunAjaranId: formData.tahunAjaranId,
           semester: formData.semester,
           catatanTambahan,
+          kurikulum,
         }),
       })
 
@@ -232,6 +234,20 @@ export default function BuatLaporanKinerjaPage() {
         <p className="text-xs text-muted-foreground mt-1">
           Catatan ini akan membantu AI menyusun narasi yang lebih personal
         </p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-medium mb-2">Kurikulum</label>
+        <select
+          value={kurikulum}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setKurikulum(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg border bg-background"
+        >
+          <option value="merdeka">Kurikulum Merdeka</option>
+          <option value="k13">K13 (Kurikulum 2013)</option>
+          <option value="kbc">KBC (Madrasah)</option>
+          <option value="hybrid">Hybrid (Gabungan)</option>
+        </select>
       </div>
 
       <div className="space-y-3">

@@ -11,6 +11,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "school_id wajib diisi" }, { status: 400 });
     }
 
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("gurupro_session")?.value;
+    const session = sessionCookie ? JSON.parse(sessionCookie) : null;
+    const userId = session?.id;
+
     // 1. Count master metrics
     const classCount = await query("SELECT COUNT(*) AS count FROM classes WHERE school_id = $1", [schoolId]);
     const subjectCount = await query("SELECT COUNT(*) AS count FROM subjects WHERE school_id = $1", [schoolId]);
@@ -70,13 +75,50 @@ export async function GET(req: Request) {
       [schoolId]
     );
 
+    // 7. RPP count this month (for the current user)
+    let rppThisMonth = 0;
+    if (userId) {
+      const rppRes = await query(
+        `SELECT COUNT(*) AS count FROM guru_administrasi
+         WHERE user_id = $1 AND tipe_dokumen = 'rpp'
+           AND created_at >= date_trunc('month', CURRENT_DATE)`,
+        [userId]
+      );
+      rppThisMonth = Number(rppRes.rows[0].count);
+    }
+
+    // 8. Overall average grade across all assessment types
+    const avgAllGrades = await query(
+      `SELECT ROUND(AVG(sg.nilai_akhir), 1) as avg_nilai
+       FROM student_grades sg
+       JOIN assessments a ON sg.assessment_id = a.id
+       WHERE a.school_id = $1`,
+      [schoolId]
+    );
+
+    // 9. Ungraded assessments (assessments with NO student_grades)
+    const ungradedRes = await query(
+      `SELECT COUNT(*) AS count FROM (
+        SELECT a.id
+        FROM assessments a
+        WHERE a.school_id = $1
+          AND NOT EXISTS (
+            SELECT 1 FROM student_grades sg WHERE sg.assessment_id = a.id
+          )
+      ) sub`,
+      [schoolId]
+    );
+
     return NextResponse.json({
       summary: {
         total_classes: Number(classCount.rows[0].count),
         total_subjects: Number(subjectCount.rows[0].count),
         total_schedules: Number(scheduleCount.rows[0].count),
         total_students: Number(studentCount.rows[0].count),
-        active_teachers: Number(activeTeachers.rows[0].count || 0) + 1, // At least the current teacher
+        active_teachers: Number(activeTeachers.rows[0].count || 0) + 1,
+        rpp_this_month: rppThisMonth,
+        avg_grade: Number(avgAllGrades.rows[0]?.avg_nilai || 0),
+        ungraded_tasks: Number(ungradedRes.rows[0].count),
       },
       journals: journalSummary.rows,
       grades: gradeSummary.rows,

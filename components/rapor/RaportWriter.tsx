@@ -45,6 +45,7 @@ export default function RaportWriter({
   const [nilai, setNilai] = useState(initialNilai || "");
   const [semester, setSemester] = useState(initialSemester);
   const [tahunAjaran, setTahunAjaran] = useState(initialTahunAjaran);
+  const [kurikulum, setKurikulum] = useState("merdeka");
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +78,7 @@ export default function RaportWriter({
           nilai: Number(nilai),
           semester,
           tahun_ajaran: tahunAjaran,
+          kurikulum,
           save: true,
         }),
       });
@@ -304,6 +306,23 @@ export default function RaportWriter({
               <option value="2">Semester 2</option>
             </select>
           </div>
+        </div>
+
+        {/* Kurikulum */}
+        <div>
+          <label className="text-[10px] font-semibold text-slate-500 block mb-1">
+            Kurikulum
+          </label>
+          <select
+            value={kurikulum}
+            onChange={(e) => setKurikulum(e.target.value)}
+            className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:border-indigo-400 focus:outline-none bg-white"
+          >
+            <option value="merdeka">Kurikulum Merdeka</option>
+            <option value="k13">K13 (Kurikulum 2013)</option>
+            <option value="kbc">KBC (Madrasah)</option>
+            <option value="hybrid">Hybrid (Gabungan)</option>
+          </select>
         </div>
 
         {/* Generate Button */}

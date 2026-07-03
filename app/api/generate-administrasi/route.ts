@@ -46,7 +46,11 @@ export async function POST(req: Request) {
       }, { status: 403 });
     }
 
-    const kurikulumLabel = kurikulum === "merdeka" ? "Kurikulum Merdeka" : "Kurikulum 2013 (K13)";
+    const kurikulumLabel = kurikulum === "merdeka" ? "Kurikulum Merdeka"
+      : kurikulum === "k13" ? "Kurikulum 2013 (K13)"
+      : kurikulum === "kbc" ? "Kurikulum Berbasis Cinta (KBC)"
+      : kurikulum === "hybrid" ? "Kurikulum Hybrid (Gabungan)"
+      : "Kurikulum Merdeka";
 
     let prompt = "";
     if (tipe === "rpp") {
@@ -77,7 +81,7 @@ Balas HANYA dalam format JSON dengan skema berikut:
 `;
     } else if (tipe === "modul") {
       prompt = `
-Anda adalah ahli kurikulum pendidikan Indonesia. Susunlah dokumen Modul Ajar lengkap yang relevan untuk Kurikulum Merdeka.
+Anda adalah ahli kurikulum pendidikan Indonesia. Susunlah dokumen Modul Ajar lengkap yang relevan untuk ${kurikulumLabel}.
 Spesifikasi Modul Ajar:
 - Mata Pelajaran: ${mapel}
 - Kelas: ${kelas}

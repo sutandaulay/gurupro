@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const { materi, aktivitas, tujuan, mapel, kelas } = await req.json();
+    const { materi, aktivitas, tujuan, mapel, kelas, kurikulum } = await req.json();
 
     if (!materi || !aktivitas || !tujuan) {
       return NextResponse.json({ error: "materi, aktivitas, dan tujuan wajib diisi" }, { status: 400 });
@@ -32,10 +32,17 @@ export async function POST(req: Request) {
       }, { status: 403 });
     }
 
+    const kurikulumLabel = kurikulum === "merdeka" ? "Kurikulum Merdeka"
+      : kurikulum === "k13" ? "Kurikulum 2013 (K13)"
+      : kurikulum === "kbc" ? "Kurikulum Berbasis Cinta (KBC)"
+      : kurikulum === "hybrid" ? "Kurikulum Hybrid (Gabungan)"
+      : "Kurikulum Merdeka";
+
     const prompt = `
 Anda adalah pakar pendidik dan kurikulum Indonesia. Bantu guru menyusun refleksi guru dan rencana tindak lanjut (remedial/pengayaan) secara akademis, formal, dan rapi untuk jurnal ajar.
 
 Data aktivitas pembelajaran:
+- Kurikulum: ${kurikulumLabel}
 - Mata Pelajaran: ${mapel || "-"}
 - Kelas: ${kelas || "-"}
 - Materi Pembelajaran: ${materi}
