@@ -9435,17 +9435,33 @@ const renderJurnalModule = () => {
             { id: "storage_saya", label: "📂 Storage Saya", icon: "" },
             { id: "scheduler", label: "⏰ Pengingat", icon: "" },
             { id: "profil", label: "👤 Profil", icon: "" },
+            { id: "laporan_kinerja", label: "📋 Laporan Kinerja", icon: "", isLink: true, href: "/dashboard/laporan-kinerja/buat" },
+            { id: "pengembangan_diri", label: "🎓 Pengembangan Diri", icon: "", isLink: true, href: "/dashboard/pengembangan-diri" },
+            { id: "upload_dokumen", label: "📁 Upload Dokumen", icon: "", isLink: true, href: "/dashboard/pengembangan-diri/dokumen/tambah" },
           ].map((tab) => {
             const isActive = currentModule === tab.id;
+            const cls = `px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              isActive
+                ? "bg-white text-indigo-600 shadow-sm"
+                : "text-slate-500 hover:text-slate-800"
+            }`;
+            if (tab.isLink) {
+              return (
+                <Link
+                  key={tab.id}
+                  href={tab.href || "#"}
+                  className={cls}
+                >
+                  <span>{tab.icon}</span>
+                  <span>{tab.label}</span>
+                </Link>
+              );
+            }
             return (
               <button
                 key={tab.id}
                 onClick={() => setCurrentModule(tab.id as any)}
-                className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                  isActive
-                    ? "bg-white text-indigo-600 shadow-sm"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
+                className={cls}
               >
                 <span>{tab.icon}</span>
                 <span>{tab.label}</span>
