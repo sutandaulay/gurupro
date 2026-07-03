@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { hashPassword } from '@/lib/auth';
+import { hashPassword, comparePassword } from '@/lib/auth';
 
 const REDIRECT_STATUS = 303;
 
@@ -46,13 +46,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (user.password_hash === null) {
-      const hashed = hashPassword(password);
+      const hashed = await hashPassword(password);
       await query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashed, user.id]);
       user.password_hash = hashed;
     }
 
-    const inputHash = hashPassword(password);
-    if (inputHash !== user.password_hash) {
+    const match = await comparePassword(password, user.password_hash);
+    if (!match) {
       const errorMsg = 'Email%20atau%20Password%20salah%21';
       if (isAjax) {
         return NextResponse.json({ success: false, error: 'Email atau Password salah!' }, { status: 401 });

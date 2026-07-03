@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     }
 
     // Hash the new password
-    const hashed = hashPassword(password);
+    const hashed = await hashPassword(password);
 
     // Update password and clear OTP columns
     await query(

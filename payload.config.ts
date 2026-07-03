@@ -46,7 +46,7 @@ export default buildConfig({
 
   editor: lexicalEditor(),
 
-  secret: process.env.PAYLOAD_SECRET || "gurupro-super-secret-key-change-in-production",
+  secret: process.env.PAYLOAD_SECRET || "",
 
   db: postgresAdapter({
     pool: {

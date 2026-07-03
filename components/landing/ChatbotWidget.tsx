@@ -11,6 +11,7 @@ interface Message {
 export interface ChatbotWidgetProps {
   apiEndpoint?: string;
   welcomeMessage?: string;
+  humanCSUrl?: string;
   agentName?: string;
 }
 

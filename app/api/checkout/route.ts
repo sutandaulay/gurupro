@@ -1,7 +1,16 @@
 import { query } from "@/lib/db";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { getPaymentGatewayConfig, getPricingConfig } from "@/lib/settings";
+import { getPaymentGatewayConfig } from "@/lib/settings";
+
+function isUUID(str: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
+function parsePrice(val: any): number {
+  if (typeof val === "string") return parseFloat(val) || 0;
+  return Number(val) || 0;
+}
 
 export async function POST(req: Request) {
   try {
@@ -18,17 +27,80 @@ export async function POST(req: Request) {
     }
     const user = userRes.rows[0];
 
-    // 2. Set amounts dynamically from settings
-    const pricingConfig = await getPricingConfig();
+    // 2. Determine plan details
     let amount = 0;
     let planLabel = "";
     let planKey = "";
+    let durationDays = 0;
+    let tokens = 0;
+    let isFree = false;
 
-    if (plan === "free") {
-      amount = pricingConfig.free.price;
-      planLabel = "GuruPRO Free";
-      planKey = "free";
-      
+    if (isUUID(plan)) {
+      // New: Look up plan by UUID from pricing_plans table
+      const planRes = await query("SELECT * FROM pricing_plans WHERE id = $1 AND is_active = true", [plan]);
+      if (planRes.rows.length === 0) {
+        return NextResponse.json({ error: "Paket tidak ditemukan atau tidak aktif!" }, { status: 404 });
+      }
+      const dbPlan = planRes.rows[0];
+      amount = parsePrice(dbPlan.price);
+      planLabel = dbPlan.package_name;
+      planKey = dbPlan.id;
+      durationDays = dbPlan.duration_days;
+      tokens = typeof dbPlan.tokens === "string" ? parseInt(dbPlan.tokens) || 0 : dbPlan.tokens || 0;
+      isFree = amount === 0;
+    } else {
+      // Legacy: Support old plan keys for backward compatibility
+      const pricingConfigRes = await query("SELECT value FROM system_settings WHERE key = 'pricing_config'");
+      let cfg: any = {};
+      if (pricingConfigRes.rows.length > 0) {
+        const raw = pricingConfigRes.rows[0].value;
+        cfg = typeof raw === "string" ? JSON.parse(raw) : raw;
+      }
+
+      if (plan === "free") {
+        isFree = true;
+        const planCfg = isUUID(plan) ? null : (cfg.free || cfg[0]);
+        if (planCfg) {
+          amount = parsePrice(planCfg.price);
+          planLabel = "GuruPRO Free";
+          planKey = "free";
+          durationDays = planCfg.duration_days || 30;
+          tokens = planCfg.tokens || 10;
+        } else {
+          amount = 0;
+          planLabel = "GuruPRO Free";
+          planKey = "free";
+          durationDays = 30;
+          tokens = 10;
+        }
+      } else if (plan === "three_month" || plan === "pro_monthly") {
+        const planCfg = cfg.three_month || cfg[1];
+        amount = parsePrice(planCfg?.price || 120000);
+        planLabel = "GuruPRO Premium 3 Bulan";
+        planKey = "three_month";
+        durationDays = planCfg?.duration_days || 90;
+        tokens = planCfg?.tokens || 500;
+      } else if (plan === "six_month") {
+        const planCfg = cfg.six_month || cfg[2];
+        amount = parsePrice(planCfg?.price || 220000);
+        planLabel = "GuruPRO Premium 6 Bulan";
+        planKey = "six_month";
+        durationDays = planCfg?.duration_days || 180;
+        tokens = planCfg?.tokens || 1100;
+      } else if (plan === "one_year" || plan === "pro_yearly") {
+        const planCfg = cfg.one_year || cfg[3];
+        amount = parsePrice(planCfg?.price || 400000);
+        planLabel = "GuruPRO Premium 1 Tahun";
+        planKey = "one_year";
+        durationDays = planCfg?.duration_days || 365;
+        tokens = planCfg?.tokens || 2500;
+      } else {
+        return NextResponse.json({ error: "Paket tidak valid!" }, { status: 400 });
+      }
+    }
+
+    // Handle free plan
+    if (isFree) {
       const transactionId = crypto.randomUUID();
       const userDateRes = await query("SELECT subscription_end, subscription_start FROM users WHERE id = $1", [userId]);
       let newEnd = new Date();
@@ -38,7 +110,7 @@ export async function POST(req: Request) {
       if (currentEnd && new Date(currentEnd) > new Date()) {
         newEnd = new Date(currentEnd);
       }
-      newEnd.setDate(newEnd.getDate() + pricingConfig.free.duration_days);
+      newEnd.setDate(newEnd.getDate() + durationDays);
 
       await query(
         `UPDATE users 
@@ -47,50 +119,33 @@ export async function POST(req: Request) {
              subscription_start = COALESCE($3, NOW()),
              subscription_end = $4
          WHERE id = $5`,
-        ["free", pricingConfig.free.tokens, currentStart, newEnd, userId]
+        ["free", tokens, currentStart, newEnd, userId]
       );
 
-      // Record immediate transaction
       await query(
         `INSERT INTO transactions (id, user_id, external_id, amount, status, created_at, notes, plan_id)
          VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)`,
-        [transactionId, userId, `free-${Date.now()}`, 0, "ACTIVATED", "Aktivasi Paket Free (Gratis)", "free"]
+        [transactionId, userId, `free-${Date.now()}`, 0, "ACTIVATED", "Aktivasi Paket Free (Gratis)", planKey]
       );
 
       return NextResponse.json({ checkoutUrl: `/dashboard?payment=success&tx=${transactionId}` });
-    } else if (plan === "three_month" || plan === "pro_monthly") {
-      amount = pricingConfig.three_month.price;
-      planLabel = "GuruPRO Premium 3 Bulan";
-      planKey = "three_month";
-    } else if (plan === "six_month") {
-      amount = pricingConfig.six_month.price;
-      planLabel = "GuruPRO Premium 6 Bulan";
-      planKey = "six_month";
-    } else if (plan === "one_year" || plan === "pro_yearly") {
-      amount = pricingConfig.one_year.price;
-      planLabel = "GuruPRO Premium 1 Tahun";
-      planKey = "one_year";
-    } else {
-      return NextResponse.json({ error: "Paket tidak valid!" }, { status: 400 });
     }
 
     const transactionId = crypto.randomUUID();
     const externalId = `invoice-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-    // 3. Load configurations from database
     const pgConfig = await getPaymentGatewayConfig();
     const gateway = pgConfig.default_gateway || "mock";
 
     let checkoutUrl = "";
     let processedGateway = "MOCK";
 
-    // 4. Router according to selected default gateway
     if (gateway === "xendit" && pgConfig.xendit.api_key) {
       try {
         const xenditApiKey = pgConfig.xendit.api_key;
         const authHeader = Buffer.from(xenditApiKey + ":").toString("base64");
-        
+
         const xenditResponse = await fetch("https://api.xendit.co/v2/invoices", {
           method: "POST",
           headers: {
@@ -119,12 +174,12 @@ export async function POST(req: Request) {
       } catch (err: any) {
         console.error("Xendit Invoice Generation failed, falling back to mock:", err.message);
       }
-    } 
+    }
     else if (gateway === "midtrans" && pgConfig.midtrans.server_key) {
       try {
         const { server_key, is_sandbox } = pgConfig.midtrans;
         const authHeader = Buffer.from(server_key + ":").toString("base64");
-        const midtransUrl = is_sandbox 
+        const midtransUrl = is_sandbox
           ? "https://app.sandbox.midtrans.com/snap/v1/transactions"
           : "https://app.midtrans.com/snap/v1/transactions";
 
@@ -182,9 +237,6 @@ export async function POST(req: Request) {
           : "https://passport.duitku.com/webapi/api/merchant/v2/inquiry";
 
         const orderId = externalId;
-        // signature = md5(merchantCode + merchantOrderId + paymentAmount + apiKey) or sha256. 
-        // In Duitku v2, signature is MD5(merchantCode + merchantOrderId + paymentAmount + apiKey) in lowercase. Let's verify Duitku standard signature formula.
-        // Formula is indeed: md5(merchantcode + merchantorderid + paymentamount + apikey) or sha256. Duitku V2 API usually uses MD5. Let's support MD5 to be fully aligned with Duitku specifications.
         const signature = crypto.createHash("md5")
           .update(merchant_code + orderId + amount + api_key)
           .digest("hex");
@@ -215,7 +267,7 @@ export async function POST(req: Request) {
         }
 
         const duitkuData = await duitkuResponse.json();
-        
+
         if (duitkuData.paymentUrl) {
           checkoutUrl = duitkuData.paymentUrl;
           processedGateway = "DUITKU";
@@ -227,13 +279,11 @@ export async function POST(req: Request) {
       }
     }
 
-    // Fallback to offline mock page if checkoutUrl is still empty
     if (!checkoutUrl) {
       checkoutUrl = `/api/checkout/mock?invoice_id=${transactionId}&amount=${amount}&userId=${userId}&plan=${plan}`;
       processedGateway = "MOCK";
     }
 
-    // 5. Store pending transaction in DB
     await query(
       `INSERT INTO transactions (id, user_id, external_id, amount, status, created_at, notes, plan_id)
        VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)`,

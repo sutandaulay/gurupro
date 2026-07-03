@@ -2,6 +2,11 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Sidebar from "../components/Sidebar";
+import FloatingActionButton from "../../components/ai/FloatingActionButton";
+import RaportWriter from "../../components/rapor/RaportWriter";
+import { TimelineSelesaiButton } from "@/components/selesai-mengajar";
+import { SelesaiMengajarModal } from "@/components/selesai-mengajar";
+import type { ScheduleInfo } from "@/lib/selesai-mengajar/types";
 
 // Dynamic CDN Loader for html2pdf.js
 const loadHtml2Pdf = () => {
@@ -44,7 +49,7 @@ function splitIntoBatches(formData: any) {
     if (qty > 0) remaining.push({ key: tk.key, tipe: tk.tipe, count: qty });
   }
 
-  let visRemaining = {
+  const visRemaining = {
     ilustrasi: formData.qty.ilustrasi || 0,
     diagram: formData.qty.diagram || 0,
     mindmap: formData.qty.mindmap || 0
@@ -288,6 +293,11 @@ export default function Dashboard() {
   const [generatedDoc, setGeneratedDoc] = useState<any | null>(null);
   const [isGeneratingDoc, setIsGeneratingDoc] = useState<boolean>(false);
   const [viewingDoc, setViewingDoc] = useState<any | null>(null);
+  const [rppSelesaiModal, setRppSelesaiModal] = useState<{ isOpen: boolean; rpp: any; schedule: any }>({
+    isOpen: false,
+    rpp: null,
+    schedule: null,
+  });
 
   // Jurnal & Ceklis States
   const [jurnalList, setJurnalList] = useState<any[]>([]);
@@ -353,6 +363,10 @@ export default function Dashboard() {
   const [isGeneratingAssessRubric, setIsGeneratingAssessRubric] = useState<boolean>(false);
   const [assessAILearningGoal, setAssessAILearningGoal] = useState<string>("");
   const [activeSupervisionTab, setActiveSupervisionTab] = useState<"nilai" | "jurnal_doc" | "audit">("nilai");
+
+  // Raport Writer State
+  const [selectedRaporStudent, setSelectedRaporStudent] = useState<any | null>(null);
+  const [showRaportWriter, setShowRaportWriter] = useState<boolean>(false);
 
   // Keuangan States
   const [financeLedger, setFinanceLedger] = useState<any[]>([]);
@@ -431,6 +445,8 @@ export default function Dashboard() {
   const [students, setStudents] = useState<any[]>([]);
   const [attendanceDate, setAttendanceDate] = useState<string>(getLocalDateString());
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
+  const [completedSessionIds, setCompletedSessionIds] = useState<Set<string>>(new Set());
+  const [isSeedingData, setIsSeedingData] = useState<boolean>(false);
   
   // Form Inputs Sekolah
   const [schId, setSchId] = useState<string>("");
@@ -465,7 +481,126 @@ export default function Dashboard() {
   const [teacherStatus, setTeacherStatus] = useState<string>("Hadir");
   const [teacherNotes, setTeacherNotes] = useState<string>("");
   const [studentAttRecords, setStudentAttRecords] = useState<{ [key: string]: { status: string; catatan: string } }>({});
-  const [tabSekolah, setTabSekolah] = useState<"profil" | "kelas-mapel" | "siswa" | "jadwal" | "presensi">("profil");
+  const [tabSekolah, setTabSekolah] = useState<"tahun-ajaran" | "profil" | "kelas-mapel" | "siswa" | "jadwal" | "presensi">("tahun-ajaran");
+
+  // Tahun Ajaran States
+  const [tahunAjaranList, setTahunAjaranList] = useState<any[]>([]);
+  const [showTahunAjaranModal, setShowTahunAjaranModal] = useState(false);
+  const [tahunAjaranForm, setTahunAjaranForm] = useState({ nama: '', tanggalMulai: '', tanggalSelesai: '' });
+  const [deleteModalTa, setDeleteModalTa] = useState<any>(null); // { id, nama }
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deletingTa, setDeletingTa] = useState(false);
+  const [deleteTaError, setDeleteTaError] = useState('');
+
+  // Delete Tahun Ajaran with password confirmation
+  const handleDeleteTahunAjaran = async () => {
+    if (!deleteModalTa || !deletePassword) return;
+    setDeletingTa(true);
+    setDeleteTaError('');
+
+    try {
+      const res = await fetch('/api/tahun-ajaran/' + deleteModalTa.id, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: deletePassword }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setDeleteModalTa(null);
+        setDeletePassword('');
+        fetchTahunAjaran();
+      } else {
+        setDeleteTaError(data.error || 'Gagal hapus');
+      }
+    } catch {
+      setDeleteTaError('Terjadi kesalahan koneksi');
+    } finally {
+      setDeletingTa(false);
+    }
+  };
+
+  // Fetch tahun ajaran list
+  const fetchTahunAjaran = async () => {
+    try {
+      const res = await fetch('/api/tahun-ajaran');
+      if (res.ok) {
+        const data = await res.json();
+        setTahunAjaranList(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch tahun ajaran:', err);
+    }
+  };
+
+  // Activate tahun ajaran with semester
+  const activateTahunAjaran = async (id: string, semester: string = 'ganjil') => {
+    try {
+      // Update localStorage first
+      localStorage.setItem('tahunAjaranId', id);
+      localStorage.setItem('semester', semester);
+      const ta = tahunAjaranList.find((t: any) => t.id === id);
+      if (ta) {
+        localStorage.setItem('tahunAjaranNama', ta.nama);
+        const label = semester === 'full' ? 'Full Year' : semester === 'ganjil' ? 'Semester 1' : 'Semester 2';
+        localStorage.setItem('semesterLabel', ta.nama + ' - ' + label);
+      }
+
+      // Call API
+      const res = await fetch('/api/tahun-ajaran/' + id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'activate', semester: semester }),
+      });
+
+      if (res.ok) {
+        fetchTahunAjaran();
+      }
+    } catch (err) {
+      console.error('Failed to activate:', err);
+    }
+  };
+
+  // Create tahun ajaran
+  const createTahunAjaran = async () => {
+    if (!tahunAjaranForm.nama) {
+      alert('Nama tahun ajaran wajib diisi');
+      return;
+    }
+    try {
+      console.log('Creating TA:', tahunAjaranForm);
+      const res = await fetch('/api/tahun-ajaran', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nama: tahunAjaranForm.nama,
+          tanggalMulai: tahunAjaranForm.tanggalMulai,
+          tanggalSelesai: tahunAjaranForm.tanggalSelesai,
+        }),
+      });
+
+      console.log('Response status:', res.status);
+      const data = await res.json();
+      console.log('Response data:', data);
+
+      if (res.ok) {
+        setShowTahunAjaranModal(false);
+        setTahunAjaranForm({ nama: '', tanggalMulai: '', tanggalSelesai: '' });
+        fetchTahunAjaran();
+        if (data.id) {
+          activateTahunAjaran(data.id, 'ganjil');
+        }
+      } else {
+        alert(data.error || 'Gagal menyimpan');
+      }
+    } catch (err) {
+      console.error('Create TA error:', err);
+      alert('Terjadi kesalahan saat menyimpan');
+    }
+  };
+
+  // Load on mount
+  useEffect(() => { fetchTahunAjaran(); }, []);
 
   // Load user profile and schools on mount
   useEffect(() => {
@@ -574,21 +709,43 @@ export default function Dashboard() {
         const params = new URLSearchParams(window.location.search);
         const checkoutPlan = params.get("checkout");
         if (checkoutPlan && (
-          checkoutPlan === "three_month" || 
-          checkoutPlan === "six_month" || 
-          checkoutPlan === "one_year" || 
-          checkoutPlan === "free" || 
-          checkoutPlan === "pro_monthly" || 
+          checkoutPlan === "three_month" ||
+          checkoutPlan === "six_month" ||
+          checkoutPlan === "one_year" ||
+          checkoutPlan === "free" ||
+          checkoutPlan === "pro_monthly" ||
           checkoutPlan === "pro_yearly"
         )) {
           // Trigger checkout
           handlePlanCheckout(checkoutPlan);
-          
+
           // Clear query param from URL to prevent re-triggering on reload
           const url = new URL(window.location.href);
           url.searchParams.delete("checkout");
           window.history.replaceState({}, "", url.pathname + url.search);
         }
+
+        // Listen for Selesai Mengajar event from RPP detail
+        const handleSelesaiMengajar = (e: Event) => {
+          const customEvent = e as CustomEvent;
+          setRppSelesaiModal({ isOpen: true, rpp: customEvent.detail.rpp, schedule: customEvent.detail.schedule });
+        };
+        window.addEventListener('openSelesaiMengajar', handleSelesaiMengajar);
+
+        // Listen for module switch events from FloatingActionButton
+        const handleSwitchModule = (e: Event) => {
+          const customEvent = e as CustomEvent;
+          const module = customEvent.detail?.module;
+          if (module) {
+            setCurrentModule(module as any);
+          }
+        };
+        window.addEventListener('switchModule', handleSwitchModule);
+
+        return () => {
+          window.removeEventListener('openSelesaiMengajar', handleSelesaiMengajar);
+          window.removeEventListener('switchModule', handleSwitchModule);
+        };
       }
     }
   }, [currentUser?.id]);
@@ -661,8 +818,43 @@ export default function Dashboard() {
     try {
       const res = await fetch(`/api/schedules?school_id=${schoolId}`).then(r => r.json());
       if (Array.isArray(res)) setSchedules(res);
+
+      // Fetch completed teaching sessions
+      const sesiRes = await fetch('/api/selesai-mengajar').catch(() => null);
+      if (sesiRes?.ok) {
+        const sesiData = await sesiRes.json();
+        const completed = new Set<string>();
+        sesiData.allSchedules?.forEach((s: any) => {
+          if (s.isCompleted) completed.add(s.id);
+        });
+        setCompletedSessionIds(completed);
+      }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const seedTestSchedules = async () => {
+    setIsSeedingData(true);
+    try {
+      // Use seed-all endpoint that creates school, classes, subjects, and schedules
+      const res = await fetch('/api/selesai-mengajar/seed-all', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        showSuccess(`Data berhasil dibuat: ${data.message}`);
+        // Refresh schools and schedules
+        fetchSchools();
+        // Reload page data after a short delay to allow DB update
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        showError(data.error || 'Gagal membuat data test');
+      }
+    } catch (e) {
+      showError('Gagal membuat data test');
+    } finally {
+      setIsSeedingData(false);
     }
   };
 
@@ -4216,6 +4408,7 @@ export default function Dashboard() {
           {/* Sub-Tab Navigator */}
           <div className="flex flex-wrap bg-slate-100 p-1 rounded-2xl gap-0.5 shrink-0 self-start sm:self-auto">
             {[
+              { id: "tahun-ajaran", label: "📅 TA", icon: "📅" },
               { id: "profil", label: "🏫 Profil", icon: "🏫" },
               { id: "kelas-mapel", label: "📚 Kelas & Mapel", icon: "📚" },
               { id: "siswa", label: "👥 Siswa", icon: "👥" },
@@ -4223,23 +4416,34 @@ export default function Dashboard() {
               { id: "presensi", label: "📝 Presensi", icon: "📝" },
             ].map((tab) => {
               const isActive = tabSekolah === tab.id;
+              const hasActiveTa = tahunAjaranList.some((ta: any) => ta.is_active);
+              const isLocked = tab.id !== "tahun-ajaran" && !hasActiveTa;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setTabSekolah(tab.id as any)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                  onClick={() => {
+                    if (isLocked) {
+                      setTabSekolah("tahun-ajaran");
+                    } else {
+                      setTabSekolah(tab.id as any);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                    isLocked ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                  } ${
                     isActive ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
                   <span>{tab.icon}</span>
                   <span>{tab.label}</span>
+                  {isLocked && <span className="text-[9px]">🔒</span>}
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* 1. Sub-Tab: Profil Sekolah */}
+        {/* Sub-Tab: Profil Sekolah */}
         {tabSekolah === "profil" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Form Input/Edit */}
@@ -4534,7 +4738,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 2. Sub-Tab: Kelas & Mapel */}
+        {/* Sub-Tab: Kelas & Mapel */}
         {tabSekolah === "kelas-mapel" && (
           <div className="space-y-6">
             {/* Pilihan Sekolah Aktif */}
@@ -4695,7 +4899,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 3. Sub-Tab: Database Siswa */}
+        {/* Sub-Tab: Database Siswa */}
         {tabSekolah === "siswa" && (
           <div className="space-y-6">
             {/* Filter Sekolah & Kelas */}
@@ -4872,7 +5076,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 4. Sub-Tab: Jadwal Pelajaran */}
+        {/* Sub-Tab: Jadwal Pelajaran */}
         {tabSekolah === "jadwal" && (
           <div className="space-y-6">
             {/* Filter Sekolah */}
@@ -5061,7 +5265,126 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 5. Sub-Tab: Presensi Harian */}
+        {/* Sub-Tab: Tahun Ajaran & Semester */}
+        {tabSekolah === "tahun-ajaran" && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-slate-700">📅 Tahun Ajaran & Semester</h4>
+                <p className="text-[10px] text-slate-500 mt-1">Pilih periode untuk filter data Anda</p>
+              </div>
+              <button onClick={() => setShowTahunAjaranModal(true)}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition">
+                + Tambah TA
+              </button>
+            </div>
+
+            {tahunAjaranList.length === 0 ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
+                <span className="text-4xl block mb-3">📅</span>
+                <p className="text-xs text-amber-700 font-medium">Belum ada tahun ajaran.</p>
+                <p className="text-[10px] text-amber-600 mt-1">Buat tahun ajaran pertama Anda</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {tahunAjaranList.map((ta: any) => (
+                  <div key={ta.id}
+                    className={`border rounded-2xl p-5 transition ${
+                      ta.is_active ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-200' : 'bg-white border-slate-200 hover:border-indigo-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-base font-bold text-slate-800">{ta.nama}</span>
+                          {ta.is_active && (
+                            <span className="px-2 py-0.5 bg-indigo-600 text-white text-[10px] font-bold rounded-full">AKTIF</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-0.5">
+                          {new Date(ta.tanggal_mulai).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} — {new Date(ta.tanggal_selesai).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </p>
+                      </div>
+                      {!ta.is_active && (
+                        <div className="flex gap-1.5">
+                          <button onClick={(e) => { e.stopPropagation(); activateTahunAjaran(ta.id, localStorage.getItem('semester') || 'ganjil'); }}
+                            className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 transition">
+                            Aktifkan
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); setDeleteModalTa(ta); setDeletePassword(''); setDeleteTaError(''); }}
+                            className="px-3 py-1.5 bg-white border border-red-200 rounded-lg text-[10px] font-bold text-red-500 hover:bg-red-50 hover:border-red-300 transition">
+                            Hapus
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Semester Selector */}
+                    {ta.is_active && (
+                      <div className="border-t border-indigo-200 pt-3 mt-2">
+                        <p className="text-[10px] font-bold text-indigo-700 mb-2">📌 Pilih Periode Data:</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            onClick={() => {
+                              localStorage.setItem('tahunAjaranId', ta.id);
+                              localStorage.setItem('tahunAjaranNama', ta.nama);
+                              localStorage.setItem('semester', 'ganjil');
+                              localStorage.setItem('semesterLabel', `${ta.nama} - Semester 1`);
+                              activateTahunAjaran(ta.id, 'ganjil');
+                            }}
+                            className={`px-3 py-2 rounded-xl text-[10px] font-bold transition ${
+                              localStorage.getItem('semester') === 'ganjil' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                            }`}
+                          >
+                            📚 Semester 1<br/><span className="text-[9px] opacity-75">Jul - Des</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              localStorage.setItem('tahunAjaranId', ta.id);
+                              localStorage.setItem('tahunAjaranNama', ta.nama);
+                              localStorage.setItem('semester', 'genap');
+                              localStorage.setItem('semesterLabel', `${ta.nama} - Semester 2`);
+                              activateTahunAjaran(ta.id, 'genap');
+                            }}
+                            className={`px-3 py-2 rounded-xl text-[10px] font-bold transition ${
+                              localStorage.getItem('semester') === 'genap' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                            }`}
+                          >
+                            📚 Semester 2<br/><span className="text-[9px] opacity-75">Jan - Jun</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              localStorage.setItem('tahunAjaranId', ta.id);
+                              localStorage.setItem('tahunAjaranNama', ta.nama);
+                              localStorage.setItem('semester', 'full');
+                              localStorage.setItem('semesterLabel', `${ta.nama} - Full Year`);
+                              activateTahunAjaran(ta.id, 'full');
+                            }}
+                            className={`px-3 py-2 rounded-xl text-[10px] font-bold transition ${
+                              localStorage.getItem('semester') === 'full' || (!localStorage.getItem('semester') && ta.is_active) ? 'bg-indigo-600 text-white shadow-md' : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                            }`}
+                          >
+                            📅 Full Year<br/><span className="text-[9px] opacity-75">Semua data</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {/* Current Selection */}
+                <div className="bg-slate-100 border border-slate-200 rounded-xl p-4">
+                  <p className="text-[10px] text-slate-500 font-bold">📊 Filter aktif:</p>
+                  <p className="text-sm font-bold text-slate-800 mt-1">
+                    {localStorage.getItem('semesterLabel') || localStorage.getItem('tahunAjaranNama') || 'Pilih semester'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Sub-Tab: Presensi Harian */}
         {tabSekolah === "presensi" && (
           <div className="space-y-6">
             {/* Filter Sekolah, Tanggal & Jadwal */}
@@ -7120,7 +7443,8 @@ const renderJurnalModule = () => {
                           <th className="py-2.5 px-3 w-32">Nilai Awal</th>
                           <th className="py-2.5 px-3 w-32">Nilai Remedial</th>
                           <th className="py-2.5 px-2 w-20 text-center">Akhir</th>
-                          <th className="py-2.5 px-2 w-28 text-center">Status</th>
+                          <th className="py-2.5 px-2 w-20 text-center">Status</th>
+                          <th className="py-2.5 px-2 w-24 text-center">AI Raport</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -7159,6 +7483,24 @@ const renderJurnalModule = () => {
                                   {isFailed ? "Remedial" : "Lulus"}
                                 </span>
                               </td>
+                              <td className="py-2 px-2 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedRaporStudent({
+                                      id: g.student_id,
+                                      nama_siswa: g.nama_siswa,
+                                      nomor_absen: g.nomor_absen || idx + 1,
+                                      nilai: g.nilai_akhir || g.nilai_awal || 0,
+                                    });
+                                    setShowRaportWriter(true);
+                                  }}
+                                  className="px-2 py-1 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-[10px] font-bold transition cursor-pointer"
+                                  title="Generate AI Raport Description"
+                                >
+                                  ✨ AI
+                                </button>
+                              </td>
                             </tr>
                           );
                         })}
@@ -7166,7 +7508,19 @@ const renderJurnalModule = () => {
                     </table>
                   </div>
 
-                  <div className="flex justify-end pt-3 border-t border-slate-100">
+                  <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Generate raport for all students
+                        if (studentGrades.length > 0) {
+                          alert("Fitur batch raport akan segera hadir! Untuk saat ini, silakan generate satu per satu.");
+                        }
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl text-xs font-bold transition shadow cursor-pointer"
+                    >
+                      ✨ Generate Semua Raport
+                    </button>
                     <button
                       type="button"
                       onClick={handleSaveGrades}
@@ -7177,6 +7531,40 @@ const renderJurnalModule = () => {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* AI Raport Writer Modal */}
+        {showRaportWriter && selectedRaporStudent && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b border-slate-100 px-4 py-3 flex items-center justify-between rounded-t-3xl">
+                <div>
+                  <h3 className="font-bold text-slate-800">✨ AI Raport Writer</h3>
+                  <p className="text-[10px] text-slate-500">Generate deskripsi rapor untuk {selectedRaporStudent.nama_siswa}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowRaportWriter(false);
+                    setSelectedRaporStudent(null);
+                  }}
+                  className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center text-slate-500 transition cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-4">
+                <RaportWriter
+                  student={selectedRaporStudent}
+                  subjectId={selectedSubjectId}
+                  assessmentId={activeAssessId}
+                  nilai={selectedRaporStudent.nilai}
+                  onGenerated={(desc: string) => {
+                    console.log("Generated raport description:", desc);
+                  }}
+                />
+              </div>
             </div>
           </div>
         )}
@@ -7945,6 +8333,39 @@ const renderJurnalModule = () => {
                     >
                       Simpan Perubahan
                     </button>
+                    {viewingDoc.tipe_dokumen === 'rpp' && (
+                      <button
+                        onClick={() => {
+                          // Open Selesai Mengajar modal for this RPP
+                          const rppData = {
+                            id: viewingDoc.id,
+                            judul: viewingDoc.judul_dokumen,
+                            mapel: viewingDoc.konten?.mapel || adminMapel,
+                            kelas: viewingDoc.konten?.kelas || adminKelas,
+                            class_id: viewingDoc.konten?.class_id || '',
+                            subject_id: viewingDoc.konten?.subject_id || '',
+                          };
+                          // Find matching schedule
+                          const matchingSchedule = schedules.find(
+                            (s: any) =>
+                              s.subject_id === rppData.subject_id &&
+                              s.class_id === rppData.class_id
+                          );
+                          // Trigger modal via custom event
+                          window.dispatchEvent(
+                            new CustomEvent('openSelesaiMengajar', {
+                              detail: {
+                                rpp: rppData,
+                                schedule: matchingSchedule || null,
+                              },
+                            })
+                          );
+                        }}
+                        className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-[10px] font-bold transition cursor-pointer flex items-center gap-1"
+                      >
+                        ✓ Selesai Mengajar
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -8175,6 +8596,101 @@ const renderJurnalModule = () => {
             ))}
           </div>
         </div>
+
+        {/* Bagian 3.5 — Jadwal Hari Ini dengan Tombol Selesai Mengajar */}
+        {(() => {
+          const today = new Date();
+          const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+          const hariIni = dayNames[today.getDay()];
+          const todaySchedules = schedules.filter((s: any) => s.hari === hariIni);
+
+          if (todaySchedules.length === 0) {
+            return (
+              <div className="bg-violet-50 border border-violet-200 rounded-2xl p-6">
+                <div className="text-center">
+                  <div className="text-4xl mb-3">📅</div>
+                  <h3 className="text-sm font-bold text-violet-800 mb-2">
+                    Tidak ada jadwal mengajar hari ini ({hariIni})
+                  </h3>
+                  <p className="text-xs text-violet-600 mb-4">
+                    Buat jadwal test untuk mencoba fitur "Selesaikan Mengajar"
+                  </p>
+                  <button
+                    onClick={seedTestSchedules}
+                    disabled={isSeedingData || !selectedSchoolId}
+                    className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300 text-white text-xs font-bold rounded-xl transition-colors"
+                  >
+                    {isSeedingData ? '⏳ Membuat data test...' : '🧪 Buat Data Test'}
+                  </button>
+                  {!selectedSchoolId && (
+                    <p className="text-xs text-amber-600 mt-2">
+                      ⚠️ Pilih sekolah terlebih dahulu
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-gray-700">📅 Jadwal Hari Ini ({hariIni})</h2>
+                <span className="text-xs bg-violet-50 text-violet-700 font-bold px-2 py-0.5 rounded-full">
+                  {todaySchedules.length} jadwal
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {todaySchedules.map((sch: any) => {
+                  const isCompleted = completedSessionIds.has(sch.id);
+                  const scheduleInfo: ScheduleInfo = {
+                    id: sch.id,
+                    class_id: sch.class_id,
+                    subject_id: sch.subject_id,
+                    school_id: sch.school_id,
+                    class_name: sch.nama_kelas,
+                    subject_name: sch.nama_mapel,
+                    jam_mulai: sch.jam_mulai,
+                    jam_selesai: sch.jam_selesai,
+                  };
+
+                  return (
+                    <div
+                      key={sch.id}
+                      className={`bg-white border rounded-xl p-4 transition-all ${
+                        isCompleted
+                          ? 'border-emerald-200 bg-emerald-50/50'
+                          : 'border-gray-200 hover:border-violet-300 hover:shadow-md'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div>
+                          <div className="font-bold text-gray-900">{sch.nama_mapel}</div>
+                          <div className="text-sm text-gray-500">Kelas {sch.nama_kelas}</div>
+                          <div className="text-xs text-gray-400 mt-1">
+                            ⏱️ {sch.jam_mulai} - {sch.jam_selesai}
+                          </div>
+                        </div>
+                        {isCompleted && (
+                          <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-1 rounded-lg">
+                            ✓ Selesai
+                          </span>
+                        )}
+                      </div>
+                      <TimelineSelesaiButton
+                        schedule={scheduleInfo}
+                        isCompleted={isCompleted}
+                        onCompleted={() => {
+                          setCompletedSessionIds((prev) => new Set([...prev, sch.id]));
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Bagian 4 — Aktivitas Terbaru + Checklist */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -9861,6 +10377,113 @@ const renderJurnalModule = () => {
         </div>
       )}
 
+      {/* TAHUN AJARAN MODAL */}
+      {showTahunAjaranModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-800">📅 Tambah Tahun Ajaran</h3>
+              <button onClick={() => setShowTahunAjaranModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Quick Setup */}
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+                <p className="text-[10px] font-bold text-indigo-700 mb-2">💡 Quick Setup:</p>
+                <div className="flex gap-2 flex-wrap">
+                  <button onClick={() => {
+                    const y = new Date().getFullYear();
+                    setTahunAjaranForm({ nama: y + '/' + (y + 1), tanggalMulai: y + '-07-15', tanggalSelesai: (y + 1) + '-06-30' });
+                  }} className="px-2 py-1 bg-white border border-indigo-200 rounded-lg text-[10px] font-semibold text-indigo-700 hover:bg-indigo-100">{new Date().getFullYear()}/{new Date().getFullYear() + 1}</button>
+                  <button onClick={() => {
+                    const y = new Date().getFullYear();
+                    setTahunAjaranForm({ nama: (y + 1) + '/' + (y + 2), tanggalMulai: (y + 1) + '-07-15', tanggalSelesai: (y + 2) + '-06-30' });
+                  }} className="px-2 py-1 bg-white border border-indigo-200 rounded-lg text-[10px] font-semibold text-indigo-700 hover:bg-indigo-100">{new Date().getFullYear() + 1}/{new Date().getFullYear() + 2}</button>
+                  <button onClick={() => {
+                    const y = new Date().getFullYear();
+                    setTahunAjaranForm({ nama: (y - 1) + '/' + y, tanggalMulai: (y - 1) + '-07-15', tanggalSelesai: y + '-06-30' });
+                  }} className="px-2 py-1 bg-white border border-indigo-200 rounded-lg text-[10px] font-semibold text-indigo-700 hover:bg-indigo-100">{new Date().getFullYear() - 1}/{new Date().getFullYear()}</button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 block mb-1">Nama Tahun Ajaran *</label>
+                <input type="text" value={tahunAjaranForm.nama}
+                  onChange={(e) => setTahunAjaranForm(prev => ({ ...prev, nama: e.target.value }))}
+                  placeholder="2024/2025"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1">Tanggal Mulai *</label>
+                  <input type="date" value={tahunAjaranForm.tanggalMulai}
+                    onChange={(e) => setTahunAjaranForm(prev => ({ ...prev, tanggalMulai: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1">Tanggal Selesai *</label>
+                  <input type="date" value={tahunAjaranForm.tanggalSelesai}
+                    onChange={(e) => setTahunAjaranForm(prev => ({ ...prev, tanggalSelesai: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white" />
+                </div>
+              </div>
+              <p className="text-[9px] text-slate-400 -mt-2">Format: Mulai 15 Juli, Selesai 30 Juni tahun berikutnya</p>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+              <button onClick={() => setShowTahunAjaranModal(false)}
+                className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition">Batal</button>
+              <button onClick={createTahunAjaran} disabled={!tahunAjaranForm.nama}
+                className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition disabled:opacity-50">Simpan</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE TAHUN AJARAN MODAL */}
+      {deleteModalTa && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-800">🗑️ Hapus Tahun Ajaran</h3>
+              <button onClick={() => { setDeleteModalTa(null); setDeleteTaError(''); }} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-slate-600">
+                Apakah Anda yakin ingin menghapus tahun ajaran <strong>{deleteModalTa.nama}</strong>?
+              </p>
+              <p className="text-[11px] text-red-600 font-bold">
+                Tindakan ini tidak dapat dibatalkan.
+              </p>
+
+              {deleteTaError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-xs">
+                  {deleteTaError}
+                </div>
+              )}
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 block mb-1">Masukkan password Anda untuk konfirmasi</label>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={e => setDeletePassword(e.target.value)}
+                  placeholder="Password Anda"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+              <button onClick={() => { setDeleteModalTa(null); setDeletePassword(''); setDeleteTaError(''); }}
+                className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition">Batal</button>
+              <button onClick={handleDeleteTahunAjaran} disabled={deletingTa || !deletePassword}
+                className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-bold transition disabled:opacity-50">
+                {deletingTa ? 'Menghapus...' : 'Hapus'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* EDIT MODAL DIALOG */}
       {isEditModalOpen && editingSoal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto no-print">
@@ -10698,7 +11321,7 @@ const renderJurnalModule = () => {
           <span className="text-xl">⚙️</span>
           <span className="text-[11px] tracking-tight">Konfigurasi</span>
         </button>
-        
+
         <button
           onClick={() => setMobileTab('preview')}
           className={`relative flex flex-col items-center gap-1 py-1 px-4 rounded-2xl transition-all duration-200 ${
@@ -10716,6 +11339,29 @@ const renderJurnalModule = () => {
           )}
         </button>
       </div>
+
+      {/* GuruPRO AI Floating Action Button - Selesaikan Mengajar */}
+      <FloatingActionButton />
+
+      {/* Selesai Mengajar Modal for RPP */}
+      {rppSelesaiModal.isOpen && rppSelesaiModal.rpp && (
+        <SelesaiMengajarModal
+          isOpen={true}
+          onClose={() => setRppSelesaiModal({ isOpen: false, rpp: null, schedule: null })}
+          preselectedSchedule={rppSelesaiModal.schedule}
+          rppId={rppSelesaiModal.rpp.id}
+          onComplete={() => {
+            setRppSelesaiModal({ isOpen: false, rpp: null, schedule: null });
+            setCompletedSessionIds((prev) => {
+              const newSet = new Set(prev);
+              if (rppSelesaiModal.schedule?.id) {
+                newSet.add(rppSelesaiModal.schedule.id);
+              }
+              return newSet;
+            });
+          }}
+        />
+      )}
 
     </main>
   );

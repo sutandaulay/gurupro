@@ -34,6 +34,18 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+function parsePrice(val: any): number {
+  if (typeof val === "string") return parseFloat(val) || 0;
+  return Number(val) || 0;
+}
+
+function parseFeatures(val: any): string[] {
+  if (!val) return [];
+  if (typeof val === "string") try { return JSON.parse(val); } catch { return []; }
+  if (Array.isArray(val)) return val;
+  return [];
+}
+
 export default async function LandingPage({
   searchParams,
 }: {
@@ -60,15 +72,16 @@ export default async function LandingPage({
   let footerCopyright = fallbackFooter.copyright;
   let footerColumns: { title: string; links: { label: string; href: string }[] }[] = [];
 
-  // Data from system_settings
-  let pricingData: any = null;
   let faqData: any = null;
   let referralData: any = null;
 
-  // Try to get content from database cache (FAST - no Payload needed)
+  // Pricing plans - always load from DB
+  let pricingPlans: any[] = [];
+
+  // Try to get content from database cache
   try {
     const cacheRes = await query(
-      "SELECT key, value FROM system_settings WHERE key IN ('landing_hero', 'landing_features', 'landing_why', 'landing_footer', 'faq_config', 'referral_config', 'pricing_config')"
+      "SELECT key, value FROM system_settings WHERE key IN ('landing_hero', 'landing_features', 'landing_why', 'landing_footer', 'faq_config', 'referral_config')"
     );
 
     if (cacheRes.rows.length > 0) {
@@ -81,7 +94,6 @@ export default async function LandingPage({
         }
       }
 
-      // Apply hero from cache
       if (cache["landing_hero"]) {
         const h = cache["landing_hero"];
         hero = {
@@ -95,7 +107,6 @@ export default async function LandingPage({
         };
       }
 
-      // Apply features from cache
       if (cache["landing_features"] && Array.isArray(cache["landing_features"])) {
         features = cache["landing_features"].map((f: any) => ({
           icon: resolveTablerIcon(f.icon) as any,
@@ -104,14 +115,12 @@ export default async function LandingPage({
         }));
       }
 
-      // Apply why points from cache
       if (cache["landing_why"] && Array.isArray(cache["landing_why"])) {
         whyPoints = cache["landing_why"].map((p: any) => ({
           text: p.point || p.text || "",
         }));
       }
 
-      // Apply footer from cache
       if (cache["landing_footer"]) {
         const f = cache["landing_footer"];
         footerDesc = f.description || fallbackFooter.description;
@@ -129,100 +138,42 @@ export default async function LandingPage({
         }
       }
 
-      // Apply FAQ from cache
       if (cache["faq_config"] && Array.isArray(cache["faq_config"])) {
         faqData = cache["faq_config"];
       }
 
-      // Apply Referral from cache
       if (cache["referral_config"]) {
         referralData = cache["referral_config"];
       }
-
-      // Apply Pricing from cache
-      if (cache["pricing_config"]) {
-        pricingData = cache["pricing_config"];
-      }
     }
-  } catch {
-    // Use fallback data on error
-  }
+  } catch {}
 
-  // Also try pricing_plans table (for CMS "Paket" tab integration)
-  if (!pricingData) {
-    try {
-      const plansRes = await query(
-        "SELECT * FROM pricing_plans WHERE is_active = true ORDER BY sort_order ASC"
-      );
-      if (plansRes.rows.length > 0) {
-        const planKeys = ["free", "three_month", "six_month", "one_year"];
-        const mapped: any = {};
-        plansRes.rows.forEach((plan: any, idx: number) => {
-          const key = planKeys[idx] || `plan_${plan.id}`;
-          mapped[key] = {
-            price: plan.price,
-            tokens: plan.tokens || 0,
-            duration_days: plan.duration_days,
-            features: plan.features || [],
-            popular: plan.popular || false,
-            package_name: plan.package_name,
-          };
-        });
-        pricingData = mapped;
-      }
-    } catch {}
-  }
+  // Load pricing plans from database
+  try {
+    const plansRes = await query(
+      "SELECT * FROM pricing_plans WHERE is_active = true ORDER BY sort_order ASC"
+    );
+    if (plansRes.rows.length > 0) {
+      pricingPlans = plansRes.rows.map((row: any) => ({
+        id: row.id,
+        package_name: row.package_name,
+        price: parsePrice(row.price),
+        tokens: typeof row.tokens === "string" ? parseInt(row.tokens) || 0 : row.tokens || 0,
+        duration_days: row.duration_days,
+        features: parseFeatures(row.features),
+        popular: row.popular || false,
+        sort_order: row.sort_order || 0,
+      }));
+    }
+  } catch {}
 
-  // Default pricing configuration
-  const defaultPricing = {
-    free: {
-      price: 0,
-      tokens: 10,
-      duration_days: 30,
-      features: [
-        "10 Token Kuota Sekali",
-        "Masa Aktif 30 Hari",
-        "Generator Soal (LOTS C1-C3)",
-        "Dukungan Kurikulum Merdeka",
-      ]
-    },
-    three_month: {
-      price: 120000,
-      tokens: 500,
-      duration_days: 90,
-      features: [
-        "500 Token Kuota Utama",
-        "Masa Aktif 90 Hari",
-        "Generator Soal HOTS (C4-C6)",
-        "Cetak Lembar Jawaban Resmi",
-        "Server Prioritas & CS Terpadu",
-      ]
-    },
-    six_month: {
-      price: 220000,
-      tokens: 1100,
-      duration_days: 180,
-      features: [
-        "1100 Token Kuota Utama",
-        "Masa Aktif 180 Hari",
-        "Generator Soal HOTS (C4-C6)",
-        "Cetak Lembar Jawaban Resmi",
-        "Server Prioritas & CS Prioritas",
-      ]
-    },
-    one_year: {
-      price: 400000,
-      tokens: 2500,
-      duration_days: 365,
-      features: [
-        "2500 Token Kuota Utama",
-        "Masa Aktif 365 Hari",
-        "Generator Soal HOTS (C4-C6)",
-        "Cetak Lembar Jawaban Resmi",
-        "CS VIP 24/7 & Backup Riwayat",
-      ]
-    },
-  };
+  // Jika tidak ada plan dari DB, gunakan default
+  const defaultPricingPlans = [
+    { id: "free", package_name: "Gratis", price: 0, tokens: 10, duration_days: 30, popular: false, features: ["10 Token Kuota Sekali", "Masa Aktif 30 Hari", "Generator Soal (LOTS C1-C3)", "Dukungan Kurikulum Merdeka"] },
+    { id: "three_month", package_name: "3 Bulan", price: 120000, tokens: 500, duration_days: 90, popular: true, features: ["500 Token Kuota Utama", "Masa Aktif 90 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Terpadu"] },
+    { id: "six_month", package_name: "6 Bulan", price: 220000, tokens: 1100, duration_days: 180, popular: false, features: ["1100 Token Kuota Utama", "Masa Aktif 180 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Prioritas"] },
+    { id: "one_year", package_name: "1 Tahun", price: 400000, tokens: 2500, duration_days: 365, popular: false, features: ["2500 Token Kuota Utama", "Masa Aktif 365 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "CS VIP 24/7 & Backup Riwayat"] },
+  ];
 
   const defaultFaq = [
     {
@@ -259,7 +210,7 @@ export default async function LandingPage({
         copyright: footerCopyright,
         columns: footerColumns,
       }}
-      pricing={pricingData || defaultPricing}
+      pricingPlans={pricingPlans.length > 0 ? pricingPlans : defaultPricingPlans}
       faq={faqData || defaultFaq}
       referral={referralData || defaultReferral}
     />

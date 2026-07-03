@@ -16,8 +16,9 @@ export async function GET() {
     const userId = session.id;
 
     const userRes = await query(
-      `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, 
-              bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at 
+      `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit,
+              bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at,
+              jenjang, mata_pelajaran, nip
        FROM users WHERE id = $1`,
       [userId]
     );
@@ -46,7 +47,7 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function PUT(req: Request) {
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("gurupro_session")?.value;
@@ -59,7 +60,52 @@ export async function POST(req: Request) {
     const userId = session.id;
 
     const body = await req.json();
-    const { nama_lengkap, nama_sekolah, username, bank_name, bank_account_number, bank_account_name } = body;
+    const { action, current_password, new_password, ...profileData } = body;
+
+    // Handle change password
+    if (action === "change_password") {
+      if (!current_password || !new_password) {
+        return NextResponse.json({ error: "Password saat ini dan baru wajib diisi" }, { status: 400 });
+      }
+
+      if (new_password.length < 6) {
+        return NextResponse.json({ error: "Password baru minimal 6 karakter" }, { status: 400 });
+      }
+
+      // Get user with hashed password
+      const userRes = await query(
+        "SELECT id, password FROM users WHERE id = $1",
+        [userId]
+      );
+
+      if (userRes.rows.length === 0) {
+        return NextResponse.json({ error: "Pengguna tidak ditemukan." }, { status: 404 });
+      }
+
+      const user = userRes.rows[0];
+
+      // Verify current password
+      const bcrypt = await import("bcrypt");
+      const isValid = await bcrypt.compare(current_password, user.password);
+
+      if (!isValid) {
+        return NextResponse.json({ error: "Password saat ini salah" }, { status: 400 });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(new_password, 12);
+
+      // Update password
+      await query(
+        "UPDATE users SET password = $1 WHERE id = $2",
+        [hashedPassword, userId]
+      );
+
+      return NextResponse.json({ message: "Password berhasil diubah!" });
+    }
+
+    // Handle profile update
+    const { nama_lengkap, nama_sekolah, username, bank_name, bank_account_number, bank_account_name, whatsapp, jenjang, mata_pelajaran, nip } = profileData;
 
     if (!nama_lengkap) {
       return NextResponse.json({ error: "Nama lengkap wajib diisi." }, { status: 400 });
@@ -88,6 +134,30 @@ export async function POST(req: Request) {
       idx++;
     }
 
+    if (whatsapp !== undefined) {
+      if (whatsapp) {
+        // Validate WhatsApp format (digits only)
+        const cleanWA = whatsapp.replace(/\D/g, "");
+        if (cleanWA.length < 10) {
+          return NextResponse.json({ error: "Nomor WhatsApp minimal 10 digit." }, { status: 400 });
+        }
+        // Check if WhatsApp is already taken
+        const existingWA = await query(
+          "SELECT id FROM users WHERE whatsapp = $1 AND id <> $2",
+          [cleanWA, userId]
+        );
+        if (existingWA.rows.length > 0) {
+          return NextResponse.json({ error: "Nomor WhatsApp sudah digunakan pengguna lain." }, { status: 409 });
+        }
+        sets.push(`whatsapp = $${idx}`);
+        values.push(cleanWA);
+      } else {
+        sets.push(`whatsapp = $${idx}`);
+        values.push(null);
+      }
+      idx++;
+    }
+
     if (bank_name !== undefined) {
       sets.push(`bank_name = $${idx}`);
       values.push(bank_name ? bank_name.trim() : null);
@@ -103,8 +173,21 @@ export async function POST(req: Request) {
       values.push(bank_account_name ? bank_account_name.trim() : null);
       idx++;
     }
-
-    const targetRole = session.role || 'guru';
+    if (jenjang !== undefined) {
+      sets.push(`jenjang = $${idx}`);
+      values.push(jenjang || null);
+      idx++;
+    }
+    if (mata_pelajaran !== undefined) {
+      sets.push(`mata_pelajaran = $${idx}`);
+      values.push(mata_pelajaran ? mata_pelajaran.trim() : null);
+      idx++;
+    }
+    if (nip !== undefined) {
+      sets.push(`nip = $${idx}`);
+      values.push(nip ? nip.trim() : null);
+      idx++;
+    }
 
     values.push(userId);
     await query(
@@ -113,7 +196,7 @@ export async function POST(req: Request) {
     );
 
     // Update session cookie with the new role
-    const sessionData = JSON.stringify({ id: userId, role: targetRole });
+    const sessionData = JSON.stringify({ id: userId, role: session.role || 'guru' });
     cookieStore.set('gurupro_session', sessionData, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -122,19 +205,26 @@ export async function POST(req: Request) {
     });
 
     const updatedUser = await query(
-      `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, 
-              bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at 
+      `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit,
+              bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at,
+              jenjang, mata_pelajaran, nip
        FROM users WHERE id = $1`,
       [userId]
     );
 
     const pricingConfig = await getPricingConfig();
     return NextResponse.json({
-      ...updatedUser.rows[0],
+      message: "Profil berhasil diperbarui!",
+      user: updatedUser.rows[0],
       pricingConfig
     });
   } catch (error: any) {
-    console.error("Profile POST API error:", error);
+    console.error("Profile PUT API error:", error);
     return NextResponse.json({ error: error.message || "Gagal memperbarui profil." }, { status: 500 });
   }
+}
+
+// Keep POST for backward compatibility
+export async function POST(req: Request) {
+  return PUT(req);
 }

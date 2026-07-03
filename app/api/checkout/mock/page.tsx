@@ -6,7 +6,7 @@ import {
   IconLoader2,
   IconCheck,
   IconX,
-  IconBrandQrcode,
+  IconBarcode,
   IconBuildingBank,
   IconCreditCard,
 } from "@tabler/icons-react";
@@ -128,7 +128,7 @@ function MockCheckoutContent() {
                   : "border-slate-700 bg-slate-900/40 text-slate-400 hover:border-slate-600"
               }`}
             >
-              <IconBrandQrcode size={28} stroke={1.5} />
+              <IconBarcode size={28} stroke={1.5} />
               <span className="text-[10px] font-bold">QRIS</span>
               <span className="text-[9px] text-slate-500">GoPay, OVO, DANA</span>
             </button>
@@ -151,7 +151,7 @@ function MockCheckoutContent() {
         {paymentMethod === "qris" ? (
           <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-2xl p-4 mb-6">
             <div className="flex items-center gap-2 mb-2">
-              <IconBrandQrcode size={16} className="text-indigo-400" />
+              <IconBarcode size={16} className="text-indigo-400" />
               <p className="text-[10px] font-bold text-indigo-300 uppercase">Petunjuk Pembayaran QRIS</p>
             </div>
             <ol className="text-[10px] text-slate-400 space-y-1.5 leading-relaxed">

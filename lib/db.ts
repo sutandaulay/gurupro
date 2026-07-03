@@ -482,11 +482,29 @@ const initDb = async () => {
       await pool.query("UPDATE users SET referral_code = $1 WHERE id = $2", [code, r.id]);
     }
 
+    // Ensure tahun_ajaran has all required columns
+    try {
+      await pool.query('ALTER TABLE tahun_ajaran ADD COLUMN IF NOT EXISTS sekolah_id UUID');
+      await pool.query("ALTER TABLE tahun_ajaran ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)");
+      await pool.query("ALTER TABLE tahun_ajaran ADD COLUMN IF NOT EXISTS semester_type VARCHAR(20) DEFAULT 'full'");
+      await pool.query("ALTER TABLE tahun_ajaran ADD COLUMN IF NOT EXISTS semester VARCHAR(20)");
+    } catch { /* table might not exist yet */ }
+
     console.log("SaaS Academic & TAMS tables checked/initialized successfully");
   } catch (err) {
     console.error("Failed to initialize SaaS Academic & TAMS tables:", err);
   }
 };
+
+export async function requireActiveTahunAjaran(): Promise<{ id: string; nama: string }> {
+  const result = await pool.query(
+    `SELECT id, nama FROM tahun_ajaran WHERE is_active = true LIMIT 1`
+  )
+  if (result.rows.length === 0) {
+    throw new Error('Tidak ada tahun ajaran yang aktif. Silakan buat dan aktivasi tahun ajaran terlebih dahulu.')
+  }
+  return result.rows[0]
+}
 
 export const logAudit = async (userId: string | null, aksi: string, deskripsi: string, ipAddress: string = '127.0.0.1') => {
   try {
@@ -500,4 +518,16 @@ export const logAudit = async (userId: string | null, aksi: string, deskripsi: s
   }
 };
 
-initDb();
+let initPromise: Promise<void> | null = null;
+
+export function ensureDbInitialized(): Promise<void> {
+  if (!initPromise) {
+    initPromise = initDb();
+  }
+  return initPromise;
+}
+
+// Run initDb at module scope but catch any errors gracefully
+ensureDbInitialized().catch((err) =>
+  console.error("Background DB initialization failed:", err)
+);

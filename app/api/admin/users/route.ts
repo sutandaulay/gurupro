@@ -84,7 +84,7 @@ export async function POST(req: Request) {
     }
 
     if (new_password && new_password.trim() !== "") {
-      const hashed = hashPassword(new_password.trim());
+      const hashed = await hashPassword(new_password.trim());
       await query(
         `UPDATE users 
          SET username = $1, token_limit = $2, role = $3, subscription_start = $4, subscription_end = $5, status_langganan = $6, is_active = $7, password_hash = $8

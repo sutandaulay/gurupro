@@ -4,21 +4,32 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { updateSystemSetting } from "@/lib/settings";
 
-const PLAN_KEYS = ["free", "three_month", "six_month", "one_year"];
+function parsePlanRow(row: any) {
+  return {
+    ...row,
+    price: typeof row.price === "string" ? parseFloat(row.price) : row.price,
+    tokens: typeof row.tokens === "string" ? parseInt(row.tokens) || 0 : row.tokens || 0,
+    features: typeof row.features === "string" ? JSON.parse(row.features) : row.features || [],
+  };
+}
 
 async function syncPricingConfig() {
   try {
-    const plans = await query("SELECT * FROM pricing_plans ORDER BY sort_order ASC LIMIT 4");
+    const plans = await query(
+      "SELECT * FROM pricing_plans WHERE is_active = true ORDER BY sort_order ASC"
+    );
     if (plans.rows.length === 0) return;
-    const config: Record<string, any> = {};
-    plans.rows.forEach((plan: any, idx: number) => {
-      config[PLAN_KEYS[idx]] = {
-        price: plan.price,
-        tokens: plan.tokens || 0,
-        duration_days: plan.duration_days,
-        features: plan.features || [],
-      };
-    });
+    const config = plans.rows.map((plan: any) => ({
+      id: plan.id,
+      package_name: plan.package_name,
+      price: typeof plan.price === "string" ? parseFloat(plan.price) : Number(plan.price),
+      tokens: typeof plan.tokens === "string" ? parseInt(plan.tokens) || 0 : plan.tokens || 0,
+      duration_days: plan.duration_days,
+      features: typeof plan.features === "string" ? JSON.parse(plan.features) : plan.features || [],
+      popular: plan.popular || false,
+      sort_order: plan.sort_order || 0,
+      is_active: plan.is_active !== false,
+    }));
     await updateSystemSetting("pricing_config", config);
   } catch (e) {
     console.error("syncPricingConfig error:", e);
@@ -36,13 +47,13 @@ async function verifyAdmin() {
 const planSchema = z.object({
   id: z.string().optional(),
   package_name: z.string().min(1).max(100),
-  price: z.number().min(0),
-  duration_days: z.number().int().positive(),
-  tokens: z.number().int().min(0).optional(),
+  price: z.preprocess((v) => (v === "" || v === undefined || v === null ? 0 : Number(v)), z.number().min(0)),
+  duration_days: z.preprocess((v) => (v === "" || v === undefined || v === null ? 30 : Number(v)), z.number().int().positive()),
+  tokens: z.preprocess((v) => (v === "" || v === undefined || v === null ? 0 : Number(v)), z.number().int().min(0)).optional(),
   features: z.array(z.string()),
   is_active: z.boolean().optional(),
   popular: z.boolean().optional(),
-  sort_order: z.number().int().optional(),
+  sort_order: z.preprocess((v) => (v === "" || v === undefined || v === null ? undefined : Number(v)), z.number().int().optional()),
 });
 
 export async function GET() {
@@ -53,7 +64,7 @@ export async function GET() {
       "SELECT * FROM pricing_plans ORDER BY sort_order ASC"
     );
 
-    return NextResponse.json({ docs: result.rows });
+    return NextResponse.json({ docs: result.rows.map(parsePlanRow) });
   } catch (error: any) {
     console.error("GET /api/admin/pricing error:", error);
     const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;
@@ -94,7 +105,7 @@ export async function POST(request: Request) {
     );
 
     await syncPricingConfig();
-    return NextResponse.json({ success: true, data: result.rows[0] });
+    return NextResponse.json({ success: true, data: parsePlanRow(result.rows[0]) });
   } catch (error: any) {
     console.error("POST /api/admin/pricing error:", error);
     const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;
@@ -145,9 +156,30 @@ export async function PUT(request: Request) {
     }
 
     await syncPricingConfig();
-    return NextResponse.json({ success: true, data: result.rows[0] });
+    return NextResponse.json({ success: true, data: parsePlanRow(result.rows[0]) });
   } catch (error: any) {
     console.error("PUT /api/admin/pricing error:", error);
+    const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    await verifyAdmin();
+    const body = await request.json();
+    const { id, sort_order } = body;
+
+    if (!id || sort_order === undefined) {
+      return NextResponse.json({ error: "ID dan sort_order diperlukan" }, { status: 400 });
+    }
+
+    await query("UPDATE pricing_plans SET sort_order = $1, updated_at = NOW() WHERE id = $2", [sort_order, id]);
+    await syncPricingConfig();
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("PATCH /api/admin/pricing error:", error);
     const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
   }

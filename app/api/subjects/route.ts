@@ -1,4 +1,4 @@
-import { query } from "@/lib/db";
+import { query, requireActiveTahunAjaran } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -49,6 +49,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const userId = await getUserId();
+    await requireActiveTahunAjaran();
     const { school_id, nama_mapel } = await req.json();
 
     if (!school_id || !nama_mapel) {
@@ -66,7 +67,8 @@ export async function POST(req: Request) {
     return NextResponse.json(res.rows[0]);
   } catch (error: any) {
     console.error("Subjects POST error:", error);
-    const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;
+    const isTaError = error.message?.includes?.('tahun ajaran');
+    const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : isTaError ? 400 : 500;
     return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
   }
 }

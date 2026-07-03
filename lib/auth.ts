@@ -1,11 +1,14 @@
-import crypto from "crypto";
+import bcrypt from "bcrypt";
 
-/**
- * Basic SHA-256 password hashing with a static salt for local PostgreSQL setup.
- */
-export function hashPassword(password: string): string {
-  return crypto
-    .createHash("sha256")
-    .update(password + "_gurupro_secure_salt_2026")
-    .digest("hex");
+const SALT_ROUNDS = 10;
+
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, SALT_ROUNDS);
+}
+
+export async function comparePassword(
+  password: string,
+  hash: string
+): Promise<boolean> {
+  return bcrypt.compare(password, hash);
 }

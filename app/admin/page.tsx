@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import CmsLandingEditor from "@/components/admin/CmsLandingEditor";
+import TransactionsManager from "@/components/admin/TransactionsManager";
+import AdminManager from "@/components/admin/AdminManager";
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"users" | "transactions" | "cms" | "referrals" | "settings">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "transactions" | "cms" | "referrals" | "admins" | "settings">("users");
   
   // Data States
   const [users, setUsers] = useState<any[]>([]);
@@ -129,10 +131,12 @@ export default function AdminPage() {
   const fetchTransactions = async (queryStr = "") => {
     setIsLoadingTx(true);
     try {
-      const res = await fetch(`/api/admin/transactions?q=${encodeURIComponent(queryStr)}`);
+      const res = await fetch(`/api/admin/transactions?q=${encodeURIComponent(queryStr)}&includeStats=true`);
       if (res.ok) {
         const data = await res.json();
-        setTransactions(data);
+        // Support both old format (array) and new format (object with transactions key)
+        const txList = Array.isArray(data) ? data : (data.transactions || []);
+        setTransactions(txList);
       } else {
         const err = await res.json();
         setErrorMsg(err.error || "Gagal memuat transaksi");
@@ -532,7 +536,8 @@ export default function AdminPage() {
 
   // Calculations for Metrics
   const totalUsers = users.length;
-  const paidTransactions = transactions.filter((t) => t.status === "PAID");
+  const transactionsList = Array.isArray(transactions) ? transactions : [];
+  const paidTransactions = transactionsList.filter((t) => t.status === "PAID");
   const totalPaidTxCount = paidTransactions.length;
   const grossRevenue = paidTransactions.reduce((acc, curr) => acc + Number(curr.amount), 0);
 
@@ -658,6 +663,15 @@ export default function AdminPage() {
                   {adminNotifications.pendingPayouts}
                 </span>
               )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab("admins")}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                activeTab === "admins" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              👥 Kelola Admin
             </button>
 
             <button
@@ -922,92 +936,10 @@ export default function AdminPage() {
               )}
             </div>
           ) : activeTab === "transactions" ? (
-            <div className="overflow-x-auto">
-              {isLoadingTx ? (
-                <div className="text-center py-20 text-slate-400 font-semibold">Memuat riwayat transaksi...</div>
-              ) : transactions.length === 0 ? (
-                <div className="text-center py-20 text-slate-400 italic">Tidak ada data transaksi ditemukan.</div>
-              ) : (
-                <table className="w-full text-xs text-left text-slate-600">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
-                    <tr>
-                      <th className="px-5 py-3.5">ID Transaksi & Tanggal</th>
-                      <th className="px-5 py-3.5">Nama & Email Guru</th>
-                      <th className="px-5 py-3.5">Invoice Xendit</th>
-                      <th className="px-5 py-3.5 text-right">Jumlah</th>
-                      <th className="px-5 py-3.5 text-center">Status</th>
-                      <th className="px-5 py-3.5 text-center">Metode</th>
-                      <th className="px-5 py-3.5 text-center">Aksi Refund</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
-                    {transactions.map((tx) => (
-                      <tr key={tx.id} className="hover:bg-slate-50/50">
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-slate-800 text-[11px] truncate max-w-[120px]" title={tx.id}>{tx.id}</p>
-                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">{new Date(tx.created_at).toLocaleString("id-ID")}</p>
-                        </td>
-                        <td className="px-5 py-4">
-                          <p className="font-bold text-slate-800 text-xs">{tx.nama_lengkap || "(Tidak Ada)"}</p>
-                          <p className="text-[10px] text-slate-400 font-semibold">{tx.email}</p>
-                        </td>
-                        <td className="px-5 py-4 font-mono text-[10px] text-slate-500">
-                          {tx.external_id || "-"}
-                        </td>
-                        <td className="px-5 py-4 text-right font-bold text-slate-800 whitespace-nowrap">
-                          {formatter.format(tx.amount)}
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-black border ${
-                            tx.status === "ACTIVATED"
-                              ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                              : tx.status === "PAID"
-                              ? "bg-amber-50 border-amber-200 text-amber-700"
-                              : tx.status === "PENDING"
-                              ? "bg-indigo-50 border-indigo-200 text-indigo-700 animate-pulse"
-                              : "bg-rose-50 border-rose-200 text-rose-700"
-                          }`}>
-                            {tx.status === "PAID" ? "⏳ PAID (BELUM AKTIF)" : tx.status === "ACTIVATED" ? "✅ AKTIF" : tx.status}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-center font-bold text-[10px] text-slate-500">
-                          {tx.payment_method || "-"}
-                          {tx.plan_id && (
-                            <span className="block text-[8px] font-black text-indigo-500 uppercase mt-0.5">
-                              Plan: {tx.plan_id === "three_month" ? "3 Bulan" : tx.plan_id === "six_month" ? "6 Bulan" : tx.plan_id === "one_year" ? "1 Tahun" : tx.plan_id}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <div className="flex justify-center gap-1.5">
-                            {tx.status === "PAID" && (
-                              <button
-                                onClick={() => handleActivateTransaction(tx.id)}
-                                disabled={isRefunding[tx.id]}
-                                className="text-[10px] font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 px-2.5 py-1.5 rounded-xl transition cursor-pointer disabled:opacity-50"
-                              >
-                                {isRefunding[tx.id] ? "Processing..." : "Aktifkan Paket"}
-                              </button>
-                            )}
-                            {(tx.status === "PAID" || tx.status === "ACTIVATED") ? (
-                              <button
-                                onClick={() => handleRefund(tx.id)}
-                                disabled={isRefunding[tx.id]}
-                                className="text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-100 px-2.5 py-1.5 rounded-xl transition cursor-pointer disabled:opacity-50"
-                              >
-                                {isRefunding[tx.id] ? "Processing..." : "Refund"}
-                              </button>
-                            ) : (
-                              <span className="text-[10px] text-slate-400 font-bold">-</span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+            <TransactionsManager
+              onSuccess={(msg) => setSuccessMsg(msg)}
+              onError={(msg) => setErrorMsg(msg)}
+            />
           ) : activeTab === "cms" ? (
             <CmsLandingEditor />
           ) : activeTab === "referrals" ? (
@@ -1188,6 +1120,13 @@ export default function AdminPage() {
                   )}
                 </div>
               </div>
+            </div>
+          ) : activeTab === "admins" ? (
+            <div className="animate-fadeIn">
+              <AdminManager
+                onSuccess={(msg) => setSuccessMsg(msg)}
+                onError={(msg) => setErrorMsg(msg)}
+              />
             </div>
           ) : (
             <div className="p-6 space-y-8 animate-fadeIn">

@@ -208,6 +208,7 @@ model students {
   created_at         DateTime?            @default(now()) @db.Timestamp(6)
   student_attendance student_attendance[]
   student_grades     student_grades[]
+  absent_alerts      absent_alerts[]
   classes            classes              @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
@@ -258,6 +259,8 @@ model teacher_journals {
   custom_values                               Json?                  @default("{}")
   status                                      String                 @default("Draft") @db.VarChar(50)
   supervisor_id                               String?                @db.Uuid
+  auto_generated                              Boolean?               @default(false) // AI auto-generated flag
+  source_schedule_id                          String?                @db.Uuid // For tracking source
   created_at                                  DateTime?              @default(now()) @db.Timestamp(6)
   journal_supervisions                        journal_supervisions[]
   classes                                     classes                @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -316,6 +319,17 @@ model users {
   transactions                                           transactions[]
   users                                                  users?                 @relation("usersTousers", fields: [referred_by], references: [id], onUpdate: NoAction)
   other_users                                            users[]                @relation("usersTousers")
+  // GuruPRO AI Relations
+  teaching_sessions                                      teaching_sessions[]
+  lesson_memories                                        lesson_memories[]
+  absent_alerts                                          absent_alerts[]
+  admin_tasks                                            admin_tasks[]
+  ai_chat_logs                                           ai_chat_logs[]
+  // Evidence & Performance Report
+  evidence_logs                                          evidence_log[]
+  pelatihan_gurus                                        pelatihan_guru[]
+  dokumen_buktis                                         dokumen_bukti[]
+  laporan_kinerjas                                       laporan_kinerja[]
 }
 
 model hero_sections {
@@ -347,8 +361,10 @@ model pricing_plans {
   package_name  String    @db.VarChar(50)
   price         Decimal   @db.Decimal(12, 2)
   duration_days Int
+  tokens        Int?      @default(0)
   features      Json
   is_active     Boolean?  @default(true)
+  popular       Boolean?  @default(false)
   sort_order    Int?      @default(0)
   created_at    DateTime? @default(now()) @db.Timestamp(6)
   updated_at    DateTime? @default(now()) @db.Timestamp(6)
@@ -400,4 +416,239 @@ model TokenUsage {
   jenjang        String
   jumlah_soal    Int
   created_at     DateTime @default(now())
+}
+
+// ==========================================
+// GURUPRO AI TEACHING FEATURES
+// ==========================================
+
+// Teaching Sessions - For "Selesaikan Mengajar" tracking
+model teaching_sessions {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id               String    @db.Uuid
+  schedule_id           String?   @db.Uuid
+  class_id              String?   @db.Uuid
+  subject_id            String?   @db.Uuid
+  school_id             String?   @db.Uuid
+  session_date          DateTime  @db.Date
+  status                String    @default("pending") @db.VarChar(50) // pending, in_progress, completed
+  attendance_completed  Boolean   @default(false)
+  journal_generated     Boolean   @default(false)
+  reflection_generated  Boolean   @default(false)
+  followup_generated    Boolean   @default(false)
+  attendance_data       Json?     @default("[]") // Stored attendance records
+  journal_id            String?   @db.Uuid // Link to created journal
+  ai_reflection         String?   @db.Text
+  ai_followup           String?   @db.Text
+  completed_at          DateTime? @db.Timestamp(6)
+  created_at            DateTime? @default(now()) @db.Timestamp(6)
+
+  users                 users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+// Lesson Memory - AI remembers what teacher taught last time
+model lesson_memories {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id             String    @db.Uuid
+  schedule_id         String    @db.Uuid
+  last_topic          String?   @db.VarChar(255)
+  last_subtopic       String?   @db.VarChar(255)
+  last_page_number    Int?      @default(0)
+  last_date           DateTime  @db.Date
+  next_recommendations String?  @db.Text
+  notes               String?   @db.Text
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  updated_at          DateTime? @default(now()) @db.Timestamp(6)
+
+  users               users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+// Raport Cache - AI-generated raport descriptions
+model raport_cache {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  student_id      String    @db.Uuid
+  subject_id     String    @db.Uuid
+  assessment_id   String?   @db.Uuid
+  nilai           Decimal   @db.Decimal(5, 2)
+  ai_description  String    @db.Text
+  generated_at    DateTime? @default(now()) @db.Timestamp(6)
+
+  @@unique([student_id, subject_id, assessment_id])
+}
+
+// Absent Alerts - Track连续 absences and auto-generate WA messages
+model absent_alerts {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  student_id       String    @db.Uuid
+  user_id          String    @db.Uuid // teacher who generates
+  absence_count    Int       @default(0)
+  last_absent_date DateTime  @db.Date
+  alert_sent       Boolean   @default(false)
+  whatsapp_message String?   @db.Text
+  sent_at          DateTime? @db.Timestamp(6)
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+
+  students         students @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users            users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+// Admin Tasks - AI Timeline for teacher tasks
+model admin_tasks {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String    @db.Uuid
+  task_type    String    @db.VarChar(50) // journal, nilai, rpp, rapor, dll
+  task_title   String    @db.VarChar(255)
+  related_id   String?   @db.Uuid // reference to journal/assessment/etc
+  status       String    @default("pending") @db.VarChar(50) // pending, completed, skipped
+  due_date     DateTime? @db.Date
+  priority     String    @default("normal") @db.VarChar(20) // low, normal, high
+  description  String?   @db.Text
+  completed_at DateTime? @db.Timestamp(6)
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+
+  users        users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+// AI Chat Logs - Store AI chat history for context
+model ai_chat_logs {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String    @db.Uuid
+  session_id   String    @db.VarChar(100)
+  role         String    @db.VarChar(20) // user, assistant
+  content      String    @db.Text
+  action_type  String?   @db.VarChar(50) // create_journal, generate_rapor, dll
+  action_data  Json?     @default("{}")
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+
+  users        users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+// ==========================================
+// EVIDENCE-BASED PERFORMANCE REPORT
+// ==========================================
+
+// Evidence Log - Auto-logged teacher activities
+model evidence_log {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guru_id            String    @db.Uuid
+  tahun_ajaran_id    String    @db.Uuid
+  semester           String    @db.VarChar(20) // ganjil, genap
+  kategori           String    @db.VarChar(50) // perencanaan, pelaksanaan, penilaian, dll
+  sub_kategori       String    @db.VarChar(100)
+  referensi_id       String?   @db.Uuid
+  referensi_tabel    String?   @db.VarChar(100)
+  judul              String    @db.VarChar(255)
+  deskripsi          String?   @db.Text
+  indikator_kinerja  String[]  @default([]) // IK-01, IK-02, dst
+  bobot_evidence     Int       @default(1)
+  tanggal_aktivitas  DateTime  @db.Date
+  metadata           Json?     @default("{}")
+  created_at         DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([guru_id, tahun_ajaran_id, semester])
+  @@index([guru_id, kategori, tanggal_aktivitas])
+  @@index([referensi_id, referensi_tabel])
+
+  users        users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+// Pelatihan & Pengembangan Diri
+model pelatihan_guru {
+  id                          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guru_id                     String    @db.Uuid
+  tahun_ajaran_id             String?   @db.Uuid
+  semester                    String?   @db.VarChar(20)
+  nama_pelatihan              String    @db.VarChar(255)
+  penyelenggara               String    @db.VarChar(255)
+  jenis                       String    @db.VarChar(50) // workshop, seminar, webinar, dll
+  lingkup                     String    @db.VarChar(50) // internasional, nasional, provinsi, dll
+  tanggal_mulai               DateTime  @db.Date
+  tanggal_selesai             DateTime  @db.Date
+  durasi_jam                  Int
+  nomor_sertifikat            String?   @db.VarChar(100)
+  deskripsi                   String?   @db.Text
+  relevansi_mapel             Boolean   @default(true)
+  kompetensi_dikembangkan     String[]  @default([]) // pedagogik, profesional, sosial, kepribadian
+  file_sertifikat_url         String?   @db.Text
+  file_sertifikat_nama        String?   @db.VarChar(255)
+  status_verifikasi           String    @default("belum_upload") @db.VarChar(50)
+  created_at                  DateTime? @default(now()) @db.Timestamp(6)
+  updated_at                  DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([guru_id, tahun_ajaran_id, semester])
+
+  users        users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+// Dokumen Bukti Tambahan (piagam, SK, surat tugas, dll)
+model dokumen_bukti {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guru_id            String    @db.Uuid
+  tahun_ajaran_id    String?   @db.Uuid
+  semester           String?   @db.VarChar(20)
+  kategori           String    @db.VarChar(50) // sertifikat_pelatihan, piagam_penghargaan, dll
+  judul              String    @db.VarChar(255)
+  deskripsi          String?   @db.Text
+  tanggal_dokumen    DateTime? @db.Date
+  penerbit           String?   @db.VarChar(255)
+  file_url           String    @db.Text
+  file_nama          String    @db.VarChar(255)
+  file_tipe          String    @db.VarChar(50) // pdf, jpg, png
+  file_ukuran        Int?      // bytes
+  indikator_kinerja  String[]  @default([])
+  created_at         DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([guru_id, tahun_ajaran_id, semester])
+
+  users        users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+// Laporan Kinerja
+model laporan_kinerja {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guru_id          String    @db.Uuid
+  tahun_ajaran_id  String    @db.Uuid
+  semester         String    @db.VarChar(20)
+  judul            String    @db.VarChar(255)
+  content          Json?
+  evidence_summary Json?
+  status           String    @default("draft") @db.VarChar(50) // draft, final
+  ai_generated_at  DateTime? @db.Timestamp(6)
+  file_pdf_url     String?   @db.Text
+  file_docx_url    String?   @db.Text
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  updated_at       DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([guru_id, tahun_ajaran_id, semester])
+
+  users        users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+// Konfigurasi Indikator Kinerja
+model indikator_kinerja_config {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kode            String    @unique @db.VarChar(20) // IK-01, IK-02, dst
+  nama            String    @db.VarChar(255)
+  deskripsi       String?   @db.Text
+  komponen        String    @db.VarChar(50) // perencanaan, pelaksanaan, dll
+  bobot_persen    Int       @default(10)
+  min_evidence    Int       @default(1)
+  is_active       Boolean   @default(true)
+  berlaku_sejak   DateTime? @db.Date
+  sumber_regulasi String?   @db.VarChar(255)
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+}
+
+// Tahun Ajaran (for linking evidence)
+model tahun_ajaran {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nama          String    @db.VarChar(50) // "2024/2025"
+  tanggal_mulai DateTime @db.Date
+  tanggal_selesai DateTime @db.Date
+  is_active    Boolean   @default(false)
+  semester_type String   @default("full") // "ganjil" | "genap" | "full"
+  semester     String?   @db.VarChar(20) // Current active semester: "ganjil" | "genap"
+  sekolah_id   String?   @db.Uuid
+  created_by   String?   @db.Uuid
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
 }

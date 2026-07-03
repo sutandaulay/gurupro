@@ -221,11 +221,46 @@ export interface PricingPlan {
   features: string[];
 }
 
+export interface PricingPlanItem {
+  id: string;
+  package_name: string;
+  price: number;
+  tokens: number;
+  duration_days: number;
+  features: string[];
+  popular: boolean;
+  is_active: boolean;
+  sort_order: number;
+}
+
 export interface PricingConfig {
   free: PricingPlan;
   three_month: PricingPlan;
   six_month: PricingPlan;
   one_year: PricingPlan;
+}
+
+export async function getActivePricingPlans(): Promise<PricingPlanItem[]> {
+  try {
+    const res = await query(
+      "SELECT * FROM pricing_plans WHERE is_active = true ORDER BY sort_order ASC"
+    );
+    if (res.rows.length === 0) return [];
+    return res.rows.map((row: any) => ({
+      id: row.id,
+      package_name: row.package_name,
+      price: typeof row.price === "string" ? parseFloat(row.price) : Number(row.price),
+      tokens: typeof row.tokens === "string" ? parseInt(row.tokens) || 0 : row.tokens || 0,
+      duration_days: row.duration_days,
+      features: typeof row.features === "string" ? JSON.parse(row.features) : row.features || [],
+      popular: row.popular || false,
+      is_active: row.is_active !== false,
+      sort_order: row.sort_order || 0,
+    }));
+  } catch (e) {
+    console.error("getActivePricingPlans error:", e);
+    return [];
+  }
 }
 
 export async function getPricingConfig(): Promise<PricingConfig> {

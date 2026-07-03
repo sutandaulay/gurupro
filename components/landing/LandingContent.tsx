@@ -9,7 +9,18 @@ import Footer from "@/components/landing/Footer";
 import type { HeroStat } from "@/components/landing/HeroSection";
 import type { FeatureItem } from "@/components/landing/FeaturesSection";
 import type { WhyPoint } from "@/components/landing/WhySection";
-import type { PricingConfig, FaqItem, ReferralConfig } from "@/lib/settings";
+import type { FaqItem, ReferralConfig } from "@/lib/settings";
+
+export interface PricingPlanDisplay {
+  id: string;
+  package_name: string;
+  price: number;
+  tokens: number;
+  duration_days: number;
+  features: string[];
+  popular: boolean;
+  sort_order?: number;
+}
 
 export interface LandingContentProps {
   isLoggedIn: boolean;
@@ -31,7 +42,7 @@ export interface LandingContentProps {
     columns?: { title: string; links: { label: string; href: string }[] }[];
   };
   showPreviewBanner?: boolean;
-  pricing?: PricingConfig;
+  pricingPlans?: PricingPlanDisplay[];
   faq?: FaqItem[];
   referral?: ReferralConfig;
 }
@@ -42,6 +53,63 @@ const formatPrice = (p: number) =>
     minimumFractionDigits: 0,
   }).format(p);
 
+function gridColsClass(count: number): string {
+  if (count <= 1) return "grid-cols-1";
+  if (count === 2) return "grid-cols-1 md:grid-cols-2";
+  if (count === 3) return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
+  return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
+}
+
+function getPlanEmoji(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.includes("gratis") || lower.includes("free")) return "🌱";
+  if (lower.includes("1 tahun") || lower.includes("tahunan") || lower.includes("year")) return "👑";
+  if (lower.includes("6 bulan") || lower.includes("semester")) return "⭐";
+  return "⚡";
+}
+
+function getPlanDesc(name: string, price: number, idx: number): string {
+  const lower = name.toLowerCase();
+  if (price === 0) return "Uji coba awal fitur GuruPRO";
+  if (lower.includes("1 tahun") || lower.includes("tahunan")) return "Efisiensi maksimal jangka panjang";
+  if (lower.includes("6 bulan") || lower.includes("semester")) return "Persiapan matang untuk 2 semester";
+  if (lower.includes("3 bulan") || lower.includes("triwulan")) return "Pendamping mengajar 1 triwulan";
+  return `Paket ${name} - Akses penuh fitur GuruPRO`;
+}
+
+function getCardStyle(plan: PricingPlanDisplay, idx: number, total: number) {
+  if (plan.popular) {
+    return {
+      bgClass: "bg-white border-2 border-primary-600 shadow-lg shadow-primary-100",
+      ctaClass: "bg-primary-600 hover:bg-primary-700 text-white",
+      badge: "Paling Populer 🔥",
+      transform: true,
+    };
+  }
+  if (idx === 0 && plan.price === 0) {
+    return {
+      bgClass: "bg-white border-slate-200/80 hover:border-slate-300",
+      ctaClass: "border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700",
+      badge: null,
+      transform: false,
+    };
+  }
+  if (idx === total - 1) {
+    return {
+      bgClass: "bg-white border-amber-300 hover:border-amber-400",
+      ctaClass: "bg-amber-500 hover:bg-amber-600 text-white",
+      badge: "Nilai Terbaik 🏆",
+      transform: false,
+    };
+  }
+  return {
+    bgClass: "bg-white border-slate-200/80 hover:border-slate-300",
+    ctaClass: "bg-primary-50 hover:bg-primary-100 text-primary-600",
+    badge: null,
+    transform: false,
+  };
+}
+
 export default function LandingContent({
   isLoggedIn,
   refCode,
@@ -50,16 +118,16 @@ export default function LandingContent({
   whyPoints,
   footer,
   showPreviewBanner,
-  pricing: pricingProp,
+  pricingPlans: pricingPlansProp,
   faq: faqProp,
   referral: referralProp,
 }: LandingContentProps) {
-  const pricing = pricingProp || {
-    free: { price: 0, tokens: 10, duration_days: 30, features: ["10 Token Kuota Sekali", "Masa Aktif 30 Hari", "Generator Soal (LOTS C1-C3)", "Dukungan Kurikulum Merdeka"] },
-    three_month: { price: 120000, tokens: 500, duration_days: 90, features: ["500 Token Kuota Utama", "Masa Aktif 90 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Terpadu"] },
-    six_month: { price: 220000, tokens: 1100, duration_days: 180, features: ["1100 Token Kuota Utama", "Masa Aktif 180 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Prioritas"] },
-    one_year: { price: 400000, tokens: 2500, duration_days: 365, features: ["2500 Token Kuota Utama", "Masa Aktif 365 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "CS VIP 24/7 & Backup Riwayat"] },
-  };
+  const pricingPlans = pricingPlansProp || [
+    { id: "free", package_name: "Gratis", price: 0, tokens: 10, duration_days: 30, popular: false, features: ["10 Token Kuota Sekali", "Masa Aktif 30 Hari", "Generator Soal (LOTS C1-C3)", "Dukungan Kurikulum Merdeka"] },
+    { id: "three_month", package_name: "3 Bulan", price: 120000, tokens: 500, duration_days: 90, popular: true, features: ["500 Token Kuota Utama", "Masa Aktif 90 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Terpadu"] },
+    { id: "six_month", package_name: "6 Bulan", price: 220000, tokens: 1100, duration_days: 180, popular: false, features: ["1100 Token Kuota Utama", "Masa Aktif 180 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Prioritas"] },
+    { id: "one_year", package_name: "1 Tahun", price: 400000, tokens: 2500, duration_days: 365, popular: false, features: ["2500 Token Kuota Utama", "Masa Aktif 365 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "CS VIP 24/7 & Backup Riwayat"] },
+  ];
   const faq = faqProp || [
     {
       question: "Bagaimana cara kerja perhitungan Token kuota?",
@@ -147,71 +215,46 @@ export default function LandingContent({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto items-stretch">
-            {([
-              {
-                id: "free", key: "free", name: "Free", desc: "Uji coba awal fitur GuruPRO", emoji: "🌱",
-                popular: false, bestValue: false,
-                bgClass: "bg-white border-slate-200/80 hover:border-slate-300",
-                ctaClass: "border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700",
-                ctaText: "Coba Gratis", badge: null,
-              },
-              {
-                id: "three_month", key: "three_month", name: "3 Bulan", desc: "Pendamping mengajar 1 triwulan", emoji: "⚡",
-                popular: false, bestValue: false,
-                bgClass: "bg-white border-slate-200/80 hover:border-slate-300",
-                ctaClass: "bg-primary-50 hover:bg-primary-100 text-primary-600",
-                ctaText: "Pilih Paket", badge: null,
-              },
-              {
-                id: "six_month", key: "six_month", name: "6 Bulan", desc: "Persiapan matang untuk 2 semester", emoji: "⭐",
-                popular: true, bestValue: false,
-                bgClass: "bg-white border-2 border-primary-600 shadow-lg shadow-primary-100",
-                ctaClass: "bg-primary-600 hover:bg-primary-700 text-white",
-                ctaText: "Beli Sekarang",
-                badge: "Paling Populer 🔥",
-              },
-              {
-                id: "one_year", key: "one_year", name: "1 Tahun", desc: "Efisiensi maksimal jangka panjang", emoji: "👑",
-                popular: false, bestValue: true,
-                bgClass: "bg-white border-amber-300 hover:border-amber-400",
-                ctaClass: "bg-amber-500 hover:bg-amber-600 text-white",
-                ctaText: "Pilih Paket", badge: "Nilai Terbaik 🏆",
-              },
-            ]).map((plan: any) => {
-              const p = pricing[plan.key as keyof PricingConfig];
-              const perMonth = p.price > 0 ? Math.round(p.price / (plan.key === "three_month" ? 3 : plan.key === "six_month" ? 6 : 12)) : 0;
+          <div className={`grid gap-6 max-w-7xl mx-auto items-stretch ${gridColsClass(pricingPlans.length)}`}>
+            {pricingPlans.map((plan, idx) => {
+              const perMonth = plan.price > 0 && plan.duration_days > 0
+                ? Math.round(plan.price / Math.max(1, Math.round(plan.duration_days / 30)))
+                : 0;
+              const style = getCardStyle(plan, idx, pricingPlans.length);
+              const emoji = getPlanEmoji(plan.package_name);
+              const desc = getPlanDesc(plan.package_name, plan.price, idx);
+              const checkoutId = plan.id;
               return (
                 <div
                   key={plan.id}
-                  className={`rounded-3xl p-6 flex flex-col justify-between shadow-sm hover:shadow-xl transition duration-300 relative group ${plan.bgClass} ${plan.popular ? "transform md:-translate-y-2" : ""}`}
+                  className={`rounded-3xl p-6 flex flex-col justify-between shadow-sm hover:shadow-xl transition duration-300 relative group ${style.bgClass} ${style.transform ? "transform md:-translate-y-2" : ""}`}
                 >
-                  {plan.badge && (
+                  {style.badge && (
                     <span className={`absolute top-0 right-6 -translate-y-1/2 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-md ${plan.popular ? "bg-gradient-to-r from-primary-600 to-purple-600 animate-bounce" : "bg-amber-500"}`}>
-                      {plan.badge}
+                      {style.badge}
                     </span>
                   )}
                   <div>
                     <div className="flex justify-between items-start">
                       <div>
-                        <h4 className="text-slate-900 font-black text-xl tracking-tight">{plan.name}</h4>
-                        <p className="text-slate-400 text-[11px] mt-0.5">{plan.desc}</p>
+                        <h4 className="text-slate-900 font-black text-xl tracking-tight">{plan.package_name}</h4>
+                        <p className="text-slate-400 text-[11px] mt-0.5">{desc}</p>
                       </div>
-                      <span className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-base shadow-inner">{plan.emoji}</span>
+                      <span className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-base shadow-inner">{emoji}</span>
                     </div>
                     <div className="mt-5 flex items-baseline text-slate-900">
-                      {p.price > 0 && <span className="text-2xl font-black">Rp</span>}
-                      <span className="text-4xl font-extrabold tracking-tight">{formatPrice(p.price)}</span>
-                      <span className="text-slate-400 text-xs font-semibold ml-1">{p.price === 0 ? `/ ${p.duration_days} hari` : "/ paket"}</span>
+                      {plan.price > 0 && <span className="text-2xl font-black">Rp</span>}
+                      <span className="text-4xl font-extrabold tracking-tight">{formatPrice(plan.price)}</span>
+                      <span className="text-slate-400 text-xs font-semibold ml-1">{plan.price === 0 ? `/ ${plan.duration_days} hari` : "/ paket"}</span>
                     </div>
-                    {perMonth ? (
+                    {perMonth > 0 ? (
                       <p className="text-[10px] text-primary-600 font-semibold mt-1">Setara Rp {formatPrice(perMonth)}/bulan</p>
                     ) : (
-                      <p className="text-[10px] text-slate-400 font-semibold mt-1">Tanpa biaya, coba langsung gratis</p>
+                      plan.price === 0 ? <p className="text-[10px] text-slate-400 font-semibold mt-1">Tanpa biaya, coba langsung gratis</p> : null
                     )}
                     <div className="w-full h-px bg-slate-100 my-5" />
                     <ul className="space-y-3 text-xs font-medium text-slate-600">
-                      {p.features.map((f, fi) => (
+                      {plan.features.map((f, fi) => (
                         <li key={fi} className="flex items-center gap-2">
                           <span className="text-emerald-500">✓</span>
                           <span>{f}</span>
@@ -220,10 +263,10 @@ export default function LandingContent({
                     </ul>
                   </div>
                   <Link
-                    href={isLoggedIn ? `/dashboard?checkout=${plan.id}` : refCode ? `/login?checkout=${plan.id}&ref=${refCode}` : `/login?checkout=${plan.id}`}
-                    className={`w-full py-3 text-center font-bold text-xs rounded-2xl mt-6 transition duration-200 block ${plan.ctaClass}`}
+                    href={isLoggedIn ? `/dashboard?checkout=${checkoutId}` : refCode ? `/login?checkout=${checkoutId}&ref=${refCode}` : `/login?checkout=${checkoutId}`}
+                    className={`w-full py-3 text-center font-bold text-xs rounded-2xl mt-6 transition duration-200 block ${style.ctaClass}`}
                   >
-                    {plan.ctaText}
+                    {plan.price === 0 ? "Coba Gratis" : "Beli Sekarang"}
                   </Link>
                 </div>
               );
@@ -282,7 +325,15 @@ export default function LandingContent({
         </div>
       </section>
 
-      <CTASection />
+      <CTASection
+        headline="Mulai Perjalanan Tanpa Administrasi yang Membebankan"
+        subheadline="Bergabunglah bersama ribuan guru Indonesia yang sudah merasakan manfaat GuruPRO AI"
+        primaryCTA={hero.ctaPrimary?.label || "Coba Gratis 14 Hari"}
+        primaryHref={hero.ctaPrimary?.url || "/login?mode=register"}
+        secondaryCTA={hero.ctaSecondary?.label || "Hubungi Kami"}
+        secondaryHref={hero.ctaSecondary?.url || "/kontak"}
+        badge="Tidak perlu kartu kredit"
+      />
 
       <Footer
         description={footer.description}

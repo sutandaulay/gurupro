@@ -36,13 +36,13 @@ export async function POST(req: Request) {
 
     console.log('[Imagen REST API] Calling Imagen 4.0 on server-side with prompt length:', enhancedPrompt.length);
 
-    let response = await fetch(url, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
-    let responseText = await response.text();
+    const responseText = await response.text();
     let data;
 
     if (!response.ok || !responseText || responseText.trim() === '') {

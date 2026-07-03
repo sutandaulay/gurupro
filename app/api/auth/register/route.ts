@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const hashed = hashPassword(password);
+    const hashed = await hashPassword(password);
 
     const newUser = await query(
       `INSERT INTO users (username, email, whatsapp, nama_lengkap, token_limit, referral_code, referred_by, password_hash, subscription_start, subscription_end, status_langganan, is_active)

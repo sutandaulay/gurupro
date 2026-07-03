@@ -28,6 +28,7 @@ const navItems = [
   { label: "Nilai", href: "/dashboard/nilai", icon: IconChartBar },
   { label: "Pengembangan", href: "/dashboard/pengembangan", icon: IconUsers },
   { label: "Komunikasi", href: "/dashboard/komunikasi", icon: IconMessage },
+  { label: "Chat AI", href: "/dashboard/chat", icon: IconMessage },
 ];
 
 export default function MobileSidebar({ isOpen, onClose }: SidebarProps) {

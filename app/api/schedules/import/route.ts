@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       const separator = line.includes(";") ? ";" : ",";
       const cols = line.split(separator).map((c: string) => c.trim().replace(/^["']|["']$/g, ""));
       if (cols.length >= 5) {
-        let hari = cols[0];
+        const hari = cols[0];
         
         // Skip metadata/brand/instruction lines if they get processed
         if (
@@ -114,7 +114,7 @@ export async function POST(req: Request) {
     try {
       for (const item of parsedSchedules) {
         // 1. Get or create class
-        let classRes = await query(
+        const classRes = await query(
           "SELECT id FROM classes WHERE school_id = $1 AND LOWER(nama_kelas) = LOWER($2)",
           [school_id, item.namaKelas]
         );
@@ -130,7 +130,7 @@ export async function POST(req: Request) {
         }
 
         // 2. Get or create subject
-        let subjectRes = await query(
+        const subjectRes = await query(
           "SELECT id FROM subjects WHERE school_id = $1 AND LOWER(nama_mapel) = LOWER($2)",
           [school_id, item.namaMapel]
         );

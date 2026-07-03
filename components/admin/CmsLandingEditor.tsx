@@ -61,7 +61,7 @@ const iconList: IconEntry[] = [
   { name: "IconQuestionMark", comp: IconQuestionMark },
 ];
 
-type TabId = "hero" | "features" | "why" | "school" | "cta" | "footer" | "chatbot" | "faq" | "referral" | "blog" | "pricing";
+type TabId = "hero" | "features" | "why" | "school" | "cta" | "footer" | "chatbot" | "faq" | "referral" | "blog" | "pricing" | "legal";
 
 interface HeroStat {
   id?: string;
@@ -138,6 +138,7 @@ const tabs: { id: TabId; label: string }[] = [
   { id: "chatbot", label: "Chatbot" },
   { id: "faq", label: "FAQ" },
   { id: "referral", label: "Referral" },
+  { id: "legal", label: "Legal" },
   { id: "blog", label: "Blog" },
 ];
 
@@ -180,6 +181,7 @@ export default function CmsLandingEditor() {
   const [showPostModal, setShowPostModal] = useState(false);
   const [editCategory, setEditCategory] = useState<any>(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [legalPages, setLegalPages] = useState<Record<string, { title: string; content: string; last_updated?: string }>>({});
 
   // Helper with timeout
   const fetchWithTimeout = async (url: string, timeout = 5000) => {
@@ -211,6 +213,8 @@ export default function CmsLandingEditor() {
             number: s.value || s.number || "",
             label: s.label || "",
           })),
+          heroCTAPrimary: heroData.heroCTAPrimary || { label: "Mulai Gratis Sekarang", url: "/login?mode=register" },
+          heroCTASecondary: heroData.heroCTASecondary || { label: "Lihat Demo", url: "#demo" },
           seoTitle: heroData.seoTitle || "",
           seoDescription: heroData.seoDescription || "",
           ogImage: heroData.ogImage ?? null,
@@ -255,12 +259,17 @@ export default function CmsLandingEditor() {
       // Load blog data
       await fetchBlogData();
 
-      // Load FAQ & Referral from settings
+      // Load FAQ & Referral & Legal from settings
       const settingsRes = await fetchWithTimeout("/api/admin/settings");
       if (settingsRes?.ok) {
         const settingsData = await settingsRes.json();
         if (settingsData.faqConfig) setFaqItems(settingsData.faqConfig);
         if (settingsData.referralConfig) setReferral(settingsData.referralConfig);
+        setLegalPages({
+          privacy_policy: settingsData.privacy_policy || { title: "Kebijakan Privasi", content: "", last_updated: "" },
+          terms_conditions: settingsData.terms_conditions || { title: "Syarat & Ketentuan", content: "", last_updated: "" },
+          refund_policy: settingsData.refund_policy || { title: "Kebijakan Refund", content: "", last_updated: "" },
+        });
       }
 
       setLoading(false);
@@ -306,6 +315,8 @@ export default function CmsLandingEditor() {
         headline: hero.heroHeadline || "",
         subheadline: hero.heroSubheadline || "",
         stats,
+        heroCTAPrimary: hero.heroCTAPrimary || { label: "Mulai Gratis Sekarang", url: "/login?mode=register" },
+        heroCTASecondary: hero.heroCTASecondary || { label: "Lihat Demo", url: "#demo" },
         seoTitle: hero.seoTitle || "",
         seoDescription: hero.seoDescription || "",
         ogImage: hero.ogImage ?? null,
@@ -469,6 +480,26 @@ export default function CmsLandingEditor() {
     finally { setSaving(null); }
   };
 
+  // Legal Pages
+  const saveLegalPage = async (key: string) => {
+    setSaving("legal");
+    try {
+      const data = legalPages[key];
+      const actionMap: Record<string, string> = {
+        privacy_policy: "update_privacy_policy",
+        terms_conditions: "update_terms_conditions",
+        refund_policy: "update_refund_policy",
+      };
+      const res = await fetch("/api/admin/settings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: actionMap[key], data: { ...data, last_updated: new Date().toLocaleDateString("id-ID") } }),
+      });
+      if (res.ok) showToast("success", `${data.title} berhasil disimpan!`);
+      else showToast("error", "Gagal menyimpan halaman legal");
+    } catch { showToast("error", "Koneksi gagal"); }
+    finally { setSaving(null); }
+  };
+
   // Pricing Management
   const savePricing = async () => {
     if (!editPricing?.package_name) { showToast("error", "Nama paket wajib diisi"); return; }
@@ -488,6 +519,22 @@ export default function CmsLandingEditor() {
       } else showToast("error", "Gagal menyimpan paket");
     } catch { showToast("error", "Koneksi gagal"); }
     finally { setSaving(null); }
+  };
+
+  const togglePricingPopular = async (plan: any) => {
+    try {
+      const res = await fetch("/api/admin/pricing", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...plan, popular: !plan.popular }),
+      });
+      if (res.ok) {
+        showToast("success", `Paket ${plan.package_name} ${plan.popular ? "tidak" : "menjadi"} populer!`);
+        setPricingPlans((prev) => prev.map((p) => p.id === plan.id ? { ...p, popular: !p.popular } : p));
+        const d = await fetch("/api/admin/pricing").then((r) => r.json());
+        setPricingPlans(d.docs || []);
+      } else showToast("error", "Gagal mengubah status populer");
+    } catch { showToast("error", "Koneksi gagal"); }
   };
 
   const deletePricing = async (id: number) => {
@@ -616,16 +663,13 @@ export default function CmsLandingEditor() {
     setFooter({ ...footer, links: [...links, ...schoolItems] });
   };
 
-  const Toast = () => {
-    if (!toast) return null;
-    return (
-      <div className={`fixed top-6 right-6 z-50 px-6 py-3.5 rounded-2xl shadow-xl text-white font-bold text-sm ${
-        toast.type === "success" ? "bg-emerald-600" : "bg-rose-600"
-      }`}>
-        {toast.type === "success" ? "✅" : "⚠️"} {toast.message}
-      </div>
-    );
-  };
+  const toastElement = toast && (
+    <div className={`fixed top-6 right-6 z-50 px-6 py-3.5 rounded-2xl shadow-xl text-white font-bold text-sm ${
+      toast.type === "success" ? "bg-emerald-600" : "bg-rose-600"
+    }`}>
+      {toast.type === "success" ? "✅" : "⚠️"} {toast.message}
+    </div>
+  );
 
   if (loading) {
     return (
@@ -637,7 +681,7 @@ export default function CmsLandingEditor() {
 
   return (
     <div>
-      <Toast />
+      {toastElement}
 
       <div className="border-b border-neutral-200 mb-6">
         <div className="flex gap-1 -mb-px flex-wrap">
@@ -667,6 +711,7 @@ export default function CmsLandingEditor() {
       {activeTab === "chatbot" && renderChatbotTab()}
       {activeTab === "faq" && renderFaqTab()}
       {activeTab === "referral" && renderReferralTab()}
+      {activeTab === "legal" && renderLegalTab()}
       {activeTab === "blog" && renderBlogTab()}
     </div>
   );
@@ -1018,10 +1063,11 @@ export default function CmsLandingEditor() {
           </button>
         </div>
 
-        <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden shadow-sm">
           <table className="w-full text-xs text-left">
             <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-600 font-bold uppercase tracking-wider text-[10px]">
               <tr>
+                <th className="px-4 py-3 w-10"></th>
                 <th className="px-4 py-3">Nama Paket</th>
                 <th className="px-4 py-3 text-right">Harga</th>
                 <th className="px-4 py-3 text-center">Durasi</th>
@@ -1032,9 +1078,53 @@ export default function CmsLandingEditor() {
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {pricingPlans.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-12 text-center text-neutral-400 italic">Belum ada paket.</td></tr>
-              ) : pricingPlans.map((plan) => (
+                <tr><td colSpan={7} className="px-4 py-12 text-center text-neutral-400 italic">Belum ada paket.</td></tr>
+              ) : pricingPlans.map((plan, idx) => (
                 <tr key={plan.id} className="hover:bg-neutral-50/50">
+                  <td className="px-4 py-3 text-neutral-300">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <button onClick={async () => {
+                        if (idx === 0) return;
+                        const updated = [...pricingPlans];
+                        [updated[idx], updated[idx - 1]] = [updated[idx - 1], updated[idx]];
+                        updated.forEach((p, i) => p.sort_order = i);
+                        setPricingPlans(updated);
+                        await fetch("/api/admin/pricing", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ id: plan.id, sort_order: idx - 1 }),
+                        });
+                        await fetch("/api/admin/pricing", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ id: updated[idx].id, sort_order: idx }),
+                        });
+                      }} disabled={idx === 0}
+                        className="p-0.5 text-neutral-400 hover:text-neutral-600 disabled:opacity-20 cursor-pointer disabled:cursor-default">
+                        <IconArrowUp size={12} />
+                      </button>
+                      <button onClick={async () => {
+                        if (idx === pricingPlans.length - 1) return;
+                        const updated = [...pricingPlans];
+                        [updated[idx], updated[idx + 1]] = [updated[idx + 1], updated[idx]];
+                        updated.forEach((p, i) => p.sort_order = i);
+                        setPricingPlans(updated);
+                        await fetch("/api/admin/pricing", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ id: plan.id, sort_order: idx + 1 }),
+                        });
+                        await fetch("/api/admin/pricing", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ id: updated[idx].id, sort_order: idx }),
+                        });
+                      }} disabled={idx === pricingPlans.length - 1}
+                        className="p-0.5 text-neutral-400 hover:text-neutral-600 disabled:opacity-20 cursor-pointer disabled:cursor-default">
+                        <IconArrowDown size={12} />
+                      </button>
+                    </div>
+                  </td>
                   <td className="px-4 py-3 font-bold text-neutral-800">
                     {plan.package_name}
                     {plan.popular && <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-black rounded-full">POPULER</span>}
@@ -1045,7 +1135,9 @@ export default function CmsLandingEditor() {
                   <td className="px-4 py-3 text-center text-neutral-600">{plan.duration_days} hari</td>
                   <td className="px-4 py-3 text-center text-neutral-600">{plan.tokens || 0} Token</td>
                   <td className="px-4 py-3 text-center">
-                    {plan.popular ? <IconToggleRight size={22} className="text-emerald-500 mx-auto" /> : <IconToggleLeft size={22} className="text-neutral-300 mx-auto" />}
+                    <button onClick={() => togglePricingPopular(plan)} className="cursor-pointer mx-auto">
+                      {plan.popular ? <IconToggleRight size={22} className="text-emerald-500" /> : <IconToggleLeft size={22} className="text-neutral-300" />}
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
@@ -1101,6 +1193,10 @@ export default function CmsLandingEditor() {
                   Aktif
                 </label>
               </div>
+              <Field label="Urutan (sort_order)">
+                <input type="number" value={editPricing?.sort_order ?? 0} onChange={(e) => setEditPricing({ ...editPricing, sort_order: parseInt(e.target.value) || 0 })}
+                  className="input-field w-24" placeholder="0" />
+              </Field>
               <div className="flex justify-end gap-3 pt-2">
                 <button onClick={() => { setShowPricingModal(false); setEditPricing(null); }}
                   className="px-4 py-2 border border-neutral-200 rounded-xl text-xs font-bold text-neutral-600 hover:bg-neutral-50 transition cursor-pointer">
@@ -1479,6 +1575,53 @@ export default function CmsLandingEditor() {
             {saving === "referral" ? "Menyimpan..." : "Simpan Referral"}
           </button>
         </div>
+      </div>
+    );
+  }
+
+  function renderLegalTab() {
+    const legalKeys = [
+      { key: "privacy_policy", label: "Kebijakan Privasi", icon: IconShield },
+      { key: "terms_conditions", label: "Syarat & Ketentuan", icon: IconFileText },
+      { key: "refund_policy", label: "Kebijakan Refund", icon: IconWallet },
+    ];
+    return (
+      <div className="space-y-6">
+        <h3 className="text-sm font-black text-neutral-900 flex items-center gap-2">
+          <IconFileText size={20} className="text-primary-600" />
+          Halaman Legal
+        </h3>
+        {legalKeys.map(({ key, label, icon: Icon }) => {
+          const page = legalPages[key] || { title: "", content: "", last_updated: "" };
+          return (
+            <div key={key} className="bg-white border border-neutral-200 rounded-2xl p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-neutral-700 uppercase tracking-wider flex items-center gap-2">
+                  <Icon size={16} className="text-primary-600" />
+                  {label}
+                </h4>
+                {page.last_updated && (
+                  <span className="text-[10px] text-neutral-400">Diperbarui: {page.last_updated}</span>
+                )}
+              </div>
+              <Field label="Judul Halaman">
+                <input type="text" value={page.title} onChange={(e) => setLegalPages({ ...legalPages, [key]: { ...page, title: e.target.value } })}
+                  className="input-field" placeholder={label} />
+              </Field>
+              <Field label="Konten (HTML)">
+                <textarea rows={12} value={page.content} onChange={(e) => setLegalPages({ ...legalPages, [key]: { ...page, content: e.target.value } })}
+                  className="input-field font-mono text-[11px]" placeholder="<h2>Judul Bagian</h2><p>Isi konten...</p>" />
+              </Field>
+              <div className="flex justify-end">
+                <button onClick={() => saveLegalPage(key)} disabled={saving === "legal"}
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl transition disabled:opacity-50 cursor-pointer flex items-center gap-2">
+                  <IconDeviceFloppy size={14} />
+                  {saving === "legal" ? "Menyimpan..." : "Simpan"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   }

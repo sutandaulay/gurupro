@@ -44,6 +44,9 @@ export async function GET() {
     const appBranding = resolveAppBrandingConfig(allSettings);
     const faqConfig = resolveFaqConfig(allSettings);
     const referralConfig = resolveReferralConfig(allSettings);
+    const privacy_policy = allSettings["privacy_policy"] ? (typeof allSettings["privacy_policy"] === "string" ? JSON.parse(allSettings["privacy_policy"]) : allSettings["privacy_policy"]) : null;
+    const terms_conditions = allSettings["terms_conditions"] ? (typeof allSettings["terms_conditions"] === "string" ? JSON.parse(allSettings["terms_conditions"]) : allSettings["terms_conditions"]) : null;
+    const refund_policy = allSettings["refund_policy"] ? (typeof allSettings["refund_policy"] === "string" ? JSON.parse(allSettings["refund_policy"]) : allSettings["refund_policy"]) : null;
 
     return NextResponse.json({
       paymentGateway,
@@ -55,6 +58,9 @@ export async function GET() {
       appBranding,
       faqConfig,
       referralConfig,
+      privacy_policy,
+      terms_conditions,
+      refund_policy,
     });
   } catch (error: any) {
     console.error("GET Admin Settings error:", error);
@@ -130,6 +136,24 @@ export async function POST(req: Request) {
       const success = await updateSystemSetting("referral_config", data);
       if (!success) throw new Error("Database update failed");
       return NextResponse.json({ success: true, message: "Pengaturan Program Referral berhasil diperbarui!" });
+    }
+
+    if (action === "update_privacy_policy") {
+      const success = await updateSystemSetting("privacy_policy", data);
+      if (!success) throw new Error("Database update failed");
+      return NextResponse.json({ success: true, message: "Kebijakan Privasi berhasil diperbarui!" });
+    }
+
+    if (action === "update_terms_conditions") {
+      const success = await updateSystemSetting("terms_conditions", data);
+      if (!success) throw new Error("Database update failed");
+      return NextResponse.json({ success: true, message: "Syarat & Ketentuan berhasil diperbarui!" });
+    }
+
+    if (action === "update_refund_policy") {
+      const success = await updateSystemSetting("refund_policy", data);
+      if (!success) throw new Error("Database update failed");
+      return NextResponse.json({ success: true, message: "Kebijakan Refund berhasil diperbarui!" });
     }
 
     if (action === "test_email") {

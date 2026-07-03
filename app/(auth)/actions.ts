@@ -3,7 +3,7 @@
 import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { hashPassword } from '@/lib/auth';
+import { hashPassword, comparePassword } from '@/lib/auth';
 import { sendEventNotification } from '@/lib/notifications';
 
 type AuthUser = {
@@ -55,14 +55,17 @@ export async function handleAuth(
 
       // Auto-migrate user password if it was registered passwordless (password_hash is null)
       if (user.password_hash === null) {
-        const hashed = hashPassword(password);
+        const hashed = await hashPassword(password!);
         await query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashed, user.id]);
         user.password_hash = hashed;
       }
 
       // Check password hash
-      const inputHash = hashPassword(password);
-      if (inputHash !== user.password_hash) {
+      if (!password || !user.password_hash) {
+        return { error: 'Email atau Password salah!' };
+      }
+      const match = await comparePassword(password, user.password_hash);
+      if (!match) {
         return { error: 'Email atau Password salah!' };
       }
     } else {
@@ -121,7 +124,7 @@ export async function handleAuth(
         }
       }
 
-      const hashed = hashPassword(password);
+      const hashed = await hashPassword(password);
 
       const newUser = await query(
         `INSERT INTO users (username, email, whatsapp, nama_lengkap, token_limit, referral_code, referred_by, password_hash, subscription_start, subscription_end, status_langganan, is_active)
