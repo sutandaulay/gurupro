@@ -28,15 +28,24 @@ export async function GET() {
     }
 
     const user = userRes.rows[0];
+    const pricingConfig = await getPricingConfig();
+
     if (user.role !== "admin" && user.subscription_end) {
       const isExpired = new Date(user.subscription_end).getTime() - new Date().getTime() <= 0;
-      if (isExpired && (user.token_limit || 0) > 0) {
-        await query("UPDATE users SET token_limit = 0 WHERE id = $1", [userId]);
-        user.token_limit = 0;
+      if (isExpired) {
+        if ((user.token_limit || 0) > 0) {
+          await query("UPDATE users SET token_limit = 0 WHERE id = $1", [userId]);
+          user.token_limit = 0;
+        }
+      } else if (!user.token_limit) {
+        const planDetails = (pricingConfig as any)[user.status_langganan];
+        if (planDetails?.tokens) {
+          await query("UPDATE users SET token_limit = $1 WHERE id = $2", [planDetails.tokens, userId]);
+          user.token_limit = planDetails.tokens;
+        }
       }
     }
 
-    const pricingConfig = await getPricingConfig();
     return NextResponse.json({
       ...user,
       pricingConfig
