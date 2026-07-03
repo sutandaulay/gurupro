@@ -2400,7 +2400,7 @@ export default function Dashboard() {
         }
       } else {
         const errData = await response.json().catch(() => ({}));
-        console.error("Gagal memuat profil dari server:", errData);
+        console.error(`Gagal memuat profil dari server (${response.status}):`, errData);
       }
     } catch (err) {
       console.error("Gagal memuat profil:", err);

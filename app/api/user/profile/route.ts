@@ -38,10 +38,15 @@ export async function GET() {
           user.token_limit = 0;
         }
       } else if (!user.token_limit) {
-        const planDetails = (pricingConfig as any)[user.status_langganan];
-        if (planDetails?.tokens) {
-          await query("UPDATE users SET token_limit = $1 WHERE id = $2", [planDetails.tokens, userId]);
-          user.token_limit = planDetails.tokens;
+        try {
+          const planKey = user.status_langganan || "free";
+          const planDetails = (pricingConfig as any)[planKey];
+          if (planDetails?.tokens) {
+            await query("UPDATE users SET token_limit = $1 WHERE id = $2", [planDetails.tokens, userId]);
+            user.token_limit = planDetails.tokens;
+          }
+        } catch (e) {
+          console.error("Auto-initialize token_limit gagal:", e);
         }
       }
     }
