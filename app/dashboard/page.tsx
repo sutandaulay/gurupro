@@ -529,7 +529,9 @@ export default function Dashboard() {
   // Fetch tahun ajaran list
   const fetchTahunAjaran = async () => {
     try {
-      const res = await fetch('/api/tahun-ajaran');
+      const sekolahId = localStorage.getItem('sekolahId') || ''
+      const params = sekolahId ? `?sekolah_id=${sekolahId}` : ''
+      const res = await fetch(`/api/tahun-ajaran${params}`);
       if (res.ok) {
         const data = await res.json();
         setTahunAjaranList(data);
@@ -582,6 +584,7 @@ export default function Dashboard() {
           nama: tahunAjaranForm.nama,
           tanggalMulai: tahunAjaranForm.tanggalMulai,
           tanggalSelesai: tahunAjaranForm.tanggalSelesai,
+          sekolahId: localStorage.getItem('sekolahId') || null,
         }),
       });
 
@@ -9435,9 +9438,8 @@ const renderJurnalModule = () => {
             { id: "storage_saya", label: "📂 Storage Saya", icon: "" },
             { id: "scheduler", label: "⏰ Pengingat", icon: "" },
             { id: "profil", label: "👤 Profil", icon: "" },
-            { id: "laporan_kinerja", label: "📋 Laporan Kinerja", icon: "", isLink: true, href: "/dashboard/laporan-kinerja/buat" },
+            { id: "laporan_kinerja", label: "📋 Laporan Kinerja", icon: "", isLink: true, href: "/dashboard/laporan-kinerja" },
             { id: "pengembangan_diri", label: "🎓 Pengembangan Diri", icon: "", isLink: true, href: "/dashboard/pengembangan-diri" },
-            { id: "upload_dokumen", label: "📁 Upload Dokumen", icon: "", isLink: true, href: "/dashboard/pengembangan-diri/dokumen/tambah" },
           ].map((tab) => {
             const isActive = currentModule === tab.id;
             const cls = `px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${

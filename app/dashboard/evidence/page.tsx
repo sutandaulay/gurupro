@@ -55,13 +55,16 @@ export default function EvidenceDashboardPage() {
   const fetchSummary = async () => {
     setLoading(true)
     try {
-      // Use localStorage or let API auto-detect
       const tahunAjaranId = localStorage.getItem('tahunAjaranId') || ''
       const semester = localStorage.getItem('semester') || ''
+      const sekolahId = localStorage.getItem('sekolahId') || ''
 
-      const url = tahunAjaranId && semester
-        ? `/api/evidence/summary?tahun_ajaran_id=${tahunAjaranId}&semester=${semester}`
-        : `/api/evidence/summary`
+      const params = new URLSearchParams()
+      if (tahunAjaranId) params.set('tahun_ajaran_id', tahunAjaranId)
+      if (semester) params.set('semester', semester)
+      if (sekolahId) params.set('sekolah_id', sekolahId)
+
+      const url = `/api/evidence/summary?${params.toString()}`
 
       const res = await fetch(url)
       const json = await res.json()

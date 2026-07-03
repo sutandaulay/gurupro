@@ -36,11 +36,21 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Table tahun_ajaran tidak ada. Jalankan migration SQL dulu.' }, { status: 500 })
     }
 
-    const result = await query(
-      `SELECT id, nama, tanggal_mulai, tanggal_selesai, is_active, semester_type, semester, created_at
-       FROM tahun_ajaran
-       ORDER BY tanggal_mulai DESC`
-    )
+    const { searchParams } = new URL(req.url)
+    const sekolahId = searchParams.get('sekolah_id')
+
+    let taQuery = `SELECT id, nama, tanggal_mulai, tanggal_selesai, is_active, semester_type, semester, sekolah_id, created_at
+             FROM tahun_ajaran`
+    const params: any[] = []
+
+    if (sekolahId) {
+      taQuery += ` WHERE sekolah_id = $1`
+      params.push(sekolahId)
+    }
+
+    taQuery += ` ORDER BY tanggal_mulai DESC`
+
+    const result = await query(taQuery, params)
 
     return NextResponse.json(result.rows)
   } catch (err: any) {
@@ -61,6 +71,7 @@ export async function POST(req: Request) {
     const nama = (body.nama || '').trim()
     const tanggalMulai = (body.tanggalMulai || '').trim()
     const tanggalSelesai = (body.tanggalSelesai || '').trim()
+    const sekolahId = (body.sekolahId || '').trim()
 
     if (!nama || !tanggalMulai || !tanggalSelesai) {
       return NextResponse.json(
@@ -69,12 +80,11 @@ export async function POST(req: Request) {
       )
     }
 
-    // Insert langsung
     const result = await query(
       `INSERT INTO tahun_ajaran (nama, tanggal_mulai, tanggal_selesai, semester_type, semester, sekolah_id, created_by)
-     VALUES ($1, $2, $3, 'full', $4, NULL, $5)
-     RETURNING *`,
-      [nama, tanggalMulai, tanggalSelesai, 'ganjil', userId]
+      VALUES ($1, $2, $3, 'full', $4, $5, $6)
+      RETURNING *`,
+      [nama, tanggalMulai, tanggalSelesai, 'ganjil', sekolahId || null, userId]
     )
 
     return NextResponse.json(result.rows[0], { status: 201 })

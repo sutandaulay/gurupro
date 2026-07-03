@@ -22,6 +22,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     let tahunAjaranId = searchParams.get('tahun_ajaran_id')
     let semester = searchParams.get('semester') as 'ganjil' | 'genap' | null
+    const sekolahId = searchParams.get('sekolah_id')
 
     // Auto-detect if not provided
     if (!tahunAjaranId || !semester) {
@@ -67,21 +68,28 @@ export async function GET(req: Request) {
       }
     }
 
+    const evParams: any[] = [guruId, tahunAjaranId, semester]
+    let evFilter = `guru_id = $1 AND tahun_ajaran_id = $2 AND semester = $3`
+    if (sekolahId) {
+      evFilter += ` AND sekolah_id = $4`
+      evParams.push(sekolahId)
+    }
+
     // 1. Get evidence count by category
     const perKategori = await query(
       `SELECT kategori, COUNT(*) as jumlah
        FROM evidence_log
-       WHERE guru_id = $1 AND tahun_ajaran_id = $2 AND semester = $3
+       WHERE ${evFilter}
        GROUP BY kategori`,
-      [guruId, tahunAjaranId, semester]
+      evParams
     )
 
     // 2. Get all evidence for indikator calculation
     const semuaEvidence = await query(
       `SELECT indikator_kinerja, bobot_evidence
        FROM evidence_log
-       WHERE guru_id = $1 AND tahun_ajaran_id = $2 AND semester = $3`,
-      [guruId, tahunAjaranId, semester]
+       WHERE ${evFilter}`,
+      evParams
     )
 
     // 3. Get indikator konfigurasi
@@ -112,14 +120,21 @@ export async function GET(req: Request) {
       }
     })
 
+    const pelParams: any[] = [guruId, tahunAjaranId, semester]
+    let pelFilter = `guru_id = $1 AND tahun_ajaran_id = $2 AND semester = $3`
+    if (sekolahId) {
+      pelFilter += ` AND sekolah_id = $4`
+      pelParams.push(sekolahId)
+    }
+
     // 5. Get pelatihan data
     const pelatihanList = await query(
       `SELECT id, nama_pelatihan, penyelenggara, jenis, lingkup,
               durasi_jam, tanggal_mulai, status_verifikasi, file_sertifikat_url
        FROM pelatihan_guru
-       WHERE guru_id = $1 AND tahun_ajaran_id = $2 AND semester = $3
+       WHERE ${pelFilter}
        ORDER BY tanggal_mulai DESC`,
-      [guruId, tahunAjaranId, semester]
+      pelParams
     )
 
     const totalJamPelatihan = pelatihanList.rows.reduce((s: number, p: any) => s + p.durasi_jam, 0)
@@ -127,12 +142,19 @@ export async function GET(req: Request) {
       (p: any) => p.status_verifikasi === 'belum_upload'
     ).length
 
+    const jrnParams: any[] = [guruId]
+    let jrnFilter = `teacher_id = $1`
+    if (sekolahId) {
+      jrnFilter += ` AND school_id = $2`
+      jrnParams.push(sekolahId)
+    }
+
     // 6. Get journal count
     const journalStats = await query(
       `SELECT COUNT(*) as total_journal
        FROM teacher_journals
-       WHERE teacher_id = $1`,
-      [guruId]
+       WHERE ${jrnFilter}`,
+      jrnParams
     )
 
     // 7. Stat cards

@@ -42,7 +42,9 @@ export default function TahunAjaranPage() {
   const fetchTahunAjaran = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/tahun-ajaran')
+      const sekolahId = localStorage.getItem('sekolahId') || ''
+      const params = sekolahId ? `?sekolah_id=${sekolahId}` : ''
+      const res = await fetch(`/api/tahun-ajaran${params}`)
       const data = await res.json()
 
       if (res.ok) {
@@ -109,7 +111,7 @@ export default function TahunAjaranPage() {
       const res = await fetch('/api/tahun-ajaran', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, sekolahId: localStorage.getItem('sekolahId') || null }),
       })
 
       if (res.ok) {

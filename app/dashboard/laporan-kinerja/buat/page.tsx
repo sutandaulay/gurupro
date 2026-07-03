@@ -43,10 +43,14 @@ export default function BuatLaporanKinerjaPage() {
     semester: 'ganjil' as 'ganjil' | 'genap',
   })
 
+  const [sekolahId, setSekolahId] = useState('')
+
   useEffect(() => {
     const tahunAjaranId = localStorage.getItem('tahunAjaranId') || ''
+    const savedSekolahId = localStorage.getItem('sekolahId') || ''
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormData(prev => ({ ...prev, tahunAjaranId }))
+    setSekolahId(savedSekolahId)
     // eslint-disable-next-line react-hooks/immutability
     fetchPreview()
   }, [])
@@ -56,10 +60,14 @@ export default function BuatLaporanKinerjaPage() {
     try {
       const tahunAjaranId = localStorage.getItem('tahunAjaranId') || ''
       const semester = localStorage.getItem('semester') || ''
+      const savedSekolahId = localStorage.getItem('sekolahId') || ''
 
-      const url = tahunAjaranId && semester
-        ? `/api/evidence/summary?tahun_ajaran_id=${tahunAjaranId}&semester=${semester}`
-        : `/api/evidence/summary`
+      const params = new URLSearchParams()
+      if (tahunAjaranId) params.set('tahun_ajaran_id', tahunAjaranId)
+      if (semester) params.set('semester', semester)
+      if (savedSekolahId) params.set('sekolah_id', savedSekolahId)
+
+      const url = `/api/evidence/summary?${params.toString()}`
 
       const res = await fetch(url)
       const data = await res.json()
@@ -87,6 +95,7 @@ export default function BuatLaporanKinerjaPage() {
           semester: formData.semester,
           catatanTambahan,
           kurikulum,
+          sekolahId: localStorage.getItem('sekolahId') || undefined,
         }),
       })
 

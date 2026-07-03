@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   const guruId = sessionData.id
 
   const body = await req.json()
-  const { tahunAjaranId, semester, catatanTambahan, kurikulum = 'merdeka' } = body
+  const { tahunAjaranId, semester, catatanTambahan, kurikulum = 'merdeka', sekolahId } = body
 
   const kurikulumLabel: Record<string, string> = {
     merdeka: 'Kurikulum Merdeka',
@@ -58,20 +58,22 @@ export async function POST(req: Request) {
 
       try {
         // STEP 1: Collect data
-        send({ step: 'collecting', message: 'Mengumpulkan data aktivitas...' })
+        send({ step: 'collecting', message: 'Mengumpulkan data aktivitas & SKP...' })
 
-        const [guruData, sekolahData, pelatihanData, evidenceSummary] = await Promise.all([
+        const [guruData, sekolahData, pelatihanData, evidenceSummary, skpData, observasiData] = await Promise.all([
           getGuruData(guruId),
-          getSekolahData(guruId),
+          getSekolahData(guruId, sekolahId),
           getPelatihanData(guruId, tahunAjaranId, semester),
-          getEvidenceSummaryData(guruId, tahunAjaranId, semester),
+          getEvidenceSummaryData(guruId, tahunAjaranId, semester, sekolahId),
+          getSkpData(guruId, tahunAjaranId),
+          getObservasiData(guruId, tahunAjaranId),
         ])
 
         if (!guruData) {
           throw new Error('Data guru tidak ditemukan')
         }
 
-        send({ step: 'analyzing', message: 'Menganalisis capaian kinerja...' })
+        send({ step: 'analyzing', message: 'Menganalisis capaian & observasi kinerja...' })
 
         // STEP 2: Build prompt
         const prompt = buildLaporanPrompt({
@@ -79,6 +81,8 @@ export async function POST(req: Request) {
           sekolah: sekolahData,
           pelatihan: pelatihanData,
           evidenceSummary,
+          skp: skpData,
+          observasi: observasiData,
           semester,
           catatanTambahan,
           kurikulum: kurikulumLabel[kurikulum] || 'Kurikulum Merdeka',
@@ -146,8 +150,8 @@ export async function POST(req: Request) {
         const insertResult = await query(
           `INSERT INTO laporan_kinerja (
             guru_id, tahun_ajaran_id, semester, judul,
-            content, evidence_summary, status, ai_generated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+            content, evidence_summary, status, ai_generated_at, sekolah_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
           RETURNING id`,
           [
             guruId,
@@ -157,6 +161,7 @@ export async function POST(req: Request) {
             JSON.stringify(laporanContent),
             JSON.stringify(evidenceSummary),
             'draft',
+            sekolahId || null,
           ]
         )
 
@@ -191,15 +196,18 @@ async function getGuruData(guruId: string) {
   return result.rows[0] || null
 }
 
-async function getSekolahData(guruId: string) {
-  const result = await query(
-    `SELECT s.nama_sekolah, s.npsn, s.alamat, s.nama_kepala_sekolah
-     FROM schools s
-     WHERE s.user_id = $1
-     LIMIT 1`,
-    [guruId]
-  )
-  return result.rows[0] || { nama_sekolah: 'Sekolah', npsn: '', alamat: '' }
+async function getSekolahData(guruId: string, sekolahId?: string) {
+  if (sekolahId) {
+    const result = await query(
+      `SELECT s.nama_sekolah, s.npsn, s.alamat, s.nama_kepala_sekolah
+       FROM schools s
+       WHERE s.id = $1 AND s.user_id = $2
+       LIMIT 1`,
+      [sekolahId, guruId]
+    )
+    if (result.rows[0]) return result.rows[0]
+  }
+  return { nama_sekolah: 'Sekolah', npsn: '', alamat: '' }
 }
 
 async function getPelatihanData(guruId: string, tahunAjaranId: string, semester: string) {
@@ -216,14 +224,20 @@ async function getPelatihanData(guruId: string, tahunAjaranId: string, semester:
   return result.rows
 }
 
-async function getEvidenceSummaryData(guruId: string, tahunAjaranId: string, semester: string) {
-  // Get counts by category
+async function getEvidenceSummaryData(guruId: string, tahunAjaranId: string, semester: string, sekolahId?: string) {
+  const params: any[] = [guruId, tahunAjaranId, semester]
+  let evidenceFilter = `guru_id = $1 AND tahun_ajaran_id = $2 AND semester = $3`
+  if (sekolahId) {
+    evidenceFilter += ` AND sekolah_id = $4`
+    params.push(sekolahId)
+  }
+
   const categoryResult = await query(
     `SELECT kategori, COUNT(*) as jumlah
      FROM evidence_log
-     WHERE guru_id = $1 AND tahun_ajaran_id = $2 AND semester = $3
+     WHERE ${evidenceFilter}
      GROUP BY kategori`,
-    [guruId, tahunAjaranId, semester]
+    params
   )
 
   const categoryMap: Record<string, number> = {}
@@ -231,33 +245,51 @@ async function getEvidenceSummaryData(guruId: string, tahunAjaranId: string, sem
     categoryMap[r.kategori] = parseInt(r.jumlah)
   })
 
-  // Get journal stats
+  const journalParams: any[] = [guruId]
+  let journalFilter = `teacher_id = $1`
+  if (sekolahId) {
+    journalFilter += ` AND school_id = $2`
+    journalParams.push(sekolahId)
+  }
+
   const journalResult = await query(
     `SELECT COUNT(*) as total,
             COUNT(*) FILTER (WHERE refleksi_guru IS NOT NULL AND LENGTH(refleksi_guru) > 20) as dengan_refleksi
      FROM teacher_journals
-     WHERE teacher_id = $1`,
-    [guruId]
+     WHERE ${journalFilter}`,
+    journalParams
   )
 
-  // Get assessment stats
+  const assessParams: any[] = [guruId]
+  let assessFilter = `user_id = $1`
+  if (sekolahId) {
+    assessFilter = `id = $2 AND user_id = $1`
+    assessParams.push(sekolahId)
+  }
+
   const assessmentResult = await query(
     `SELECT COUNT(DISTINCT a.id) as total_asesmen,
             COUNT(DISTINCT sg.student_id) FILTER (WHERE sg.nilai_akhir < a.kkm) as belum_tuntas
      FROM assessments a
      LEFT JOIN student_grades sg ON sg.assessment_id = a.id
-     WHERE a.school_id IN (SELECT id FROM schools WHERE user_id = $1)`,
-    [guruId]
+     WHERE a.school_id IN (SELECT id FROM schools WHERE ${assessFilter})`,
+    assessParams
   )
 
-  // Get schedule/mapel info
+  const mapelParams: any[] = [guruId]
+  let mapelFilter = `user_id = $1`
+  if (sekolahId) {
+    mapelFilter = `id = $2 AND user_id = $1`
+    mapelParams.push(sekolahId)
+  }
+
   const mapelResult = await query(
     `SELECT DISTINCT sub.nama_mapel, c.nama_kelas
      FROM schedules s
      JOIN subjects sub ON sub.id = s.subject_id
      JOIN classes c ON c.id = s.class_id
-     WHERE s.school_id IN (SELECT id FROM schools WHERE user_id = $1)`,
-    [guruId]
+     WHERE s.school_id IN (SELECT id FROM schools WHERE ${mapelFilter})`,
+    mapelParams
   )
 
   return {
@@ -274,6 +306,67 @@ async function getEvidenceSummaryData(guruId: string, tahunAjaranId: string, sem
   }
 }
 
+// ─── SKP & OBSERVASI HELPERS ──────────────────────────────────────────────────
+
+async function getSkpData(guruId: string, tahunAjaranId: string) {
+  const skpResult = await query(
+    `SELECT id, status, catatan_guru, catatan_kepsek
+     FROM skp_tahunan
+     WHERE guru_id = $1 AND tahun_ajaran_id = $2`,
+    [guruId, tahunAjaranId]
+  )
+
+  if (skpResult.rows.length === 0) return null
+
+  const skp = skpResult.rows[0]
+
+  const indikatorResult = await query(
+    `SELECT si.target_self, ik.kode, ik.nama, ik.komponen, ik.bobot_persen, ik.min_evidence
+     FROM skp_indikator si
+     JOIN indikator_kinerja_config ik ON ik.id = si.indikator_id
+     WHERE si.skp_id = $1
+     ORDER BY ik.kode`,
+    [skp.id]
+  )
+
+  return {
+    ...skp,
+    indikator_list: indikatorResult.rows,
+  }
+}
+
+async function getObservasiData(guruId: string, tahunAjaranId: string) {
+  const obsResult = await query(
+    `SELECT id, tanggal_observasi, jenis, suasana_pembelajaran, catatan_observer, rekomendasi, status
+     FROM observasi_kinerja
+     WHERE guru_id = $1 AND tahun_ajaran_id = $2 AND status = 'completed'
+     ORDER BY tanggal_observasi DESC`,
+    [guruId, tahunAjaranId]
+  )
+
+  if (obsResult.rows.length === 0) return []
+
+  const observasiList = []
+
+  for (const obs of obsResult.rows) {
+    const ratingResult = await query(
+      `SELECT oi.rating, oi.catatan, oi.bukti_observasi, ik.kode, ik.nama as indikator_nama
+       FROM observasi_indikator oi
+       JOIN indikator_kinerja_config ik ON ik.id = oi.indikator_id
+       WHERE oi.observasi_id = $1
+       ORDER BY ik.kode`,
+      [obs.id]
+    )
+
+    observasiList.push({
+      ...obs,
+      indikator_ratings: ratingResult.rows,
+    })
+  }
+
+  return observasiList
+}
+
 // ─── PROMPT BUILDER ──────────────────────────────────────────────────────────
 
 interface LaporanPromptData {
@@ -281,17 +374,51 @@ interface LaporanPromptData {
   sekolah: any
   pelatihan: any[]
   evidenceSummary: any
+  skp: any
+  observasi: any[]
   semester: string
   catatanTambahan?: string
   kurikulum?: string
 }
 
 function buildLaporanPrompt(data: LaporanPromptData): string {
-  const { guru, sekolah, pelatihan, evidenceSummary, semester, catatanTambahan, kurikulum } = data
-  const tahunAjaran = '2024/2025' // Should come from params
+  const { guru, sekolah, pelatihan, evidenceSummary, skp, observasi, semester, catatanTambahan, kurikulum } = data
+  const tahunAjaran = '2024/2025'
+
+  let skpSection = ''
+  if (skp) {
+    skpSection = `
+RENCANA SKP TAHUNAN:
+- Status: ${skp.status}
+- Indikator yang dipilih:
+${skp.indikator_list?.map((ind: any) =>
+  `  - ${ind.kode}: ${ind.nama} (target: ${ind.target_self} evidence, komponen: ${ind.komponen})`
+).join('\n') || '  - Tidak ada indikator dipilih'}
+${skp.catatan_guru ? `- Catatan Guru: ${skp.catatan_guru}` : ''}
+`
+  }
+
+  let observasiSection = ''
+  if (observasi && observasi.length > 0) {
+    observasiSection = `
+HASIL OBSERVASI KINERJA (${observasi.length} observasi):
+${observasi.map((obs: any, i: number) => {
+  const avg = obs.indikator_ratings?.length > 0
+    ? (obs.indikator_ratings.reduce((s: number, r: any) => s + r.rating, 0) / obs.indikator_ratings.length).toFixed(1)
+    : '-'
+  return `Observasi ${i + 1} (${new Date(obs.tanggal_observasi).toLocaleDateString('id-ID')}):
+  Jenis: ${obs.jenis}
+  Rata-rata rating: ${avg}/4
+  ${obs.indikator_ratings?.map((r: any) => `  ${r.kode}: ${r.rating}/4 — ${r.catatan || ''}`).join('\n') || '  - Belum ada rating'}
+  ${obs.suasana_pembelajaran ? `Suasana: ${obs.suasana_pembelajaran}` : ''}
+  ${obs.catatan_observer ? `Catatan Observer: ${obs.catatan_observer}` : ''}
+  ${obs.rekomendasi ? `Rekomendasi: ${obs.rekomendasi}` : ''}`
+}).join('\n\n')}
+`
+  }
 
   return `
-Kamu adalah sistem penyusun Laporan Kinerja Guru profesional berbasis data aktivitas nyata.
+Kamu adalah sistem penyusun Laporan Kinerja Guru profesional sesuai pedoman PKG 2026 (Kepmendikdasmen No. 271/O/2025).
 
 DATA GURU:
 - Nama: ${guru?.nama_lengkap || 'Guru'}
@@ -302,7 +429,7 @@ DATA GURU:
 - NPSN: ${sekolah?.npsn || '-'}
 - Alamat: ${sekolah?.alamat || '-'}
 - Periode: Semester ${semester === 'ganjil' ? 'Ganjil' : 'Genap'} TP ${tahunAjaran}
-- Kurikulum: ${kurikulum || 'Kurikulum Merdeka'}
+- Kurikulum: ${kurikulum || 'Kurikulum Merdeka'}${skpSection}
 
 BUKTI AKTIVITAS MENGAJAR (data nyata dari sistem):
 - Total aktivitas mengajar tercatat: ${evidenceSummary.total_pembelajaran || 0}
@@ -330,11 +457,13 @@ ${pelatihan && pelatihan.length > 0
   ? `Total jam pengembangan diri: ${pelatihan.reduce((s: number, p: any) => s + p.durasi_jam, 0)} jam`
   : ''}
 
+${skpSection}
+${observasiSection}
 ${catatanTambahan ? `CATATAN TAMBAHAN DARI GURU:
 ${catatanTambahan}` : ''}
 
 TUGAS:
-Susun Laporan Kinerja Guru yang profesional, naratif, dan berbasis data di atas.
+Susun Laporan Kinerja Guru yang profesional, naratif, dan berbasis data sesuai struktur PKG 2026.
 
 ATURAN PENULISAN:
 1. Bahasa Indonesia baku dan profesional
@@ -343,7 +472,8 @@ ATURAN PENULISAN:
 4. Hindari klise dan frasa generik yang tidak informatif
 5. Jujur — jika data pelatihan belum ada, sebutkan bahwa ini perlu dilengkapi
 6. Panjang total narasi: 600–900 kata
-7. Jika data某个 kategori 0 atau kosong, tetap tulis narasi yang menjelaskan perlunya aktivitas tersebut
+7. Jika suatu kategori 0 atau kosong, tetap tulis narasi yang menjelaskan perlunya aktivitas tersebut
+8. Cantumkan hasil observasi dan SKP jika tersedia
 
 FORMAT OUTPUT (JSON ketat, tidak ada teks di luar JSON):
 \`\`\`json
@@ -358,27 +488,35 @@ FORMAT OUTPUT (JSON ketat, tidak ada teks di luar JSON):
   "sections": [
     {
       "heading": "I. Pendahuluan",
-      "content": "narasi paragraf..."
+      "content": "narasi tentang latar belakang, tujuan laporan, dan gambaran umum kinerja..."
     },
     {
-      "heading": "II. Pelaksanaan Pembelajaran",
+      "heading": "II. Perencanaan Kinerja (SKP)",
+      "content": "narasi tentang rencana SKP tahunan, indikator yang menjadi fokus, dan target yang ditetapkan. Korelasikan dengan data evidence yang terkumpul..."
+    },
+    {
+      "heading": "III. Pelaksanaan Pembelajaran",
       "content": "narasi 2-3 paragraf tentang konsistensi mengajar, kualitas perencanaan, pendekatan pembelajaran..."
     },
     {
-      "heading": "III. Penilaian dan Evaluasi Hasil Belajar",
-      "content": "narasi tentang ragak asesmen, tindak lanjut remedial/pengayaan..."
+      "heading": "IV. Penilaian dan Evaluasi Hasil Belajar",
+      "content": "narasi tentang ragam asesmen, tindak lanjut remedial/pengayaan..."
     },
     {
-      "heading": "IV. Pengembangan Diri dan Kompetensi Profesional",
-      "content": "narasi tentang pelatihan yang diikuti (sebutkan nama spesifik), dampaknya, jam pengembangan..."
+      "heading": "V. Hasil Observasi Kinerja",
+      "content": "narasi tentang hasil observasi oleh atasan/kepala sekolah, rating per indikator, catatan observer, dan suasana pembelajaran..."
     },
     {
-      "heading": "V. Kolaborasi dan Komunikasi",
+      "heading": "VI. Pengembangan Diri dan Kompetensi Profesional",
+      "content": "narasi tentang pelatihan yang diikuti, dampaknya, jam pengembangan..."
+    },
+    {
+      "heading": "VII. Kolaborasi dan Komunikasi",
       "content": "narasi tentang komunikasi dengan orang tua siswa..."
     },
     {
-      "heading": "VI. Kesimpulan dan Rencana Tindak Lanjut",
-      "content": "narasi capaian utama + 2-3 rencana perbaikan semester berikutnya..."
+      "heading": "VIII. Kesimpulan dan Rencana Tindak Lanjut",
+      "content": "narasi capaian utama + 2-3 rencana perbaikan semester berikutnya berdasarkan hasil observasi..."
     }
   ],
   "ringkasan_singkat": "1-2 kalimat ringkasan untuk dashboard"

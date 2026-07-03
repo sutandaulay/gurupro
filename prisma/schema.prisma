@@ -171,6 +171,12 @@ model schools {
   subjects            subjects[]
   teacher_attendance  teacher_attendance[]
   teacher_journals    teacher_journals[]
+  laporan_kinerjas    laporan_kinerja[]
+  evidence_logs       evidence_log[]
+  skp_tahunans        skp_tahunan[]
+  observasi_kinerjas  observasi_kinerja[]
+  pelatihan_gurus     pelatihan_guru[]
+  dokumen_buktis      dokumen_bukti[]
 }
 
 model student_attendance {
@@ -330,6 +336,9 @@ model users {
   pelatihan_gurus                                        pelatihan_guru[]
   dokumen_buktis                                         dokumen_bukti[]
   laporan_kinerjas                                       laporan_kinerja[]
+  skp_tahunans                                           skp_tahunan[]
+  observasi_kinerja_observasi_kinerja_guru_idTousers     observasi_kinerja[] @relation("observasi_kinerja_guru_idTousers")
+  observasi_kinerja_observasi_kinerja_observer_idTousers observasi_kinerja[] @relation("observasi_kinerja_observer_idTousers")
 }
 
 model hero_sections {
@@ -532,24 +541,27 @@ model evidence_log {
   id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   guru_id            String    @db.Uuid
   tahun_ajaran_id    String    @db.Uuid
-  semester           String    @db.VarChar(20) // ganjil, genap
-  kategori           String    @db.VarChar(50) // perencanaan, pelaksanaan, penilaian, dll
+  semester           String    @db.VarChar(20)
+  kategori           String    @db.VarChar(50)
   sub_kategori       String    @db.VarChar(100)
   referensi_id       String?   @db.Uuid
   referensi_tabel    String?   @db.VarChar(100)
   judul              String    @db.VarChar(255)
   deskripsi          String?   @db.Text
-  indikator_kinerja  String[]  @default([]) // IK-01, IK-02, dst
+  indikator_kinerja  String[]  @default([])
   bobot_evidence     Int       @default(1)
   tanggal_aktivitas  DateTime  @db.Date
   metadata           Json?     @default("{}")
+  sekolah_id         String?   @db.Uuid
   created_at         DateTime? @default(now()) @db.Timestamp(6)
 
   @@index([guru_id, tahun_ajaran_id, semester])
   @@index([guru_id, kategori, tanggal_aktivitas])
   @@index([referensi_id, referensi_tabel])
+  @@index([sekolah_id])
 
   users        users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  schools      schools?  @relation(fields: [sekolah_id], references: [id])
 }
 
 // Pelatihan & Pengembangan Diri
@@ -560,24 +572,27 @@ model pelatihan_guru {
   semester                    String?   @db.VarChar(20)
   nama_pelatihan              String    @db.VarChar(255)
   penyelenggara               String    @db.VarChar(255)
-  jenis                       String    @db.VarChar(50) // workshop, seminar, webinar, dll
-  lingkup                     String    @db.VarChar(50) // internasional, nasional, provinsi, dll
+  jenis                       String    @db.VarChar(50)
+  lingkup                     String    @db.VarChar(50)
   tanggal_mulai               DateTime  @db.Date
   tanggal_selesai             DateTime  @db.Date
   durasi_jam                  Int
   nomor_sertifikat            String?   @db.VarChar(100)
   deskripsi                   String?   @db.Text
   relevansi_mapel             Boolean   @default(true)
-  kompetensi_dikembangkan     String[]  @default([]) // pedagogik, profesional, sosial, kepribadian
+  kompetensi_dikembangkan     String[]  @default([])
   file_sertifikat_url         String?   @db.Text
   file_sertifikat_nama        String?   @db.VarChar(255)
   status_verifikasi           String    @default("belum_upload") @db.VarChar(50)
+  sekolah_id                  String?   @db.Uuid
   created_at                  DateTime? @default(now()) @db.Timestamp(6)
   updated_at                  DateTime? @default(now()) @db.Timestamp(6)
 
   @@index([guru_id, tahun_ajaran_id, semester])
+  @@index([sekolah_id])
 
   users        users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  schools      schools?  @relation(fields: [sekolah_id], references: [id])
 }
 
 // Dokumen Bukti Tambahan (piagam, SK, surat tugas, dll)
@@ -586,21 +601,24 @@ model dokumen_bukti {
   guru_id            String    @db.Uuid
   tahun_ajaran_id    String?   @db.Uuid
   semester           String?   @db.VarChar(20)
-  kategori           String    @db.VarChar(50) // sertifikat_pelatihan, piagam_penghargaan, dll
+  kategori           String    @db.VarChar(50)
   judul              String    @db.VarChar(255)
   deskripsi          String?   @db.Text
   tanggal_dokumen    DateTime? @db.Date
   penerbit           String?   @db.VarChar(255)
   file_url           String    @db.Text
   file_nama          String    @db.VarChar(255)
-  file_tipe          String    @db.VarChar(50) // pdf, jpg, png
-  file_ukuran        Int?      // bytes
+  file_tipe          String    @db.VarChar(50)
+  file_ukuran        Int?
   indikator_kinerja  String[]  @default([])
+  sekolah_id         String?   @db.Uuid
   created_at         DateTime? @default(now()) @db.Timestamp(6)
 
   @@index([guru_id, tahun_ajaran_id, semester])
+  @@index([sekolah_id])
 
   users        users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  schools      schools?  @relation(fields: [sekolah_id], references: [id])
 }
 
 // Laporan Kinerja
@@ -612,7 +630,12 @@ model laporan_kinerja {
   judul            String    @db.VarChar(255)
   content          Json?
   evidence_summary Json?
-  status           String    @default("draft") @db.VarChar(50) // draft, final
+  status           String    @default("draft") @db.VarChar(50)
+  skp_id           String?   @db.Uuid
+  predikat         String?   @db.VarChar(50)
+  total_observasi  Int?      @default(0)
+  rata_rata_rating Decimal?  @db.Decimal(3, 2)
+  sekolah_id       String?   @db.Uuid
   ai_generated_at  DateTime? @db.Timestamp(6)
   file_pdf_url     String?   @db.Text
   file_docx_url    String?   @db.Text
@@ -620,23 +643,107 @@ model laporan_kinerja {
   updated_at       DateTime? @default(now()) @db.Timestamp(6)
 
   @@index([guru_id, tahun_ajaran_id, semester])
+  @@index([sekolah_id])
 
-  users        users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users        users         @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  skp_tahunan  skp_tahunan?  @relation(fields: [skp_id], references: [id])
+  schools      schools?      @relation(fields: [sekolah_id], references: [id])
 }
 
 // Konfigurasi Indikator Kinerja
 model indikator_kinerja_config {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  kode            String    @unique @db.VarChar(20) // IK-01, IK-02, dst
+  kode            String    @unique @db.VarChar(20)
   nama            String    @db.VarChar(255)
   deskripsi       String?   @db.Text
-  komponen        String    @db.VarChar(50) // perencanaan, pelaksanaan, dll
+  komponen        String    @db.VarChar(50)
   bobot_persen    Int       @default(10)
   min_evidence    Int       @default(1)
   is_active       Boolean   @default(true)
   berlaku_sejak   DateTime? @db.Date
   sumber_regulasi String?   @db.VarChar(255)
   created_at      DateTime? @default(now()) @db.Timestamp(6)
+
+  skp_indikators          skp_indikator[]
+  observasi_indikators    observasi_indikator[]
+}
+
+// SKP Tahunan - Perencanaan Kinerja di awal tahun
+model skp_tahunan {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guru_id         String    @db.Uuid
+  tahun_ajaran_id String    @db.Uuid
+  status          String    @default("draft") @db.VarChar(50)
+  catatan_guru    String?   @db.Text
+  catatan_kepsek  String?   @db.Text
+  sekolah_id      String?   @db.Uuid
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+  updated_at      DateTime? @default(now()) @db.Timestamp(6)
+
+  users           users              @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  schools         schools?           @relation(fields: [sekolah_id], references: [id])
+  skp_indikators  skp_indikator[]
+  observasis      observasi_kinerja[]
+  laporan_kinerjas laporan_kinerja[]
+
+  @@unique([guru_id, tahun_ajaran_id, sekolah_id])
+  @@index([guru_id, tahun_ajaran_id])
+  @@index([sekolah_id])
+}
+
+model skp_indikator {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  skp_id        String            @db.Uuid
+  indikator_id  String            @db.Uuid
+  target_self   Decimal?          @default(0) @db.Decimal(5, 2)
+  target_sk     Decimal?          @default(0) @db.Decimal(5, 2)
+  created_at    DateTime?         @default(now()) @db.Timestamp(6)
+
+  skp_tahunan              skp_tahunan              @relation(fields: [skp_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  indikator_kinerja_config indikator_kinerja_config @relation(fields: [indikator_id], references: [id])
+
+  @@unique([skp_id, indikator_id])
+}
+
+model observasi_kinerja {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guru_id             String    @db.Uuid
+  skp_id              String?   @db.Uuid
+  observer_id         String?   @db.Uuid
+  tahun_ajaran_id     String    @db.Uuid
+  tanggal_observasi   DateTime  @db.Date
+  jenis               String    @default("kelas") @db.VarChar(50)
+  suasana_pembelajaran String?  @db.Text
+  catatan_observer    String?   @db.Text
+  rekomendasi         String?   @db.Text
+  status              String    @default("draft") @db.VarChar(50)
+  sekolah_id          String?   @db.Uuid
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  updated_at          DateTime? @default(now()) @db.Timestamp(6)
+
+  users_observasi_kinerja_guru_id     users           @relation("observasi_kinerja_guru_idTousers", fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_observasi_kinerja_observer_id users?          @relation("observasi_kinerja_observer_idTousers", fields: [observer_id], references: [id])
+  skp_tahunan                         skp_tahunan?    @relation(fields: [skp_id], references: [id])
+  schools                             schools?        @relation(fields: [sekolah_id], references: [id])
+  observasi_indikators                observasi_indikator[]
+
+  @@index([guru_id, tahun_ajaran_id])
+  @@index([sekolah_id])
+}
+
+model observasi_indikator {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  observasi_id  String    @db.Uuid
+  indikator_id  String    @db.Uuid
+  rating        Int
+  catatan       String?   @db.Text
+  bukti_observasi String? @db.Text
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
+
+  observasi_kinerja        observasi_kinerja        @relation(fields: [observasi_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  indikator_kinerja_config indikator_kinerja_config @relation(fields: [indikator_id], references: [id])
+
+  @@unique([observasi_id, indikator_id])
 }
 
 // Tahun Ajaran (for linking evidence)
