@@ -647,6 +647,17 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Poll token/profile every 60s for real-time balance update
+  useEffect(() => {
+    const poll = () => {
+      if (document.visibilityState === 'visible') {
+        fetchProfile();
+      }
+    };
+    const interval = setInterval(poll, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const [notifiedScheduleIds, setNotifiedScheduleIds] = useState<{ [key: string]: string }>({});
 
   // Background Checker for Scheduler Reminders and Teaching Schedules
@@ -2387,10 +2398,19 @@ export default function Dashboard() {
         if (typeof window !== "undefined") {
           localStorage.setItem("gurupro_cached_profile", JSON.stringify(data));
         }
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        console.error("Gagal memuat profil dari server:", errData);
       }
     } catch (err) {
       console.error("Gagal memuat profil:", err);
     }
+
+    setCurrentUser((prev: any) => {
+      if (!prev) return { status_langganan: "free", token_limit: 0 };
+      if (prev.token_limit === undefined) return { ...prev, token_limit: 0 };
+      return prev;
+    });
   };
 
   useEffect(() => {
@@ -3118,6 +3138,7 @@ export default function Dashboard() {
       setActiveTab("soal");
       setMobileTab("preview");
       showSuccess(`Berhasil membuat ${indexedSoal.length} butir soal!`);
+      fetchProfile();
     } catch (err: any) {
       console.error(err);
       showError(err.message || "Gagal membuat soal. Coba lagi.");
@@ -4452,12 +4473,12 @@ export default function Dashboard() {
           {/* Sub-Tab Navigator */}
           <div className="flex flex-wrap bg-slate-100 p-1 rounded-2xl gap-0.5 shrink-0 self-start sm:self-auto">
             {[
-              { id: "tahun-ajaran", label: "📅 TA", icon: "📅" },
-              { id: "profil", label: "🏫 Profil", icon: "🏫" },
-              { id: "kelas-mapel", label: "📚 Kelas & Mapel", icon: "📚" },
-              { id: "siswa", label: "👥 Siswa", icon: "👥" },
-              { id: "jadwal", label: "📅 Jadwal", icon: "📅" },
-              { id: "presensi", label: "📝 Presensi", icon: "📝" },
+              { id: "tahun-ajaran", label: "TA", icon: "📅" },
+              { id: "profil", label: "Profil", icon: "🏫" },
+              { id: "kelas-mapel", label: "Kelas & Mapel", icon: "📚" },
+              { id: "siswa", label: "Siswa", icon: "👥" },
+              { id: "jadwal", label: "Jadwal", icon: "📅" },
+              { id: "presensi", label: "Presensi", icon: "📝" },
             ].map((tab) => {
               const isActive = tabSekolah === tab.id;
               const hasActiveTa = tahunAjaranList.some((ta: any) => ta.is_active);
@@ -8592,7 +8613,7 @@ const renderJurnalModule = () => {
           <div className="flex items-center gap-3">
             <div className="bg-violet-50 border border-violet-100 text-violet-700 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5">
               <span>⚡</span>
-              <span>{currentUser?.token_limit !== undefined ? `${currentUser.token_limit} Token` : "Memuat..."}</span>
+              <span>{currentUser?.token_limit !== undefined ? `${currentUser.token_limit} Token` : "0 Token"}</span>
             </div>
             <div className="bg-gray-50 border border-gray-200 text-gray-700 font-bold px-3.5 py-2 rounded-xl text-xs">
               {currentUser?.status_langganan?.toUpperCase() || "FREE"}
@@ -9374,7 +9395,7 @@ const renderJurnalModule = () => {
             <div className="bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold px-3.5 py-2 rounded-2xl text-xs flex items-center gap-1.5 shadow-sm">
               <span>⚡</span>
               <span>
-                {currentUser?.token_limit !== undefined ? `${currentUser.token_limit} Token` : "Memuat..."}
+                {currentUser?.token_limit !== undefined ? `${currentUser.token_limit} Token` : "0 Token"}
               </span>
             </div>
 
