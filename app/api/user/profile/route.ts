@@ -17,8 +17,7 @@ export async function GET() {
 
     const userRes = await query(
       `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit,
-              bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at,
-              jenjang, mata_pelajaran, nip
+              bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at
        FROM users WHERE id = $1`,
       [userId]
     );
@@ -190,21 +189,7 @@ export async function PUT(req: Request) {
       values.push(bank_account_name ? bank_account_name.trim() : null);
       idx++;
     }
-    if (jenjang !== undefined) {
-      sets.push(`jenjang = $${idx}`);
-      values.push(jenjang || null);
-      idx++;
-    }
-    if (mata_pelajaran !== undefined) {
-      sets.push(`mata_pelajaran = $${idx}`);
-      values.push(mata_pelajaran ? mata_pelajaran.trim() : null);
-      idx++;
-    }
-    if (nip !== undefined) {
-      sets.push(`nip = $${idx}`);
-      values.push(nip ? nip.trim() : null);
-      idx++;
-    }
+
 
     values.push(userId);
     await query(
@@ -223,8 +208,7 @@ export async function PUT(req: Request) {
 
     const updatedUser = await query(
       `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit,
-              bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at,
-              jenjang, mata_pelajaran, nip
+              bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at
        FROM users WHERE id = $1`,
       [userId]
     );
