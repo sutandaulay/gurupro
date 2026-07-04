@@ -322,52 +322,57 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get school ID for this user
-    const schoolId = await getSchoolIdForUser(user.id);
+    // Find all schools for this user
+    const userSchools = await prisma.schools.findMany({
+      where: { user_id: user.id },
+      select: { id: true, nama_sekolah: true },
+    });
+
+    // If no schools found via user_id, try looking through classes
+    let allSchoolIds: string[] = userSchools.map((s) => s.id);
+    if (allSchoolIds.length === 0) {
+      const userClasses = await prisma.classes.findMany({
+        where: { schools: { user_id: user.id } },
+        select: { school_id: true },
+        distinct: ['school_id'],
+      });
+      allSchoolIds = [...new Set(userClasses.map((c) => c.school_id))];
+    }
+
+    const schoolMap = new Map(userSchools.map((s) => [s.id, s.nama_sekolah]));
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Get today's schedules
     const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
     const hariIni = dayNames[today.getDay()];
 
     const todaySchedules = await prisma.schedules.findMany({
       where: {
-        school_id: schoolId || undefined,
+        school_id: allSchoolIds.length > 0 ? { in: allSchoolIds } : undefined,
         hari: hariIni,
       },
       include: {
-        classes: {
-          select: { nama_kelas: true },
-        },
-        subjects: {
-          select: { nama_mapel: true },
-        },
+        classes: { select: { nama_kelas: true } },
+        subjects: { select: { nama_mapel: true } },
+        schools: { select: { nama_sekolah: true } },
       },
-      orderBy: {
-        jam_mulai: 'asc',
-      },
+      orderBy: [{ school_id: 'asc' }, { jam_mulai: 'asc' }],
     });
 
-    // Check which sessions are already completed today
     const completedSessions = await prisma.teaching_sessions.findMany({
       where: {
         user_id: user.id,
         session_date: today,
         status: 'completed',
       },
-      select: {
-        schedule_id: true,
-        journal_generated: true,
-      },
+      select: { schedule_id: true, journal_generated: true },
     });
 
     const completedMap = new Map(
       completedSessions.map((s) => [s.schedule_id, s.journal_generated])
     );
 
-    // Filter schedules that don't have completed journals
     const availableSchedules = todaySchedules
       .filter((s) => !completedMap.get(s.id))
       .map((s) => ({
@@ -375,6 +380,7 @@ export async function GET() {
         class_id: s.class_id,
         subject_id: s.subject_id,
         school_id: s.school_id,
+        school_name: s.schools?.nama_sekolah || schoolMap.get(s.school_id) || '',
         class_name: s.classes.nama_kelas,
         subject_name: s.subjects.nama_mapel,
         jam_mulai: s.jam_mulai,
@@ -388,6 +394,7 @@ export async function GET() {
         class_id: s.class_id,
         subject_id: s.subject_id,
         school_id: s.school_id,
+        school_name: s.schools?.nama_sekolah || schoolMap.get(s.school_id) || '',
         class_name: s.classes.nama_kelas,
         subject_name: s.subjects.nama_mapel,
         jam_mulai: s.jam_mulai,

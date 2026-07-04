@@ -261,6 +261,11 @@ export default function HasilModal({
                 <div className="text-sm font-bold text-slate-700">
                   {schedule.subject_name} • {schedule.class_name}
                 </div>
+                {schedule.school_name && (
+                  <div className="text-xs text-indigo-500 font-medium mt-0.5">
+                    {schedule.school_name}
+                  </div>
+                )}
                 <div className="text-xs text-slate-500 mt-1">
                   {schedule.jam_mulai} - {schedule.jam_selesai}
                 </div>

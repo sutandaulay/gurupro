@@ -9438,6 +9438,7 @@ const renderJurnalModule = () => {
             { id: "storage_saya", label: "📂 Storage Saya", icon: "" },
             { id: "scheduler", label: "⏰ Pengingat", icon: "" },
             { id: "profil", label: "👤 Profil", icon: "" },
+            { id: "laporan_harian", label: "📋 Laporan Harian", icon: "", isLink: true, href: "/dashboard/laporan-harian" },
             { id: "laporan_kinerja", label: "📋 Laporan Kinerja", icon: "", isLink: true, href: "/dashboard/laporan-kinerja" },
             { id: "pengembangan_diri", label: "🎓 Pengembangan Diri", icon: "", isLink: true, href: "/dashboard/pengembangan-diri" },
           ].map((tab) => {

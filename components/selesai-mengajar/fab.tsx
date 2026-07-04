@@ -163,7 +163,7 @@ export default function SelesaiMengajarFAB({ className = '' }: SelesaiMengajarFA
               </div>
               <div className="text-[10px] text-white/80">
                 {currentSchedule
-                  ? `${currentSchedule.class_name} - ${currentSchedule.jam_mulai}`
+                  ? `${currentSchedule.class_name}${currentSchedule.school_name ? ` (${currentSchedule.school_name})` : ''} - ${currentSchedule.jam_mulai}`
                   : 'Waktu mengajar aktif'}
               </div>
             </div>

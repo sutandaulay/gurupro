@@ -287,7 +287,12 @@ function SelesaiMengajarModalContent({
                             <div className="text-sm text-slate-500">
                               {schedule.class_name}
                             </div>
-                            <div className="flex items-center gap-1 mt-2 text-xs text-slate-400">
+                            {schedule.school_name && (
+                              <div className="text-xs text-indigo-500 mt-0.5 font-medium">
+                                {schedule.school_name}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1 mt-1 text-xs text-slate-400">
                               <IconClock size={12} />
                               <span>
                                 {schedule.jam_mulai} - {schedule.jam_selesai}
@@ -335,7 +340,11 @@ function SelesaiMengajarModalContent({
                       {selectedSchedule.subject_name}
                     </h2>
                     <p className="text-xs text-white/80">
-                      {selectedSchedule.class_name} •{' '}
+                      {selectedSchedule.class_name}
+                      {selectedSchedule.school_name && (
+                        <> • {selectedSchedule.school_name}</>
+                      )}
+                      {' • '}
                       {new Date().toLocaleDateString('id-ID', {
                         weekday: 'long',
                         day: 'numeric',

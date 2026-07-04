@@ -27,6 +27,7 @@ export interface ScheduleInfo {
   class_id: string;
   subject_id: string;
   school_id: string;
+  school_name?: string;
   class_name: string;
   subject_name: string;
   jam_mulai: string;
