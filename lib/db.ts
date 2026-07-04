@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 
 // Inisialisasi pool koneksi database postgresql lokal Anda
-const pool = new Pool({
+export const pool = new Pool({
   user: 'postgres',          // sesuaikan dengan username pgAdmin Anda
   host: 'localhost',
   database: 'gurupro_db',    // nama database lokal Anda
@@ -236,6 +236,10 @@ const initDb = async () => {
 
     // 16. Alter users table to support referrals and bank details
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(50) UNIQUE');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS addon_token_balance INTEGER DEFAULT 0');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS main_token_reset_date TIMESTAMP');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS grace_period_ends_at TIMESTAMP');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(30) DEFAULT \'active\'');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by UUID REFERENCES users(id) ON DELETE SET NULL');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS cashback_balance INTEGER DEFAULT 0');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100)');
@@ -321,7 +325,34 @@ const initDb = async () => {
     await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS plan_id VARCHAR(50)');
     await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT');
 
-    // 21. Create system_settings table
+    // 21. Create addon token package table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS addon_token_packages (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(100) NOT NULL,
+        token_amount INTEGER NOT NULL DEFAULT 0,
+        price NUMERIC(12,2) NOT NULL DEFAULT 0,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query('ALTER TABLE addon_token_packages ADD COLUMN IF NOT EXISTS description TEXT');
+
+    // Seed default addon packages if empty
+    const packageCount = await pool.query('SELECT COUNT(*) FROM addon_token_packages');
+    if (parseInt(packageCount.rows[0].count) === 0) {
+      await pool.query(`
+        INSERT INTO addon_token_packages (name, token_amount, price, is_active, sort_order, description)
+        VALUES
+          ('Paket 50 Token', 50, 25000, TRUE, 1, 'Token eceran untuk kebutuhan sesekali'),
+          ('Paket 100 Token', 100, 45000, TRUE, 2, 'Token eceran dengan nilai lebih hemat'),
+          ('Paket 250 Token', 250, 95000, TRUE, 3, 'Token eceran untuk kebutuhan intensif')
+      `);
+    }
+
+    // 22. Create system_settings table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS system_settings (
         key VARCHAR(50) PRIMARY KEY,
@@ -447,7 +478,6 @@ const initDb = async () => {
         );
       }
     }
-
 
     // Pre-populate cms_landing with default content if empty
     const checkCms = await pool.query("SELECT COUNT(*) FROM cms_landing");

@@ -177,8 +177,20 @@ export default async function LandingPage({
 
   const defaultFaq = [
     {
-      question: "Bagaimana cara kerja perhitungan Token kuota?",
-      answer: "Setiap kali Anda menekan tombol generate paket butir soal baru, sistem akan memotong 1 Token dari sisa batas limit token Anda. Token ini akan otomatis diperbarui setiap masa tagihan bulanan berjalan.",
+      question: "Bagaimana cara kerja Token Kuota di GuruPRO?",
+      answer: "Setiap paket langganan GuruPRO dilengkapi dengan Kuota Token bulanan. Token ini dipakai setiap kali Anda menggunakan fitur AI seperti Generator Soal, RPP, atau fitur cerdas lainnya. Kuota utama akan reset otomatis setiap siklus bulanan (dihitung dari tanggal mulai langganan). Sisa token utama tidak diakumulasi ke bulan berikutnya.",
+    },
+    {
+      question: "Apa bedanya Kuota Utama dan Token Eceran?",
+      answer: "Kuota Utama adalah token yang diberikan setiap awal siklus langganan. Token Eceran adalah token tambahan yang bisa Anda beli kapan saja saat kuota utama habis sebelum reset berikutnya. Token eceran tidak hangus saat reset bulanan dan berlaku selama langganan aktif.",
+    },
+    {
+      question: "Apakah Token Eceran bisa hangus?",
+      answer: "Token Eceran akan tetap tersimpan selama masa langganan aktif. Jika langganan berakhir dan tidak diperpanjang dalam masa tenggang (grace period) 14 hari, maka token eceran akan hangus. Pastikan memperpanjang langganan sebelum grace period berakhir.",
+    },
+    {
+      question: "Berapa harga Token Eceran?",
+      answer: "Token Eceran dijual dalam paket nominal tetap (50, 100, atau 250 token) dengan harga flat yang sama untuk semua tier. Pembelian token eceran bisa dilakukan kapan saja langsung dari dashboard.",
     },
     {
       question: "Apakah metode pembayaran mendukung e-Wallet lokal?",

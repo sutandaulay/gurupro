@@ -48,19 +48,10 @@ function MockCheckoutContent() {
     await new Promise(resolve => setTimeout(resolve, 3000));
 
     try {
-      // Panggil webhook lokal untuk mensimulasikan callback sukses pembayaran
-      const response = await fetch("/api/webhook/xendit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "PAID",
-          id: invoiceId,
-          amount: Number(amount),
-          payment_method: paymentMethod === "qris" ? "QRIS" : "VIRTUAL_ACCOUNT",
-          userId: userId,
-          plan: plan,
-          isMock: true // Penanda simulasi internal
-        }),
+      const pmLabel = paymentMethod === "qris" ? "QRIS" : "VIRTUAL_ACCOUNT";
+      // Call mock checkout API to verify transaction and grant tokens
+      const response = await fetch(`/api/checkout/mock?invoice_id=${invoiceId}&userId=${userId}&payment_method=${pmLabel}`, {
+        method: "GET",
       });
 
       const data = await response.json();
@@ -69,8 +60,8 @@ function MockCheckoutContent() {
         throw new Error(data.error || "Gagal memverifikasi pembayaran.");
       }
 
-      // Berhasil -> Redirect kembali ke dashboard dengan parameter sukses
-      router.push(`/dashboard?payment=success&tx=${invoiceId}`);
+      // Successful payment simulation -> redirect back to dashboard
+      router.push(data.redirect || `/dashboard?payment=success&tx=${invoiceId}`);
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Gagal mensimulasikan pembayaran. Coba lagi.");

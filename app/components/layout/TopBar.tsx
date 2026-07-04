@@ -12,6 +12,9 @@ import {
   IconHelp,
   IconLogout,
 } from "@tabler/icons-react";
+import dynamic from "next/dynamic";
+
+const TokenTopUpModal = dynamic(() => import("@/app/components/ui/TokenTopUpModal"), { ssr: false });
 
 interface TopBarProps {
   onToggleSidebar?: () => void;
@@ -26,6 +29,7 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
   const [notifications, setNotifications] = useState<any[]>([
     { id: "welcome", title: "Selamat Datang!", body: "Terima kasih telah bergabung dengan GuruPRO.", time: "Baru saja", read: false },
   ]);
+  const [showTopUp, setShowTopUp] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -92,6 +96,18 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
       <div className="flex items-center justify-between h-full px-4 lg:px-6">
         {/* Left */}
         <div className="flex items-center gap-3">
+          {/* Token indicator */}
+          <div className="hidden sm:flex items-center gap-2">
+            <button
+              onClick={() => setShowTopUp(true)}
+              className="flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 border border-violet-100 text-violet-700 text-sm font-semibold hover:bg-violet-100"
+            >
+              <span className="text-xs">Token:</span>
+              <span className="text-sm">{profile ? Number(profile.token_limit || 0) : "—"}</span>
+              <span className="text-xs text-gray-400">+</span>
+              <span className="text-sm">{profile ? Number(profile.addon_token_balance || 0) : "—"}</span>
+            </button>
+          </div>
           <button
             onClick={onToggleSidebar}
             className="lg:hidden p-2 -ml-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
@@ -176,6 +192,11 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
           </div>
 
           <div className="relative" ref={dropdownRef}>
+            {showTopUp && (
+              // Lazy load modal to avoid SSR issues
+              // @ts-ignore
+              <TokenTopUpModal open={showTopUp} onClose={() => setShowTopUp(false)} userId={profile?.id} />
+            )}
             <button
               onClick={() => setShowDropdown(!showDropdown)}
               className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 cursor-pointer"

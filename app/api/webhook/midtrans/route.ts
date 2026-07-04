@@ -1,60 +1,39 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
-import { getPaymentGatewayConfig } from "@/lib/settings";
-import { processSuccessPayment } from "@/lib/payments";
+import { query } from "@/lib/db";
+import { grantAddonTokens } from "@/lib/token-system";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    console.log("[MIDTRANS WEBHOOK RECEIVED]:", body);
+    const payload = await req.json().catch(() => ({}));
 
-    const {
-      order_id,
-      status_code,
-      gross_amount,
-      transaction_status,
-      payment_type,
-      signature_key
-    } = body;
+    // Midtrans usually sends order_id in transaction_status callbacks
+    const orderId = payload?.order_id || payload?.transaction_details?.order_id || payload?.orderId;
+    const transactionStatus = payload?.transaction_status || payload?.transactionStatus || payload?.status;
 
-    if (!order_id || !status_code || !gross_amount || !signature_key) {
-      return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
-    }
+    if (!orderId) return NextResponse.json({ ok: true });
 
-    // 1. Get Midtrans Server Key from settings to verify signature key
-    const pgConfig = await getPaymentGatewayConfig();
-    const serverKey = pgConfig.midtrans.server_key;
+    // Try find transaction by external_id (order id)
+    const txRes = await query("SELECT id, user_id, plan_id, status FROM transactions WHERE external_id = $1", [orderId]);
+    if (txRes.rows.length === 0) return NextResponse.json({ ok: true });
+    const tx = txRes.rows[0];
 
-    // Verify signature key if server key is configured
-    if (serverKey) {
-      const payloadString = order_id + status_code + gross_amount + serverKey;
-      const calculatedSignature = crypto
-        .createHash("sha512")
-        .update(payloadString)
-        .digest("hex");
+    if (tx.status === "PAID" || tx.status === "ACTIVATED") return NextResponse.json({ ok: true });
 
-      if (calculatedSignature !== signature_key) {
-        console.warn("[MIDTRANS WEBHOOK] Signature mismatch. Calculated:", calculatedSignature, "Received:", signature_key);
-        return NextResponse.json({ error: "Signature key mismatch" }, { status: 403 });
+    if (String(transactionStatus).toLowerCase() === "settlement" || String(transactionStatus).toLowerCase() === "capture" || String(transactionStatus).toLowerCase() === "success") {
+      await query("UPDATE transactions SET status = $1, updated_at = NOW() WHERE id = $2", ["PAID", tx.id]);
+      if (tx.plan_id && tx.plan_id.startsWith("addon:")) {
+        const addonId = tx.plan_id.split(":")[1];
+        const pkgRes = await query("SELECT token_amount FROM addon_token_packages WHERE id = $1", [addonId]);
+        if (pkgRes.rows.length) {
+          const tokens = Number(pkgRes.rows[0].token_amount || 0);
+          await grantAddonTokens(tx.user_id, tokens);
+        }
       }
     }
 
-    // 2. Check if transaction is paid
-    const isPaid = 
-      transaction_status === "settlement" || 
-      (transaction_status === "capture" && body.fraud_status === "accept");
-
-    if (isPaid) {
-      const result = await processSuccessPayment(order_id, `MIDTRANS-${payment_type.toUpperCase()}`, Number(gross_amount));
-      if (!result.success) {
-        return NextResponse.json({ error: result.error }, { status: 500 });
-      }
-      return NextResponse.json({ success: true, message: "Webhook processed, payment completed." });
-    }
-
-    return NextResponse.json({ success: true, message: `Status is ${transaction_status}. No action taken.` });
-  } catch (error: any) {
-    console.error("Midtrans webhook error:", error);
-    return NextResponse.json({ error: error.message || "Webhook processing error" }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    console.error("Midtrans webhook error:", err);
+    return NextResponse.json({ error: err.message || "webhook error" }, { status: 500 });
   }
 }

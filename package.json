@@ -8,7 +8,12 @@
     "start": "next start",
     "lint": "eslint",
     "init:payload": "npx tsx scripts/init-payload.ts",
-    "push:payload": "npx payload push"
+    "push:payload": "npx payload push",
+    "token:cron": "npx tsx scripts/token-jobs.ts",
+    "dev:cron": "npx tsx scripts/dev-cron.ts",
+    "dev:cron:once": "npx tsx scripts/dev-cron.ts once",
+    "dev:cron:scenario": "npx tsx scripts/dev-cron.ts scenario",
+    "dev:cron:help": "npx tsx scripts/dev-cron.ts --help"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -28,7 +33,8 @@
     "pg": "^8.22.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

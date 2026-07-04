@@ -2,6 +2,8 @@ import { query } from "@/lib/db";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { getPaymentGatewayConfig } from "@/lib/settings";
+import { grantUserTokens } from "@/lib/token-system";
+import { cookies } from "next/headers";
 
 function isUUID(str: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
@@ -14,7 +16,21 @@ function parsePrice(val: any): number {
 
 export async function POST(req: Request) {
   try {
-    const { plan, userId } = await req.json();
+    let { plan, userId, packageId } = await req.json();
+
+    if (!userId) {
+      // Fallback: try to resolve userId from active cookie session
+      const cookieStore = await cookies();
+      const sessionCookie = cookieStore.get("gurupro_session")?.value;
+      if (sessionCookie) {
+        try {
+          const session = JSON.parse(sessionCookie);
+          userId = session.id;
+        } catch (e) {
+          console.error("Failed to parse session cookie in checkout API:", e);
+        }
+      }
+    }
 
     if (!userId || !plan) {
       return NextResponse.json({ error: "Data user dan paket wajib diisi!" }, { status: 400 });
@@ -34,8 +50,22 @@ export async function POST(req: Request) {
     let durationDays = 0;
     let tokens = 0;
     let isFree = false;
+    let isAddonPackage = false;
 
-    if (isUUID(plan)) {
+    if (plan === "addon") {
+      isAddonPackage = true;
+      const packageRes = await query("SELECT * FROM addon_token_packages WHERE id = $1 AND is_active = true", [packageId]);
+      if (packageRes.rows.length === 0) {
+        return NextResponse.json({ error: "Paket token tambahan tidak ditemukan atau tidak aktif!" }, { status: 404 });
+      }
+      const addonPackage = packageRes.rows[0];
+      amount = parsePrice(addonPackage.price);
+      planLabel = addonPackage.name;
+      planKey = `addon:${addonPackage.id}`;
+      durationDays = 0;
+      tokens = Number(addonPackage.token_amount || 0);
+      isFree = amount === 0;
+    } else if (isUUID(plan)) {
       // New: Look up plan by UUID from pricing_plans table
       const planRes = await query("SELECT * FROM pricing_plans WHERE id = $1 AND is_active = true", [plan]);
       if (planRes.rows.length === 0) {
@@ -99,6 +129,63 @@ export async function POST(req: Request) {
       }
     }
 
+    if (isAddonPackage) {
+      const transactionId = crypto.randomUUID();
+      const externalId = `addon-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const pgConfig = await getPaymentGatewayConfig();
+      const gateway = pgConfig.default_gateway || "mock";
+
+      let checkoutUrl = "";
+      let processedGateway = "MOCK";
+
+      if (gateway === "xendit" && pgConfig.xendit.api_key) {
+        try {
+          const xenditApiKey = pgConfig.xendit.api_key;
+          const authHeader = Buffer.from(xenditApiKey + ":").toString("base64");
+          const xenditResponse = await fetch("https://api.xendit.co/v2/invoices", {
+            method: "POST",
+            headers: {
+              "Authorization": `Basic ${authHeader}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              external_id: externalId,
+              amount,
+              payer_email: user.email,
+              description: planLabel,
+              invoice_duration: 86400,
+              success_redirect_url: `${appUrl}/dashboard?payment=success&tx=${transactionId}`,
+              failure_redirect_url: `${appUrl}/dashboard?payment=failed`,
+            }),
+          });
+
+          if (!xenditResponse.ok) {
+            const xenditErr = await xenditResponse.json();
+            throw new Error(xenditErr.message || "Xendit returned error status");
+          }
+          const invoice = await xenditResponse.json();
+          checkoutUrl = invoice.invoice_url;
+          processedGateway = "XENDIT";
+        } catch (err: any) {
+          console.error("Xendit addon invoice failed, falling back to mock:", err.message);
+        }
+      }
+
+      if (!checkoutUrl) {
+        checkoutUrl = `/checkout/mock?invoice_id=${transactionId}&amount=${amount}&userId=${userId}&plan=${encodeURIComponent(planLabel)}`;
+        processedGateway = "MOCK";
+      }
+
+      await query(
+        `INSERT INTO transactions (id, user_id, external_id, amount, status, created_at, notes, plan_id)
+         VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)`,
+        [transactionId, userId, externalId, amount, "PENDING", `Top-up token tambahan via ${processedGateway}`, planKey]
+      );
+
+      return NextResponse.json({ checkoutUrl });
+    }
+
     // Handle free plan
     if (isFree) {
       const transactionId = crypto.randomUUID();
@@ -114,13 +201,14 @@ export async function POST(req: Request) {
 
       await query(
         `UPDATE users 
-         SET status_langganan = $1, 
-             token_limit = COALESCE(token_limit, 0) + $2,
-             subscription_start = COALESCE($3, NOW()),
-             subscription_end = $4
-         WHERE id = $5`,
-        ["free", tokens, currentStart, newEnd, userId]
+         SET status_langganan = $1,
+             subscription_start = COALESCE($2, NOW()),
+             subscription_end = $3
+         WHERE id = $4`,
+        ["free", currentStart, newEnd, userId]
       );
+
+      await grantUserTokens(userId, tokens);
 
       await query(
         `INSERT INTO transactions (id, user_id, external_id, amount, status, created_at, notes, plan_id)
@@ -280,7 +368,7 @@ export async function POST(req: Request) {
     }
 
     if (!checkoutUrl) {
-      checkoutUrl = `/api/checkout/mock?invoice_id=${transactionId}&amount=${amount}&userId=${userId}&plan=${plan}`;
+      checkoutUrl = `/checkout/mock?invoice_id=${transactionId}&amount=${amount}&userId=${userId}&plan=${plan}`;
       processedGateway = "MOCK";
     }
 
