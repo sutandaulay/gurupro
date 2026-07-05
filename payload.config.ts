@@ -13,6 +13,7 @@ import FooterContent from "./collections/FooterContent";
 import ChatbotConfig from "./collections/ChatbotConfig";
 import Categories from "./collections/Categories";
 import Posts from "./collections/Posts";
+import AddonTokenPackages from "./collections/AddonTokenPackages";
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -40,7 +41,7 @@ export default buildConfig({
     admin: "/cms",
   },
 
-  collections: [Users, Media, Features, WhyPoints, Categories, Posts],
+  collections: [Users, Media, Features, WhyPoints, Categories, Posts, AddonTokenPackages],
 
   globals: [LandingPage, FooterContent, ChatbotConfig],
 

@@ -59,12 +59,19 @@ export default function TambahPelatihanPage() {
     setError('')
 
     try {
+      const semester = typeof window !== 'undefined' ? (localStorage.getItem('semester') || '') : ''
+      const tahunAjaranId = typeof window !== 'undefined' ? (localStorage.getItem('tahunAjaranId') || '') : ''
+      const sekolahId = typeof window !== 'undefined' ? (localStorage.getItem('sekolahId') || '') : ''
+
       const res = await fetch('/api/pelatihan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
           durasiJam: parseInt(formData.durasiJam),
+          semester,
+          tahunAjaranId,
+          sekolahId
         }),
       })
 

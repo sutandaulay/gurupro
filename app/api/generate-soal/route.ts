@@ -1,6 +1,7 @@
 import { generateAIContent } from "@/lib/ai";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { consumeUserToken, getUserTokenAccess } from "@/lib/token-system";
 import { cookies } from "next/headers";
 
 export async function POST(req: Request) {
@@ -17,28 +18,17 @@ export async function POST(req: Request) {
     const userId = session.id;
 
     // Ambil data user
-    const userRes = await query("SELECT token_limit, role, subscription_end FROM users WHERE id = $1", [userId]);
-    if (userRes.rows.length === 0) {
+    const tokenState = await getUserTokenAccess(userId);
+    if (!tokenState.user) {
       return NextResponse.json({ error: "Pengguna tidak ditemukan." }, { status: 404 });
     }
-    const user = userRes.rows[0];
+    const user = tokenState.user;
 
-    if (user.role !== "admin" && user.subscription_end) {
-      const isExpired = new Date(user.subscription_end).getTime() - new Date().getTime() <= 0;
-      if (isExpired) {
-        if ((user.token_limit || 0) > 0) {
-          await query("UPDATE users SET token_limit = 0 WHERE id = $1", [userId]);
-        }
-        return NextResponse.json({ 
-          error: "Masa aktif langganan akun Anda telah habis! Silakan lakukan perpanjangan langganan terlebih dahulu." 
-        }, { status: 403 });
-      }
-    }
-
-    if (user.role !== "admin" && (user.token_limit || 0) <= 0) {
-      return NextResponse.json({ 
-        error: "Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan di Landing Page." 
-      }, { status: 403 });
+    if (!tokenState.access.allowed) {
+      const message = tokenState.access.reason === "subscription_expired"
+        ? "Masa aktif langganan akun Anda telah habis! Silakan lakukan perpanjangan langganan terlebih dahulu."
+        : "Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan di Landing Page.";
+      return NextResponse.json({ error: message }, { status: 403 });
     }
 
     const kurikulumName = body.kurikulum === 'merdeka' ? 'Kurikulum Merdeka' : body.kurikulum === 'k13' ? 'Kurikulum 2013 (K13)' : body.kurikulum === 'kbc' ? 'Kurikulum Berbasis Kompetensi (KBC)' : 'Kurikulum Hybrid';
@@ -171,7 +161,7 @@ Output harus berupa JSON murni dengan format schema berikut:
 
     // Deduct token on success
     if (user.role !== "admin") {
-      await query("UPDATE users SET token_limit = GREATEST(0, token_limit - 1) WHERE id = $1", [userId]);
+      await consumeUserToken(userId, 1);
     }
 
     return NextResponse.json(parsed);

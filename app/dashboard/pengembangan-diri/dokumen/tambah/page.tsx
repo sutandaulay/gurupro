@@ -83,6 +83,10 @@ export default function TambahDokumenPage() {
     setError('')
 
     try {
+      const semester = typeof window !== 'undefined' ? (localStorage.getItem('semester') || '') : ''
+      const tahunAjaranId = typeof window !== 'undefined' ? (localStorage.getItem('tahunAjaranId') || '') : ''
+      const sekolahId = typeof window !== 'undefined' ? (localStorage.getItem('sekolahId') || '') : ''
+
       const fd = new FormData()
       fd.append('file', selectedFile)
       fd.append('kategori', formData.kategori)
@@ -91,6 +95,9 @@ export default function TambahDokumenPage() {
       fd.append('tanggal_dokumen', formData.tanggalDokumen)
       fd.append('penerbit', formData.penerbit)
       fd.append('indikator_kinerja', JSON.stringify(formData.indikatorKinerja))
+      fd.append('semester', semester)
+      fd.append('tahun_ajaran_id', tahunAjaranId)
+      fd.append('sekolah_id', sekolahId)
 
       const res = await fetch('/api/dokumen-bukti', {
         method: 'POST',

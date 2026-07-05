@@ -182,6 +182,14 @@ export default function Dashboard() {
     return diff <= 0;
   };
 
+  const isSubscriptionExpiredOver30Days = () => {
+    const isPro = currentUser?.status_langganan && currentUser.status_langganan !== 'free';
+    if (!currentUser || !isPro) return false;
+    if (!currentUser.subscription_end) return false;
+    const diff = new Date().getTime() - new Date(currentUser.subscription_end).getTime();
+    return diff > 30 * 24 * 60 * 60 * 1000;
+  };
+
   const formatIndonesianDateTime = (d: Date | null) => {
     if (!d) return "";
     const dateStr = d.toLocaleDateString("id-ID", {
@@ -1554,6 +1562,10 @@ export default function Dashboard() {
   };
 
   const handlePrintJournal = (j: any) => {
+    if (isSubscriptionExpired()) {
+      showError("Masa aktif langganan Anda telah berakhir. Perpanjang paket Anda untuk mencetak jurnal.");
+      return;
+    }
     const school = schools.find(s => s.id === selectedSchoolId);
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
@@ -1743,6 +1755,10 @@ export default function Dashboard() {
   };
 
   const handlePrintJournalTable = () => {
+    if (isSubscriptionExpired()) {
+      showError("Masa aktif langganan Anda telah berakhir. Perpanjang paket Anda untuk mencetak jurnal.");
+      return;
+    }
     if (jurnalList.length === 0) {
       showError("Tidak ada data jurnal untuk dicetak.");
       return;
@@ -2023,6 +2039,10 @@ export default function Dashboard() {
   };
 
   const handleEvidenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isSubscriptionExpired()) {
+      showError("Masa aktif langganan Anda telah berakhir. Perpanjang paket Anda untuk menggunakan kapasitas penyimpanan (storage) dan mengunggah evidensi.");
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -2724,6 +2744,10 @@ export default function Dashboard() {
   };
 
   const openSavedDoc = (doc: any) => {
+    if (isSubscriptionExpiredOver30Days()) {
+      showError("Dokumen ini telah diarsipkan karena masa aktif langganan Anda berakhir lebih dari 30 hari yang lalu. Perpanjang paket premium untuk mengakses kembali berkas Anda.");
+      return;
+    }
     setViewingDoc(doc);
     setGeneratedDoc(null);
   };
@@ -3819,6 +3843,10 @@ export default function Dashboard() {
   const isAllReviewed = totalReviewed === soalList.length;
 
   const triggerExportWithReviewCheck = (exportAction: () => void) => {
+    if (isSubscriptionExpired()) {
+      showError("Masa aktif langganan Anda telah berakhir. Perpanjang paket Anda untuk melakukan ekspor, cetak, atau unduh dokumen.");
+      return;
+    }
     if (totalReviewed < soalList.length) {
       setPendingExportAction(() => exportAction);
     } else {
@@ -8336,9 +8364,13 @@ const renderJurnalModule = () => {
                     <div key={doc.id} className="flex items-center justify-between bg-white border border-slate-200 p-2 rounded-xl text-[11px] font-medium hover:border-slate-300 transition">
                       <button
                         onClick={() => openSavedDoc(doc)}
-                        className="text-left font-bold text-slate-700 hover:text-indigo-600 truncate flex-1 mr-2 cursor-pointer"
+                        className={`text-left font-bold truncate flex-1 mr-2 cursor-pointer ${
+                          isSubscriptionExpiredOver30Days()
+                            ? "text-slate-400 line-through"
+                            : "text-slate-700 hover:text-indigo-600"
+                        }`}
                       >
-                        {doc.judul_dokumen}
+                        {isSubscriptionExpiredOver30Days() && "🔒 "}{doc.judul_dokumen}
                       </button>
                       <button
                         onClick={() => deleteSavedDoc(doc.id)}
@@ -8393,6 +8425,10 @@ const renderJurnalModule = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={() => {
+                        if (isSubscriptionExpired()) {
+                          showError("Masa aktif langganan Anda telah berakhir. Perpanjang paket Anda untuk menyalin atau mencetak berkas.");
+                          return;
+                        }
                         navigator.clipboard.writeText(viewingDoc.konten?.markdown || "");
                         showSuccess("Konten berhasil disalin!");
                       }}
@@ -8402,6 +8438,10 @@ const renderJurnalModule = () => {
                     </button>
                     <button
                       onClick={() => {
+                        if (isSubscriptionExpired()) {
+                          showError("Masa aktif langganan Anda telah berakhir. Perpanjang paket Anda untuk menyalin atau mencetak berkas.");
+                          return;
+                        }
                         const printWindow = window.open("", "_blank");
                         if (printWindow) {
                           printWindow.document.write(`
@@ -8492,6 +8532,10 @@ const renderJurnalModule = () => {
   };
 
   const handlePrintExplorerSoal = (file: any) => {
+    if (isSubscriptionExpired()) {
+      showError("Masa aktif langganan Anda telah berakhir. Perpanjang paket Anda untuk mencetak atau mengunduh berkas.");
+      return;
+    }
     const list = file.konten?.soalList || [];
     const meta = file.konten?.meta || {};
     const printWindow = window.open("", "_blank");
@@ -8572,6 +8616,10 @@ const renderJurnalModule = () => {
   };
 
   const handleCopyExplorerSoal = (file: any) => {
+    if (isSubscriptionExpired()) {
+      showError("Masa aktif langganan Anda telah berakhir. Perpanjang paket Anda untuk menyalin atau mengunduh berkas.");
+      return;
+    }
     const list = file.konten?.soalList || [];
     const meta = file.konten?.meta || {};
     
@@ -8827,7 +8875,7 @@ const renderJurnalModule = () => {
           <div className="lg:col-span-2 space-y-3">
             <h2 className="text-sm font-semibold text-gray-700">Aktivitas Terbaru</h2>
             <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
-              {recentActivities.map((activity, i) => (
+              {recentActivities.map((activity: any, i: number) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-3">
                   <span className="text-lg">{activity.icon}</span>
                   <div className="flex-1 min-w-0">
@@ -9289,14 +9337,22 @@ const renderJurnalModule = () => {
 
                         return (
                           <tr key={file.id} className="hover:bg-slate-50/50 transition">
-                            <td className="px-6 py-4 font-bold text-slate-800 flex items-center gap-2">
-                              <span>📄</span>
+                            <td className={`px-6 py-4 font-bold flex items-center gap-2 ${
+                              isSubscriptionExpiredOver30Days() ? "text-slate-400 line-through" : "text-slate-800"
+                            }`}>
+                              <span>{isSubscriptionExpiredOver30Days() ? "🔒" : "📄"}</span>
                               <span className="truncate max-w-md">{title}</span>
                             </td>
                             <td className="px-6 py-4 text-slate-400">{dateText}</td>
                             <td className="px-6 py-4 text-right space-x-2 shrink-0">
                               <button
-                                onClick={() => setSelectedExplorerFile(file)}
+                                onClick={() => {
+                                  if (isSubscriptionExpiredOver30Days()) {
+                                    showError("Dokumen ini telah diarsipkan karena masa aktif langganan Anda berakhir lebih dari 30 hari yang lalu. Perpanjang paket premium untuk mengakses kembali berkas Anda.");
+                                    return;
+                                  }
+                                  setSelectedExplorerFile(file);
+                                }}
                                 className="px-3 py-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 hover:bg-indigo-100 rounded-lg font-bold text-[10px] transition cursor-pointer font-sans"
                               >
                                 Lihat Berkas
@@ -10929,6 +10985,10 @@ const renderJurnalModule = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
+                          if (isSubscriptionExpired()) {
+                            showError("Masa aktif langganan Anda telah berakhir. Perpanjang paket Anda untuk menyalin atau mencetak berkas.");
+                            return;
+                          }
                           navigator.clipboard.writeText(selectedExplorerFile.konten?.markdown || "");
                           showSuccess("Konten dokumen berhasil disalin ke clipboard!");
                         }}
@@ -10938,6 +10998,10 @@ const renderJurnalModule = () => {
                       </button>
                       <button
                         onClick={() => {
+                          if (isSubscriptionExpired()) {
+                            showError("Masa aktif langganan Anda telah berakhir. Perpanjang paket Anda untuk menyalin atau mencetak berkas.");
+                            return;
+                          }
                           const school = schools.find(s => s.id === selectedSchoolId);
                           let signaturesHtml = "";
                           if (school) {

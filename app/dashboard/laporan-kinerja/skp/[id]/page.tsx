@@ -38,7 +38,7 @@ export default function DetailSkpPage() {
     try {
       const res = await fetch(`/api/skp/${id}/submit`, { method: 'POST' })
       if (res.ok) {
-        setSkp(prev => ({ ...prev, status: 'submitted' }))
+        setSkp((prev: any) => ({ ...prev, status: 'submitted' }))
       } else {
         const data = await res.json()
         throw new Error(data.error || 'Gagal submit')

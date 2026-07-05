@@ -14,6 +14,10 @@ import {
   IconMessage,
   IconLogout,
   IconCapRounded,
+  IconFileText,
+  IconListCheck,
+  IconTimeline,
+  IconBrain,
 } from "@tabler/icons-react";
 
 interface SidebarProps {
@@ -29,6 +33,14 @@ const navItems = [
   { label: "Pengembangan", href: "/dashboard/pengembangan", icon: IconUsers },
   { label: "Komunikasi", href: "/dashboard/komunikasi", icon: IconMessage },
   { label: "Chat AI", href: "/dashboard/chat", icon: IconMessage },
+];
+
+// Deep Learning menu items
+const deepLearningItems = [
+  { label: "ATP Editor", href: "/dashboard/atp-editor", icon: IconTimeline, badge: "NEW" },
+  { label: "Program Tahunan (Prota)", href: "/dashboard/prota", icon: IconListCheck, badge: "NEW" },
+  { label: "Program Semester (Prosem)", href: "/dashboard/prosem", icon: IconFileText, badge: "NEW" },
+  { label: "AI Modul Ajar", href: "/dashboard/administrasi", icon: IconBrain, badge: "✨" },
 ];
 
 export default function MobileSidebar({ isOpen, onClose }: SidebarProps) {
@@ -112,6 +124,43 @@ export default function MobileSidebar({ isOpen, onClose }: SidebarProps) {
               >
                 <Icon size={20} stroke={1.5} />
                 {item.label}
+              </Link>
+            );
+          })}
+
+          {/* Deep Learning Section */}
+          <div className="mx-2 mt-4 mb-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-4 py-2">
+              ✨ Deep Learning (Kerangka 8334)
+            </p>
+          </div>
+          {deepLearningItems.map((item) => {
+            const isActive =
+              pathname === item.href ||
+              pathname.startsWith(item.href + "/");
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onClose}
+                className={`flex items-center gap-3 mx-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-emerald-50 text-emerald-600 border-l-3 border-emerald-500"
+                    : "text-gray-600 hover:bg-emerald-50 hover:text-emerald-600"
+                }`}
+              >
+                <Icon size={20} stroke={1.5} />
+                <span className="flex-1">{item.label}</span>
+                {item.badge && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    item.badge === "NEW"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-amber-100 text-amber-700"
+                  }`}>
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}

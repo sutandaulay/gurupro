@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { uploadToR2 } from '@/lib/r2'
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 const MAX_SIZE = 10 * 1024 * 1024 // 10MB
@@ -31,13 +32,13 @@ export async function GET(req: Request) {
     let paramIndex = 2
 
     if (tahunAjaranId) {
-      sql += ` AND tahun_ajaran_id = $${paramIndex}`
+      sql += ` AND (tahun_ajaran_id = $${paramIndex} OR tahun_ajaran_id IS NULL)`
       params.push(tahunAjaranId)
       paramIndex++
     }
 
     if (semester) {
-      sql += ` AND semester = $${paramIndex}`
+      sql += ` AND (semester = $${paramIndex} OR semester IS NULL)`
       params.push(semester)
       paramIndex++
     }
@@ -65,6 +66,15 @@ export async function POST(req: Request) {
     const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
     const guruId = sessionData.id
 
+    const userDb = await query("SELECT role, status_langganan, subscription_end FROM users WHERE id = $1", [guruId])
+    const user = userDb.rows[0]
+    const isPro = user?.status_langganan && user.status_langganan !== 'free'
+    const isExpired = isPro && user.subscription_end && new Date(user.subscription_end).getTime() < Date.now()
+
+    if (isExpired && user.role !== 'admin') {
+      return NextResponse.json({ error: 'Masa aktif langganan Anda telah berakhir. Perpanjang paket Anda untuk menggunakan kapasitas penyimpanan (storage) dan fitur unggah dokumen bukti.' }, { status: 403 })
+    }
+
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     const kategori = formData.get('kategori') as string
@@ -73,6 +83,9 @@ export async function POST(req: Request) {
     const tanggalDokumen = formData.get('tanggal_dokumen') as string
     const penerbit = formData.get('penerbit') as string
     const indikatorKinerja = formData.get('indikator_kinerja') as string
+    const semester = formData.get('semester') as string
+    const tahunAjaranId = formData.get('tahun_ajaran_id') as string
+    const sekolahId = formData.get('sekolah_id') as string
 
     if (!file || !kategori || !judul) {
       return NextResponse.json({ error: 'Field wajib belum diisi' }, { status: 400 })
@@ -87,19 +100,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Ukuran file maksimal 10MB' }, { status: 400 })
     }
 
-    // Upload file (base64 for now)
+    // Upload file
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
-    const base64 = buffer.toString('base64')
-    const fileUrl = `data:${file.type};base64,${base64}`
+
+    let fileUrl = ""
+    try {
+      const r2Url = await uploadToR2(buffer, file.name, file.type)
+      if (r2Url) {
+        fileUrl = r2Url
+      } else {
+        const base64 = buffer.toString('base64')
+        fileUrl = `data:${file.type};base64,${base64}`
+      }
+    } catch (err) {
+      console.warn("Failed to upload to R2, falling back to base64:", err)
+      const base64 = buffer.toString('base64')
+      fileUrl = `data:${file.type};base64,${base64}`
+    }
 
     const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'unknown'
 
     const result = await query(
       `INSERT INTO dokumen_bukti (
         guru_id, kategori, judul, deskripsi, tanggal_dokumen, penerbit,
-        file_url, file_nama, file_tipe, file_ukuran, indikator_kinerja
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        file_url, file_nama, file_tipe, file_ukuran, indikator_kinerja,
+        semester, tahun_ajaran_id, sekolah_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING *`,
       [
         guruId,
@@ -113,6 +140,9 @@ export async function POST(req: Request) {
         fileExtension,
         file.size,
         indikatorKinerja ? JSON.parse(indikatorKinerja) : [],
+        semester || null,
+        tahunAjaranId || null,
+        sekolahId || null
       ]
     )
 

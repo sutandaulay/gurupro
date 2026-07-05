@@ -7,6 +7,70 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==========================================
+// MULTI-SCHOOL MULTI-TENANCY
+// Support guru yang mengajar di banyak sekolah, banyak mapel, banyak kelas
+// ==========================================
+
+// Junction table: Guru ↔ Sekolah (Many-to-Many)
+model user_school_assignments {
+  id               String       @id @default(dbgenerated("gen_random_uuid()"))
+  userId           String
+  schoolId         String
+  tahunAjaranId    String?
+  isWaliKelas      Boolean      @default(false)
+  createdAt        DateTime?    @default(now())
+
+  user    users      @relation("UserAssignmentToSchool", fields: [userId], references: [id], onDelete: Cascade)
+  school  schools    @relation("SchoolAssignmentToUser", fields: [schoolId], references: [id], onDelete: Cascade)
+  tahunAjaran tahun_ajaran? @relation("TahunAjaranUserSchool", fields: [tahunAjaranId], references: [id])
+
+  @@unique([userId, schoolId, tahunAjaranId])
+  @@index([userId])
+  @@index([schoolId])
+}
+
+// Junction table: Guru ↔ Mata Pelajaran (Many-to-Many)
+model teacher_subject_assignments {
+  id               String       @id @default(dbgenerated("gen_random_uuid()"))
+  userId           String
+  schoolId         String
+  subjectId        String
+  tahunAjaranId    String?
+  createdAt        DateTime?    @default(now())
+
+  user      users     @relation("UserAssignmentToSubject", fields: [userId], references: [id], onDelete: Cascade)
+  school    schools   @relation("SchoolAssignmentToSubject", fields: [schoolId], references: [id], onDelete: Cascade)
+  subject   subjects @relation("SubjectAssignmentToUser", fields: [subjectId], references: [id], onDelete: Cascade)
+  tahunAjaran tahun_ajaran? @relation("TahunAjaranTeacherSubject", fields: [tahunAjaranId], references: [id])
+
+  @@unique([userId, schoolId, subjectId, tahunAjaranId])
+  @@index([userId])
+  @@index([schoolId])
+  @@index([subjectId])
+}
+
+// Junction table: Guru ↔ Kelas (Many-to-Many)
+model teacher_class_assignments {
+  id               String       @id @default(dbgenerated("gen_random_uuid()"))
+  userId           String
+  schoolId         String
+  classId          String
+  tahunAjaranId    String?
+  isWaliKelas      Boolean      @default(false)
+  createdAt        DateTime?    @default(now())
+
+  user      users    @relation("UserAssignmentToClass", fields: [userId], references: [id], onDelete: Cascade)
+  school    schools  @relation("SchoolAssignmentToClass", fields: [schoolId], references: [id], onDelete: Cascade)
+  class     classes  @relation("ClassAssignmentToUser", fields: [classId], references: [id], onDelete: Cascade)
+  tahunAjaran tahun_ajaran? @relation("TahunAjaranTeacherClass", fields: [tahunAjaranId], references: [id])
+
+  @@unique([userId, schoolId, classId, tahunAjaranId])
+  @@index([userId])
+  @@index([schoolId])
+  @@index([classId])
+}
+
 model academic_calendars {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   school_id       String    @db.Uuid
@@ -54,6 +118,9 @@ model classes {
   schedules        schedules[]
   students         students[]
   teacher_journals teacher_journals[]
+  // === MULTI-SCHOOL MULTI-TENANCY ===
+  guru_administrasi guru_administrasi[]
+  teacherClassAssignments teacher_class_assignments[] @relation("ClassAssignmentToUser")
 }
 
 model cms_landing {
@@ -63,14 +130,39 @@ model cms_landing {
 }
 
 model guru_administrasi {
-  id               String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  user_id          String?   @db.Uuid
-  tipe_dokumen     String    @db.VarChar(50)
-  judul_dokumen    String    @db.VarChar(255)
+  id               String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id          String?       @db.Uuid
+  tipe_dokumen     String        @db.VarChar(50) // 'rpp', 'modul_ajar', 'silabus', 'lkpd', 'laporan_lkpd', 'atp', 'prota', 'prosem'
+  judul_dokumen    String        @db.VarChar(255)
   konten           Json
-  tanggal_kegiatan DateTime? @default(dbgenerated("CURRENT_DATE")) @db.Date
-  created_at       DateTime? @default(now()) @db.Timestamp(6)
-  users            users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tanggal_kegiatan DateTime?     @default(dbgenerated("CURRENT_DATE")) @db.Date
+  // === MULTI-SCHOOL CONTEXT (nullable for backward compatibility) ===
+  school_id        String?       @db.Uuid
+  class_id         String?       @db.Uuid
+  subject_id       String?       @db.Uuid
+  tahun_ajaran_id String?       @db.Uuid
+  semester         String?        @db.VarChar(20) // 'ganjil' | 'genap'
+  kurikulum        String?       @db.VarChar(50) // 'merdeka' | 'k13' | 'kbc' | 'hybrid'
+  jenjang          String?       @db.VarChar(20) // 'SD' | 'SMP' | 'SMA' | 'SMK'
+  fase             String?       @db.VarChar(10) // 'A' | 'B' | 'C' | 'D' | 'E' | 'F'
+  // === DEEP LEARNING (Kerangka 8334) ===
+  dimensi8         String[]      @default([]) // ['beriman', 'kreatif', 'bergotongroyong', dll]
+  tiga_pengalaman  Boolean       @default(false) // Memahami / Mengaplikasi / Merefleksikan
+  pai_mode         String?       @db.VarChar(50) // 'none' | 'spiritual_only' | 'hybrid_kbc'
+  created_at       DateTime?     @default(now()) @db.Timestamp(6)
+
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  schools    schools?  @relation(fields: [school_id], references: [id], onUpdate: NoAction)
+  classes    classes? @relation(fields: [class_id], references: [id], onUpdate: NoAction)
+  subjects   subjects? @relation(fields: [subject_id], references: [id], onUpdate: NoAction)
+
+  @@index([user_id])
+  @@index([school_id])
+  @@index([class_id])
+  @@index([subject_id])
+  @@index([tipe_dokumen])
+  @@index([kurikulum])
+  @@index([dimensi8])
 }
 
 model journal_schemas {
@@ -115,8 +207,19 @@ model question_banks {
   mata_pelajaran String    @db.VarChar(100)
   topik          String    @db.VarChar(255)
   detail_soal    Json
+  // === MULTI-SCHOOL CONTEXT (nullable for backward compatibility) ===
+  school_id      String?   @db.Uuid
+  subject_id     String?   @db.Uuid
+  jenjang        String?   @db.VarChar(20)
   created_at     DateTime? @default(now()) @db.Timestamp(6)
   users          users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  schools        schools?  @relation(fields: [school_id], references: [id], onUpdate: NoAction)
+  subjects       subjects? @relation(fields: [subject_id], references: [id], onUpdate: NoAction)
+
+  @@index([user_id])
+  @@index([school_id])
+  @@index([subject_id])
+  @@index([kurikulum])
 }
 
 model referrals {
@@ -148,7 +251,7 @@ model schedules {
 
 model schools {
   id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id             String               @db.Uuid
+  user_id             String               @db.Uuid // Creator/admin of this school
   nama_sekolah        String               @db.VarChar(255)
   logo                String?
   alamat              String?
@@ -177,6 +280,14 @@ model schools {
   observasi_kinerjas  observasi_kinerja[]
   pelatihan_gurus     pelatihan_guru[]
   dokumen_buktis      dokumen_bukti[]
+  // === MULTI-SCHOOL MULTI-TENANCY ===
+  userSchoolAssignments      user_school_assignments[]      @relation("SchoolAssignmentToUser")
+  teacherSubjectAssignments teacher_subject_assignments[]  @relation("SchoolAssignmentToSubject")
+  teacherClassAssignments   teacher_class_assignments[]    @relation("SchoolAssignmentToClass")
+  // === EVIDENCE & PERFORMANCE ===
+  tahun_ajarans       tahun_ajaran[]
+  guru_administrasi   guru_administrasi[]
+  question_banks      question_banks[]
 }
 
 model student_attendance {
@@ -223,10 +334,14 @@ model subjects {
   school_id        String             @db.Uuid
   nama_mapel       String             @db.VarChar(255)
   created_at       DateTime?          @default(now()) @db.Timestamp(6)
+  // === MULTI-SCHOOL MULTI-TENANCY ===
   assessments      assessments[]
   schedules        schedules[]
-  schools          schools            @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  schools          schools   @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   teacher_journals teacher_journals[]
+  teacherSubjectAssignments teacher_subject_assignments[] @relation("SubjectAssignmentToUser")
+  guru_administrasi guru_administrasi[]
+  question_banks   question_banks[]
 }
 
 model system_settings {
@@ -339,6 +454,10 @@ model users {
   skp_tahunans                                           skp_tahunan[]
   observasi_kinerja_observasi_kinerja_guru_idTousers     observasi_kinerja[] @relation("observasi_kinerja_guru_idTousers")
   observasi_kinerja_observasi_kinerja_observer_idTousers observasi_kinerja[] @relation("observasi_kinerja_observer_idTousers")
+  // === MULTI-SCHOOL MULTI-TENANCY ===
+  userSchoolAssignments      user_school_assignments[]      @relation("UserAssignmentToSchool")
+  teacherSubjectAssignments  teacher_subject_assignments[]  @relation("UserAssignmentToSubject")
+  teacherClassAssignments    teacher_class_assignments[]    @relation("UserAssignmentToClass")
 }
 
 model hero_sections {
@@ -748,14 +867,22 @@ model observasi_indikator {
 
 // Tahun Ajaran (for linking evidence)
 model tahun_ajaran {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nama          String    @db.VarChar(50) // "2024/2025"
-  tanggal_mulai DateTime @db.Date
-  tanggal_selesai DateTime @db.Date
-  is_active    Boolean   @default(false)
-  semester_type String   @default("full") // "ganjil" | "genap" | "full"
-  semester     String?   @db.VarChar(20) // Current active semester: "ganjil" | "genap"
-  sekolah_id   String?   @db.Uuid
-  created_by   String?   @db.Uuid
-  created_at   DateTime? @default(now()) @db.Timestamp(6)
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nama          String       @db.VarChar(50) // "2024/2025"
+  tanggal_mulai DateTime    @db.Date
+  tanggal_selesai DateTime  @db.Date
+  is_active    Boolean      @default(false)
+  semester_type String      @default("full") // "ganjil" | "genap" | "full"
+  semester     String?      @db.VarChar(20) // Current active semester: "ganjil" | "genap"
+  sekolah_id   String?      @db.Uuid // Nullable for backward compat; recommended per school
+  created_by   String?      @db.Uuid
+  created_at   DateTime?    @default(now()) @db.Timestamp(6)
+  schools      schools?     @relation(fields: [sekolah_id], references: [id], onUpdate: NoAction)
+  // === MULTI-SCHOOL MULTI-TENANCY ===
+  userSchoolAssignments    user_school_assignments[]      @relation("TahunAjaranUserSchool")
+  teacherSubjectAssignments teacher_subject_assignments[] @relation("TahunAjaranTeacherSubject")
+  teacherClassAssignments teacher_class_assignments[]    @relation("TahunAjaranTeacherClass")
+
+  @@index([sekolah_id])
+  @@index([is_active])
 }

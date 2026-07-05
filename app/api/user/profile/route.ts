@@ -16,7 +16,7 @@ export async function GET() {
     const userId = session.id;
 
     const userRes = await query(
-      `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit,
+      `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, addon_token_balance,
               bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at
        FROM users WHERE id = $1`,
       [userId]
@@ -207,7 +207,7 @@ export async function PUT(req: Request) {
     });
 
     const updatedUser = await query(
-      `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit,
+      `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, addon_token_balance,
               bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at
        FROM users WHERE id = $1`,
       [userId]

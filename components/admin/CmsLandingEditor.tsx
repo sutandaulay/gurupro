@@ -62,7 +62,7 @@ const iconList: IconEntry[] = [
   { name: "IconQuestionMark", comp: IconQuestionMark },
 ];
 
-type TabId = "hero" | "features" | "why" | "school" | "cta" | "footer" | "chatbot" | "faq" | "referral" | "blog" | "pricing" | "legal";
+type TabId = "hero" | "features" | "why" | "school" | "cta" | "footer" | "chatbot" | "faq" | "referral" | "blog" | "pricing" | "legal" | "addons";
 
 interface HeroStat {
   id?: string;
@@ -133,6 +133,7 @@ const tabs: { id: TabId; label: string }[] = [
   { id: "features", label: "Fitur" },
   { id: "why", label: "Kenapa" },
   { id: "pricing", label: "Paket" },
+  { id: "addons", label: "Token Eceran" },
   { id: "school", label: "Sekolah" },
   { id: "cta", label: "CTA" },
   { id: "footer", label: "Footer" },
@@ -183,6 +184,9 @@ export default function CmsLandingEditor() {
   const [editCategory, setEditCategory] = useState<any>(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [legalPages, setLegalPages] = useState<Record<string, { title: string; content: string; last_updated?: string }>>({});
+  const [addonPackages, setAddonPackages] = useState<any[]>([]);
+  const [showAddonModal, setShowAddonModal] = useState(false);
+  const [editAddon, setEditAddon] = useState<any>(null);
 
   // Helper with timeout
   const fetchWithTimeout = async (url: string, timeout = 5000) => {
@@ -255,6 +259,13 @@ export default function CmsLandingEditor() {
       if (pricingRes?.ok) {
         const pricingData = await pricingRes.json();
         setPricingPlans(pricingData.plans || pricingData.docs || []);
+      }
+
+      // Load token packages (addons)
+      const addonsRes = await fetchWithTimeout("/api/admin/token-packages");
+      if (addonsRes?.ok) {
+        const addonsData = await addonsRes.json();
+        setAddonPackages(addonsData.docs || []);
       }
 
       // Load blog data
@@ -551,6 +562,54 @@ export default function CmsLandingEditor() {
     } catch { showToast("error", "Koneksi gagal"); }
   };
 
+  // Addon Token Packages Management
+  const saveAddonPackage = async () => {
+    if (!editAddon?.name) { showToast("error", "Nama paket wajib diisi"); return; }
+    setSaving("addons");
+    try {
+      const method = editAddon.id ? "PUT" : "POST";
+      const res = await fetch("/api/admin/token-packages", {
+        method, headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editAddon),
+      });
+      if (res.ok) {
+        showToast("success", editAddon.id ? "Paket eceran diperbarui!" : "Paket eceran ditambahkan!");
+        setShowAddonModal(false);
+        setEditAddon(null);
+        const d = await fetch("/api/admin/token-packages").then((r) => r.json());
+        setAddonPackages(d.docs || []);
+      } else showToast("error", "Gagal menyimpan paket eceran");
+    } catch { showToast("error", "Koneksi gagal"); }
+    finally { setSaving(null); }
+  };
+
+  const toggleAddonActive = async (addon: any) => {
+    try {
+      const res = await fetch("/api/admin/token-packages", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...addon, is_active: !addon.is_active }),
+      });
+      if (res.ok) {
+        showToast("success", `Paket eceran ${addon.name} ${addon.is_active ? "dinonaktifkan" : "diaktifkan"}!`);
+        setAddonPackages((prev) => prev.map((p) => p.id === addon.id ? { ...p, is_active: !p.is_active } : p));
+        const d = await fetch("/api/admin/token-packages").then((r) => r.json());
+        setAddonPackages(d.docs || []);
+      } else showToast("error", "Gagal mengubah status aktif");
+    } catch { showToast("error", "Koneksi gagal"); }
+  };
+
+  const deleteAddonPackage = async (id: string) => {
+    if (!confirm("Hapus paket eceran ini?")) return;
+    try {
+      const res = await fetch(`/api/admin/token-packages?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        showToast("success", "Paket eceran dihapus!");
+        setAddonPackages((prev) => prev.filter((p) => p.id !== id));
+      } else showToast("error", "Gagal menghapus paket eceran");
+    } catch { showToast("error", "Koneksi gagal"); }
+  };
+
   // Blog Post Management
   const savePost = async () => {
     if (!editPost?.title) { showToast("error", "Judul artikel wajib diisi"); return; }
@@ -708,6 +767,7 @@ export default function CmsLandingEditor() {
       {activeTab === "features" && renderFeaturesTab()}
       {activeTab === "why" && renderWhyTab()}
       {activeTab === "pricing" && renderPricingTab()}
+      {activeTab === "addons" && renderAddonsTab()}
       {activeTab === "school" && renderSchoolTab()}
       {activeTab === "cta" && renderCTATab()}
       {activeTab === "footer" && renderFooterTab()}
@@ -1208,6 +1268,117 @@ export default function CmsLandingEditor() {
                 <button onClick={savePricing} disabled={saving === "pricing"}
                   className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl transition disabled:opacity-50 cursor-pointer">
                   {saving === "pricing" ? "Menyimpan..." : "Simpan"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderAddonsTab() {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-black text-neutral-900 flex items-center gap-2">
+            <IconCreditCard size={20} className="text-primary-600" />
+            Paket Token Eceran (Top-Up)
+          </h3>
+          <button onClick={() => { setEditAddon({ name: "", token_amount: 50, price: 15000, description: "", is_active: true }); setShowAddonModal(true); }}
+            className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl transition cursor-pointer">
+            <IconPlus size={16} />
+            Tambah Paket Eceran
+          </button>
+        </div>
+
+        <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden shadow-sm">
+          <table className="w-full text-xs text-left">
+            <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-600 font-bold uppercase tracking-wider text-[10px]">
+              <tr>
+                <th className="px-4 py-3">Nama Paket</th>
+                <th className="px-4 py-3 text-right">Harga</th>
+                <th className="px-4 py-3 text-center">Jumlah Token</th>
+                <th className="px-4 py-3">Deskripsi</th>
+                <th className="px-4 py-3 text-center">Status</th>
+                <th className="px-4 py-3 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100">
+              {addonPackages.length === 0 ? (
+                <tr><td colSpan={6} className="px-4 py-12 text-center text-neutral-400 italic">Belum ada paket eceran.</td></tr>
+              ) : addonPackages.map((addon) => (
+                <tr key={addon.id} className="hover:bg-neutral-50/50">
+                  <td className="px-4 py-3 font-bold text-neutral-800">
+                    {addon.name}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-emerald-600">
+                    Rp {Number(addon.price).toLocaleString("id-ID")}
+                  </td>
+                  <td className="px-4 py-3 text-center text-neutral-600">{addon.token_amount} Token</td>
+                  <td className="px-4 py-3 text-neutral-500 max-w-xs truncate">{addon.description || "-"}</td>
+                  <td className="px-4 py-3 text-center">
+                    <button onClick={() => toggleAddonActive(addon)} className="cursor-pointer mx-auto">
+                      {addon.is_active ? (
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">AKTIF</span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-neutral-100 text-neutral-500 text-[10px] font-bold rounded-full">NONAKTIF</span>
+                      )}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => { setEditAddon(addon); setShowAddonModal(true); }}
+                        className="p-1.5 text-primary-600 hover:bg-primary-50 rounded-lg transition cursor-pointer">
+                        <IconEdit size={16} />
+                      </button>
+                      <button onClick={() => deleteAddonPackage(addon.id)}
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer">
+                        <IconTrash size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {showAddonModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-modal p-6 w-full max-w-lg mx-4 space-y-4 max-h-[80vh] overflow-y-auto">
+              <h3 className="text-sm font-black text-neutral-900">{editAddon?.id ? "Edit Paket Eceran" : "Tambah Paket Eceran Baru"}</h3>
+              <Field label="Nama Paket">
+                <input type="text" value={editAddon?.name || ""} onChange={(e) => setEditAddon({ ...editAddon, name: e.target.value })}
+                  className="input-field" placeholder="Paket 50 Token" />
+              </Field>
+              <Field label="Harga (Rp)">
+                <input type="number" value={editAddon?.price || 0} onChange={(e) => setEditAddon({ ...editAddon, price: parseInt(e.target.value) || 0 })}
+                  className="input-field" placeholder="25000" />
+              </Field>
+              <Field label="Jumlah Token">
+                <input type="number" value={editAddon?.token_amount || 0} onChange={(e) => setEditAddon({ ...editAddon, token_amount: parseInt(e.target.value) || 0 })}
+                  className="input-field" placeholder="50" />
+              </Field>
+              <Field label="Deskripsi">
+                <textarea rows={3} value={editAddon?.description || ""} onChange={(e) => setEditAddon({ ...editAddon, description: e.target.value })}
+                  className="input-field" placeholder="Keterangan singkat paket token..." />
+              </Field>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-xs font-semibold text-neutral-600 cursor-pointer">
+                  <input type="checkbox" checked={editAddon?.is_active !== false} onChange={(e) => setEditAddon({ ...editAddon, is_active: e.target.checked })}
+                    className="w-4 h-4 rounded border-neutral-300 text-primary-600" />
+                  Aktif / Tampilkan
+                </label>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => { setShowAddonModal(false); setEditAddon(null); }}
+                  className="px-4 py-2 border border-neutral-200 rounded-xl text-xs font-bold text-neutral-600 hover:bg-neutral-50 transition cursor-pointer">
+                  Batal
+                </button>
+                <button onClick={saveAddonPackage} disabled={saving === "addons"}
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl transition disabled:opacity-50 cursor-pointer">
+                  {saving === "addons" ? "Menyimpan..." : "Simpan"}
                 </button>
               </div>
             </div>

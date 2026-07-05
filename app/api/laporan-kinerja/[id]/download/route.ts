@@ -19,6 +19,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
     const guruId = sessionData.id
 
+    const userDb = await query("SELECT role, status_langganan, subscription_end FROM users WHERE id = $1", [guruId])
+    const user = userDb.rows[0]
+    const isPro = user?.status_langganan && user.status_langganan !== 'free'
+    const isExpired = isPro && user.subscription_end && new Date(user.subscription_end).getTime() < Date.now()
+
+    if (isExpired && user.role !== 'admin') {
+      return NextResponse.json({ error: 'Masa aktif langganan Anda telah berakhir. Perpanjang paket Anda untuk mencetak atau mengunduh laporan kinerja.' }, { status: 403 })
+    }
+
     const { searchParams } = new URL(req.url)
     const format = searchParams.get('format') || 'docx'
 

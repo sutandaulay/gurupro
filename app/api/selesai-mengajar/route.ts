@@ -76,6 +76,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const userDb = await prisma.users.findUnique({
+      where: { id: user.id },
+      select: { role: true, status_langganan: true, subscription_end: true },
+    });
+
+    const isPro = userDb?.status_langganan && userDb.status_langganan !== 'free';
+    const isExpired = isPro && userDb.subscription_end && new Date(userDb.subscription_end).getTime() < Date.now();
+
+    if (isExpired && userDb.role !== 'admin') {
+      return NextResponse.json({ error: 'expired' }, { status: 403 });
+    }
+
     const guruId = user.id;
     const body: SelesaiMengajarInput = await request.json();
 
@@ -320,6 +332,18 @@ export async function GET() {
 
     if (!user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userDb = await prisma.users.findUnique({
+      where: { id: user.id },
+      select: { role: true, status_langganan: true, subscription_end: true },
+    });
+
+    const isPro = userDb?.status_langganan && userDb.status_langganan !== 'free';
+    const isExpired = isPro && userDb.subscription_end && new Date(userDb.subscription_end).getTime() < Date.now();
+
+    if (isExpired && userDb.role !== 'admin') {
+      return NextResponse.json({ error: 'expired' }, { status: 403 });
     }
 
     // Find all schools for this user

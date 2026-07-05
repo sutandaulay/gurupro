@@ -1,5 +1,10 @@
 "use client";
 import React, { useState, useRef } from 'react';
+import SchoolSwitcher from './school-switcher';
+import Dimensi8Selector from './dimensi-8-selector';
+import TigaPengalamanSelector from './tiga-pengalaman-selector';
+import PaiModeSelector from './pai-mode-selector';
+import { useKurikulumStore } from '@/lib/stores';
 
 const kurikulumData: { [key: string]: {
   title: string;
@@ -158,6 +163,9 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
     setError(null);
 
     // Sanitasi: Hanya kirim data yang bermakna
+    // Include Deep Learning context
+    const kurikulumOptions = useKurikulumStore.getState().serializeForAPI();
+
     const payload = {
       ...formData,
       qty: Object.fromEntries(Object.entries(formData.qty).filter(([_, v]: any) => v > 0)),
@@ -166,7 +174,9 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
       propSedang: formData.proporsi.sedang,
       propSulit: formData.proporsi.sulit,
       kognitif: formData.activeLevels,
-      kurikulumLabel: kurikulumData[formData.kurikulum]?.title || "Kurikulum Merdeka"
+      kurikulumLabel: kurikulumData[formData.kurikulum]?.title || "Kurikulum Merdeka",
+      // === DEEP LEARNING CONTEXT (Kerangka 8334) ===
+      ...kurikulumOptions,
     };
 
     try {
@@ -183,7 +193,10 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
   return (
     <aside className="w-full p-6 bg-white border border-slate-200 rounded-3xl lg:h-[calc(100vh-3rem)] lg:sticky lg:top-6 lg:overflow-y-auto shadow-sm text-slate-800">
       <h2 className="text-2xl font-bold mb-6 text-slate-900 text-center">GuruPRO</h2>
-      
+
+      {/* === DEEP LEARNING MULTI-SCHOOL FEATURES === */}
+      <SchoolSwitcher />
+
       <div className="glass-card rounded-2xl p-5 border border-slate-200 bg-white mb-6">
         <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-sm">
           <i className="fa-solid fa-book-open text-indigo-500"></i> Pilih Kurikulum
@@ -243,6 +256,14 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
           </div>
         </div>
       </div>
+
+      {/* === 8 DIMENSI PROFIL LULUSAN (Deep Learning) === */}
+      {formData.kurikulum === 'merdeka' && (
+        <div className="mb-4 space-y-2">
+          <Dimensi8Selector />
+          <TigaPengalamanSelector />
+        </div>
+      )}
 
       <div className="glass-card rounded-2xl p-5 border border-slate-200 bg-white shadow-inner">
         <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-sm">
@@ -350,6 +371,22 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
             </select>
             {isMapelCustom && <input type="text" value={formData.mapel} onChange={(e) => updateField('mapel', e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm mt-2 focus:border-indigo-400" placeholder="Ketik nama mata pelajaran..." />}
           </div>
+
+          {/* === PAI SPECIAL MODE === */}
+          <div className="col-span-2">
+            <PaiModeSelector
+              isPaiSubject={
+                formData.mapel === 'PAI' ||
+                formData.mapel === 'Al-Qur\'an Hadits' ||
+                formData.mapel === 'Aqidah Akhlak' ||
+                formData.mapel === 'Fiqih' ||
+                formData.mapel === 'Sejarah Kebudayaan Islam (SKI)' ||
+                formData.mapel === 'Bahasa Arab'
+              }
+              kurikulum={formData.kurikulum}
+            />
+          </div>
+
           <div className="col-span-2">
             <label className="text-xs font-medium text-gray-500 mb-1 block">Topik/Materi <span className="text-red-500">*</span></label>
             <input type="text" value={formData.topik} onChange={(e) => updateField('topik', e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none" placeholder="Contoh: Teorema Pythagoras" />

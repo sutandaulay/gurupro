@@ -15,10 +15,22 @@ async function getUserId() {
 export async function GET() {
   try {
     const userId = await getUserId();
-    const schools = await query(
-      "SELECT * FROM schools WHERE user_id = $1 ORDER BY created_at DESC",
-      [userId]
-    );
+    // Get schools from junction table OR owned schools (multi-school support)
+    const schools = await query(`
+      SELECT DISTINCT ON (s.id)
+        s.id,
+        s.nama_sekolah,
+        s.logo,
+        s.alamat,
+        s.npsn,
+        s.nama_kepala_sekolah,
+        s.created_at,
+        CASE WHEN s.user_id = $1 THEN true ELSE false END as is_owner
+      FROM schools s
+      LEFT JOIN "user_school_assignments" usa ON usa."schoolId" = s.id AND usa."userId" = $1
+      WHERE s.user_id = $1 OR usa."userId" = $1
+      ORDER BY s.id, is_owner DESC
+    `, [userId]);
     return NextResponse.json(schools.rows);
   } catch (error: any) {
     console.error("Schools GET error:", error);
@@ -84,7 +96,7 @@ export async function POST(req: Request) {
       }
       return NextResponse.json(res.rows[0]);
     } else {
-      // Insert
+      // Insert new school
       const res = await query(
         `INSERT INTO schools (
           user_id, nama_sekolah, logo, alamat, npsn, nama_kepala_sekolah, nama_pengawas,
@@ -110,6 +122,15 @@ export async function POST(req: Request) {
           show_ttd_wali !== undefined ? show_ttd_wali : true
         ]
       );
+      // Auto-create junction table entry for school owner
+      if (res.rows.length > 0) {
+        const newSchool = res.rows[0];
+        await query(`
+          INSERT INTO "user_school_assignments" ("userId", "schoolId", "tahunAjaranId", "isWaliKelas")
+          VALUES ($1, $2, NULL, true)
+          ON CONFLICT DO NOTHING
+        `, [userId, newSchool.id]);
+      }
       return NextResponse.json(res.rows[0]);
     }
   } catch (error: any) {
@@ -130,6 +151,12 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
+    // Delete junction entries first (cascade should handle this, but be explicit)
+    await query('DELETE FROM "user_school_assignments" WHERE "schoolId" = $1', [id]);
+    await query('DELETE FROM "teacher_subject_assignments" WHERE "schoolId" = $1', [id]);
+    await query('DELETE FROM "teacher_class_assignments" WHERE "schoolId" = $1', [id]);
+
+    // Then delete the school (user must be owner)
     const res = await query(
       "DELETE FROM schools WHERE id = $1 AND user_id = $2 RETURNING *",
       [id, userId]

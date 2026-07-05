@@ -1,5 +1,6 @@
 import { generateAIContent } from "@/lib/ai";
 import { query } from "@/lib/db";
+import { consumeUserToken, getUserTokenAccess } from "@/lib/token-system";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -20,16 +21,17 @@ export async function POST(req: Request) {
     const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
-    const userRes = await query("SELECT token_limit, role FROM users WHERE id = $1", [userId]);
-    if (userRes.rows.length === 0) {
+    const tokenState = await getUserTokenAccess(userId);
+    if (!tokenState.user) {
       return NextResponse.json({ error: "Pengguna tidak ditemukan." }, { status: 404 });
     }
-    const user = userRes.rows[0];
+    const user = tokenState.user;
 
-    if (user.role !== "admin" && (user.token_limit || 0) <= 0) {
-      return NextResponse.json({ 
-        error: "Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan." 
-      }, { status: 403 });
+    if (!tokenState.access.allowed) {
+      const message = tokenState.access.reason === "subscription_expired"
+        ? "Masa aktif langganan akun Anda telah habis. Silakan perpanjang paket terlebih dahulu."
+        : "Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.";
+      return NextResponse.json({ error: message }, { status: 403 });
     }
 
     const kurikulumLabel = kurikulum === "merdeka" ? "Kurikulum Merdeka"
@@ -82,7 +84,7 @@ Harap berikan respons dalam JSON dengan format persis seperti ini:
 
     // 3. Deduct token on success
     if (user.role !== "admin") {
-      await query("UPDATE users SET token_limit = GREATEST(0, token_limit - 1) WHERE id = $1", [userId]);
+      await consumeUserToken(userId, 1);
     }
 
     return NextResponse.json(parsed);

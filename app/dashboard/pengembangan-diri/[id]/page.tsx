@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { Button } from '@/app/components/ui'
 import { Input } from '@/app/components/ui/form'
 import { cn } from '@/lib/utils'
@@ -38,10 +38,15 @@ export default function EditPelatihanPage() {
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
+  const searchParams = useSearchParams()
+  const action = searchParams.get('action')
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
 
   const [formData, setFormData] = useState({
     namaPelatihan: '',
@@ -121,6 +126,56 @@ export default function EditPelatihanPage() {
     }
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+      if (!allowedTypes.includes(file.type)) {
+        setUploadError('Format file tidak didukung. Gunakan PDF, JPG, atau PNG.')
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError('Ukuran file maksimal 5MB.')
+        return
+      }
+      setSelectedFile(file)
+      setUploadError('')
+    }
+  }
+
+  const handleUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedFile) {
+      setUploadError('Pilih file terlebih dahulu')
+      return
+    }
+
+    setUploading(true)
+    setUploadError('')
+
+    try {
+      const fd = new FormData()
+      fd.append('file', selectedFile)
+
+      const res = await fetch(`/api/pelatihan/${id}/upload-sertifikat`, {
+        method: 'POST',
+        body: fd,
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Gagal mengunggah sertifikat')
+      }
+
+      router.push('/dashboard/pengembangan-diri')
+    } catch (err: any) {
+      setUploadError(err.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const toggleKompetensi = (value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -136,6 +191,70 @@ export default function EditPelatihanPage() {
         <div className="h-96 flex items-center justify-center">
           <div className="animate-spin w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full" />
         </div>
+      </div>
+    )
+  }
+
+  if (action === 'upload') {
+    return (
+      <div className="container max-w-md mx-auto py-6 px-4">
+        <Button variant="ghost" onClick={() => router.back()} className="mb-4 gap-2">
+          <span>←</span>
+          <span>Kembali</span>
+        </Button>
+
+        <h1 className="text-2xl font-bold mb-1">📜 Upload Sertifikat</h1>
+        <p className="text-muted-foreground mb-6 text-sm">
+          Unggah berkas sertifikat untuk pelatihan: <strong className="text-slate-800">{formData.namaPelatihan}</strong>
+        </p>
+
+        {uploadError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
+            {uploadError}
+          </div>
+        )}
+
+        <form onSubmit={handleUploadSubmit} className="space-y-6">
+          <div className="border-2 border-dashed border-slate-300 hover:border-violet-500 rounded-xl p-6 text-center cursor-pointer transition-colors relative bg-white">
+            <input
+              type="file"
+              accept=".pdf,image/jpeg,image/png,image/webp"
+              onChange={handleFileChange}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              required
+            />
+            <div className="text-4xl mb-2">📄</div>
+            {selectedFile ? (
+              <div>
+                <p className="font-medium text-sm text-slate-800 truncate">{selectedFile.name}</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+              </div>
+            ) : (
+              <div>
+                <p className="font-bold text-sm text-slate-700">Pilih berkas sertifikat Anda</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Mendukung PDF, JPG, PNG, atau WEBP (Maks 5MB)
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <Button type="submit" disabled={uploading || !selectedFile} className="w-full">
+              {uploading ? 'Mengunggah...' : 'Upload Sertifikat'}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => router.push(`/dashboard/pengembangan-diri/${id}`)}
+              className="w-full"
+            >
+              Batal
+            </Button>
+          </div>
+        </form>
       </div>
     )
   }

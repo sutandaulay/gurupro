@@ -1,6 +1,7 @@
 import { query, logAudit } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { uploadBase64ToR2 } from "@/lib/r2";
 
 async function getUserId() {
   const cookieStore = await cookies();
@@ -123,7 +124,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Field wajib (sekolah, kelas, mapel, tanggal, materi, tujuan, aktivitas) harus diisi" }, { status: 400 });
     }
 
-    const evidensiJson = JSON.stringify(evidensi || []);
+    // Process evidence array to upload base64 strings to Cloudflare R2
+    const processedEvidensi = [];
+    if (Array.isArray(evidensi)) {
+      for (const item of evidensi) {
+        if (typeof item === 'string' && item.startsWith('data:')) {
+          try {
+            const r2Url = await uploadBase64ToR2(item, 'journals');
+            processedEvidensi.push(r2Url || item);
+          } catch (err) {
+            console.warn("Failed to upload base64 evidence to R2, keeping original:", err);
+            processedEvidensi.push(item);
+          }
+        } else {
+          processedEvidensi.push(item);
+        }
+      }
+    } else if (evidensi) {
+      processedEvidensi.push(evidensi);
+    }
+
+    const evidensiJson = JSON.stringify(processedEvidensi);
     const customValuesJson = JSON.stringify(custom_values || {});
 
     if (id) {

@@ -79,6 +79,11 @@ function SelesaiMengajarModalContent({
           setSelectedSchedule(data.schedules[0]);
           setStep('input');
         }
+      } else {
+        const data = await response.json().catch(() => null);
+        if (response.status === 403 && data?.error === 'expired') {
+          setError('expired');
+        }
       }
     } catch (err) {
       console.error('Failed to fetch schedules:', err);
@@ -221,6 +226,38 @@ function SelesaiMengajarModalContent({
   };
 
   if (!isOpen) return null;
+
+  if (error === 'expired') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={handleClose}
+        />
+        <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 text-center animate-modal-in space-y-4">
+          <div className="w-16 h-16 bg-rose-50 border border-rose-200 text-rose-600 rounded-full flex items-center justify-center text-3xl mx-auto">🔒</div>
+          <h3 className="text-base font-black text-slate-800">Akses Selesai Mengajar Terkunci</h3>
+          <p className="text-xs text-slate-500 max-w-xs mx-auto">
+            Fitur Selesaikan Mengajar dinonaktifkan karena masa aktif langganan PRO Anda telah berakhir. Silakan perpanjang paket Anda untuk menggunakan fitur ini kembali.
+          </p>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={handleClose}
+              className="flex-1 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+            >
+              Tutup
+            </button>
+            <button
+              onClick={() => window.location.assign("/dashboard?perpanjang=true")}
+              className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
+            >
+              Perpanjang Premium
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

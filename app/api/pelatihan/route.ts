@@ -38,13 +38,13 @@ export async function GET(req: Request) {
     let paramIndex = 2
 
     if (tahunAjaranId) {
-      sql += ` AND tahun_ajaran_id = $${paramIndex}`
+      sql += ` AND (tahun_ajaran_id = $${paramIndex} OR tahun_ajaran_id IS NULL)`
       params.push(tahunAjaranId)
       paramIndex++
     }
 
     if (semester) {
-      sql += ` AND semester = $${paramIndex}`
+      sql += ` AND (semester = $${paramIndex} OR semester IS NULL)`
       params.push(semester)
       paramIndex++
     }
@@ -60,7 +60,7 @@ export async function GET(req: Request) {
         COALESCE(SUM(durasi_jam), 0) as total_jam,
         COUNT(*) FILTER (WHERE status_verifikasi = 'belum_upload') as belum_sertifikat
       FROM pelatihan_guru
-      WHERE guru_id = $1 ${tahunAjaranId ? 'AND tahun_ajaran_id = $2' : ''} ${semester ? `AND semester = '${semester}'` : ''}`,
+      WHERE guru_id = $1 ${tahunAjaranId ? 'AND (tahun_ajaran_id = $2 OR tahun_ajaran_id IS NULL)' : ''} ${semester ? `AND (semester = '${semester}' OR semester IS NULL)` : ''}`,
       tahunAjaranId ? [guruId, tahunAjaranId] : [guruId]
     )
 
@@ -108,6 +108,7 @@ export async function POST(req: Request) {
       deskripsi,
       relevansiMapel,
       kompetensiDikembangkan,
+      sekolahId,
     } = body
 
     // Validate required fields
@@ -124,8 +125,8 @@ export async function POST(req: Request) {
         guru_id, tahun_ajaran_id, semester, nama_pelatihan, penyelenggara,
         jenis, lingkup, tanggal_mulai, tanggal_selesai, durasi_jam,
         nomor_sertifikat, deskripsi, relevansi_mapel, kompetensi_dikembangkan,
-        status_verifikasi
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        status_verifikasi, sekolah_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING *`,
       [
         guruId,
@@ -143,6 +144,7 @@ export async function POST(req: Request) {
         relevansiMapel ?? true,
         kompetensiDikembangkan || [],
         'belum_upload',
+        sekolahId || null,
       ]
     )
 

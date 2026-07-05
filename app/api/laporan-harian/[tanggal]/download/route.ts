@@ -25,6 +25,18 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const userDb = await prisma.users.findUnique({
+      where: { id: user.id },
+      select: { role: true, status_langganan: true, subscription_end: true },
+    });
+
+    const isPro = userDb?.status_langganan && userDb.status_langganan !== 'free';
+    const isExpired = isPro && userDb.subscription_end && new Date(userDb.subscription_end).getTime() < Date.now();
+
+    if (isExpired && userDb.role !== 'admin') {
+      return NextResponse.json({ error: 'Masa aktif langganan Anda telah berakhir. Perpanjang paket Anda untuk mencetak atau mengunduh laporan harian.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const sekolahId = searchParams.get('sekolah_id');
 
