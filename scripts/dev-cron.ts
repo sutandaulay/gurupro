@@ -11,6 +11,7 @@
 
 import { pool } from "../lib/db";
 import { resetMonthlyTokens, enforceGracePeriods } from "./token-jobs";
+import { runScheduledNotifications } from "./notification-jobs";
 
 const args = process.argv.slice(2);
 const mode = args[0] || "watch";
@@ -45,6 +46,10 @@ async function runOnce() {
     log("Starting grace period enforcement...", "yellow");
     const graceResult = await enforceGracePeriods();
     log(`Grace period enforcement: ${graceResult.graceEntered} entered grace, ${graceResult.locked} locked`, "green");
+
+    log("Starting scheduled notifications...", "yellow");
+    const notifyResult = await runScheduledNotifications();
+    log(`Scheduled notifications: ${notifyResult.sent} sent, ${notifyResult.skipped} skipped, ${notifyResult.errors} errors`, "green");
 
     log("All cron jobs completed successfully!", "green");
   } catch (error: any) {
