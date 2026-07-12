@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { hashPassword, comparePassword } from '@/lib/auth';
+import { setDefaultSessionCookie } from '@/lib/session';
 
 const REDIRECT_STATUS = 303;
 
@@ -60,7 +61,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.redirect(new URL('/login?error=' + errorMsg, request.url), REDIRECT_STATUS);
     }
 
-    const sessionData = JSON.stringify({ id: user.id, role: user.role || 'guru' });
+    const sessionData = JSON.stringify({
+      id: user.id,
+      role: user.role || 'guru',
+      activeContext: 'individual',
+    });
 
     const targetUrl = user?.role === 'admin'
       ? '/admin'
@@ -68,25 +73,22 @@ export async function POST(request: NextRequest) {
         ? `/dashboard?checkout=${checkoutPlan}`
         : '/dashboard';
 
-    // If AJAX request, return JSON with redirect URL instead of redirecting
-    if (isAjax) {
-      const response = NextResponse.json({ success: true, redirectUrl: targetUrl });
-      response.cookies.set('gurupro_session', sessionData, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 60 * 24 * 7,
-        path: '/',
-      });
-      return response;
-    }
-
-    const response = NextResponse.redirect(new URL(targetUrl, request.url), 303);
-    response.cookies.set('gurupro_session', sessionData, {
+    const cookieOpts = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 60 * 24 * 7,
       path: '/',
-    });
+    };
+
+    // If AJAX request, return JSON with redirect URL instead of redirecting
+    if (isAjax) {
+      const response = NextResponse.json({ success: true, redirectUrl: targetUrl });
+      response.cookies.set('gurupro_session', sessionData, cookieOpts);
+      return response;
+    }
+
+    const response = NextResponse.redirect(new URL(targetUrl, request.url), 303);
+    response.cookies.set('gurupro_session', sessionData, cookieOpts);
 
     return response;
   } catch (err) {

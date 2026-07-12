@@ -169,6 +169,45 @@ const LeaderContacts: CollectionConfig = {
       },
     },
     {
+      name: "notificationTime",
+      type: "text",
+      label: "Jam Kirim Laporan",
+      defaultValue: "14:00",
+      admin: {
+        description: "Jam pengiriman laporan (format 24 jam, contoh: 14:00)",
+      },
+    },
+    {
+      name: "notificationDay",
+      type: "select",
+      label: "Hari Kirim (Mingguan)",
+      defaultValue: "5",
+      options: [
+        { label: "Senin", value: "1" },
+        { label: "Selasa", value: "2" },
+        { label: "Rabu", value: "3" },
+        { label: "Kamis", value: "4" },
+        { label: "Jumat", value: "5" },
+        { label: "Sabtu", value: "6" },
+      ],
+      admin: {
+        description: "Hari pengiriman untuk laporan mingguan (default: Jumat)",
+      },
+    },
+    {
+      name: "notificationDate",
+      type: "select",
+      label: "Tanggal Kirim (Bulanan)",
+      defaultValue: "25",
+      options: Array.from({ length: 28 }, (_, i) => ({
+        label: `Tanggal ${i + 1}`,
+        value: String(i + 1),
+      })),
+      admin: {
+        description: "Tanggal pengiriman untuk laporan bulanan (default: 25)",
+      },
+    },
+    {
       name: "nextScheduledNotification",
       type: "date",
       label: "Notifikasi Berikutnya",

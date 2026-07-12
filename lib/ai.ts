@@ -14,9 +14,11 @@ export async function generateAIContent(
   const vendor = config.default_vendor || "mock";
 
   console.log(`[AI SERVICE] Invoking vendor: ${vendor.toUpperCase()}`);
+  console.log(`[AI SERVICE] Config keys available:`, Object.keys(config).join(', '));
 
   // 1. OFFLINE MOCK MODE
   if (vendor === "mock") {
+    console.log("[AI SERVICE] Running in MOCK mode - will return simulated responses");
     // Generate realistic simulated content to save API credits during sandbox tests
     if (isJson) {
       if (prompt.includes("rpp") || prompt.includes("Rencana Pelaksanaan Pembelajaran")) {
@@ -132,7 +134,7 @@ export async function generateAIContent(
       return JSON.stringify({
         success: true,
         message: "Respons JSON simulasi offline GuruPRO.",
-        originalPromptPreview: prompt.substring(0, 100) + "..."
+        originalPromptPreview: (prompt || "").substring(0, 100) + "..."
       });
     }
 
@@ -142,18 +144,26 @@ export async function generateAIContent(
   // 2. GOOGLE GEMINI SENDER
   if (vendor === "gemini") {
     const apiKey = config.gemini.api_key;
+    console.log("[AI SERVICE] Gemini config - API Key exists:", !!apiKey, "Model:", config.gemini.model_name);
     if (!apiKey) throw new Error("GEMINI_API_KEY tidak dikonfigurasi di admin panel.");
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: config.gemini.model_name || "gemini-2.5-flash",
-      systemInstruction: systemInstruction,
-      generationConfig: isJson ? { responseMimeType: "application/json" } : undefined
-    });
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({
+        model: config.gemini.model_name || "gemini-2.5-flash",
+        systemInstruction: systemInstruction,
+        generationConfig: isJson ? { responseMimeType: "application/json", maxOutputTokens: 32768 } : undefined
+      });
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    return text.trim();
+      console.log("[AI SERVICE] Sending request to Gemini...");
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      console.log("[AI SERVICE] Gemini response received, length:", text?.length);
+      return text.trim();
+    } catch (geminiError: any) {
+      console.error("[AI SERVICE] Gemini error:", geminiError?.message || geminiError);
+      throw geminiError;
+    }
   }
 
   // 3. OPENAI SENDER
@@ -174,6 +184,7 @@ export async function generateAIContent(
           { role: "user", content: prompt + (isJson ? "\n\nRespond ONLY with a valid, clean JSON object matching the requested schema. Do not output codeblocks." : "") }
         ],
         response_format: isJson ? { type: "json_object" } : undefined,
+        max_completion_tokens: 32768,
         temperature: 0.3
       })
     });
@@ -204,6 +215,7 @@ export async function generateAIContent(
           { role: "user", content: prompt + (isJson ? "\n\nRespond ONLY with a valid, clean JSON object matching the requested schema. Do not output codeblocks." : "") }
         ],
         response_format: isJson ? { type: "json_object" } : undefined,
+        max_tokens: 32768,
         temperature: 0.3
       })
     });
@@ -230,7 +242,7 @@ export async function generateAIContent(
       },
       body: JSON.stringify({
         model: config.claude.model_name || "claude-3-5-sonnet-20241022",
-        max_tokens: 4096,
+        max_tokens: 32768,
         system: systemInstruction || "You are a professional Indonesian education consultant.",
         messages: [
           { role: "user", content: prompt + (isJson ? "\n\nRespond ONLY with a valid, clean JSON object matching the requested schema. Do not wrap in markdown block. Return the JSON text raw." : "") }

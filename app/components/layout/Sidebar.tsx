@@ -1,51 +1,142 @@
 "use client";
 
-import { useEffect } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { useProfileStore } from "@/lib/stores";
 import {
   IconX,
-  IconLayoutDashboard,
-  IconCalendarDue,
-  IconFileSpreadsheet,
-  IconChartBar,
-  IconUsers,
-  IconMessage,
-  IconLogout,
   IconCapRounded,
-  IconFileText,
-  IconListCheck,
-  IconTimeline,
-  IconBrain,
+  IconChevronDown,
 } from "@tabler/icons-react";
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  onStorageClick?: () => void;
 }
 
-const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: IconLayoutDashboard },
-  { label: "Perencanaan", href: "/dashboard/perencanaan", icon: IconCalendarDue },
-  { label: "Administrasi", href: "/dashboard/administrasi", icon: IconFileSpreadsheet },
-  { label: "Nilai", href: "/dashboard/nilai", icon: IconChartBar },
-  { label: "Pengembangan", href: "/dashboard/pengembangan", icon: IconUsers },
-  { label: "Komunikasi", href: "/dashboard/komunikasi", icon: IconMessage },
-  { label: "Chat AI", href: "/dashboard/chat", icon: IconMessage },
+type SubItem = {
+  label: string;
+  href: string;
+};
+
+type MenuItem = {
+  label: string;
+  icon: string;
+  href?: string;
+  submenu?: SubItem[];
+};
+
+const menuItems: MenuItem[] = [
+  { label: "Dasbor", icon: "📊", href: "/dashboard" },
+  {
+    label: "Master Data",
+    icon: "🗄️",
+    href: "/dashboard?module=sekolah",
+  },
+  {
+    label: "Administrasi",
+    icon: "📋",
+    submenu: [
+      { label: "AI Silabus", href: "/dashboard/administrasi?tipe=silabus" },
+      { label: "Program Tahunan (Prota)", href: "/dashboard/prota" },
+      { label: "Program Semester (Prosem)", href: "/dashboard/prosem" },
+      { label: "ATP Editor", href: "/dashboard/atp-editor" },
+      { label: "AI Modul Ajar", href: "/dashboard/administrasi?tipe=modul_ajar" },
+      { label: "AI RPP", href: "/dashboard/administrasi?tipe=rpp" },
+      { label: "AI LKPD", href: "/dashboard/administrasi?tipe=lkpd" },
+      { label: "AI Bahan Ajar", href: "/dashboard/bahan-ajar" },
+    ],
+  },
+  {
+    label: "Monitoring",
+    icon: "📊",
+    submenu: [
+      { label: "Jurnal Mengajar", href: "/dashboard?module=jurnal" },
+      { label: "Kalender Akademik", href: "/dashboard?module=kalender" },
+      { label: "Supervisi & Analitik", href: "/dashboard?module=supervisi_analitik" },
+      { label: "Tugas Harian", href: "/dashboard?module=tugas_harian" },
+      { label: "Pengingat", href: "/dashboard?module=scheduler" },
+    ],
+  },
+  {
+    label: "AI",
+    icon: "💬",
+    submenu: [
+      { label: "Chat AI", href: "/dashboard/chat" },
+      { label: "AI Performance Report", href: "/dashboard/ai-performance-report" },
+      { label: "Deep Learning", href: "/dashboard" },
+    ],
+  },
+  {
+    label: "Laporan",
+    icon: "📝",
+    submenu: [
+      { label: "Laporan Harian", href: "/dashboard/laporan-harian" },
+      { label: "Laporan Kinerja", href: "/dashboard/laporan-kinerja" },
+      { label: "Evidence", href: "/dashboard/evidence" },
+      { label: "Status Raport", href: "/dashboard/raport-status" },
+      { label: "Review Nilai Raport", href: "/dashboard/rapor-review" },
+      { label: "Layout Raport", href: "/dashboard/layout-raport" },
+    ],
+  },
+  {
+    label: "Pengembangan Diri",
+    icon: "🌱",
+    submenu: [
+      { label: "Daftar Kegiatan", href: "/dashboard/pengembangan-diri" },
+      { label: "Buat Baru", href: "/dashboard/pengembangan-diri/tambah" },
+      { label: "Sertifikat", href: "/dashboard/pengembangan-diri" },
+    ],
+  },
+  {
+    label: "Buku Nilai",
+    icon: "📚",
+    href: "/dashboard?module=nilai",
+  },
+  {
+    label: "Rapor",
+    icon: "📋",
+    submenu: [
+      { label: "Status Raport", href: "/dashboard/raport-status" },
+      { label: "Review Nilai Raport", href: "/dashboard/rapor-review" },
+      { label: "Layout Raport", href: "/dashboard/layout-raport" },
+    ],
+  },
+  {
+    label: "Brankas",
+    icon: "🗂️",
+    href: "/dashboard/brankas",
+  },
+  {
+    label: "Keuangan",
+    icon: "💰",
+    submenu: [
+      { label: "Pemasukan", href: "/dashboard?module=keuangan" },
+      { label: "Pengeluaran", href: "/dashboard?module=keuangan" },
+      { label: "Laporan Keuangan", href: "/dashboard?module=keuangan" },
+    ],
+  },
+  {
+    label: "Profil",
+    icon: "👤",
+    submenu: [
+      { label: "Profil Saya", href: "/profile" },
+      { label: "Billing & Langganan", href: "/profile?tab=billing" },
+      { label: "Pengaturan", href: "/settings" },
+      { label: "Pemetaan Kolom", href: "/settings#pemetaan-kolom" },
+    ],
+  },
 ];
 
-// Deep Learning menu items
-const deepLearningItems = [
-  { label: "ATP Editor", href: "/dashboard/atp-editor", icon: IconTimeline, badge: "NEW" },
-  { label: "Program Tahunan (Prota)", href: "/dashboard/prota", icon: IconListCheck, badge: "NEW" },
-  { label: "Program Semester (Prosem)", href: "/dashboard/prosem", icon: IconFileText, badge: "NEW" },
-  { label: "AI Modul Ajar", href: "/dashboard/administrasi", icon: IconBrain, badge: "✨" },
-];
-
-export default function MobileSidebar({ isOpen, onClose }: SidebarProps) {
+export default function MobileSidebar({ isOpen, onClose, onStorageClick }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
+  const profile = useProfileStore(s => s.profile);
+  const fetchProfile = useProfileStore(s => s.fetchProfile);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -58,6 +149,10 @@ export default function MobileSidebar({ isOpen, onClose }: SidebarProps) {
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!profile) fetchProfile();
+  }, []);
+
   const initials = session?.user?.name
     ? session.user.name
         .split(" ")
@@ -67,9 +162,23 @@ export default function MobileSidebar({ isOpen, onClose }: SidebarProps) {
         .slice(0, 2)
     : "GP";
 
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+
+  const toggleExpand = (label: string) => {
+    setExpandedMenus((prev) =>
+      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
+    );
+  };
+
+  const isExpanded = (label: string) => expandedMenus.includes(label);
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    signOut({ callbackUrl: "/login" });
+  };
+
   return (
     <>
-      {/* Backdrop */}
       <div
         className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-200 lg:hidden ${
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
@@ -77,24 +186,22 @@ export default function MobileSidebar({ isOpen, onClose }: SidebarProps) {
         onClick={onClose}
       />
 
-      {/* Sidebar */}
       <div
         className={`fixed top-0 left-0 z-50 h-full w-[280px] bg-white shadow-xl transition-transform duration-200 ease-out lg:hidden ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Header */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-          <Link
+          <a
             href="/dashboard"
-            onClick={onClose}
-            className="flex items-center gap-2"
+            onClick={(e) => { e.preventDefault(); router.push("/dashboard"); onClose(); }}
+            className="flex items-center gap-2 cursor-pointer"
           >
             <IconCapRounded size={26} stroke={1.5} className="text-violet-600" />
             <span className="text-lg font-bold text-gray-900">
               Guru<span className="text-violet-600">PRO</span>
             </span>
-          </Link>
+          </a>
           <button
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
@@ -104,75 +211,91 @@ export default function MobileSidebar({ isOpen, onClose }: SidebarProps) {
           </button>
         </div>
 
-        {/* Nav items */}
         <nav className="flex-1 py-4 overflow-y-auto" style={{ height: "calc(100% - 140px)" }}>
-          {navItems.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              pathname.startsWith(item.href + "/");
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                className={`flex items-center gap-3 mx-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-violet-50 text-violet-600 border-l-3 border-violet-600"
-                    : "text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                <Icon size={20} stroke={1.5} />
-                {item.label}
-              </Link>
-            );
-          })}
+          {menuItems.map((item) => {
+            if (!item.submenu) {
+              const isStorage = item.label === "Brankas";
+              const active = isStorage ? false : isActive(item.href!);
+              return (
+                <a
+                  key={item.label}
+                  href={isStorage ? "#" : item.href!}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (isStorage) {
+                      onStorageClick?.();
+                    } else {
+                      router.push(item.href!);
+                    }
+                    onClose();
+                  }}
+                  className={`flex items-center gap-3 mx-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                    active
+                      ? "bg-violet-50 text-violet-600 border-l-3 border-violet-600"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <span>{item.icon}</span>
+                  {item.label}
+                </a>
+              );
+            }
 
-          {/* Deep Learning Section */}
-          <div className="mx-2 mt-4 mb-2">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-4 py-2">
-              ✨ Deep Learning (Kerangka 8334)
-            </p>
-          </div>
-          {deepLearningItems.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              pathname.startsWith(item.href + "/");
-            const Icon = item.icon;
+            const expanded = isExpanded(item.label);
+            const anyChildActive = item.submenu.some((s) => isActive(s.href));
+
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                className={`flex items-center gap-3 mx-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-emerald-50 text-emerald-600 border-l-3 border-emerald-500"
-                    : "text-gray-600 hover:bg-emerald-50 hover:text-emerald-600"
-                }`}
-              >
-                <Icon size={20} stroke={1.5} />
-                <span className="flex-1">{item.label}</span>
-                {item.badge && (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                    item.badge === "NEW"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-amber-100 text-amber-700"
-                  }`}>
-                    {item.badge}
-                  </span>
+              <div key={item.label} className="mx-2">
+                <button
+                  onClick={() => toggleExpand(item.label)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                    anyChildActive && !expanded
+                      ? "bg-violet-50 text-violet-600"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <span>{item.icon}</span>
+                  <span className="flex-1 text-left">{item.label}</span>
+                  <IconChevronDown
+                    size={16}
+                    stroke={1.5}
+                    className={`transition-transform duration-200 ${
+                      expanded ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {expanded && (
+                  <div className="ml-4 mt-1 mb-1 border-l-2 border-gray-100 pl-2">
+                    {item.submenu.map((sub) => {
+                      const active = isActive(sub.href);
+                      return (
+                        <a
+                          key={sub.label}
+                          href={sub.href}
+                          onClick={(e) => { e.preventDefault(); router.push(sub.href); onClose(); }}
+                          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-colors cursor-pointer ${
+                            active
+                              ? "bg-violet-50 text-violet-600"
+                              : "text-gray-600 hover:bg-gray-50"
+                          }`}
+                        >
+                          {sub.label}
+                        </a>
+                      );
+                    })}
+                  </div>
                 )}
-              </Link>
+              </div>
             );
           })}
         </nav>
 
-        {/* Footer */}
         <div className="absolute bottom-0 left-0 right-0 border-t border-gray-200 p-4 bg-white">
           <div className="flex items-center gap-3 mb-3">
-            {session?.user?.image ? (
+            {profile?.photo_url || session?.user?.image ? (
               <img
-                src={session.user.image}
-                alt={session.user.name || "User"}
+                src={profile?.photo_url || session?.user?.image || ""}
+                alt={session?.user?.name || "User"}
                 className="w-9 h-9 rounded-full object-cover"
               />
             ) : (
@@ -190,10 +313,9 @@ export default function MobileSidebar({ isOpen, onClose }: SidebarProps) {
             </div>
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="flex items-center justify-center gap-2 w-full py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
           >
-            <IconLogout size={16} stroke={1.5} />
             Keluar
           </button>
         </div>

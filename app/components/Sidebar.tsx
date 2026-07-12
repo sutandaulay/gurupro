@@ -4,7 +4,7 @@ import SchoolSwitcher from './school-switcher';
 import Dimensi8Selector from './dimensi-8-selector';
 import TigaPengalamanSelector from './tiga-pengalaman-selector';
 import PaiModeSelector from './pai-mode-selector';
-import { useKurikulumStore } from '@/lib/stores';
+import { useKurikulumStore, useTeacherStore } from '@/lib/stores';
 
 const kurikulumData: { [key: string]: {
   title: string;
@@ -165,6 +165,7 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
     // Sanitasi: Hanya kirim data yang bermakna
     // Include Deep Learning context
     const kurikulumOptions = useKurikulumStore.getState().serializeForAPI();
+    const activeSchoolId = useTeacherStore.getState().activeSchoolId;
 
     const payload = {
       ...formData,
@@ -177,6 +178,8 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
       kurikulumLabel: kurikulumData[formData.kurikulum]?.title || "Kurikulum Merdeka",
       // === DEEP LEARNING CONTEXT (Kerangka 8334) ===
       ...kurikulumOptions,
+      // === SCHOOL CONTEXT ===
+      school_id: activeSchoolId,
     };
 
     try {
@@ -191,13 +194,13 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
   const activeCurriculum = kurikulumData[formData.kurikulum] || kurikulumData.merdeka;
 
   return (
-    <aside className="w-full p-6 bg-white border border-slate-200 rounded-3xl lg:h-[calc(100vh-3rem)] lg:sticky lg:top-6 lg:overflow-y-auto shadow-sm text-slate-800">
-      <h2 className="text-2xl font-bold mb-6 text-slate-900 text-center">GuruPRO</h2>
+    <aside className="w-full p-6 bg-white/70 backdrop-blur-md border border-slate-200/60 rounded-[32px] lg:h-[calc(100vh-3rem)] lg:sticky lg:top-6 lg:overflow-y-auto shadow-[0_8px_32px_rgba(31,38,135,0.03)] text-slate-800">
+      <h2 className="text-2xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-indigo-600 text-center">GuruPRO</h2>
 
       {/* === DEEP LEARNING MULTI-SCHOOL FEATURES === */}
       <SchoolSwitcher />
 
-      <div className="glass-card rounded-2xl p-5 border border-slate-200 bg-white mb-6">
+      <div className="rounded-[24px] p-5 border border-slate-100 bg-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] mb-6 transition-all duration-300">
         <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-sm">
           <i className="fa-solid fa-book-open text-indigo-500"></i> Pilih Kurikulum
         </h3>
@@ -209,10 +212,10 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
                 type="button"
                 key={key}
                 onClick={() => updateField('kurikulum', key)}
-                className={`curriculum-option cursor-pointer p-3 rounded-xl border-2 transition-all duration-300 text-left ${
+                className={`curriculum-option cursor-pointer p-3.5 rounded-2xl border-2 transition-all duration-300 text-left ${
                   isActive
-                    ? `${item.bgActive} ${item.borderActive} shadow-[0_4px_12px_rgba(0,0,0,0.05)]`
-                    : 'border-slate-200 bg-white hover:bg-slate-50 hover:translate-y-[-2px] hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)]'
+                    ? `${item.bgActive} ${item.borderActive} shadow-[0_8px_20px_rgba(99,102,241,0.08)] scale-[1.02] -translate-y-0.5`
+                    : 'border-slate-200 bg-white hover:bg-slate-50 hover:translate-y-[-2px] hover:shadow-[0_8px_20px_rgba(0,0,0,0.03)]'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -231,7 +234,7 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
         
         {/* Dynamic Detail Panel */}
         <div className="transition-all duration-300">
-          <div className={`${activeCurriculum.infoBg} border ${activeCurriculum.infoBorder} rounded-2xl p-4 transition-all duration-300`}>
+          <div className={`${activeCurriculum.infoBg} border ${activeCurriculum.infoBorder} rounded-2xl p-4 transition-all duration-300 shadow-[0_4px_12px_rgba(0,0,0,0.01)]`}>
             <div className="flex items-start gap-2.5">
               <i className={`fa-solid fa-circle-info ${activeCurriculum.iconColor} mt-0.5 text-sm`}></i>
               <div>
@@ -265,47 +268,13 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
         </div>
       )}
 
-      <div className="glass-card rounded-2xl p-5 border border-slate-200 bg-white shadow-inner">
+      <div className="rounded-[24px] p-5 border border-slate-100 bg-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] mt-6 transition-all duration-300">
         <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-sm">
           <span className="text-indigo-500">🪪</span> Identitas Soal
         </h3>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Nama Guru</label>
-            <input type="text" value={formData.namaGuru} onChange={(e) => updateField('namaGuru', e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none" placeholder="Masukkan nama" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Nama Sekolah</label>
-            {schools && schools.length > 0 ? (
-              <div className="space-y-1.5">
-                <select
-                  value={schools.some(s => s.nama_sekolah === formData.namaSekolah) ? formData.namaSekolah : (formData.namaSekolah ? "custom" : "")}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === "custom") {
-                      updateField('namaSekolah', "");
-                    } else {
-                      updateField('namaSekolah', val);
-                    }
-                  }}
-                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800"
-                >
-                  <option value="">-- Pilih Sekolah --</option>
-                  {schools.map((sch) => (
-                    <option key={sch.id} value={sch.nama_sekolah}>{sch.nama_sekolah}</option>
-                  ))}
-                  <option value="custom">Input Manual...</option>
-                </select>
-                {(!schools.some(s => s.nama_sekolah === formData.namaSekolah) || formData.namaSekolah === "") && (
-                  <input type="text" value={formData.namaSekolah} onChange={(e) => updateField('namaSekolah', e.target.value)} className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none" placeholder="Masukkan nama sekolah manual" />
-                )}
-              </div>
-            ) : (
-              <input type="text" value={formData.namaSekolah} onChange={(e) => updateField('namaSekolah', e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none" placeholder="SDN/SMPN/..." />
-            )}
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Jenjang</label>
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Jenjang</label>
             <select
               value={formData.jenjang}
               onChange={(e) => {
@@ -321,7 +290,7 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
                   kelas: defaultKelas
                 }));
               }}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none"
+              className="w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-sm bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 focus:outline-none"
             >
               <option value="SD">SD / MI</option>
               <option value="SMP">SMP / MTs</option>
@@ -330,13 +299,13 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Kelas</label>
-            <select value={formData.kelas} onChange={(e) => updateField('kelas', e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none">
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Kelas</label>
+            <select value={formData.kelas} onChange={(e) => updateField('kelas', e.target.value)} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-sm bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 focus:outline-none">
               {getKelasOptions().map(k => <option key={k} value={String(k)}>Kelas {k}</option>)}
             </select>
           </div>
           <div className="col-span-2">
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Mata Pelajaran</label>
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Mata Pelajaran</label>
             <select 
               value={isMapelCustom ? 'custom' : formData.mapel}
               onChange={(e) => {
@@ -344,7 +313,7 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
                 setIsMapelCustom(val === 'custom');
                 updateField('mapel', val === 'custom' ? '' : val);
               }}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none"
+              className="w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-sm bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 focus:outline-none"
             >
               <option value="">-- Pilih Mata Pelajaran --</option>
               <option>Bahasa Indonesia</option><option>Matematika</option><option>IPA</option><option>IPS</option>
@@ -369,7 +338,7 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
               </optgroup>
               <option value="custom">Lainnya (Ketik Sendiri)</option>
             </select>
-            {isMapelCustom && <input type="text" value={formData.mapel} onChange={(e) => updateField('mapel', e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm mt-2 focus:border-indigo-400" placeholder="Ketik nama mata pelajaran..." />}
+            {isMapelCustom && <input type="text" value={formData.mapel} onChange={(e) => updateField('mapel', e.target.value)} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-sm bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 focus:outline-none mt-2" placeholder="Ketik nama mata pelajaran..." />}
           </div>
 
           {/* === PAI SPECIAL MODE === */}
@@ -388,32 +357,32 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
           </div>
 
           <div className="col-span-2">
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Topik/Materi <span className="text-red-500">*</span></label>
-            <input type="text" value={formData.topik} onChange={(e) => updateField('topik', e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none" placeholder="Contoh: Teorema Pythagoras" />
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Topik/Materi <span className="text-red-500">*</span></label>
+            <input type="text" value={formData.topik} onChange={(e) => updateField('topik', e.target.value)} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-sm bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 focus:outline-none" placeholder="Contoh: Teorema Pythagoras" />
           </div>
           <div className="col-span-2">
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Tujuan Pembelajaran <span className="text-xs font-normal text-gray-400">(Opsional)</span></label>
-            <input type="text" value={formData.tujuan} onChange={(e) => updateField('tujuan', e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none" placeholder="Contoh: Siswa mampu menjelaskan..." />
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Tujuan Pembelajaran <span className="text-xs font-normal text-slate-400">(Opsional)</span></label>
+            <input type="text" value={formData.tujuan} onChange={(e) => updateField('tujuan', e.target.value)} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-sm bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 focus:outline-none" placeholder="Contoh: Siswa mampu menjelaskan..." />
           </div>
           <div className="col-span-2">
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Bahasa Pengantar Soal <span className="text-xs font-normal text-gray-400">(Opsional)</span></label>
-            <select value={formData.bahasa} onChange={(e) => updateField('bahasa', e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none">
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Bahasa Pengantar Soal <span className="text-xs font-normal text-slate-400">(Opsional)</span></label>
+            <select value={formData.bahasa} onChange={(e) => updateField('bahasa', e.target.value)} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-sm bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 focus:outline-none">
               <option value="id">Indonesia (Bawaan)</option><option value="ar">Arab (Full Hijaiyah)</option><option value="en">Inggris (Full English)</option>
             </select>
           </div>
         </div>
       </div>
 
-      <div className="glass-card rounded-2xl p-5 border border-slate-200 bg-white mt-6">
+      <div className="rounded-[24px] p-5 border border-slate-100 bg-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] mt-6 transition-all duration-300">
         <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2 text-sm">
           📚 Materi Referensi <span className="text-xs font-normal text-gray-400">(Opsional)</span>
         </h3>
         <p className="text-xs text-gray-500 mb-4">💡 Jika tidak diisi, AI akan membuat soal berdasarkan topik.</p>
-        <div className="flex gap-2 mb-3">
-          <button type="button" onClick={() => { setMateriTab('none'); setFileName(null); updateField('fileName', null); }} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${materiTab === 'none' ? 'bg-teal-500 text-white' : 'bg-slate-100'}`}>Tanpa Materi</button>
-          <button type="button" onClick={() => { setMateriTab('pdf'); setFileName(null); updateField('fileName', null); }} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${materiTab === 'pdf' ? 'bg-teal-500 text-white' : 'bg-slate-100'}`}>PDF</button>
-          <button type="button" onClick={() => { setMateriTab('txt'); setFileName(null); updateField('fileName', null); }} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${materiTab === 'txt' ? 'bg-teal-500 text-white' : 'bg-slate-100'}`}>TXT</button>
-          <button type="button" onClick={() => { setMateriTab('manual'); setFileName(null); updateField('fileName', null); }} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${materiTab === 'manual' ? 'bg-teal-500 text-white' : 'bg-slate-100'}`}>Ketik Manual</button>
+        <div className="flex flex-wrap gap-2 mb-3">
+          <button type="button" onClick={() => { setMateriTab('none'); setFileName(null); updateField('fileName', null); }} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${materiTab === 'none' ? 'bg-indigo-650 text-white shadow-md shadow-indigo-500/20' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>Tanpa Materi</button>
+          <button type="button" onClick={() => { setMateriTab('pdf'); setFileName(null); updateField('fileName', null); }} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${materiTab === 'pdf' ? 'bg-indigo-650 text-white shadow-md shadow-indigo-500/20' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>PDF</button>
+          <button type="button" onClick={() => { setMateriTab('txt'); setFileName(null); updateField('fileName', null); }} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${materiTab === 'txt' ? 'bg-indigo-650 text-white shadow-md shadow-indigo-500/20' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>TXT</button>
+          <button type="button" onClick={() => { setMateriTab('manual'); setFileName(null); updateField('fileName', null); }} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${materiTab === 'manual' ? 'bg-indigo-650 text-white shadow-md shadow-indigo-500/20' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>Ketik Manual</button>
         </div>
 
         {/* Logic Upload File */}
@@ -421,99 +390,97 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
         <input type="file" ref={txtInputRef} onChange={handleFileChange} className="hidden" accept=".txt" />
 
         {materiTab === 'pdf' && (
-          <div onClick={() => pdfInputRef.current?.click()} className="cursor-pointer p-4 border-2 border-dashed border-teal-300 rounded-xl bg-teal-50 text-center text-xs text-teal-600 font-medium">
+          <div onClick={() => pdfInputRef.current?.click()} className="cursor-pointer p-5 border border-dashed border-indigo-300 hover:border-indigo-500 rounded-2xl bg-indigo-50/20 hover:bg-indigo-50/40 text-center text-xs text-indigo-650 font-bold transition-all duration-200 hover:scale-[1.01]">
             {fileName || "Klik untuk upload PDF"}
           </div>
         )}
         {materiTab === 'txt' && (
-          <div onClick={() => txtInputRef.current?.click()} className="cursor-pointer p-4 border-2 border-dashed border-purple-300 rounded-xl bg-purple-50 text-center text-xs text-purple-600 font-medium">
+          <div onClick={() => txtInputRef.current?.click()} className="cursor-pointer p-5 border border-dashed border-indigo-300 hover:border-indigo-500 rounded-2xl bg-indigo-50/20 hover:bg-indigo-50/40 text-center text-xs text-indigo-650 font-bold transition-all duration-200 hover:scale-[1.01]">
             {fileName || "Klik untuk upload TXT"}
           </div>
         )}
-        {materiTab === 'manual' && <textarea rows={4} value={formData.materiManual || ''} onChange={(e) => updateField('materiManual', e.target.value)} className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 outline-none" placeholder="Ketik materi di sini..."></textarea>}
+        {materiTab === 'manual' && <textarea rows={4} value={formData.materiManual || ''} onChange={(e) => updateField('materiManual', e.target.value)} className="w-full p-3.5 border border-slate-200 rounded-2xl text-sm bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 focus:outline-none" placeholder="Ketik materi di sini..."></textarea>}
       </div>
 
       {/* Konfigurasi Soal */}
-      <div className="glass-card rounded-2xl p-5 border border-slate-200 bg-white mt-6 shadow-sm">
+      <div className="rounded-[24px] p-5 border border-slate-100 bg-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] mt-6 transition-all duration-300">
         <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-sm">⚙️ Konfigurasi Soal</h3>
         <div className="grid grid-cols-3 gap-3">
           <div className="col-span-3">
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Jenis Asesmen</label>
-            <select value={formData.jenisAsesmen} onChange={(e) => updateField('jenisAsesmen', e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none transition">
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Jenis Asesmen</label>
+            <select value={formData.jenisAsesmen} onChange={(e) => updateField('jenisAsesmen', e.target.value)} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-sm bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 focus:outline-none">
               <optgroup label="📖 Kurikulum Merdeka"><option>Sumatif Harian</option><option>Sumatif Tengah Semester (STS)</option><option>Sumatif Akhir Semester (SAS)</option><option>Sumatif Akhir Tahun (SAT)</option></optgroup>
               <optgroup label="📘 K13 / Umum"><option>Ulangan Harian (UH)</option><option>Penilaian Tengah Semester (PTS)</option><option>Penilaian Akhir Semester (PAS)</option><option>Penilaian Akhir Tahun (PAT)</option></optgroup>
-              <optgroup label="🕌 Madrasah"><option>Ulangan Harian Madrasah</option><option>Penilaian Tengah Semester Madrasah (PTS)</option><option>Penilaian Akhir Semester Madrasah (PAS)</option><option>Penilaian Akhir Tahun Madrasah (PAT)</option><option>Ujian Madrasah (UM)</option><option>Ujian Akhir Madrasah Berstandar Nasional (UAMBN)</option></optgroup>
               <optgroup label="📊 ANBK / Asesmen Nasional"><option>ANBK - AKM Literasi</option><option>ANBK - AKM Numerasi</option></optgroup>
               <optgroup label="📌 Lainnya"><option>Ujian Sekolah (US)</option><option>Ujian Praktik</option><option>Try Out</option><option>Latihan Soal / Kuis</option></optgroup>
             </select>
           </div>
           <div className="col-span-1">
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Opsi (PG)</label>
-            <select value={formData.opsiPG} onChange={(e) => updateField('opsiPG', e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 transition">
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Opsi (PG)</label>
+            <select value={formData.opsiPG} onChange={(e) => updateField('opsiPG', e.target.value)} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-sm bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 focus:outline-none">
               <option value="3">3 Opsi A-C</option>
               <option value="4">4 Opsi A-D</option>
               <option value="5">5 Opsi A-E</option>
             </select>
           </div>
           <div className="col-span-2">
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Pendekatan Soal</label>
-            <select value={formData.pendekatan} onChange={(e) => updateField('pendekatan', e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 transition">
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Pendekatan Soal</label>
+            <select value={formData.pendekercatan || formData.pendekatan} onChange={(e) => updateField('pendekatan', e.target.value)} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-sm bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 focus:outline-none">
               <option value="standar">Standar / Kurikuler</option>
               <option value="literasi">Literasi - AKM</option>
-              <option value="numerasi">Numerasi - AKM</option>
             </select>
           </div>
         </div>
       </div>
 
       {/* Jumlah Per Tipe Soal */}
-      <div className="glass-card rounded-2xl p-5 border border-slate-200 bg-white mt-6">
+      <div className="rounded-[24px] p-5 border border-slate-100 bg-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] mt-6 transition-all duration-300">
         <label className="text-xs font-medium text-gray-500 mb-2 block flex items-center justify-between">
           <h3 className="font-bold text-slate-800 text-sm">Jumlah Per Tipe Soal</h3>
-          <span id="total-soal-badge" className="px-2 py-0.5 bg-indigo-100 text-indigo-600 rounded-full text-xs font-bold">Total: {totalSoal}</span>
+          <span id="total-soal-badge" className="px-2.5 py-0.5 bg-indigo-100 text-indigo-600 rounded-full text-xs font-bold">Total: {totalSoal}</span>
         </label>
         <div className="grid grid-cols-3 gap-2">
-          <div className="bg-gray-50 rounded-xl p-2 border border-gray-100">
-            <label className="text-[10px] text-gray-600 block mb-1 font-semibold">Pilihan Ganda</label>
-            <input type="number" value={formData.qty.pg} min="0" max="50" onChange={(e) => updateQty('pg', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-bold outline-none" />
+          <div className="bg-slate-50 hover:bg-slate-100/80 rounded-2xl p-2.5 border border-slate-100/50 transition-all duration-200">
+            <label className="text-[10px] text-slate-500 block mb-1 font-bold">Pilihan Ganda</label>
+            <input type="number" value={formData.qty.pg} min="0" max="50" onChange={(e) => updateQty('pg', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-black text-slate-800 focus:text-indigo-650 outline-none transition-colors" />
           </div>
-          <div className="bg-gray-50 rounded-xl p-2 border border-gray-100">
-            <label className="text-[10px] text-gray-600 block mb-1 font-semibold">Isian Singkat</label>
-            <input type="number" value={formData.qty.isian} min="0" max="50" onChange={(e) => updateQty('isian', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-bold outline-none" />
+          <div className="bg-slate-50 hover:bg-slate-100/80 rounded-2xl p-2.5 border border-slate-100/50 transition-all duration-200">
+            <label className="text-[10px] text-slate-500 block mb-1 font-bold">Isian Singkat</label>
+            <input type="number" value={formData.qty.isian} min="0" max="50" onChange={(e) => updateQty('isian', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-black text-slate-800 focus:text-indigo-650 outline-none transition-colors" />
           </div>
-          <div className="bg-gray-50 rounded-xl p-2 border border-gray-100">
-            <label className="text-[10px] text-gray-600 block mb-1 font-semibold">Essay/Uraian</label>
-            <input type="number" value={formData.qty.essay} min="0" max="50" onChange={(e) => updateQty('essay', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-bold outline-none" />
+          <div className="bg-slate-50 hover:bg-slate-100/80 rounded-2xl p-2.5 border border-slate-100/50 transition-all duration-200">
+            <label className="text-[10px] text-slate-500 block mb-1 font-bold">Essay/Uraian</label>
+            <input type="number" value={formData.qty.essay} min="0" max="50" onChange={(e) => updateQty('essay', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-black text-slate-800 focus:text-indigo-650 outline-none transition-colors" />
           </div>
-          <div className="bg-blue-50 rounded-xl p-2 border border-blue-100">
-            <label className="text-[10px] text-blue-700 block mb-1 font-semibold">PG Kompleks</label>
-            <input type="number" value={formData.qty.pgKompleks} min="0" max="50" onChange={(e) => updateQty('pgKompleks', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-bold outline-none" />
+          <div className="bg-indigo-50/50 hover:bg-indigo-50 rounded-2xl p-2.5 border border-indigo-100 transition-all duration-200">
+            <label className="text-[10px] text-indigo-700 block mb-1 font-bold">PG Kompleks</label>
+            <input type="number" value={formData.qty.pgKompleks} min="0" max="50" onChange={(e) => updateQty('pgKompleks', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-black text-indigo-850 focus:text-indigo-650 outline-none transition-colors" />
           </div>
-          <div className="bg-green-50 rounded-xl p-2 border border-green-100">
-            <label className="text-[10px] text-green-700 block mb-1 font-semibold">Benar/Salah</label>
-            <input type="number" value={formData.qty.bs} min="0" max="50" onChange={(e) => updateQty('bs', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-bold outline-none" />
+          <div className="bg-emerald-50/50 hover:bg-emerald-50 rounded-2xl p-2.5 border border-emerald-100 transition-all duration-200">
+            <label className="text-[10px] text-emerald-700 block mb-1 font-bold">Benar/Salah</label>
+            <input type="number" value={formData.qty.bs} min="0" max="50" onChange={(e) => updateQty('bs', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-black text-emerald-850 focus:text-emerald-650 outline-none transition-colors" />
           </div>
-          <div className="bg-purple-50 rounded-xl p-2 border border-purple-100">
-            <label className="text-[10px] text-purple-700 block mb-1 font-semibold">Menjodohkan</label>
-            <input type="number" value={formData.qty.jodoh} min="0" max="50" onChange={(e) => updateQty('jodoh', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-bold outline-none" />
+          <div className="bg-purple-50/50 hover:bg-purple-50 rounded-2xl p-2.5 border border-purple-100 transition-all duration-200">
+            <label className="text-[10px] text-purple-700 block mb-1 font-bold">Menjodohkan</label>
+            <input type="number" value={formData.qty.jodoh} min="0" max="50" onChange={(e) => updateQty('jodoh', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-black text-purple-850 focus:text-purple-650 outline-none transition-colors" />
           </div>
-          <div className="bg-amber-50 rounded-xl p-2 border border-amber-100">
-            <label className="text-[10px] text-amber-700 block mb-1 font-semibold">Urutan</label>
-            <input type="number" value={formData.qty.urutan} min="0" max="50" onChange={(e) => updateQty('urutan', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-bold outline-none" />
+          <div className="bg-amber-50/50 hover:bg-amber-50 rounded-2xl p-2.5 border border-amber-100 transition-all duration-200">
+            <label className="text-[10px] text-amber-700 block mb-1 font-bold">Urutan</label>
+            <input type="number" value={formData.qty.urutan} min="0" max="50" onChange={(e) => updateQty('urutan', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-black text-amber-850 focus:text-amber-650 outline-none transition-colors" />
           </div>
-          <div className="bg-cyan-50 rounded-xl p-2 border border-cyan-100">
-            <label className="text-[10px] text-cyan-700 block mb-1 font-semibold">Isi Tabel</label>
-            <input type="number" value={formData.qty.tabel} min="0" max="50" onChange={(e) => updateQty('tabel', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-bold outline-none" />
+          <div className="bg-cyan-50/50 hover:bg-cyan-50 rounded-2xl p-2.5 border border-cyan-100 transition-all duration-200">
+            <label className="text-[10px] text-cyan-700 block mb-1 font-bold">Isi Tabel</label>
+            <input type="number" value={formData.qty.tabel} min="0" max="50" onChange={(e) => updateQty('tabel', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-black text-cyan-850 focus:text-cyan-650 outline-none transition-colors" />
           </div>
-          <div className="bg-rose-50 rounded-xl p-2 border border-rose-100">
-            <label className="text-[10px] text-rose-700 block mb-1 font-semibold">Sebab-Akibat</label>
-            <input type="number" value={formData.qty.sebabAkibat} min="0" max="50" onChange={(e) => updateQty('sebabAkibat', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-bold outline-none" />
+          <div className="bg-rose-50/50 hover:bg-rose-50 rounded-2xl p-2.5 border border-rose-100 transition-all duration-200">
+            <label className="text-[10px] text-rose-700 block mb-1 font-bold">Sebab-Akibat</label>
+            <input type="number" value={formData.qty.sebabAkibat} min="0" max="50" onChange={(e) => updateQty('sebabAkibat', e.target.value)} className="w-full bg-transparent px-1 py-1 text-sm text-center font-black text-rose-850 focus:text-rose-650 outline-none transition-colors" />
           </div>
         </div>
       </div>
 
       {/* Proporsi Kesulitan */}
-      <div className="glass-card rounded-2xl p-5 border border-slate-200 bg-white mt-6">
+      <div className="rounded-[24px] p-5 border border-slate-100 bg-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] mt-6 transition-all duration-300">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-slate-800 text-sm">Proporsi Tingkat Kesulitan Soal</h3>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${totalProporsi === 100 ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>{totalProporsi}%</span>
@@ -524,9 +491,9 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
             { label: 'Sedang', val: sedang, set: (val: number) => updateProporsi('sedang', String(val)), color: 'blue' },
             { label: 'Sulit', val: sulit, set: (val: number) => updateProporsi('sulit', String(val)), color: 'rose' }
           ].map((item) => (
-            <div key={item.label} className={`bg-${item.color}-50 rounded-xl p-2 border border-${item.color}-100`}>
+            <div key={item.label} className={`bg-${item.color}-50/50 hover:bg-${item.color}-50 rounded-2xl p-2.5 border border-${item.color}-100 transition-all duration-200`}>
               <label className="text-[10px] font-bold text-slate-500 block mb-1">{item.label}</label>
-              <input type="number" value={item.val} onChange={(e) => item.set(Number(e.target.value) || 0)} className="w-full bg-transparent text-center font-black text-sm outline-none" />
+              <input type="number" value={item.val} onChange={(e) => item.set(Number(e.target.value) || 0)} className="w-full bg-transparent text-center font-black text-sm text-slate-800 outline-none" />
             </div>
           ))}
         </div>
@@ -538,7 +505,7 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
       </div>
       
       {/* Level Kognitif */}
-      <div className="glass-card rounded-2xl p-5 border border-slate-200 bg-white mt-6">
+      <div className="rounded-[24px] p-5 border border-slate-100 bg-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] mt-6 transition-all duration-300">
         <h3 className="font-bold text-slate-800 text-sm mb-1">Level Kognitif - Taksonomi Bloom</h3>
         <p className="text-[10px] text-gray-500 mb-4">(LOTS: C1-C3, HOTS: C4-C6)</p>
         <div className="grid grid-cols-6 gap-1" id="kognitif-container">
@@ -560,8 +527,8 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
               >
                 <div className={`w-9 h-9 rounded-full border flex items-center justify-center text-xs font-bold transition-all duration-300 
                   ${isActive 
-                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent shadow-sm' 
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-400'}`}
+                    ? 'bg-gradient-to-r from-indigo-650 to-violet-600 text-white border-transparent shadow-md shadow-indigo-500/20 scale-105' 
+                    : 'bg-white text-slate-650 border-slate-200 hover:border-indigo-400 hover:scale-105'}`}
                 >
                   {item.id}
                 </div>
@@ -571,9 +538,9 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
           })}
         </div>
       </div>
-
+ 
       {/* Visual & Multimedia */}
-      <div className="glass-card rounded-2xl p-5 border border-slate-200 bg-white mt-6">
+      <div className="rounded-[24px] p-5 border border-slate-100 bg-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] mt-6 transition-all duration-300">
         <label className="text-xs font-medium text-gray-500 mb-3 block flex items-center justify-between">
           <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">📚 Visual & Multimedia</h3>
           <span className="text-xs font-normal text-gray-400">(Opsional)</span>
@@ -604,7 +571,7 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
                     <p className={`text-xs font-semibold text-${item.bg}-700`}>{item.label}</p>
                     <p className={`text-[9px] text-${item.bg}-500`}>{item.desc}</p>
                   </div>
-                  <input type="number" value={formData.qty[item.key]} min="0" max="50" onChange={(e) => updateQty(item.key, e.target.value)} className="w-16 px-2 py-2 border-2 border-slate-200 rounded-lg text-sm text-center font-bold focus:border-indigo-400 outline-none bg-white shrink-0" />
+                  <input type="number" value={formData.qty[item.key]} min="0" max="50" onChange={(e) => updateQty(item.key, e.target.value)} className="w-16 px-2 py-2 border border-slate-200 rounded-xl text-sm text-center font-bold focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none bg-white transition-all duration-200 shrink-0" />
                 </div>
 
                 {hasQty && (
@@ -632,9 +599,9 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
                                 }
                               }));
                             }}
-                            className={`px-2 py-0.5 rounded text-[8px] font-bold border transition cursor-pointer ${
+                            className={`px-2 py-0.5 rounded-lg text-[8px] font-bold border transition-all cursor-pointer ${
                               isSelected
-                                ? 'bg-indigo-600 border-transparent text-white'
+                                ? 'bg-indigo-600 border-transparent text-white shadow-sm'
                                 : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                             }`}
                           >
@@ -656,7 +623,7 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
           type="button"
           onClick={generateSoal}
           disabled={isLoading}
-          className="w-full py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold rounded-2xl shadow-lg shadow-indigo-200 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 disabled:opacity-50"
+          className="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-black rounded-2xl shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 transition-all transform hover:-translate-y-0.5 active:scale-98 flex items-center justify-center gap-2.5 disabled:opacity-50 cursor-pointer"
         >
           {isLoading ? (
             <>

@@ -13,6 +13,46 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
 
+    // Verifikasi peran jika SKP dikaitkan dengan sekolah yang terhubung ke institusi
+    const skpRes = await query("SELECT sekolah_id FROM skp_tahunan WHERE id = $1", [id])
+    if (skpRes.rows.length === 0) {
+      return NextResponse.json({ error: 'SKP tidak ditemukan' }, { status: 404 })
+    }
+    const { sekolah_id } = skpRes.rows[0]
+
+    if (sekolah_id) {
+      const schoolRes = await query("SELECT npsn FROM schools WHERE id = $1", [sekolah_id])
+      if (schoolRes.rows.length > 0 && schoolRes.rows[0].npsn) {
+        const npsn = schoolRes.rows[0].npsn
+        const instRes = await query("SELECT id, approval_layer_config FROM institutions WHERE npsn = $1", [npsn])
+        if (instRes.rows.length > 0) {
+          const inst = instRes.rows[0]
+          // Cari peran pengguna pada institusi ini
+          const roleRes = await query(
+            `SELECT imr.value FROM institution_members im
+             JOIN institution_members_role imr ON imr.parent_id = im.id
+             WHERE im.app_user_id = $1 AND im.institution_id = $2 AND im.status = 'active'`,
+            [sessionData.id, inst.id]
+          )
+          const roles = roleRes.rows.map((r: any) => r.value)
+          
+          let hasApprovalPermission = false
+          if (roles.includes('kepala_sekolah')) {
+            hasApprovalPermission = true
+          } else if (roles.includes('wakasek')) {
+            hasApprovalPermission = inst.approval_layer_config === 'double'
+          }
+          
+          if (!hasApprovalPermission) {
+            return NextResponse.json(
+              { error: 'Forbidden: Anda tidak memiliki wewenang untuk menyetujui dokumen ini' },
+              { status: 403 }
+            )
+          }
+        }
+      }
+    }
+
     const body = await req.json()
     const { catatanKepsek } = body
 

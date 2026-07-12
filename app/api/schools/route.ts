@@ -27,8 +27,8 @@ export async function GET() {
         s.created_at,
         CASE WHEN s.user_id = $1 THEN true ELSE false END as is_owner
       FROM schools s
-      LEFT JOIN "user_school_assignments" usa ON usa."schoolId" = s.id AND usa."userId" = $1
-      WHERE s.user_id = $1 OR usa."userId" = $1
+      LEFT JOIN user_school_assignments usa ON usa.schoolid = s.id AND usa.userid = $1
+      WHERE s.user_id = $1 OR usa.userid = $1
       ORDER BY s.id, is_owner DESC
     `, [userId]);
     return NextResponse.json(schools.rows);
@@ -126,7 +126,7 @@ export async function POST(req: Request) {
       if (res.rows.length > 0) {
         const newSchool = res.rows[0];
         await query(`
-          INSERT INTO "user_school_assignments" ("userId", "schoolId", "tahunAjaranId", "isWaliKelas")
+          INSERT INTO user_school_assignments (userid, schoolid, tahunajaranid, iswalikelas)
           VALUES ($1, $2, NULL, true)
           ON CONFLICT DO NOTHING
         `, [userId, newSchool.id]);
@@ -152,9 +152,9 @@ export async function DELETE(req: Request) {
     }
 
     // Delete junction entries first (cascade should handle this, but be explicit)
-    await query('DELETE FROM "user_school_assignments" WHERE "schoolId" = $1', [id]);
-    await query('DELETE FROM "teacher_subject_assignments" WHERE "schoolId" = $1', [id]);
-    await query('DELETE FROM "teacher_class_assignments" WHERE "schoolId" = $1', [id]);
+    await query('DELETE FROM user_school_assignments WHERE schoolid = $1', [id]);
+    await query('DELETE FROM teacher_subject_assignments WHERE schoolid = $1', [id]);
+    await query('DELETE FROM teacher_class_assignments WHERE classid = $1', [id]);
 
     // Then delete the school (user must be owner)
     const res = await query(

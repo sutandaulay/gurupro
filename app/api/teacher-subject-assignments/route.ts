@@ -1,6 +1,7 @@
 import { query } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { getContextFilters } from "@/lib/session";
 
 // ==========================================
 // TEACHER SUBJECT ASSIGNMENTS API
@@ -17,6 +18,7 @@ export async function GET(req: Request) {
     }
     const session = JSON.parse(sessionCookie);
     const userId = session.id;
+    const filters = await getContextFilters(userId);
 
     const { searchParams } = new URL(req.url);
     const school_id = searchParams.get("school_id");
@@ -41,7 +43,16 @@ export async function GET(req: Request) {
       ORDER BY sub.id
     `, [userId, school_id]);
 
-    return NextResponse.json({ data: result.rows, count: result.rows.length });
+    let rows = result.rows;
+    if (filters.assignedMapel.length > 0) {
+      rows = rows.filter((row: any) =>
+        filters.assignedMapel.some((m) =>
+          row.nama_mapel.toLowerCase().includes(m.toLowerCase())
+        )
+      );
+    }
+
+    return NextResponse.json({ data: rows, count: rows.length });
   } catch (error: any) {
     console.error("Get Subject Assignments Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

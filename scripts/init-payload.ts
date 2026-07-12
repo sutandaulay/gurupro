@@ -194,7 +194,7 @@ async function initPayload() {
     console.log("🎉 Payload CMS Initialization Complete!");
     console.log("\n📌 Next Steps:");
     console.log("1. Run: npm run dev");
-    console.log("2. Open: http://localhost:3000/cms");
+    console.log("2. Open: http://localhost:3000/admin");
     console.log("3. Login with admin credentials");
     console.log("4. Navigate to 'CMS' section to edit landing page content\n");
 

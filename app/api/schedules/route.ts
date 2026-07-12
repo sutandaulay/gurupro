@@ -1,6 +1,7 @@
 import { query, requireActiveTahunAjaran } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { getContextFilters } from "@/lib/session";
 
 async function verifySchoolOwner(schoolId: string, userId: string) {
   const check = await query(
@@ -25,6 +26,7 @@ async function getUserId() {
 export async function GET(req: Request) {
   try {
     const userId = await getUserId();
+    const filters = await getContextFilters(userId);
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get("school_id");
 
@@ -53,7 +55,23 @@ export async function GET(req: Request) {
          END ASC, sc.jam_mulai ASC`,
       [schoolId]
     );
-    return NextResponse.json(schedules.rows);
+
+    let rows = schedules.rows;
+    if (filters.assignedMapel.length > 0 || filters.assignedKelas.length > 0) {
+      rows = rows.filter((row: any) => {
+        const matchMapel = filters.assignedMapel.length === 0 ||
+          (row.nama_mapel && filters.assignedMapel.some((m) =>
+            row.nama_mapel.toLowerCase().includes(m.toLowerCase())
+          ));
+        const matchKelas = filters.assignedKelas.length === 0 ||
+          (row.nama_kelas && filters.assignedKelas.some((k) =>
+            row.nama_kelas.toLowerCase().includes(k.toLowerCase())
+          ));
+        return matchMapel && matchKelas;
+      });
+    }
+
+    return NextResponse.json(rows);
   } catch (error: any) {
     console.error("Schedules GET error:", error);
     const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;

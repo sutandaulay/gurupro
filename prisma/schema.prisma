@@ -7,68 +7,46 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ==========================================
-// MULTI-SCHOOL MULTI-TENANCY
-// Support guru yang mengajar di banyak sekolah, banyak mapel, banyak kelas
-// ==========================================
-
-// Junction table: Guru ↔ Sekolah (Many-to-Many)
 model user_school_assignments {
-  id               String       @id @default(dbgenerated("gen_random_uuid()"))
-  userId           String
-  schoolId         String
-  tahunAjaranId    String?
-  isWaliKelas      Boolean      @default(false)
-  createdAt        DateTime?    @default(now())
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userid        String    @db.Uuid
+  schoolid      String    @db.Uuid
+  tahunajaranid String?   @db.Uuid
+  iswalikelas   Boolean?  @default(false)
+  createdat     DateTime? @default(now()) @db.Timestamp(6)
 
-  user    users      @relation("UserAssignmentToSchool", fields: [userId], references: [id], onDelete: Cascade)
-  school  schools    @relation("SchoolAssignmentToUser", fields: [schoolId], references: [id], onDelete: Cascade)
-  tahunAjaran tahun_ajaran? @relation("TahunAjaranUserSchool", fields: [tahunAjaranId], references: [id])
-
-  @@unique([userId, schoolId, tahunAjaranId])
-  @@index([userId])
-  @@index([schoolId])
+  @@unique([userid, schoolid, tahunajaranid])
+  @@index([schoolid], map: "idx_usa_school")
+  @@index([userid], map: "idx_usa_user")
 }
 
-// Junction table: Guru ↔ Mata Pelajaran (Many-to-Many)
 model teacher_subject_assignments {
-  id               String       @id @default(dbgenerated("gen_random_uuid()"))
-  userId           String
-  schoolId         String
-  subjectId        String
-  tahunAjaranId    String?
-  createdAt        DateTime?    @default(now())
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userid        String    @db.Uuid
+  schoolid      String    @db.Uuid
+  subjectid     String    @db.Uuid
+  tahunajaranid String?   @db.Uuid
+  createdat     DateTime? @default(now()) @db.Timestamp(6)
 
-  user      users     @relation("UserAssignmentToSubject", fields: [userId], references: [id], onDelete: Cascade)
-  school    schools   @relation("SchoolAssignmentToSubject", fields: [schoolId], references: [id], onDelete: Cascade)
-  subject   subjects @relation("SubjectAssignmentToUser", fields: [subjectId], references: [id], onDelete: Cascade)
-  tahunAjaran tahun_ajaran? @relation("TahunAjaranTeacherSubject", fields: [tahunAjaranId], references: [id])
-
-  @@unique([userId, schoolId, subjectId, tahunAjaranId])
-  @@index([userId])
-  @@index([schoolId])
-  @@index([subjectId])
+  @@unique([userid, schoolid, subjectid, tahunajaranid])
+  @@index([schoolid], map: "idx_tsa_school")
+  @@index([subjectid], map: "idx_tsa_subject")
+  @@index([userid], map: "idx_tsa_user")
 }
 
-// Junction table: Guru ↔ Kelas (Many-to-Many)
 model teacher_class_assignments {
-  id               String       @id @default(dbgenerated("gen_random_uuid()"))
-  userId           String
-  schoolId         String
-  classId          String
-  tahunAjaranId    String?
-  isWaliKelas      Boolean      @default(false)
-  createdAt        DateTime?    @default(now())
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userid        String    @db.Uuid
+  schoolid      String    @db.Uuid
+  classid       String    @db.Uuid
+  tahunajaranid String?   @db.Uuid
+  iswalikelas   Boolean?  @default(false)
+  createdat     DateTime? @default(now()) @db.Timestamp(6)
 
-  user      users    @relation("UserAssignmentToClass", fields: [userId], references: [id], onDelete: Cascade)
-  school    schools  @relation("SchoolAssignmentToClass", fields: [schoolId], references: [id], onDelete: Cascade)
-  class     classes  @relation("ClassAssignmentToUser", fields: [classId], references: [id], onDelete: Cascade)
-  tahunAjaran tahun_ajaran? @relation("TahunAjaranTeacherClass", fields: [tahunAjaranId], references: [id])
-
-  @@unique([userId, schoolId, classId, tahunAjaranId])
-  @@index([userId])
-  @@index([schoolId])
-  @@index([classId])
+  @@unique([userid, schoolid, classid, tahunajaranid])
+  @@index([classid], map: "idx_tca_class")
+  @@index([schoolid], map: "idx_tca_school")
+  @@index([userid], map: "idx_tca_user")
 }
 
 model academic_calendars {
@@ -118,9 +96,6 @@ model classes {
   schedules        schedules[]
   students         students[]
   teacher_journals teacher_journals[]
-  // === MULTI-SCHOOL MULTI-TENANCY ===
-  guru_administrasi guru_administrasi[]
-  teacherClassAssignments teacher_class_assignments[] @relation("ClassAssignmentToUser")
 }
 
 model cms_landing {
@@ -130,39 +105,34 @@ model cms_landing {
 }
 
 model guru_administrasi {
-  id               String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  user_id          String?       @db.Uuid
-  tipe_dokumen     String        @db.VarChar(50) // 'rpp', 'modul_ajar', 'silabus', 'lkpd', 'laporan_lkpd', 'atp', 'prota', 'prosem'
-  judul_dokumen    String        @db.VarChar(255)
+  id               String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id          String?   @db.Uuid
+  tipe_dokumen     String    @db.VarChar(50)
+  judul_dokumen    String    @db.VarChar(255)
   konten           Json
-  tanggal_kegiatan DateTime?     @default(dbgenerated("CURRENT_DATE")) @db.Date
-  // === MULTI-SCHOOL CONTEXT (nullable for backward compatibility) ===
-  school_id        String?       @db.Uuid
-  class_id         String?       @db.Uuid
-  subject_id       String?       @db.Uuid
-  tahun_ajaran_id String?       @db.Uuid
-  semester         String?        @db.VarChar(20) // 'ganjil' | 'genap'
-  kurikulum        String?       @db.VarChar(50) // 'merdeka' | 'k13' | 'kbc' | 'hybrid'
-  jenjang          String?       @db.VarChar(20) // 'SD' | 'SMP' | 'SMA' | 'SMK'
-  fase             String?       @db.VarChar(10) // 'A' | 'B' | 'C' | 'D' | 'E' | 'F'
-  // === DEEP LEARNING (Kerangka 8334) ===
-  dimensi8         String[]      @default([]) // ['beriman', 'kreatif', 'bergotongroyong', dll]
-  tiga_pengalaman  Boolean       @default(false) // Memahami / Mengaplikasi / Merefleksikan
-  pai_mode         String?       @db.VarChar(50) // 'none' | 'spiritual_only' | 'hybrid_kbc'
-  created_at       DateTime?     @default(now()) @db.Timestamp(6)
+  tanggal_kegiatan DateTime? @default(dbgenerated("CURRENT_DATE")) @db.Date
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  school_id        String?   @db.Uuid
+  class_id         String?   @db.Uuid
+  subject_id       String?   @db.Uuid
+  tahun_ajaran_id  String?   @db.Uuid
+  semester         String?   @db.VarChar(20)
+  kurikulum        String?   @db.VarChar(50)
+  jenjang          String?   @db.VarChar(20)
+  fase             String?   @db.VarChar(10)
+  dimensi8         String[]  @default([])
+  tiga_pengalaman  Boolean?  @default(false)
+  pai_mode         String?   @db.VarChar(50)
+  owned_by_institution Boolean?  @default(false)
+  institution_id       Int?
+  users                users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  schools    schools?  @relation(fields: [school_id], references: [id], onUpdate: NoAction)
-  classes    classes? @relation(fields: [class_id], references: [id], onUpdate: NoAction)
-  subjects   subjects? @relation(fields: [subject_id], references: [id], onUpdate: NoAction)
-
-  @@index([user_id])
-  @@index([school_id])
-  @@index([class_id])
-  @@index([subject_id])
-  @@index([tipe_dokumen])
-  @@index([kurikulum])
-  @@index([dimensi8])
+  @@index([class_id], map: "idx_ga_class")
+  @@index([dimensi8], map: "idx_ga_dimensi8", type: Gin)
+  @@index([kurikulum], map: "idx_ga_kurikulum")
+  @@index([school_id], map: "idx_ga_school")
+  @@index([subject_id], map: "idx_ga_subject")
+  @@index([tipe_dokumen], map: "idx_ga_tipe")
 }
 
 model journal_schemas {
@@ -193,10 +163,10 @@ model payout_requests {
   jumlah              Int
   status              String    @default("PENDING") @db.VarChar(50)
   catatan             String?
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
   bank_name           String?   @db.VarChar(100)
   bank_account_number String?   @db.VarChar(50)
   bank_account_name   String?   @db.VarChar(150)
-  created_at          DateTime? @default(now()) @db.Timestamp(6)
   users               users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
@@ -207,19 +177,15 @@ model question_banks {
   mata_pelajaran String    @db.VarChar(100)
   topik          String    @db.VarChar(255)
   detail_soal    Json
-  // === MULTI-SCHOOL CONTEXT (nullable for backward compatibility) ===
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
   school_id      String?   @db.Uuid
   subject_id     String?   @db.Uuid
   jenjang        String?   @db.VarChar(20)
-  created_at     DateTime? @default(now()) @db.Timestamp(6)
   users          users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  schools        schools?  @relation(fields: [school_id], references: [id], onUpdate: NoAction)
-  subjects       subjects? @relation(fields: [subject_id], references: [id], onUpdate: NoAction)
 
-  @@index([user_id])
-  @@index([school_id])
-  @@index([subject_id])
-  @@index([kurikulum])
+  @@index([kurikulum], map: "idx_qb_kurikulum")
+  @@index([school_id], map: "idx_qb_school")
+  @@index([subject_id], map: "idx_qb_subject")
 }
 
 model referrals {
@@ -251,7 +217,7 @@ model schedules {
 
 model schools {
   id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id             String               @db.Uuid // Creator/admin of this school
+  user_id             String               @db.Uuid
   nama_sekolah        String               @db.VarChar(255)
   logo                String?
   alamat              String?
@@ -274,20 +240,6 @@ model schools {
   subjects            subjects[]
   teacher_attendance  teacher_attendance[]
   teacher_journals    teacher_journals[]
-  laporan_kinerjas    laporan_kinerja[]
-  evidence_logs       evidence_log[]
-  skp_tahunans        skp_tahunan[]
-  observasi_kinerjas  observasi_kinerja[]
-  pelatihan_gurus     pelatihan_guru[]
-  dokumen_buktis      dokumen_bukti[]
-  // === MULTI-SCHOOL MULTI-TENANCY ===
-  userSchoolAssignments      user_school_assignments[]      @relation("SchoolAssignmentToUser")
-  teacherSubjectAssignments teacher_subject_assignments[]  @relation("SchoolAssignmentToSubject")
-  teacherClassAssignments   teacher_class_assignments[]    @relation("SchoolAssignmentToClass")
-  // === EVIDENCE & PERFORMANCE ===
-  tahun_ajarans       tahun_ajaran[]
-  guru_administrasi   guru_administrasi[]
-  question_banks      question_banks[]
 }
 
 model student_attendance {
@@ -323,9 +275,9 @@ model students {
   nisn               String?              @db.VarChar(50)
   nomor_absen        Int?
   created_at         DateTime?            @default(now()) @db.Timestamp(6)
+  absent_alerts      absent_alerts[]
   student_attendance student_attendance[]
   student_grades     student_grades[]
-  absent_alerts      absent_alerts[]
   classes            classes              @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
@@ -334,14 +286,10 @@ model subjects {
   school_id        String             @db.Uuid
   nama_mapel       String             @db.VarChar(255)
   created_at       DateTime?          @default(now()) @db.Timestamp(6)
-  // === MULTI-SCHOOL MULTI-TENANCY ===
   assessments      assessments[]
   schedules        schedules[]
-  schools          schools   @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  schools          schools            @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   teacher_journals teacher_journals[]
-  teacherSubjectAssignments teacher_subject_assignments[] @relation("SubjectAssignmentToUser")
-  guru_administrasi guru_administrasi[]
-  question_banks   question_banks[]
 }
 
 model system_settings {
@@ -380,15 +328,17 @@ model teacher_journals {
   custom_values                               Json?                  @default("{}")
   status                                      String                 @default("Draft") @db.VarChar(50)
   supervisor_id                               String?                @db.Uuid
-  auto_generated                              Boolean?               @default(false) // AI auto-generated flag
-  source_schedule_id                          String?                @db.Uuid // For tracking source
   created_at                                  DateTime?              @default(now()) @db.Timestamp(6)
+  auto_generated                              Boolean?               @default(false)
+  source_schedule_id                          String?                @db.Uuid
   journal_supervisions                        journal_supervisions[]
   classes                                     classes                @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   schedules                                   schedules?             @relation(fields: [schedule_id], references: [id], onUpdate: NoAction)
   schools                                     schools                @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   subjects                                    subjects               @relation(fields: [subject_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users_teacher_journals_supervisor_idTousers users?                 @relation("teacher_journals_supervisor_idTousers", fields: [supervisor_id], references: [id], onUpdate: NoAction)
+  owned_by_institution                         Boolean?               @default(false)
+  institution_id                               Int?
   users_teacher_journals_teacher_idTousers    users                  @relation("teacher_journals_teacher_idTousers", fields: [teacher_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
@@ -402,12 +352,12 @@ model transactions {
   created_at     DateTime? @default(now()) @db.Timestamp(6)
   plan_id        String?   @db.VarChar(50)
   updated_at     DateTime? @default(now()) @db.Timestamp(6)
+  notes          String?
   users          users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model users {
   id                                                     String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  username                                               String?                @unique @db.VarChar(80)
   email                                                  String                 @unique @db.VarChar(255)
   whatsapp                                               String                 @unique @db.VarChar(20)
   nama_lengkap                                           String                 @db.VarChar(255)
@@ -428,42 +378,39 @@ model users {
   subscription_start                                     DateTime?              @db.Timestamp(6)
   subscription_end                                       DateTime?              @db.Timestamp(6)
   is_active                                              Boolean?               @default(true)
-  audit_trails                                           audit_trails[]
-  guru_administrasi                                      guru_administrasi[]
-  journal_supervisions                                   journal_supervisions[]
-  payout_requests                                        payout_requests[]
-  question_banks                                         question_banks[]
-  referrals_referrals_referee_idTousers                  referrals[]            @relation("referrals_referee_idTousers")
-  referrals_referrals_referrer_idTousers                 referrals[]            @relation("referrals_referrer_idTousers")
-  teacher_journals_teacher_journals_supervisor_idTousers teacher_journals[]     @relation("teacher_journals_supervisor_idTousers")
-  teacher_journals_teacher_journals_teacher_idTousers    teacher_journals[]     @relation("teacher_journals_teacher_idTousers")
-  transactions                                           transactions[]
-  users                                                  users?                 @relation("usersTousers", fields: [referred_by], references: [id], onUpdate: NoAction)
-  other_users                                            users[]                @relation("usersTousers")
-  // GuruPRO AI Relations
-  teaching_sessions                                      teaching_sessions[]
-  lesson_memories                                        lesson_memories[]
+  username                                               String?                @unique @db.VarChar(80)
+  addon_token_balance                                    Int?                   @default(0)
+  main_token_reset_date                                  DateTime?              @db.Timestamp(6)
+  grace_period_ends_at                                   DateTime?              @db.Timestamp(6)
+  subscription_status                                    String?                @default("active") @db.VarChar(30)
   absent_alerts                                          absent_alerts[]
   admin_tasks                                            admin_tasks[]
   ai_chat_logs                                           ai_chat_logs[]
-  // Evidence & Performance Report
-  evidence_logs                                          evidence_log[]
-  pelatihan_gurus                                        pelatihan_guru[]
+  audit_trails                                           audit_trails[]
   dokumen_buktis                                         dokumen_bukti[]
+  evidence_logs                                          evidence_log[]
+  guru_administrasi                                      guru_administrasi[]
+  journal_supervisions                                   journal_supervisions[]
   laporan_kinerjas                                       laporan_kinerja[]
-  skp_tahunans                                           skp_tahunan[]
-  observasi_kinerja_observasi_kinerja_guru_idTousers     observasi_kinerja[] @relation("observasi_kinerja_guru_idTousers")
-  observasi_kinerja_observasi_kinerja_observer_idTousers observasi_kinerja[] @relation("observasi_kinerja_observer_idTousers")
-  // === MULTI-SCHOOL MULTI-TENANCY ===
-  userSchoolAssignments      user_school_assignments[]      @relation("UserAssignmentToSchool")
-  teacherSubjectAssignments  teacher_subject_assignments[]  @relation("UserAssignmentToSubject")
-  teacherClassAssignments    teacher_class_assignments[]    @relation("UserAssignmentToClass")
+  lesson_memories                                        lesson_memories[]
+  payout_requests                                        payout_requests[]
+  pelatihan_gurus                                        pelatihan_guru[]
+  question_banks                                         question_banks[]
+  referrals_referrals_referee_idTousers                  referrals[]            @relation("referrals_referee_idTousers")
+  referrals_referrals_referrer_idTousers                 referrals[]            @relation("referrals_referrer_idTousers")
+  tahun_ajaran                                           tahun_ajaran[]
+  teacher_journals_teacher_journals_supervisor_idTousers teacher_journals[]     @relation("teacher_journals_supervisor_idTousers")
+  teacher_journals_teacher_journals_teacher_idTousers    teacher_journals[]     @relation("teacher_journals_teacher_idTousers")
+  teaching_sessions                                      teaching_sessions[]
+  transactions                                           transactions[]
+  users                                                  users?                 @relation("usersTousers", fields: [referred_by], references: [id], onUpdate: NoAction)
+  other_users                                            users[]                @relation("usersTousers")
 }
 
 model hero_sections {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title       String    @db.VarChar(255)
-  subtitle    String?   @db.Text
+  subtitle    String?
   button_text String?   @db.VarChar(100)
   media_url   String?   @db.VarChar(500)
   media_type  String    @default("image") @db.VarChar(20)
@@ -476,7 +423,7 @@ model hero_sections {
 model features {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title       String    @db.VarChar(255)
-  description String?   @db.Text
+  description String?
   icon        String?   @db.VarChar(100)
   is_active   Boolean?  @default(true)
   sort_order  Int?      @default(0)
@@ -485,50 +432,51 @@ model features {
 }
 
 model pricing_plans {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  package_name  String    @db.VarChar(50)
-  price         Decimal   @db.Decimal(12, 2)
-  duration_days Int
-  tokens        Int?      @default(0)
-  features      Json
-  is_active     Boolean?  @default(true)
-  popular       Boolean?  @default(false)
-  sort_order    Int?      @default(0)
-  created_at    DateTime? @default(now()) @db.Timestamp(6)
-  updated_at    DateTime? @default(now()) @db.Timestamp(6)
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  package_name      String    @db.VarChar(50)
+  price             Decimal   @db.Decimal(12, 2)
+  duration_days     Int
+  features          Json
+  is_active         Boolean?  @default(true)
+  sort_order        Int?      @default(0)
+  created_at        DateTime? @default(now()) @db.Timestamp(6)
+  updated_at        DateTime? @default(now()) @db.Timestamp(6)
+  tokens            Int?      @default(0)
+  popular           Boolean?  @default(false)
+  grace_period_days Int?      @default(14)
 }
 
 model landing_page_settings {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  hero_badge       String?   @db.VarChar(255)
-  youtube_url      String?   @db.VarChar(500)
-  cs_contact       String?   @db.VarChar(100)
-  cs_whatsapp      String?   @db.VarChar(20)
-  chatbot_active   Boolean?  @default(true)
-  chatbot_welcome  String?   @db.Text
-  faq              Json?
-  referral_terms   String?   @db.Text
-  footer_copyright String?   @db.VarChar(255)
-  footer_desc      String?   @db.Text
-  footer_terms     String?   @db.VarChar(500)
-  footer_privacy   String?   @db.VarChar(500)
-  footer_contact      String?   @db.VarChar(255)
-  min_payout_cashback Int?      @default(50000)
-  cashback_to_token_rate Int?   @default(1000)
-  created_at          DateTime? @default(now()) @db.Timestamp(6)
-  updated_at          DateTime? @default(now()) @db.Timestamp(6)
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  youtube_url            String?   @db.VarChar(500)
+  cs_contact             String?   @db.VarChar(100)
+  cs_whatsapp            String?   @db.VarChar(20)
+  chatbot_active         Boolean?  @default(true)
+  chatbot_welcome        String?
+  created_at             DateTime? @default(now()) @db.Timestamp(6)
+  updated_at             DateTime? @default(now()) @db.Timestamp(6)
+  faq                    Json?
+  footer_contact         String?   @db.VarChar(255)
+  footer_copyright       String?   @db.VarChar(255)
+  footer_desc            String?
+  footer_privacy         String?   @db.VarChar(500)
+  footer_terms           String?   @db.VarChar(500)
+  hero_badge             String?   @db.VarChar(255)
+  referral_terms         String?
+  cashback_to_token_rate Int?      @default(1000)
+  min_payout_cashback    Int?      @default(50000)
 }
 
 model GeminiCache {
-  id           String   @id @default(uuid())
-  cache_name   String   @unique
-  cache_type   String
-  model_name   String
-  token_count  Int
-  expire_time  DateTime
-  is_active    Boolean  @default(true)
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  id          String   @id @default(uuid())
+  cache_name  String   @unique
+  cache_type  String
+  model_name  String
+  token_count Int
+  expire_time DateTime
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
 }
 
 model TokenUsage {
@@ -546,201 +494,180 @@ model TokenUsage {
   created_at     DateTime @default(now())
 }
 
-// ==========================================
-// GURUPRO AI TEACHING FEATURES
-// ==========================================
-
-// Teaching Sessions - For "Selesaikan Mengajar" tracking
 model teaching_sessions {
-  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id               String    @db.Uuid
-  schedule_id           String?   @db.Uuid
-  class_id              String?   @db.Uuid
-  subject_id            String?   @db.Uuid
-  school_id             String?   @db.Uuid
-  session_date          DateTime  @db.Date
-  status                String    @default("pending") @db.VarChar(50) // pending, in_progress, completed
-  attendance_completed  Boolean   @default(false)
-  journal_generated     Boolean   @default(false)
-  reflection_generated  Boolean   @default(false)
-  followup_generated    Boolean   @default(false)
-  attendance_data       Json?     @default("[]") // Stored attendance records
-  journal_id            String?   @db.Uuid // Link to created journal
-  ai_reflection         String?   @db.Text
-  ai_followup           String?   @db.Text
-  completed_at          DateTime? @db.Timestamp(6)
-  created_at            DateTime? @default(now()) @db.Timestamp(6)
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id              String    @db.Uuid
+  schedule_id          String?   @db.Uuid
+  class_id             String?   @db.Uuid
+  subject_id           String?   @db.Uuid
+  school_id            String?   @db.Uuid
+  session_date         DateTime  @db.Date
+  status               String?   @default("pending") @db.VarChar(50)
+  attendance_completed Boolean?  @default(false)
+  journal_generated    Boolean?  @default(false)
+  reflection_generated Boolean?  @default(false)
+  followup_generated   Boolean?  @default(false)
+  attendance_data      Json?     @default("[]")
+  journal_id           String?   @db.Uuid
+  ai_reflection        String?
+  ai_followup          String?
+  completed_at         DateTime? @db.Timestamp(6)
+  created_at           DateTime? @default(now()) @db.Timestamp(6)
+  users                users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  users                 users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@index([user_id, status], map: "idx_teaching_sessions_status")
+  @@index([user_id, session_date], map: "idx_teaching_sessions_user_date")
 }
 
-// Lesson Memory - AI remembers what teacher taught last time
 model lesson_memories {
-  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id             String    @db.Uuid
-  schedule_id         String    @db.Uuid
-  last_topic          String?   @db.VarChar(255)
-  last_subtopic       String?   @db.VarChar(255)
-  last_page_number    Int?      @default(0)
-  last_date           DateTime  @db.Date
-  next_recommendations String?  @db.Text
-  notes               String?   @db.Text
-  created_at          DateTime? @default(now()) @db.Timestamp(6)
-  updated_at          DateTime? @default(now()) @db.Timestamp(6)
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id              String    @db.Uuid
+  schedule_id          String    @db.Uuid
+  last_topic           String?   @db.VarChar(255)
+  last_subtopic        String?   @db.VarChar(255)
+  last_page_number     Int?      @default(0)
+  last_date            DateTime? @db.Date
+  next_recommendations String?
+  notes                String?
+  created_at           DateTime? @default(now()) @db.Timestamp(6)
+  updated_at           DateTime? @default(now()) @db.Timestamp(6)
+  users                users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  users               users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@index([user_id, schedule_id], map: "idx_lesson_memories_user_schedule")
 }
 
-// Raport Cache - AI-generated raport descriptions
 model raport_cache {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  student_id      String    @db.Uuid
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  student_id     String    @db.Uuid
   subject_id     String    @db.Uuid
-  assessment_id   String?   @db.Uuid
-  nilai           Decimal   @db.Decimal(5, 2)
-  ai_description  String    @db.Text
-  generated_at    DateTime? @default(now()) @db.Timestamp(6)
+  assessment_id  String?   @db.Uuid
+  nilai          Decimal   @db.Decimal(5, 2)
+  ai_description String
+  generated_at   DateTime? @default(now()) @db.Timestamp(6)
 
   @@unique([student_id, subject_id, assessment_id])
+  @@index([student_id], map: "idx_raport_cache_student")
 }
 
-// Absent Alerts - Track连续 absences and auto-generate WA messages
 model absent_alerts {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   student_id       String    @db.Uuid
-  user_id          String    @db.Uuid // teacher who generates
-  absence_count    Int       @default(0)
+  user_id          String    @db.Uuid
+  absence_count    Int?      @default(0)
   last_absent_date DateTime  @db.Date
-  alert_sent       Boolean   @default(false)
-  whatsapp_message String?   @db.Text
+  alert_sent       Boolean?  @default(false)
+  whatsapp_message String?
   sent_at          DateTime? @db.Timestamp(6)
   created_at       DateTime? @default(now()) @db.Timestamp(6)
+  students         students  @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users            users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  students         students @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users            users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@index([student_id], map: "idx_absent_alerts_student")
+  @@index([user_id], map: "idx_absent_alerts_user")
 }
 
-// Admin Tasks - AI Timeline for teacher tasks
 model admin_tasks {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id      String    @db.Uuid
-  task_type    String    @db.VarChar(50) // journal, nilai, rpp, rapor, dll
+  task_type    String    @db.VarChar(50)
   task_title   String    @db.VarChar(255)
-  related_id   String?   @db.Uuid // reference to journal/assessment/etc
-  status       String    @default("pending") @db.VarChar(50) // pending, completed, skipped
+  related_id   String?   @db.Uuid
+  status       String?   @default("pending") @db.VarChar(50)
   due_date     DateTime? @db.Date
-  priority     String    @default("normal") @db.VarChar(20) // low, normal, high
-  description  String?   @db.Text
+  priority     String?   @default("normal") @db.VarChar(20)
+  description  String?
   completed_at DateTime? @db.Timestamp(6)
   created_at   DateTime? @default(now()) @db.Timestamp(6)
-
   users        users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, due_date], map: "idx_admin_tasks_due_date")
+  @@index([user_id, status], map: "idx_admin_tasks_user_status")
 }
 
-// AI Chat Logs - Store AI chat history for context
 model ai_chat_logs {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id      String    @db.Uuid
-  session_id   String    @db.VarChar(100)
-  role         String    @db.VarChar(20) // user, assistant
-  content      String    @db.Text
-  action_type  String?   @db.VarChar(50) // create_journal, generate_rapor, dll
-  action_data  Json?     @default("{}")
-  created_at   DateTime? @default(now()) @db.Timestamp(6)
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String    @db.Uuid
+  session_id  String    @db.VarChar(100)
+  role        String    @db.VarChar(20)
+  content     String
+  action_type String?   @db.VarChar(50)
+  action_data Json?     @default("{}")
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  users       users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  users        users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@index([user_id, session_id], map: "idx_ai_chat_logs_session")
 }
 
-// ==========================================
-// EVIDENCE-BASED PERFORMANCE REPORT
-// ==========================================
-
-// Evidence Log - Auto-logged teacher activities
 model evidence_log {
-  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  guru_id            String    @db.Uuid
-  tahun_ajaran_id    String    @db.Uuid
-  semester           String    @db.VarChar(20)
-  kategori           String    @db.VarChar(50)
-  sub_kategori       String    @db.VarChar(100)
-  referensi_id       String?   @db.Uuid
-  referensi_tabel    String?   @db.VarChar(100)
-  judul              String    @db.VarChar(255)
-  deskripsi          String?   @db.Text
-  indikator_kinerja  String[]  @default([])
-  bobot_evidence     Int       @default(1)
-  tanggal_aktivitas  DateTime  @db.Date
-  metadata           Json?     @default("{}")
-  sekolah_id         String?   @db.Uuid
-  created_at         DateTime? @default(now()) @db.Timestamp(6)
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guru_id           String    @db.Uuid
+  tahun_ajaran_id   String    @db.Uuid
+  semester          String    @db.VarChar(20)
+  kategori          String    @db.VarChar(50)
+  sub_kategori      String    @db.VarChar(100)
+  referensi_id      String?   @db.Uuid
+  referensi_tabel   String?   @db.VarChar(100)
+  judul             String    @db.VarChar(255)
+  deskripsi         String?
+  indikator_kinerja String[]  @default([])
+  bobot_evidence    Int?      @default(1)
+  tanggal_aktivitas DateTime  @db.Date
+  metadata          Json?     @default("{}")
+  created_at        DateTime? @default(now()) @db.Timestamp(6)
+  users             users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([guru_id, tahun_ajaran_id, semester])
-  @@index([guru_id, kategori, tanggal_aktivitas])
-  @@index([referensi_id, referensi_tabel])
-  @@index([sekolah_id])
-
-  users        users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  schools      schools?  @relation(fields: [sekolah_id], references: [id])
+  @@index([guru_id, tahun_ajaran_id, semester], map: "idx_evidence_guru_semester")
+  @@index([guru_id, kategori, tanggal_aktivitas], map: "idx_evidence_kategori")
+  @@index([referensi_id, referensi_tabel], map: "idx_evidence_referensi")
 }
 
-// Pelatihan & Pengembangan Diri
 model pelatihan_guru {
-  id                          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  guru_id                     String    @db.Uuid
-  tahun_ajaran_id             String?   @db.Uuid
-  semester                    String?   @db.VarChar(20)
-  nama_pelatihan              String    @db.VarChar(255)
-  penyelenggara               String    @db.VarChar(255)
-  jenis                       String    @db.VarChar(50)
-  lingkup                     String    @db.VarChar(50)
-  tanggal_mulai               DateTime  @db.Date
-  tanggal_selesai             DateTime  @db.Date
-  durasi_jam                  Int
-  nomor_sertifikat            String?   @db.VarChar(100)
-  deskripsi                   String?   @db.Text
-  relevansi_mapel             Boolean   @default(true)
-  kompetensi_dikembangkan     String[]  @default([])
-  file_sertifikat_url         String?   @db.Text
-  file_sertifikat_nama        String?   @db.VarChar(255)
-  status_verifikasi           String    @default("belum_upload") @db.VarChar(50)
-  sekolah_id                  String?   @db.Uuid
-  created_at                  DateTime? @default(now()) @db.Timestamp(6)
-  updated_at                  DateTime? @default(now()) @db.Timestamp(6)
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guru_id                 String    @db.Uuid
+  tahun_ajaran_id         String?   @db.Uuid
+  semester                String?   @db.VarChar(20)
+  nama_pelatihan          String    @db.VarChar(255)
+  penyelenggara           String    @db.VarChar(255)
+  jenis                   String    @db.VarChar(50)
+  lingkup                 String    @db.VarChar(50)
+  tanggal_mulai           DateTime  @db.Date
+  tanggal_selesai         DateTime  @db.Date
+  durasi_jam              Int
+  nomor_sertifikat        String?   @db.VarChar(100)
+  deskripsi               String?
+  relevansi_mapel         Boolean?  @default(true)
+  kompetensi_dikembangkan String[]  @default([])
+  file_sertifikat_url     String?
+  file_sertifikat_nama    String?   @db.VarChar(255)
+  status_verifikasi       String?   @default("belum_upload") @db.VarChar(50)
+  created_at              DateTime? @default(now()) @db.Timestamp(6)
+  updated_at              DateTime? @default(now()) @db.Timestamp(6)
+  users                   users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([guru_id, tahun_ajaran_id, semester])
-  @@index([sekolah_id])
-
-  users        users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  schools      schools?  @relation(fields: [sekolah_id], references: [id])
+  @@index([guru_id, tahun_ajaran_id, semester], map: "idx_pelatihan_guru_semester")
 }
 
-// Dokumen Bukti Tambahan (piagam, SK, surat tugas, dll)
 model dokumen_bukti {
-  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  guru_id            String    @db.Uuid
-  tahun_ajaran_id    String?   @db.Uuid
-  semester           String?   @db.VarChar(20)
-  kategori           String    @db.VarChar(50)
-  judul              String    @db.VarChar(255)
-  deskripsi          String?   @db.Text
-  tanggal_dokumen    DateTime? @db.Date
-  penerbit           String?   @db.VarChar(255)
-  file_url           String    @db.Text
-  file_nama          String    @db.VarChar(255)
-  file_tipe          String    @db.VarChar(50)
-  file_ukuran        Int?
-  indikator_kinerja  String[]  @default([])
-  sekolah_id         String?   @db.Uuid
-  created_at         DateTime? @default(now()) @db.Timestamp(6)
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guru_id           String    @db.Uuid
+  tahun_ajaran_id   String?   @db.Uuid
+  semester          String?   @db.VarChar(20)
+  kategori          String    @db.VarChar(50)
+  judul             String    @db.VarChar(255)
+  deskripsi         String?
+  tanggal_dokumen   DateTime? @db.Date
+  penerbit          String?   @db.VarChar(255)
+  file_url          String
+  file_nama         String    @db.VarChar(255)
+  file_tipe         String    @db.VarChar(50)
+  file_ukuran       Int?
+  indikator_kinerja String[]  @default([])
+  created_at        DateTime? @default(now()) @db.Timestamp(6)
+  users             users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([guru_id, tahun_ajaran_id, semester])
-  @@index([sekolah_id])
-
-  users        users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  schools      schools?  @relation(fields: [sekolah_id], references: [id])
+  @@index([guru_id, tahun_ajaran_id, semester], map: "idx_dokumen_bukti_guru_semester")
 }
 
-// Laporan Kinerja
 model laporan_kinerja {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   guru_id          String    @db.Uuid
@@ -749,140 +676,529 @@ model laporan_kinerja {
   judul            String    @db.VarChar(255)
   content          Json?
   evidence_summary Json?
-  status           String    @default("draft") @db.VarChar(50)
-  skp_id           String?   @db.Uuid
-  predikat         String?   @db.VarChar(50)
-  total_observasi  Int?      @default(0)
-  rata_rata_rating Decimal?  @db.Decimal(3, 2)
-  sekolah_id       String?   @db.Uuid
+  status           String?   @default("draft") @db.VarChar(50)
   ai_generated_at  DateTime? @db.Timestamp(6)
-  file_pdf_url     String?   @db.Text
-  file_docx_url    String?   @db.Text
+  file_pdf_url     String?
+  file_docx_url    String?
   created_at       DateTime? @default(now()) @db.Timestamp(6)
   updated_at       DateTime? @default(now()) @db.Timestamp(6)
+  users            users     @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([guru_id, tahun_ajaran_id, semester])
-  @@index([sekolah_id])
-
-  users        users         @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  skp_tahunan  skp_tahunan?  @relation(fields: [skp_id], references: [id])
-  schools      schools?      @relation(fields: [sekolah_id], references: [id])
+  @@index([guru_id, tahun_ajaran_id, semester], map: "idx_laporan_kinerja_guru_semester")
 }
 
-// Konfigurasi Indikator Kinerja
 model indikator_kinerja_config {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   kode            String    @unique @db.VarChar(20)
   nama            String    @db.VarChar(255)
-  deskripsi       String?   @db.Text
+  deskripsi       String?
   komponen        String    @db.VarChar(50)
-  bobot_persen    Int       @default(10)
-  min_evidence    Int       @default(1)
-  is_active       Boolean   @default(true)
+  bobot_persen    Int?      @default(10)
+  min_evidence    Int?      @default(1)
+  is_active       Boolean?  @default(true)
   berlaku_sejak   DateTime? @db.Date
   sumber_regulasi String?   @db.VarChar(255)
   created_at      DateTime? @default(now()) @db.Timestamp(6)
-
-  skp_indikators          skp_indikator[]
-  observasi_indikators    observasi_indikator[]
 }
 
-// SKP Tahunan - Perencanaan Kinerja di awal tahun
-model skp_tahunan {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  guru_id         String    @db.Uuid
-  tahun_ajaran_id String    @db.Uuid
-  status          String    @default("draft") @db.VarChar(50)
-  catatan_guru    String?   @db.Text
-  catatan_kepsek  String?   @db.Text
-  sekolah_id      String?   @db.Uuid
-  created_at      DateTime? @default(now()) @db.Timestamp(6)
-  updated_at      DateTime? @default(now()) @db.Timestamp(6)
-
-  users           users              @relation(fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  schools         schools?           @relation(fields: [sekolah_id], references: [id])
-  skp_indikators  skp_indikator[]
-  observasis      observasi_kinerja[]
-  laporan_kinerjas laporan_kinerja[]
-
-  @@unique([guru_id, tahun_ajaran_id, sekolah_id])
-  @@index([guru_id, tahun_ajaran_id])
-  @@index([sekolah_id])
-}
-
-model skp_indikator {
-  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  skp_id        String            @db.Uuid
-  indikator_id  String            @db.Uuid
-  target_self   Decimal?          @default(0) @db.Decimal(5, 2)
-  target_sk     Decimal?          @default(0) @db.Decimal(5, 2)
-  created_at    DateTime?         @default(now()) @db.Timestamp(6)
-
-  skp_tahunan              skp_tahunan              @relation(fields: [skp_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  indikator_kinerja_config indikator_kinerja_config @relation(fields: [indikator_id], references: [id])
-
-  @@unique([skp_id, indikator_id])
-}
-
-model observasi_kinerja {
-  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  guru_id             String    @db.Uuid
-  skp_id              String?   @db.Uuid
-  observer_id         String?   @db.Uuid
-  tahun_ajaran_id     String    @db.Uuid
-  tanggal_observasi   DateTime  @db.Date
-  jenis               String    @default("kelas") @db.VarChar(50)
-  suasana_pembelajaran String?  @db.Text
-  catatan_observer    String?   @db.Text
-  rekomendasi         String?   @db.Text
-  status              String    @default("draft") @db.VarChar(50)
-  sekolah_id          String?   @db.Uuid
-  created_at          DateTime? @default(now()) @db.Timestamp(6)
-  updated_at          DateTime? @default(now()) @db.Timestamp(6)
-
-  users_observasi_kinerja_guru_id     users           @relation("observasi_kinerja_guru_idTousers", fields: [guru_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users_observasi_kinerja_observer_id users?          @relation("observasi_kinerja_observer_idTousers", fields: [observer_id], references: [id])
-  skp_tahunan                         skp_tahunan?    @relation(fields: [skp_id], references: [id])
-  schools                             schools?        @relation(fields: [sekolah_id], references: [id])
-  observasi_indikators                observasi_indikator[]
-
-  @@index([guru_id, tahun_ajaran_id])
-  @@index([sekolah_id])
-}
-
-model observasi_indikator {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  observasi_id  String    @db.Uuid
-  indikator_id  String    @db.Uuid
-  rating        Int
-  catatan       String?   @db.Text
-  bukti_observasi String? @db.Text
-  created_at    DateTime? @default(now()) @db.Timestamp(6)
-
-  observasi_kinerja        observasi_kinerja        @relation(fields: [observasi_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  indikator_kinerja_config indikator_kinerja_config @relation(fields: [indikator_id], references: [id])
-
-  @@unique([observasi_id, indikator_id])
-}
-
-// Tahun Ajaran (for linking evidence)
 model tahun_ajaran {
-  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nama          String       @db.VarChar(50) // "2024/2025"
-  tanggal_mulai DateTime    @db.Date
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nama            String    @db.VarChar(50)
+  tanggal_mulai   DateTime  @db.Date
   tanggal_selesai DateTime  @db.Date
-  is_active    Boolean      @default(false)
-  semester_type String      @default("full") // "ganjil" | "genap" | "full"
-  semester     String?      @db.VarChar(20) // Current active semester: "ganjil" | "genap"
-  sekolah_id   String?      @db.Uuid // Nullable for backward compat; recommended per school
-  created_by   String?      @db.Uuid
-  created_at   DateTime?    @default(now()) @db.Timestamp(6)
-  schools      schools?     @relation(fields: [sekolah_id], references: [id], onUpdate: NoAction)
-  // === MULTI-SCHOOL MULTI-TENANCY ===
-  userSchoolAssignments    user_school_assignments[]      @relation("TahunAjaranUserSchool")
-  teacherSubjectAssignments teacher_subject_assignments[] @relation("TahunAjaranTeacherSubject")
-  teacherClassAssignments teacher_class_assignments[]    @relation("TahunAjaranTeacherClass")
-
-  @@index([sekolah_id])
-  @@index([is_active])
+  is_active       Boolean?  @default(false)
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+  semester_type   String?   @default("full") @db.VarChar(20)
+  semester        String?   @db.VarChar(20)
+  sekolah_id      String?   @db.Uuid
+  created_by      String?   @db.Uuid
+  users           users?    @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
+
+model posts_v {
+  id                        Int                           @id @default(dbgenerated("nextval('_posts_v_id_seq'::regclass)"))
+  parent_id                 Int?
+  version_title             String?                       @db.VarChar
+  version_slug              String?                       @db.VarChar
+  version_author            String?                       @default("Tim GuruPRO") @db.VarChar
+  version_published_date    DateTime?                     @db.Timestamptz(3)
+  version_category_id       Int?
+  version_featured_image_id Int?
+  version_excerpt           String?                       @db.VarChar
+  version_content           Json?
+  version_status            enum__posts_v_version_status? @default(draft)
+  version_updated_at        DateTime?                     @db.Timestamptz(3)
+  version_created_at        DateTime?                     @db.Timestamptz(3)
+  version__status           enum__posts_v_version_status? @default(draft)
+  created_at                DateTime                      @default(now()) @db.Timestamptz(3)
+  updated_at                DateTime                      @default(now()) @db.Timestamptz(3)
+  latest                    Boolean?
+  posts                     posts?                        @relation(fields: [parent_id], references: [id], onUpdate: NoAction, map: "_posts_v_parent_id_posts_id_fk")
+  categories                categories?                   @relation(fields: [version_category_id], references: [id], onUpdate: NoAction, map: "_posts_v_version_category_id_categories_id_fk")
+  media                     media?                        @relation(fields: [version_featured_image_id], references: [id], onUpdate: NoAction, map: "_posts_v_version_featured_image_id_media_id_fk")
+
+  @@map("_posts_v")
+}
+
+model addon_token_packages {
+  id                            String                          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                          String                          @db.VarChar(100)
+  token_amount                  Int                             @default(0)
+  price                         Decimal                         @default(0) @db.Decimal(12, 2)
+  is_active                     Boolean                         @default(true)
+  sort_order                    Int                             @default(0)
+  created_at                    DateTime?                       @default(now()) @db.Timestamp(6)
+  description                   String?
+  updated_at                    DateTime?                       @default(now()) @db.Timestamptz(3)
+  payload_locked_documents_rels payload_locked_documents_rels[]
+}
+
+model categories {
+  id                            Int                             @id @default(autoincrement())
+  title                         String                          @db.VarChar(255)
+  slug                          String?                         @unique @db.VarChar(255)
+  description                   String?
+  color                         String?                         @default("#4f46e5") @db.VarChar(20)
+  post_count                    Int?                            @default(0)
+  created_at                    DateTime?                       @default(now()) @db.Timestamp(6)
+  updated_at                    DateTime?                       @default(now()) @db.Timestamp(6)
+  posts_v                       posts_v[]
+  payload_locked_documents_rels payload_locked_documents_rels[]
+  posts                         posts[]
+}
+
+model chatbot_config {
+  id              Int       @id @default(autoincrement())
+  is_enabled      Boolean?  @default(true)
+  welcome_message String?   @default("Halo! Saya asisten AI GuruPRO 👋 Ada yang bisa saya bantu tentang fitur, harga, atau cara daftar GuruPRO AI?") @db.VarChar
+  system_prompt   String?   @default("Kamu adalah CS assistant GuruPRO AI, platform administrasi keguruan berbasis AI untuk guru Indonesia. Bantu pengguna dengan informasi tentang fitur (RPP AI, absensi, jurnal, rapor, PKG), harga (Rp49.000/bulan), cara daftar, dan pertanyaan umum. Jawab dalam Bahasa Indonesia yang ramah dan profesional. Jika pertanyaan di luar produk GuruPRO, arahkan ke kontak CS manusia di wa.me/6281283960337.") @db.VarChar
+  human_c_s_url   String?   @default("https://wa.me/6281283960337") @db.VarChar
+  updated_at      DateTime? @db.Timestamptz(3)
+  created_at      DateTime? @db.Timestamptz(3)
+}
+
+model cms_features {
+  id                            String                          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  icon                          String?                         @db.VarChar(100)
+  title                         String                          @db.VarChar(255)
+  description                   String?
+  order                         Int?                            @default(0)
+  isActive                      Boolean?                        @default(true)
+  created_at                    DateTime?                       @default(now()) @db.Timestamp(6)
+  updated_at                    DateTime?                       @default(now()) @db.Timestamp(6)
+  is_active                     Boolean?                        @default(true)
+  payload_locked_documents_rels payload_locked_documents_rels[]
+}
+
+model cms_users {
+  id                            Int                             @id @default(autoincrement())
+  name                          String                          @db.VarChar
+  password                      String                          @db.VarChar
+  role                          enum_cms_users_role             @default(editor)
+  phone                         String?                         @db.VarChar
+  avatar_id                     Int?
+  updated_at                    DateTime                        @default(now()) @db.Timestamptz(3)
+  created_at                    DateTime                        @default(now()) @db.Timestamptz(3)
+  email                         String                          @db.VarChar
+  reset_password_token          String?                         @db.VarChar
+  reset_password_expiration     DateTime?                       @db.Timestamptz(3)
+  salt                          String?                         @db.VarChar
+  hash                          String?                         @db.VarChar
+  login_attempts                Decimal?                        @default(0) @db.Decimal
+  lock_until                    DateTime?                       @db.Timestamptz(3)
+  media                         media?                          @relation(fields: [avatar_id], references: [id], onUpdate: NoAction, map: "cms_users_avatar_id_media_id_fk")
+  cms_users_sessions            cms_users_sessions[]
+  institution_members           institution_members[]
+  payload_locked_documents_rels payload_locked_documents_rels[]
+  payload_preferences_rels      payload_preferences_rels[]
+}
+
+model cms_users_sessions {
+  order      Int       @map("_order")
+  parent_id  Int       @map("_parent_id")
+  id         String    @id @db.VarChar
+  created_at DateTime? @db.Timestamptz(3)
+  expires_at DateTime  @db.Timestamptz(3)
+  cms_users  cms_users @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "cms_users_sessions_parent_id_fk")
+}
+
+model footer_content {
+  id                          Int                           @id @default(autoincrement())
+  description                 String?                       @default("Platform administrasi guru berbasis AI untuk membantu guru Indonesia membuat RPP, absensi, jurnal mengajar, hingga rapor dalam satu platform.") @db.VarChar
+  contact_email               String?                       @default("support@gurupro.id") @db.VarChar
+  contact_whatsapp            String?                       @default("+62 812-8396-0337") @db.VarChar
+  copyright_text              String?                       @default("GuruPRO AI © 2026. All rights reserved.") @db.VarChar
+  updated_at                  DateTime?                     @db.Timestamptz(3)
+  created_at                  DateTime?                     @db.Timestamptz(3)
+  footer_content_links        footer_content_links[]
+  footer_content_social_links footer_content_social_links[]
+}
+
+model footer_content_links {
+  order          Int                              @map("_order")
+  parent_id      Int                              @map("_parent_id")
+  id             String                           @id @db.VarChar
+  label          String                           @db.VarChar
+  url            String                           @db.VarChar
+  column         enum_footer_content_links_column @default(links)
+  footer_content footer_content                   @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "footer_content_links_parent_id_fk")
+}
+
+model footer_content_social_links {
+  order          Int                                       @map("_order")
+  parent_id      Int                                       @map("_parent_id")
+  id             String                                    @id @db.VarChar
+  platform       enum_footer_content_social_links_platform
+  url            String                                    @db.VarChar
+  footer_content footer_content                            @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "footer_content_social_links_parent_id_fk")
+}
+
+model institution_members {
+  id                                 Int                                  @id @default(autoincrement())
+  user_id                            Int
+  app_user_id                        String?                              @db.Uuid
+  institution_id                     Int
+  status                             enum_institution_members_status      @default(invited)
+  joined_at                          DateTime?                            @db.Timestamptz(3)
+  updated_at                         DateTime                             @default(now()) @db.Timestamptz(3)
+  created_at                         DateTime                             @default(now()) @db.Timestamptz(3)
+  institutions                       institutions                         @relation(fields: [institution_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "institution_members_institution_id_institutions_id_fk")
+  cms_users                          cms_users                            @relation(fields: [user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "institution_members_user_id_cms_users_id_fk")
+  institution_members_assigned_kelas institution_members_assigned_kelas[]
+  institution_members_assigned_mapel institution_members_assigned_mapel[]
+  institution_members_role           institution_members_role[]
+  payload_locked_documents_rels      payload_locked_documents_rels[]
+
+  @@unique([user_id, institution_id], map: "user_institution_idx")
+  @@index([created_at])
+  @@index([institution_id], map: "institution_members_institution_idx")
+  @@index([updated_at])
+  @@index([user_id], map: "institution_members_user_idx")
+  @@index([app_user_id], map: "institution_members_app_user_idx")
+}
+
+model institution_members_assigned_kelas {
+  order               Int                 @map("_order")
+  parent_id           Int                 @map("_parent_id")
+  id                  String              @id @db.VarChar
+  kelas               String              @db.VarChar
+  institution_members institution_members @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "institution_members_assigned_kelas_parent_id_fk")
+
+  @@index([order], map: "institution_members_assigned_kelas_order_idx")
+  @@index([parent_id], map: "institution_members_assigned_kelas_parent_id_idx")
+}
+
+model institution_members_assigned_mapel {
+  order               Int                 @map("_order")
+  parent_id           Int                 @map("_parent_id")
+  id                  String              @id @db.VarChar
+  mapel               String              @db.VarChar
+  institution_members institution_members @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "institution_members_assigned_mapel_parent_id_fk")
+
+  @@index([order], map: "institution_members_assigned_mapel_order_idx")
+  @@index([parent_id], map: "institution_members_assigned_mapel_parent_id_idx")
+}
+
+model institution_members_role {
+  order               Int
+  parent_id           Int
+  value               enum_institution_members_role?
+  id                  Int                            @id @default(autoincrement())
+  institution_members institution_members            @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "institution_members_role_parent_fk")
+
+  @@index([order])
+  @@index([parent_id], map: "institution_members_role_parent_idx")
+}
+
+model institutions {
+  id                            Int                                      @id @default(autoincrement())
+  name                          String                                   @db.VarChar
+  npsn                          String?                                  @unique(map: "institutions_npsn_idx") @db.VarChar
+  jenjang                       enum_institutions_jenjang
+  naungan                       enum_institutions_naungan
+  subscription_tier             enum_institutions_subscription_tier?     @default(trial)
+  academic_year_active          String?                                  @db.VarChar
+  approval_layer_config         enum_institutions_approval_layer_config? @default(single)
+  status                        enum_institutions_status?                @default(trial)
+  updated_at                    DateTime                                 @default(now()) @db.Timestamptz(3)
+  created_at                    DateTime                                 @default(now()) @db.Timestamptz(3)
+  institution_members           institution_members[]
+  payload_locked_documents_rels payload_locked_documents_rels[]
+
+  @@index([created_at])
+  @@index([updated_at])
+}
+
+model landing_page {
+  id                         Int                       @id @default(autoincrement())
+  hero_badge_text            String?                   @default("✨ Didukung VideaClass AI") @db.VarChar
+  hero_headline              String?                   @default("Administrasi Guru Lebih Cepat dengan AI") @db.VarChar
+  hero_subheadline           String?                   @default("GuruPRO AI hadir untuk membantu guru membuat RPP, absensi, jurnal mengajar, hingga rapor — semua dalam satu platform, didukung kecerdasan buatan.") @db.VarChar
+  hero_c_t_a_primary_label   String?                   @default("Mulai Gratis Sekarang") @db.VarChar
+  hero_c_t_a_primary_url     String?                   @default("/login?mode=register") @db.VarChar
+  hero_c_t_a_secondary_label String?                   @default("Lihat Demo") @db.VarChar
+  hero_c_t_a_secondary_url   String?                   @default("#demo") @db.VarChar
+  seo_title                  String?                   @db.VarChar
+  seo_description            String?                   @db.VarChar
+  og_image_id                Int?
+  updated_at                 DateTime?                 @db.Timestamptz(3)
+  created_at                 DateTime?                 @db.Timestamptz(3)
+  media                      media?                    @relation(fields: [og_image_id], references: [id], onUpdate: NoAction, map: "landing_page_og_image_id_media_id_fk")
+  landing_page_hero_stats    landing_page_hero_stats[]
+}
+
+model landing_page_hero_stats {
+  order        Int          @map("_order")
+  parent_id    Int          @map("_parent_id")
+  id           String       @id @db.VarChar
+  number       String?      @default("50.000+") @db.VarChar
+  label        String?      @default("Guru Aktif") @db.VarChar
+  landing_page landing_page @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "landing_page_hero_stats_parent_id_fk")
+}
+
+model media {
+  id                            Int                             @id @default(autoincrement())
+  alt                           String                          @db.VarChar
+  caption                       String?                         @db.VarChar
+  file_size                     Decimal?                        @db.Decimal
+  updated_at                    DateTime                        @default(now()) @db.Timestamptz(3)
+  created_at                    DateTime                        @default(now()) @db.Timestamptz(3)
+  url                           String?                         @db.VarChar
+  thumbnail_u_r_l               String?                         @db.VarChar
+  filename                      String?                         @db.VarChar
+  mime_type                     String?                         @db.VarChar
+  filesize                      Decimal?                        @db.Decimal
+  width                         Decimal?                        @db.Decimal
+  height                        Decimal?                        @db.Decimal
+  focal_x                       Decimal?                        @db.Decimal
+  focal_y                       Decimal?                        @db.Decimal
+  sizes_thumbnail_url           String?                         @db.VarChar
+  sizes_thumbnail_width         Decimal?                        @db.Decimal
+  sizes_thumbnail_height        Decimal?                        @db.Decimal
+  sizes_thumbnail_mime_type     String?                         @db.VarChar
+  sizes_thumbnail_filesize      Decimal?                        @db.Decimal
+  sizes_thumbnail_filename      String?                         @db.VarChar
+  sizes_card_url                String?                         @db.VarChar
+  sizes_card_width              Decimal?                        @db.Decimal
+  sizes_card_height             Decimal?                        @db.Decimal
+  sizes_card_mime_type          String?                         @db.VarChar
+  sizes_card_filesize           Decimal?                        @db.Decimal
+  sizes_card_filename           String?                         @db.VarChar
+  sizes_hero_url                String?                         @db.VarChar
+  sizes_hero_width              Decimal?                        @db.Decimal
+  sizes_hero_height             Decimal?                        @db.Decimal
+  sizes_hero_mime_type          String?                         @db.VarChar
+  sizes_hero_filesize           Decimal?                        @db.Decimal
+  sizes_hero_filename           String?                         @db.VarChar
+  posts_v                       posts_v[]
+  cms_users                     cms_users[]
+  landing_page                  landing_page[]
+  payload_locked_documents_rels payload_locked_documents_rels[]
+  posts                         posts[]
+}
+
+model payload_kv {
+  id   Int    @id @default(autoincrement())
+  key  String @db.VarChar
+  data Json
+}
+
+model payload_locked_documents {
+  id                            Int                             @id @default(autoincrement())
+  global_slug                   String?                         @db.VarChar
+  updated_at                    DateTime                        @default(now()) @db.Timestamptz(3)
+  created_at                    DateTime                        @default(now()) @db.Timestamptz(3)
+  payload_locked_documents_rels payload_locked_documents_rels[]
+}
+
+model payload_locked_documents_rels {
+  id                       Int                      @id @default(autoincrement())
+  order                    Int?
+  parent_id                Int
+  path                     String                   @db.VarChar
+  cms_users_id             Int?
+  media_id                 Int?
+  cms_features_id          String?                  @db.Uuid
+  why_points_id            String?                  @db.Uuid
+  categories_id            Int?
+  posts_id                 Int?
+  addon_token_packages_id  String?                  @db.Uuid
+  institutions_id          Int?
+  institution_members_id   Int?
+  addon_token_packages     addon_token_packages?    @relation(fields: [addon_token_packages_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "payload_locked_documents_rels_addon_token_packages_fk")
+  categories               categories?              @relation(fields: [categories_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "payload_locked_documents_rels_categories_fk")
+  cms_features             cms_features?            @relation(fields: [cms_features_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "payload_locked_documents_rels_cms_features_fk")
+  cms_users                cms_users?               @relation(fields: [cms_users_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "payload_locked_documents_rels_cms_users_fk")
+  institution_members      institution_members?     @relation(fields: [institution_members_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "payload_locked_documents_rels_institution_members_fk")
+  institutions             institutions?            @relation(fields: [institutions_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "payload_locked_documents_rels_institutions_fk")
+  media                    media?                   @relation(fields: [media_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "payload_locked_documents_rels_media_fk")
+  payload_locked_documents payload_locked_documents @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "payload_locked_documents_rels_parent_fk")
+  posts                    posts?                   @relation(fields: [posts_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "payload_locked_documents_rels_posts_fk")
+  why_points               why_points?              @relation(fields: [why_points_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "payload_locked_documents_rels_why_points_fk")
+}
+
+model payload_migrations {
+  id         Int      @id @default(autoincrement())
+  name       String?  @db.VarChar
+  batch      Decimal? @db.Decimal
+  updated_at DateTime @default(now()) @db.Timestamptz(3)
+  created_at DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model payload_preferences {
+  id                       Int                        @id @default(autoincrement())
+  key                      String?                    @db.VarChar
+  value                    Json?
+  updated_at               DateTime                   @default(now()) @db.Timestamptz(3)
+  created_at               DateTime                   @default(now()) @db.Timestamptz(3)
+  payload_preferences_rels payload_preferences_rels[]
+}
+
+model payload_preferences_rels {
+  id                  Int                 @id @default(autoincrement())
+  order               Int?
+  parent_id           Int
+  path                String              @db.VarChar
+  cms_users_id        Int?
+  cms_users           cms_users?          @relation(fields: [cms_users_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "payload_preferences_rels_cms_users_fk")
+  payload_preferences payload_preferences @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "payload_preferences_rels_parent_fk")
+}
+
+model posts {
+  id                            Int                             @id @default(autoincrement())
+  title                         String                          @db.VarChar(255)
+  slug                          String?                         @unique @db.VarChar(255)
+  excerpt                       String?
+  content                       String?
+  featured_image                String?
+  author                        String?                         @default("Admin") @db.VarChar(255)
+  status                        String?                         @default("draft") @db.VarChar(20)
+  category_id                   Int?
+  tags                          String[]
+  view_count                    Int?                            @default(0)
+  published_at                  DateTime?                       @db.Timestamp(6)
+  created_at                    DateTime?                       @default(now()) @db.Timestamp(6)
+  updated_at                    DateTime?                       @default(now()) @db.Timestamp(6)
+  published_date                DateTime?                       @db.Timestamptz(3)
+  featured_image_id             Int?
+  status_cms                    enum_posts_status?              @default(draft) @map("_status")
+  posts_v                       posts_v[]
+  payload_locked_documents_rels payload_locked_documents_rels[]
+  categories                    categories?                     @relation(fields: [category_id], references: [id], onUpdate: NoAction, map: "posts_category_id_categories_id_fk")
+  media                         media?                          @relation(fields: [featured_image_id], references: [id], onUpdate: NoAction, map: "posts_featured_image_id_media_id_fk")
+}
+
+model why_points {
+  id                            String                          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  point                         String                          @db.VarChar(500)
+  order                         Int?                            @default(0)
+  isActive                      Boolean?                        @default(true)
+  created_at                    DateTime?                       @default(now()) @db.Timestamp(6)
+  updated_at                    DateTime?                       @default(now()) @db.Timestamp(6)
+  is_active                     Boolean?                        @default(true)
+  payload_locked_documents_rels payload_locked_documents_rels[]
+}
+
+enum enum__posts_v_version_status {
+  draft
+  published
+}
+
+enum enum_cms_users_role {
+  admin
+  editor
+  viewer
+}
+
+enum enum_footer_content_links_column {
+  links
+  sekolah
+}
+
+enum enum_footer_content_social_links_platform {
+  facebook
+  instagram
+  youtube
+  tiktok
+  linkedin
+}
+
+enum enum_institution_members_role {
+  kepala_sekolah
+  wakasek
+  operator
+  admin_sekolah
+  bendahara
+  guru
+}
+
+enum enum_institution_members_status {
+  invited
+  pending
+  active
+  inactive
+  left
+  rejected
+}
+
+enum enum_institutions_approval_layer_config {
+  single
+  double
+}
+
+enum enum_institutions_jenjang {
+  SD
+  MI
+  SMP
+  MTs
+  SMA
+  MA
+  SMK
+  Pesantren
+  Lainnya
+}
+
+enum enum_institutions_naungan {
+  Kemendikbud
+  Kemenag
+  Swasta_Lainnya @map("Swasta Lainnya")
+}
+
+enum enum_institutions_status {
+  active
+  suspended
+  trial
+}
+
+enum enum_institutions_subscription_tier {
+  trial
+  basic
+  premium
+  enterprise
+}
+
+enum enum_posts_status {
+  draft
+  published
+}
+
+model school_registrations {
+  id                String   @id @default(uuid()) @db.Uuid
+  nama_lembaga      String   @db.VarChar(255)
+  npsn              String?  @db.VarChar(50)
+  jenjang           String   @db.VarChar(50)
+  naungan           String   @db.VarChar(50)
+  alamat            String?  @db.Text
+  nama_kepala_sekolah String? @db.VarChar(255)
+  email_kontak      String   @db.VarChar(255)
+  whatsapp          String?  @db.VarChar(20)
+  status            String   @default("pending") @db.VarChar(20)
+  catatan_admin     String?  @db.Text
+  created_at        DateTime @default(now()) @db.Timestamptz(3)
+  updated_at        DateTime @updatedAt @db.Timestamptz(3)
+}
+
+// ============================================
+// MODUL AJAR & BAHAN AJAR MODELS - removed
+// Using Payload CMS collections instead (see collections/ModulAjar.ts and collections/BahanAjar.ts)
+// ============================================

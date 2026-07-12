@@ -51,7 +51,7 @@ export default function ForSchoolSection({
   subtitle = "Pantau kinerja guru, kelola dokumen administrasi sekolah, dan tingkatkan akreditasi — semua tersentralisasi.",
   benefits = defaultBenefits as unknown as BenefitItem[],
   ctaText = "Daftarkan Sekolah Saya",
-  ctaHref = "/login?mode=register&sekolah=1",
+  ctaHref = "/daftar-sekolah",
 }: ForSchoolSectionProps) {
   return (
     <section className="py-20 md:py-28 bg-gradient-to-br from-primary-900 via-primary-800 to-purple-900 text-white relative overflow-hidden">

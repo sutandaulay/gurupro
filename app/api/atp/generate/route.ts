@@ -3,6 +3,9 @@ import { query } from "@/lib/db";
 import { consumeUserToken, getUserTokenAccess } from "@/lib/token-system";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { jsonrepair as repair } from "jsonrepair";
+import { uploadToR2 } from "@/lib/r2";
+import { generatePdfBuffer, generateDocBuffer } from "@/lib/doc-compiler";
 
 // ==========================================
 // ATP GENERATE API
@@ -176,19 +179,39 @@ ${dimensi8 && dimensi8.length > 0 ? '- Setiap materi mengintegrasikan 8 Dimensi 
 ${tiga_pengalaman ? '- Gunakan pendekatan 3 Pengalaman Belajar (Memahami, Mengaplikasi, Merefleksikan)' : ''}
 ${pai_mode ? '- Integrasikan nilai spiritual PAI dalam setiap pembelajaran' : ''}
 
-Hasilkan dokumen ATP LENGKAP dalam format Markdown yang rapi.
-Balas HANYA dalam format JSON:
-{
-  "judul": "ATP - ${resolvedMapel} ${jenjang} Fase ${fase} ${semester === 'ganjil' ? 'Ganjil' : 'Genap'} ${tahun_ajaran || ''}",
-  "konten": "(Dokumen Markdown lengkap ATP)"
-}
+Hasilkan seluruh dokumen ATP LENGKAP tersebut langsung dalam format Markdown yang rapi. Jangan membungkus dokumen ini di dalam format JSON. Balas HANYA dengan teks Markdown lengkap tersebut.
 `;
 
     let parsed: any;
     try {
-      const text = await generateAIContent(prompt);
-      const cleanText = text.replace(/```json|```/g, "").trim();
-      parsed = JSON.parse(cleanText);
+      const text = await generateAIContent(prompt, undefined, false);
+      const cleanMarkdown = text.trim();
+      const docTitle = `ATP - ${resolvedMapel} ${jenjang} Fase ${fase} ${semester === 'ganjil' ? 'Ganjil' : 'Genap'} ${tahun_ajaran || ''}`;
+
+      parsed = {
+        judul: docTitle,
+        konten: cleanMarkdown,
+      };
+
+      // Compile & Upload ATP files
+      let pdfUrl: string | null = null;
+      let docxUrl: string | null = null;
+      try {
+        const cleanMarkdown = (parsed.konten || "").trim();
+        const docTitle = parsed.judul || `ATP - ${resolvedMapel} Kelas ${fase || ""}`;
+
+        const pdfBuf = await generatePdfBuffer(cleanMarkdown, docTitle);
+        pdfUrl = await uploadToR2(pdfBuf, `${Date.now()}-atp.pdf`, "application/pdf");
+
+        const docBuf = generateDocBuffer(cleanMarkdown, docTitle);
+        docxUrl = await uploadToR2(docBuf, `${Date.now()}-atp.doc`, "application/msword");
+      } catch (uploadErr) {
+        console.error("Failed to compile or upload ATP files to R2:", uploadErr);
+      }
+
+      parsed.pdf_url = pdfUrl;
+      parsed.docx_url = docxUrl;
+
     } catch (aiError: any) {
       console.error("ATP AI generation failed:", aiError);
       return NextResponse.json({ error: `Gagal generate ATP: ${aiError.message}` }, { status: 502 });
@@ -206,7 +229,13 @@ Balas HANYA dalam format JSON:
       `, [
         userId,
         parsed.judul || judul_dokumen || `ATP - ${resolvedMapel}`,
-        JSON.stringify({ konten: parsed.konten, generated_with_ai: true }),
+        JSON.stringify({ 
+          markdown: parsed.konten, 
+          generated_with_ai: true,
+          pptx_url: null,
+          pdf_url: parsed.pdf_url || null,
+          docx_url: parsed.docx_url || null
+        }),
         school_id || null,
         subject_id || null,
         jenjang,

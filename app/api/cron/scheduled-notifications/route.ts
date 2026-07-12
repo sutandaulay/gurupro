@@ -6,11 +6,99 @@ import { sendWhatsAppNotification, sendEmailNotification } from "@/lib/notificat
 import { SHARE_LINK_DEFAULT_EXPIRY_DAYS } from "@/collections/config";
 import { query } from "@/lib/db";
 
-const FREQUENCY_MAP = {
-  daily: 1,
-  weekly: 7,
-  monthly: 30,
-};
+// Helper function to parse time string "HH:MM" to minutes since midnight
+function parseTimeToMinutes(timeStr: string): number {
+  const parts = timeStr.split(":");
+  if (parts.length !== 2) return -1;
+  const hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  if (isNaN(hours) || isNaN(minutes)) return -1;
+  return hours * 60 + minutes;
+}
+
+// Check if current time is within the notification window (within 5 minutes of scheduled time)
+function isNotificationTime(now: Date, scheduledTime: string): boolean {
+  const scheduledMinutes = parseTimeToMinutes(scheduledTime);
+  if (scheduledMinutes === -1) return false;
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  // Allow a 5-minute window before and after the scheduled time
+  const diff = Math.abs(currentMinutes - scheduledMinutes);
+  return diff <= 5;
+}
+
+// Check if today matches the scheduled day for weekly notifications
+function isScheduledDay(now: Date, scheduledDay: string): boolean {
+  // getDay() returns 0 for Sunday, 1 for Monday, etc.
+  // Our scheduledDay uses 1 for Monday, 2 for Tuesday, etc.
+  const currentDay = now.getDay();
+  const targetDay = parseInt(scheduledDay, 10);
+
+  // Convert: our 1-6 (Mon-Sat) maps to getDay() 1-6
+  return currentDay === targetDay;
+}
+
+// Check if today matches the scheduled date for monthly notifications
+function isScheduledDate(now: Date, scheduledDate: string): boolean {
+  const currentDate = now.getDate();
+  const targetDate = parseInt(scheduledDate, 10);
+  return currentDate === targetDate;
+}
+
+// Check if it's time to send based on frequency and scheduling
+function shouldSendNow(
+  now: Date,
+  frequency: string,
+  notificationTime: string,
+  notificationDay: string,
+  notificationDate: string,
+  lastNotifiedAt: Date | null
+): boolean {
+  switch (frequency) {
+    case "daily":
+      // For daily: check if it's the scheduled time
+      return isNotificationTime(now, notificationTime || "14:00");
+
+    case "weekly":
+      // For weekly: check if it's the scheduled day AND time
+      const targetDay = notificationDay || "5";
+      if (!isScheduledDay(now, targetDay)) return false;
+      return isNotificationTime(now, notificationTime || "14:00");
+
+    case "monthly":
+      // For monthly: check if it's the scheduled date AND time
+      const targetDate = notificationDate || "25";
+      if (!isScheduledDate(now, targetDate)) return false;
+      return isNotificationTime(now, notificationTime || "10:00");
+
+    default:
+      return false;
+  }
+}
+
+// Get human-readable frequency label
+function getFrequencyLabel(
+  frequency: string,
+  notificationTime: string,
+  notificationDay: string,
+  notificationDate: string
+): string {
+  const dayNames: Record<string, string> = {
+    "1": "Senin", "2": "Selasa", "3": "Rabu", "4": "Kamis", "5": "Jumat", "6": "Sabtu"
+  };
+
+  switch (frequency) {
+    case "daily":
+      return `Harian pada jam ${notificationTime || "14:00"}`;
+    case "weekly":
+      return `Mingguan setiap ${dayNames[notificationDay || "5"]} jam ${notificationTime || "14:00"}`;
+    case "monthly":
+      return `Bulanan setiap tanggal ${notificationDate || "25"} jam ${notificationTime || "10:00"}`;
+    default:
+      return "Manual";
+  }
+}
 
 async function getAggregatedStatsForTeacher(userId: string) {
   const now = new Date();
@@ -122,25 +210,28 @@ export async function GET(req: Request) {
 
     for (const contact of contacts.docs) {
       try {
-        const frequency = (contact as any).notificationFrequency as keyof typeof FREQUENCY_MAP;
-        const lastNotified = (contact as any).lastNotifiedAt;
+        const frequency = (contact as any).notificationFrequency as string;
+        const notificationTime = (contact as any).notificationTime as string || "14:00";
+        const notificationDay = (contact as any).notificationDay as string || "5";
+        const notificationDate = (contact as any).notificationDate as string || "25";
+        const lastNotifiedAt = (contact as any).lastNotifiedAt
+          ? new Date((contact as any).lastNotifiedAt)
+          : null;
 
-        let shouldSend = false;
-
-        if (!lastNotified) {
-          shouldSend = true;
-        } else {
-          const lastDate = new Date(lastNotified);
-          const daysSinceLast = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-
-          if (daysSinceLast >= FREQUENCY_MAP[frequency]) {
-            shouldSend = true;
-          }
-        }
-
-        if (!shouldSend) {
+        // Check if it's time to send based on frequency and scheduling
+        if (!shouldSendNow(now, frequency, notificationTime, notificationDay, notificationDate, lastNotifiedAt)) {
           skipped++;
           continue;
+        }
+
+        // Prevent duplicate sends on the same day
+        if (lastNotifiedAt) {
+          const lastDate = lastNotifiedAt.toISOString().split('T')[0];
+          const today = now.toISOString().split('T')[0];
+          if (lastDate === today) {
+            skipped++;
+            continue;
+          }
         }
 
         const teacherId = (contact as any).teacherId;
@@ -196,7 +287,7 @@ export async function GET(req: Request) {
                 Lihat Laporan
               </a>
               <p style="color: #666; font-size: 14px;">
-                Frekuensi pengiriman: ${frequency === "daily" ? "Harian" : frequency === "weekly" ? "Mingguan" : "Bulanan"}
+                Frekuensi: ${getFrequencyLabel(frequency, notificationTime, notificationDay, notificationDate)}
               </p>
             </div>
           `;
@@ -221,6 +312,13 @@ export async function GET(req: Request) {
       skipped,
       errors,
       checked: contacts.docs.length,
+      currentTime: now.toISOString(),
+      currentTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      details: {
+        daily: contacts.docs.filter(c => (c as any).notificationFrequency === "daily").length,
+        weekly: contacts.docs.filter(c => (c as any).notificationFrequency === "weekly").length,
+        monthly: contacts.docs.filter(c => (c as any).notificationFrequency === "monthly").length,
+      },
     });
   } catch (error: any) {
     console.error("Scheduled notifications error:", error);

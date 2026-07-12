@@ -1,6 +1,7 @@
 import { query, requireActiveTahunAjaran } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { getContextFilters } from "@/lib/session";
 
 async function verifySchoolOwner(schoolId: string, userId: string) {
   const check = await query(
@@ -25,6 +26,7 @@ async function getUserId() {
 export async function GET(req: Request) {
   try {
     const userId = await getUserId();
+    const filters = await getContextFilters(userId);
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get("school_id");
 
@@ -38,7 +40,17 @@ export async function GET(req: Request) {
       "SELECT * FROM classes WHERE school_id = $1 ORDER BY nama_kelas ASC",
       [schoolId]
     );
-    return NextResponse.json(classes.rows);
+
+    let rows = classes.rows;
+    if (filters.assignedKelas.length > 0) {
+      rows = rows.filter((row: any) =>
+        filters.assignedKelas.some((k) =>
+          row.nama_kelas.toLowerCase().includes(k.toLowerCase())
+        )
+      );
+    }
+
+    return NextResponse.json(rows);
   } catch (error: any) {
     console.error("Classes GET error:", error);
     const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;

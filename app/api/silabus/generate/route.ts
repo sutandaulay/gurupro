@@ -1,0 +1,213 @@
+import { generateAIContent } from '@/lib/ai';
+import { query } from '@/lib/db';
+import { consumeUserToken, getUserTokenAccess } from '@/lib/token-system';
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
+import { uploadToR2 } from '@/lib/r2';
+import { generateSilabusPdfBuffer, generateSilabusDocBuffer } from '@/lib/export/silabus-export';
+import {
+  buildSilabusPrompt,
+  parseSilabusFromAIResponse,
+  SILABUS_SYSTEM_PROMPT,
+} from '@/lib/ai/silabusPrompts';
+import { silabusFormInputSchema } from '@/lib/schemas/silabus';
+import { jsonrepair } from 'jsonrepair';
+
+// ============================================
+// SILABUS (ATP) GENERATE API - JSON Structured Output
+// Alur Tujuan Pembelajaran dengan AI - Output Terstruktur
+// ============================================
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+
+    // Validate input
+    const validationResult = silabusFormInputSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: 'Validasi gagal', details: validationResult.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const {
+      mataPelajaran,
+      subject_id,
+      fase,
+      kelas,
+      semester,
+      kurikulum = 'merdeka',
+      dimensi8 = [],
+      tiga_pengalaman = false,
+      capaianPembelajaran,
+      jumlahMingguEfektif = 18,
+      tahunAjaran,
+      school_id,
+      school_name,
+      school_npsn,
+      jenjang = 'SMA',
+      pai_mode,
+    } = validationResult.data;
+
+    // Auth
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('gurupro_session')?.value;
+    if (!sessionCookie) {
+      return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
+    }
+    const session = JSON.parse(sessionCookie);
+    const userId = session.id;
+
+    // Token check
+    const tokenState = await getUserTokenAccess(userId);
+    if (!tokenState.user) {
+      return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 404 });
+    }
+
+    if (!tokenState.access.allowed) {
+      const message =
+        tokenState.access.reason === 'subscription_expired'
+          ? 'Masa aktif langganan akun Anda telah habis. Silakan perpanjang paket terlebih dahulu.'
+          : 'Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.';
+      return NextResponse.json({ error: message }, { status: 403 });
+    }
+
+    const currentUser = tokenState.user;
+
+    // Resolve mapel name
+    let resolvedMapel = mataPelajaran;
+    if (!resolvedMapel && subject_id) {
+      try {
+        const subjectRes = await query('SELECT nama_mapel FROM subjects WHERE id = $1', [
+          subject_id,
+        ]);
+        if (subjectRes.rows[0]?.nama_mapel) {
+          resolvedMapel = subjectRes.rows[0].nama_mapel;
+        }
+      } catch (subjectErr) {
+        console.error('Failed to resolve subject name:', subjectErr);
+      }
+    }
+
+    if (!resolvedMapel) {
+      return NextResponse.json({ error: 'Mata pelajaran wajib diisi' }, { status: 400 });
+    }
+
+    // Build prompt
+    const prompt = buildSilabusPrompt({
+      sekolah: school_name,
+      npsn: school_npsn,
+      tahunAjaran,
+      mataPelajaran: resolvedMapel,
+      jenjang,
+      fase,
+      kelas,
+      semester: semester as 1 | 2,
+      capaianPembelajaran,
+      jumlahMingguEfektif,
+      kurikulum,
+      dimensi8,
+      tigaPengalaman: tiga_pengalaman,
+      paiMode: pai_mode,
+    });
+
+    // Generate with AI
+    let silabusData;
+    try {
+      const aiResponse = await generateAIContent(prompt, SILABUS_SYSTEM_PROMPT, true);
+      silabusData = parseSilabusFromAIResponse(aiResponse);
+    } catch (aiError: any) {
+      console.error('Silabus AI generation failed:', aiError);
+
+      // Try repair with jsonrepair
+      try {
+        const repaired = jsonrepair(aiError.message || String(aiError));
+        silabusData = JSON.parse(repaired);
+        silabusData = parseSilabusFromAIResponse(silabusData);
+      } catch (repairError) {
+        return NextResponse.json(
+          { error: `Gagal generate Silabus: ${aiError.message}` },
+          { status: 502 }
+        );
+      }
+    }
+
+    // Compile & Upload files
+    let pdfUrl: string | null = null;
+    let docxUrl: string | null = null;
+
+    try {
+      const pdfBuf = await generateSilabusPdfBuffer(silabusData);
+      pdfUrl = await uploadToR2(pdfBuf, `${Date.now()}-silabus.pdf`, 'application/pdf');
+
+      const docBuf = await generateSilabusDocBuffer(silabusData);
+      docxUrl = await uploadToR2(docBuf, `${Date.now()}-silabus.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    } catch (uploadErr) {
+      console.error('Failed to compile/upload Silabus files:', uploadErr);
+    }
+
+    // Save to database
+    const docTitle = `Silabus - ${resolvedMapel} ${jenjang} Fase ${fase} Semester ${semester === 1 ? 'Ganjil' : 'Genap'}`;
+    let savedId: string | null = null;
+
+    try {
+      const result = await query(
+        `
+        INSERT INTO guru_administrasi (
+          user_id, tipe_dokumen, judul_dokumen, konten,
+          school_id, subject_id, jenjang, kurikulum, fase, semester,
+          dimensi8, tahunAjaran
+        ) VALUES ($1, 'silabus', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING id
+      `,
+        [
+          userId,
+          docTitle,
+          JSON.stringify({
+            identitas: silabusData.identitas,
+            capaianPembelajaran: silabusData.capaianPembelajaran,
+            alurTujuanPembelajaran: silabusData.alurTujuanPembelajaran,
+            totalEstimasi: silabusData.totalEstimasi,
+            generated_with_ai: true,
+            aiGeneratedFields: {},
+            pdf_url: pdfUrl,
+            docx_url: docxUrl,
+          }),
+          school_id || null,
+          subject_id || null,
+          jenjang,
+          kurikulum,
+          fase,
+          semester,
+          dimensi8,
+          tahunAjaran || null,
+        ]
+      );
+      savedId = result.rows[0]?.id;
+    } catch (dbErr) {
+      console.error('Failed to save Silabus:', dbErr);
+    }
+
+    // Deduct token (skip for admins)
+    if (currentUser.role !== 'admin') {
+      await consumeUserToken(userId, 1);
+    }
+
+    return NextResponse.json({
+      success: true,
+      id: savedId,
+      data: silabusData,
+      files: {
+        pdf_url: pdfUrl,
+        docx_url: docxUrl,
+      },
+    });
+  } catch (error: any) {
+    console.error('Silabus Generate Error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Gagal generate Silabus' },
+      { status: 500 }
+    );
+  }
+}

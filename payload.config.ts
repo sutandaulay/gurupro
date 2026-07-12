@@ -14,6 +14,17 @@ import ChatbotConfig from "./collections/ChatbotConfig";
 import Categories from "./collections/Categories";
 import Posts from "./collections/Posts";
 import AddonTokenPackages from "./collections/AddonTokenPackages";
+import Institutions from "./collections/Institutions";
+import InstitutionMembers from "./collections/InstitutionMembers";
+import ModulAjar from "./collections/ModulAjar";
+import BahanAjar from "./collections/BahanAjar";
+import Silabus from "./collections/Silabus";
+import LKPD from "./collections/LKPD";
+import LaporanEvaluasiLKPD from "./collections/LaporanEvaluasiLKPD";
+import LeaderContacts from "./collections/LeaderContacts";
+import PerformanceShareLinks from "./collections/PerformanceShareLinks";
+import DocumentAccessGrants from "./collections/DocumentAccessGrants";
+import OtpVerifications from "./collections/OtpVerifications";
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -38,10 +49,29 @@ export default buildConfig({
   },
 
   routes: {
-    admin: "/cms",
+    admin: "/admin",
   },
 
-  collections: [Users, Media, Features, WhyPoints, Categories, Posts, AddonTokenPackages],
+  collections: [
+    Users,
+    Media,
+    Features,
+    WhyPoints,
+    Categories,
+    Posts,
+    AddonTokenPackages,
+    Institutions,
+    InstitutionMembers,
+    ModulAjar,
+    BahanAjar,
+    Silabus,
+    LKPD,
+    LaporanEvaluasiLKPD,
+    LeaderContacts,
+    PerformanceShareLinks,
+    DocumentAccessGrants,
+    OtpVerifications,
+  ],
 
   globals: [LandingPage, FooterContent, ChatbotConfig],
 
@@ -56,6 +86,7 @@ export default buildConfig({
         "postgresql://postgres:nus4nt4r4@localhost:5432/gurupro_db",
     },
     push: true,
+    schemaName: "payload",
   }),
 
   typescript: {
@@ -64,10 +95,16 @@ export default buildConfig({
 
   cors: [
     process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:3003",
   ],
 
   csrf: [
     process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:3003",
   ],
 
   upload: {

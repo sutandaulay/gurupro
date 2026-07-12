@@ -74,10 +74,14 @@ const initDb = async () => {
         class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
         nama_siswa VARCHAR(255) NOT NULL,
         nisn VARCHAR(50),
+        nis_lokal VARCHAR(50),
         nomor_absen INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    // Add nis_lokal column if it doesn't exist (for existing tables)
+    await pool.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS nis_lokal VARCHAR(50)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_students_nis_lokal ON students(nis_lokal)`);
 
     // 6. Tabel Teacher Attendance (Presensi Mengajar Guru)
     await pool.query(`
@@ -162,6 +166,11 @@ const initDb = async () => {
         tipe_dokumen VARCHAR(50) NOT NULL,
         judul_dokumen VARCHAR(255) NOT NULL,
         konten JSONB NOT NULL,
+        school_id UUID,
+        jenjang VARCHAR(50),
+        kurikulum VARCHAR(50),
+        owned_by_institution BOOLEAN DEFAULT FALSE,
+        institution_id INTEGER,
         tanggal_kegiatan DATE NOT NULL DEFAULT CURRENT_DATE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -190,9 +199,13 @@ const initDb = async () => {
         nama_asesmen VARCHAR(255) NOT NULL,
         tipe_asesmen VARCHAR(50) NOT NULL, -- 'Diagnostik', 'Formatif', 'Sumatif'
         kkm INTEGER NOT NULL DEFAULT 70,
+        is_akhir_semester BOOLEAN NOT NULL DEFAULT false,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    // Add is_akhir_semester column if it doesn't exist (for existing tables)
+    await pool.query(`ALTER TABLE assessments ADD COLUMN IF NOT EXISTS is_akhir_semester BOOLEAN NOT NULL DEFAULT false`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_assessments_akhir_semester ON assessments(class_id, subject_id) WHERE is_akhir_semester = true`);
 
     // 14. Tabel Student Grades (Buku Nilai & Remedial Tracker)
     await pool.query(`
@@ -248,6 +261,7 @@ const initDb = async () => {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_start TIMESTAMP WITHOUT TIME ZONE');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_end TIMESTAMP WITHOUT TIME ZONE');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT');
     
     // Backfill default values for existing users with null subscription fields
     await pool.query(`
@@ -520,6 +534,501 @@ const initDb = async () => {
       await pool.query("ALTER TABLE tahun_ajaran ADD COLUMN IF NOT EXISTS semester VARCHAR(20)");
     } catch { /* table might not exist yet */ }
 
+    // 23. Add app_user_id to institution_members for app-side reference
+    try {
+      await pool.query('ALTER TABLE institution_members ADD COLUMN IF NOT EXISTS "app_user_id" UUID');
+      await pool.query('CREATE INDEX IF NOT EXISTS institution_members_app_user_idx ON institution_members ("app_user_id")');
+    } catch { /* table may not exist yet */ }
+
+    // Add new enum values first (before setting defaults)
+    try {
+      await pool.query("ALTER TYPE enum_institution_members_status ADD VALUE IF NOT EXISTS 'invited' BEFORE 'active'");
+    } catch { /* not a native enum or already exists */ }
+    try {
+      await pool.query("ALTER TYPE enum_institution_members_status ADD VALUE IF NOT EXISTS 'left' AFTER 'active'");
+    } catch { /* not a native enum or already exists */ }
+    try {
+      await pool.query("ALTER TYPE enum_institution_members_status ADD VALUE IF NOT EXISTS 'rejected' AFTER 'left'");
+    } catch { /* not a native enum or already exists */ }
+
+    // Migrate data and set default (runs after enum values are available)
+    try {
+      await pool.query("UPDATE institution_members SET status = 'invited' WHERE status = 'pending'");
+      await pool.query("UPDATE institution_members SET status = 'left' WHERE status = 'inactive'");
+      await pool.query("ALTER TABLE institution_members ALTER COLUMN status SET DEFAULT 'invited'");
+    } catch { /* column may be text type or table doesn't exist */ }
+
+    // 24. Add document ownership fields to teacher_journals
+    try {
+      await pool.query('ALTER TABLE teacher_journals ADD COLUMN IF NOT EXISTS owned_by_institution BOOLEAN DEFAULT FALSE');
+      await pool.query('ALTER TABLE teacher_journals ADD COLUMN IF NOT EXISTS institution_id INTEGER');
+    } catch { /* table may not exist yet */ }
+
+    // 25. Add document ownership fields to guru_administrasi
+    try {
+      await pool.query('ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS owned_by_institution BOOLEAN DEFAULT FALSE');
+      await pool.query('ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS institution_id INTEGER');
+      await pool.query('ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS school_id UUID');
+      await pool.query('ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS jenjang VARCHAR(50)');
+      await pool.query('ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS kurikulum VARCHAR(50)');
+      await pool.query('ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS fase VARCHAR(10)');
+      await pool.query('ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS semester INTEGER');
+      await pool.query('ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS dimensi8 JSONB DEFAULT \'[]\'');
+      await pool.query('ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS tahunAjaran VARCHAR(20)');
+      await pool.query('ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS subject_id UUID');
+    } catch { /* table may not exist yet */ }
+
+    // 26. Create in_app_notifications table
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS in_app_notifications (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          title VARCHAR(255) NOT NULL,
+          body TEXT NOT NULL,
+          type VARCHAR(50) NOT NULL DEFAULT 'info',
+          reference_type VARCHAR(50),
+          reference_id VARCHAR(255),
+          is_read BOOLEAN NOT NULL DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_notif_user ON in_app_notifications (user_id)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_notif_unread ON in_app_notifications (user_id) WHERE is_read = FALSE');
+    } catch { /* table may not exist yet */ }
+
+    // 27. Create wali_kelas_assignments table (File 01: Relasi Wali Kelas)
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS wali_kelas_assignments (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          kelas_id UUID NOT NULL REFERENCES classes(id) ON DELETE RESTRICT,
+          wali_kelas_member_id UUID NOT NULL,
+          tahun_ajaran VARCHAR(9) NOT NULL,
+          semester VARCHAR(6) NOT NULL CHECK (semester IN ('ganjil', 'genap')),
+          status VARCHAR(10) NOT NULL DEFAULT 'aktif' CHECK (status IN ('aktif', 'nonaktif')),
+          ditugaskan_pada TIMESTAMP NOT NULL DEFAULT now(),
+          ditugaskan_oleh UUID,
+          created_at TIMESTAMP NOT NULL DEFAULT now(),
+          updated_at TIMESTAMP NOT NULL DEFAULT now()
+        )
+      `);
+
+      // Indexes
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_wali_kelas_kelas_periode
+          ON wali_kelas_assignments (kelas_id, tahun_ajaran, semester)
+          WHERE status = 'aktif'
+      `);
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_wali_kelas_guru
+          ON wali_kelas_assignments (wali_kelas_member_id, tahun_ajaran, semester)
+          WHERE status = 'aktif'
+      `);
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_wali_kelas_periode
+          ON wali_kelas_assignments (tahun_ajaran, semester)
+          WHERE status = 'aktif'
+      `);
+
+      // Unique constraint: only 1 active assignment per class per period
+      await pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS uniq_wali_kelas_aktif
+          ON wali_kelas_assignments (kelas_id, tahun_ajaran, semester)
+          WHERE status = 'aktif'
+      `);
+
+      // Trigger for auto-updating updated_at
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_wali_kelas_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = now();
+          RETURN NEW;
+        END;
+        $$ language 'plpgsql'
+      `);
+      await pool.query(`
+        DROP TRIGGER IF EXISTS update_wali_kelas_assignments_updated_at ON wali_kelas_assignments
+      `);
+      await pool.query(`
+        CREATE TRIGGER update_wali_kelas_assignments_updated_at
+          BEFORE UPDATE ON wali_kelas_assignments
+          FOR EACH ROW
+          EXECUTE FUNCTION update_wali_kelas_updated_at()
+      `);
+    } catch (err) {
+      console.error('Failed to create wali_kelas_assignments table:', err);
+    }
+
+    // 28. Create sikap, ekstrakurikuler, catatan_wali_kelas tables (File 03)
+    try {
+      // Tabel penilaian_sikap
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS penilaian_sikap (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          siswa_id UUID NOT NULL REFERENCES students(id),
+          kelas_id UUID NOT NULL REFERENCES classes(id),
+          periode VARCHAR(30) NOT NULL,
+          varian VARCHAR(30) NOT NULL CHECK (varian IN ('profil_pelajar_pancasila', 'dimensi_profil_lulusan_madrasah', 'profil_rahmatan_lil_alamin')),
+          penilaian_per_dimensi JSONB NOT NULL,
+          deskripsi_umum TEXT NOT NULL,
+          dinilai_oleh UUID NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT now(),
+          UNIQUE (siswa_id, kelas_id, periode)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_penilaian_sikap_siswa ON penilaian_sikap(siswa_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_penilaian_sikap_kelas ON penilaian_sikap(kelas_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_penilaian_sikap_dinilai_oleh ON penilaian_sikap(dinilai_oleh)`);
+      // Migration: Update penilaian_sikap.varian CHECK constraint
+      try {
+        await pool.query(`ALTER TABLE penilaian_sikap DROP CONSTRAINT IF EXISTS penilaian_sikap_varian_check`);
+        await pool.query(`ALTER TABLE penilaian_sikap ADD CONSTRAINT penilaian_sikap_varian_check CHECK (varian IN ('profil_pelajar_pancasila', 'dimensi_profil_lulusan_madrasah', 'profil_rahmatan_lil_alamin'))`);
+      } catch (_) {}
+
+      // Tabel ekstrakurikuler
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS ekstrakurikuler (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          nama_ekskul VARCHAR(255) NOT NULL,
+          kelas_id UUID NOT NULL REFERENCES classes(id),
+          pembina_member_id UUID NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT now(),
+          updated_at TIMESTAMP NOT NULL DEFAULT now()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_ekstrakurikuler_kelas ON ekstrakurikuler(kelas_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_ekstrakurikuler_pembina ON ekstrakurikuler(pembina_member_id)`);
+
+      // Tabel penilaian_ekstrakurikuler
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS penilaian_ekstrakurikuler (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          siswa_id UUID NOT NULL REFERENCES students(id),
+          ekstrakurikuler_id UUID NOT NULL REFERENCES ekstrakurikuler(id),
+          periode VARCHAR(30) NOT NULL,
+          predikat VARCHAR(20) NOT NULL CHECK (predikat IN ('sangat_baik', 'baik', 'cukup', 'perlu_bimbingan')),
+          deskripsi TEXT NOT NULL,
+          dinilai_oleh UUID NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT now(),
+          UNIQUE (siswa_id, ekstrakurikuler_id, periode)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_penilaian_ekskul_siswa ON penilaian_ekstrakurikuler(siswa_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_penilaian_ekskul_ekskul ON penilaian_ekstrakurikuler(ekstrakurikuler_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_penilaian_ekskul_dinilai_oleh ON penilaian_ekstrakurikuler(dinilai_oleh)`);
+
+      // Tabel catatan_wali_kelas
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS catatan_wali_kelas (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          siswa_id UUID NOT NULL REFERENCES students(id),
+          kelas_id UUID NOT NULL REFERENCES classes(id),
+          periode VARCHAR(30) NOT NULL,
+          catatan TEXT NOT NULL,
+          ditulis_oleh UUID NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT now(),
+          updated_at TIMESTAMP NOT NULL DEFAULT now(),
+          UNIQUE (siswa_id, kelas_id, periode)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_catatan_wali_kelas_siswa ON catatan_wali_kelas(siswa_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_catatan_wali_kelas_kelas ON catatan_wali_kelas(kelas_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_catatan_wali_kelas_ditulis_oleh ON catatan_wali_kelas(ditulis_oleh)`);
+
+      // Trigger for auto-updating updated_at
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_sikap_ekskul_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = now();
+          RETURN NEW;
+        END;
+        $$ language 'plpgsql'
+      `);
+      await pool.query(`DROP TRIGGER IF EXISTS update_ekstrakurikuler_updated_at ON ekstrakurikuler`);
+      await pool.query(`CREATE TRIGGER update_ekstrakurikuler_updated_at BEFORE UPDATE ON ekstrakurikuler FOR EACH ROW EXECUTE FUNCTION update_sikap_ekskul_updated_at()`);
+      await pool.query(`DROP TRIGGER IF EXISTS update_catatan_wali_kelas_updated_at ON catatan_wali_kelas`);
+      await pool.query(`CREATE TRIGGER update_catatan_wali_kelas_updated_at BEFORE UPDATE ON catatan_wali_kelas FOR EACH ROW EXECUTE FUNCTION update_sikap_ekskul_updated_at()`);
+    } catch (err) {
+      console.error('Failed to create sikap/ekskul/catatan_wali_kelas tables:', err);
+    }
+
+    // 28b. Create raport tables (File 04: Template Raport, Data Raport)
+    try {
+      // Table: template_raport
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS template_raport (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          sekolah_id UUID NOT NULL REFERENCES schools(id) ON DELETE RESTRICT,
+          nama_template VARCHAR(255) NOT NULL,
+          jalur_regulasi VARCHAR(20) NOT NULL CHECK (jalur_regulasi IN ('kemendikdasmen', 'kemenag')),
+          jenjang VARCHAR(20) NOT NULL CHECK (jenjang IN ('paud', 'sd_mi', 'smp_mts', 'sma_ma', 'smk_mak')),
+          kurikulum VARCHAR(20) NOT NULL CHECK (kurikulum IN ('kurikulum_merdeka', 'k13', 'kbc', 'hybrid')),
+          jenis_laporan VARCHAR(20) NOT NULL CHECK (jenis_laporan IN ('tengah_semester', 'akhir_semester', 'kokurikuler_p5', 'kokurikuler_p2ra')),
+          mode_nilai_akademik VARCHAR(20) NOT NULL CHECK (mode_nilai_akademik IN ('angka_kkm', 'angka_deskripsi', 'naratif_saja')),
+          varian_sikap VARCHAR(30) CHECK (varian_sikap IN ('profil_pelajar_pancasila', 'dimensi_profil_lulusan_madrasah', 'profil_rahmatan_lil_alamin')),
+          basis_deskripsi VARCHAR(30) NOT NULL CHECK (basis_deskripsi IN ('capaian_pembelajaran', 'alur_tujuan_pembelajaran', 'poin_materi')),
+          sections JSONB NOT NULL DEFAULT '[]',
+          is_default BOOLEAN NOT NULL DEFAULT false,
+          created_at TIMESTAMP NOT NULL DEFAULT now(),
+          updated_at TIMESTAMP NOT NULL DEFAULT now()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_template_raport_sekolah ON template_raport (sekolah_id, jalur_regulasi, jenjang, kurikulum, jenis_laporan)`);
+
+      // Migration: Update CHECK constraints to include KBC and Hybrid options
+      try {
+        await pool.query(`ALTER TABLE template_raport DROP CONSTRAINT IF EXISTS template_raport_kurikulum_check`);
+        await pool.query(`ALTER TABLE template_raport ADD CONSTRAINT template_raport_kurikulum_check CHECK (kurikulum IN ('kurikulum_merdeka', 'k13', 'kbc', 'hybrid'))`);
+      } catch (_) {}
+      try {
+        await pool.query(`ALTER TABLE template_raport DROP CONSTRAINT IF EXISTS template_raport_varian_sikap_check`);
+        await pool.query(`ALTER TABLE template_raport ADD CONSTRAINT template_raport_varian_sikap_check CHECK (varian_sikap IN ('profil_pelajar_pancasila', 'dimensi_profil_lulusan_madrasah', 'profil_rahmatan_lil_alamin'))`);
+      } catch (_) {}
+      try {
+        await pool.query(`ALTER TABLE template_raport DROP CONSTRAINT IF EXISTS template_raport_jenis_laporan_check`);
+        await pool.query(`ALTER TABLE template_raport ADD CONSTRAINT template_raport_jenis_laporan_check CHECK (jenis_laporan IN ('tengah_semester', 'akhir_semester', 'kokurikuler_p5', 'kokurikuler_p2ra'))`);
+      } catch (_) {}
+
+      // Table: data_raport
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS data_raport (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          siswa_id UUID NOT NULL REFERENCES students(id) ON DELETE RESTRICT,
+          nisn VARCHAR(10) NOT NULL,
+          nis_lokal VARCHAR(50) NOT NULL,
+          kelas_id UUID NOT NULL REFERENCES classes(id) ON DELETE RESTRICT,
+          template_raport_id UUID NOT NULL REFERENCES template_raport(id) ON DELETE RESTRICT,
+          periode VARCHAR(30) NOT NULL,
+          jenis_laporan VARCHAR(20) NOT NULL CHECK (jenis_laporan IN ('tengah_semester', 'akhir_semester', 'kokurikuler_p5', 'kokurikuler_p2ra')),
+          status VARCHAR(25) NOT NULL DEFAULT 'draft'
+            CHECK (status IN ('draft', 'dikirim_ke_wali_kelas', 'dikonfirmasi', 'difinalisasi', 'siap_print')),
+          sikap_id UUID,
+          catatan_wali_kelas TEXT,
+          presensi_snapshot JSONB,
+          created_at TIMESTAMP NOT NULL DEFAULT now(),
+          updated_at TIMESTAMP NOT NULL DEFAULT now(),
+          UNIQUE (siswa_id, template_raport_id, periode)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_data_raport_siswa ON data_raport (siswa_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_data_raport_kelas ON data_raport (kelas_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_data_raport_status ON data_raport (status)`);
+      // Migration: Update data_raport.jenis_laporan CHECK constraint
+      try {
+        await pool.query(`ALTER TABLE data_raport DROP CONSTRAINT IF EXISTS data_raport_jenis_laporan_check`);
+        await pool.query(`ALTER TABLE data_raport ADD CONSTRAINT data_raport_jenis_laporan_check CHECK (jenis_laporan IN ('tengah_semester', 'akhir_semester', 'kokurikuler_p5', 'kokurikuler_p2ra'))`);
+      } catch (_) {}
+
+
+      // Table: data_raport_nilai_mapel
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS data_raport_nilai_mapel (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          data_raport_id UUID NOT NULL REFERENCES data_raport(id) ON DELETE CASCADE,
+          mapel_id UUID NOT NULL,
+          guru_mapel_member_id UUID NOT NULL,
+          nilai_akhir NUMERIC(5,1),
+          kkm NUMERIC(5,1),
+          deskripsi_capaian TEXT NOT NULL DEFAULT '',
+          deskripsi_sumber_ai BOOLEAN NOT NULL DEFAULT false,
+          deskripsi_dibuka_untuk_review BOOLEAN NOT NULL DEFAULT false,
+          dikonfirmasi_guru BOOLEAN NOT NULL DEFAULT false,
+          created_at TIMESTAMP NOT NULL DEFAULT now(),
+          updated_at TIMESTAMP NOT NULL DEFAULT now(),
+          UNIQUE (data_raport_id, mapel_id)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_data_raport_nilai_mapel_raport ON data_raport_nilai_mapel (data_raport_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_data_raport_nilai_mapel_guru ON data_raport_nilai_mapel (guru_mapel_member_id)`);
+
+      // Table: data_raport_status_history
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS data_raport_status_history (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          data_raport_id UUID NOT NULL REFERENCES data_raport(id) ON DELETE CASCADE,
+          status VARCHAR(25) NOT NULL,
+          changed_at TIMESTAMP NOT NULL DEFAULT now(),
+          changed_by UUID NOT NULL,
+          changed_by_role VARCHAR(20)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_data_raport_status_history_raport ON data_raport_status_history (data_raport_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_data_raport_status_history_changed_by ON data_raport_status_history (changed_by)`);
+
+      // Triggers for auto-updating updated_at
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_raport_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = now();
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+      `);
+      await pool.query(`DROP TRIGGER IF EXISTS update_template_raport_updated_at ON template_raport`);
+      await pool.query(`CREATE TRIGGER update_template_raport_updated_at BEFORE UPDATE ON template_raport FOR EACH ROW EXECUTE FUNCTION update_raport_updated_at()`);
+      await pool.query(`DROP TRIGGER IF EXISTS update_data_raport_updated_at ON data_raport`);
+      await pool.query(`CREATE TRIGGER update_data_raport_updated_at BEFORE UPDATE ON data_raport FOR EACH ROW EXECUTE FUNCTION update_raport_updated_at()`);
+      await pool.query(`DROP TRIGGER IF EXISTS update_data_raport_nilai_mapel_updated_at ON data_raport_nilai_mapel`);
+      await pool.query(`CREATE TRIGGER update_data_raport_nilai_mapel_updated_at BEFORE UPDATE ON data_raport_nilai_mapel FOR EACH ROW EXECUTE FUNCTION update_raport_updated_at()`);
+
+      // Validation function: Cek role guru
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION validate_guru_mapel_member(p_member_id UUID)
+        RETURNS BOOLEAN AS $$
+        DECLARE
+          v_role VARCHAR(20);
+        BEGIN
+          SELECT imr.value INTO v_role
+      FROM institution_members im
+      JOIN institution_members_role imr ON imr.parent_id = im.id
+      WHERE im.app_user_id = p_member_id
+        AND imr.value = 'guru'
+          LIMIT 1;
+          RETURN v_role IS NOT NULL;
+        END;
+        $$ LANGUAGE plpgsql
+      `);
+    } catch (err) {
+      console.error('Failed to create raport tables:', err);
+    }
+
+    // 29. Create layout_raport table (File 06: Layout Builder)
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS layout_raport (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          template_raport_id UUID NOT NULL REFERENCES template_raport(id) ON DELETE CASCADE,
+          sekolah_id UUID NOT NULL,
+          nama_layout VARCHAR(255) NOT NULL,
+          sections JSONB NOT NULL,
+          created_by_wali_kelas_member_id UUID NOT NULL,
+          last_edited_at TIMESTAMP NOT NULL DEFAULT now()
+        )
+      `);
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_layout_raport_template
+          ON layout_raport (template_raport_id)
+      `);
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_layout_raport_sekolah
+          ON layout_raport (sekolah_id)
+      `);
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_layout_raport_last_edited()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.last_edited_at = now();
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+      `);
+      await pool.query(`
+        DROP TRIGGER IF EXISTS update_layout_raport_last_edited_trigger ON layout_raport
+      `);
+      await pool.query(`
+        CREATE TRIGGER update_layout_raport_last_edited_trigger
+          BEFORE UPDATE ON layout_raport
+          FOR EACH ROW EXECUTE FUNCTION update_layout_raport_last_edited()
+      `);
+    } catch (err) {
+      console.error('Failed to create layout_raport table:', err);
+    }
+
+    // 30. Create kontak_eksternal_raport table (File 07: Kontak Eksternal + OTP-Link)
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS kontak_eksternal_raport (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          guru_mapel_member_id UUID NOT NULL,
+          nama_kontak VARCHAR(255) NOT NULL,
+          kontak_wa VARCHAR(20),
+          kontak_email VARCHAR(255),
+          kelas_id UUID NOT NULL REFERENCES classes(id),
+          link_token VARCHAR(255) NOT NULL UNIQUE,
+          otp_expired_at TIMESTAMP NOT NULL,
+          status_klaim VARCHAR(15) NOT NULL DEFAULT 'belum_klaim' CHECK (status_klaim IN ('belum_klaim', 'sudah_klaim')),
+          claimed_by_member_id UUID,
+          created_at TIMESTAMP NOT NULL DEFAULT now()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_kontak_eksternal_raport_link_token ON kontak_eksternal_raport (link_token)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_kontak_eksternal_raport_guru_mapel ON kontak_eksternal_raport (guru_mapel_member_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_kontak_eksternal_raport_kelas ON kontak_eksternal_raport (kelas_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_kontak_eksternal_raport_otp_expired ON kontak_eksternal_raport (otp_expired_at)`);
+
+      // 31. Create kontak_eksternal_akses_log table
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS kontak_eksternal_akses_log (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          kontak_eksternal_id UUID NOT NULL REFERENCES kontak_eksternal_raport(id),
+          accessed_at TIMESTAMP NOT NULL DEFAULT now(),
+          ip_address VARCHAR(45)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_kontak_eksternal_akses_log_kontak ON kontak_eksternal_akses_log (kontak_eksternal_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_kontak_eksternal_akses_log_accessed ON kontak_eksternal_akses_log (accessed_at)`);
+
+      // 32. Create pemetaan_kolom_profile table
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS pemetaan_kolom_profile (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          sekolah_id UUID NOT NULL,
+          jalur_regulasi VARCHAR(20) NOT NULL CHECK (jalur_regulasi IN ('kemendikdasmen', 'kemenag')),
+          urutan_siswa VARCHAR(20) NOT NULL CHECK (urutan_siswa IN ('abjad_nama', 'nomor_absen', 'nisn')),
+          urutan_kolom JSONB NOT NULL,
+          system_version_catatan VARCHAR(100),
+          last_validated_at TIMESTAMP NOT NULL DEFAULT now(),
+          UNIQUE (sekolah_id, jalur_regulasi)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_pemetaan_kolom_profile_sekolah ON pemetaan_kolom_profile (sekolah_id)`);
+    } catch (err) {
+      console.error('Failed to create kontak eksternal / pemetaan kolom tables:', err);
+    }
+
+    // 33. Create user_storage tables (user-created folders and files)
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS user_folders (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          name VARCHAR(255) NOT NULL,
+          parent_id UUID REFERENCES user_folders(id) ON DELETE CASCADE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_folders_user ON user_folders (user_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_folders_parent ON user_folders (parent_id)`);
+      await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_folders_unique_name ON user_folders (user_id, parent_id, name)`);
+      await pool.query(`ALTER TABLE user_folders ADD COLUMN IF NOT EXISTS pin VARCHAR(255)`);
+      await pool.query(`ALTER TABLE user_folders ADD COLUMN IF NOT EXISTS pin_reset_code VARCHAR(6)`);
+      await pool.query(`ALTER TABLE user_folders ADD COLUMN IF NOT EXISTS pin_reset_expires_at TIMESTAMP`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS user_files (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          folder_id UUID REFERENCES user_folders(id) ON DELETE CASCADE,
+          name VARCHAR(255) NOT NULL,
+          r2_key TEXT NOT NULL,
+          r2_url TEXT NOT NULL,
+          size BIGINT NOT NULL DEFAULT 0,
+          mime_type VARCHAR(255) NOT NULL DEFAULT 'application/octet-stream',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_files_user ON user_files (user_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_files_folder ON user_files (folder_id)`);
+    } catch (err) {
+      console.error('Failed to create user_storage tables:', err);
+    }
+
     console.log("SaaS Academic & TAMS tables checked/initialized successfully");
   } catch (err) {
     console.error("Failed to initialize SaaS Academic & TAMS tables:", err);
@@ -547,6 +1056,32 @@ export const logAudit = async (userId: string | null, aksi: string, deskripsi: s
     console.error("Failed to write audit log:", err);
   }
 };
+
+export interface UserRecord {
+  id: string;
+  email: string;
+  nama_lengkap: string;
+  whatsapp?: string;
+  phone?: string;
+  username?: string;
+}
+
+export async function getUserById(userId: string): Promise<UserRecord | null> {
+  try {
+    const result = await pool.query(
+      `SELECT id, email, nama_lengkap, whatsapp, phone, username
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [userId]
+    );
+    if (result.rows.length === 0) return null;
+    return result.rows[0] as UserRecord;
+  } catch (err) {
+    console.error("Failed to get user by ID:", err);
+    return null;
+  }
+}
 
 let initPromise: Promise<void> | null = null;
 

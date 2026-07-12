@@ -6,6 +6,8 @@
 import { PrismaClient } from '@prisma/client';
 import { generateAIContent } from '@/lib/ai/generators';
 import type { SelesaiMengajarInput, JurnalResult } from './types';
+import { uploadToR2 } from '@/lib/r2';
+import { generatePdfBuffer, generateDocBuffer } from '@/lib/doc-compiler';
 
 const prisma = new PrismaClient();
 
@@ -79,6 +81,71 @@ Buat dalam Bahasa Indonesia yang formal dan sesuai standar administrasi guru.
 
   const jurnalContent = result.data;
 
+  let pdfUrl: string | null = null;
+  let docxUrl: string | null = null;
+
+  try {
+    // Resolve school name
+    let schoolName = "-";
+    if (data.school_id) {
+      const school = await prisma.schools.findUnique({
+        where: { id: data.school_id }
+      });
+      if (school) schoolName = school.nama_sekolah;
+    }
+
+    const markdown = `
+# JURNAL HARIAN MENGAJAR GURU
+
+## IDENTITAS KBM
+- **Nama Guru**: ${guruName || "-"}
+- **Sekolah**: ${schoolName || "-"}
+- **Mata Pelajaran**: ${data.mapel_nama || "-"}
+- **Kelas**: Kelas ${data.kelas_nama || "-"}
+- **Tanggal**: ${data.tanggal || "-"}
+
+## DETAIL PEMBELAJARAN
+### 1. Materi Pembelajaran
+${jurnalContent.materi_pembelajaran}
+
+### 2. Tujuan Pembelajaran
+${jurnalContent.tujuan_pembelajaran.join('\n')}
+
+### 3. Aktivitas Pembelajaran
+${jurnalContent.aktivitas_pembelajaran}
+
+### 4. Media Pembelajaran
+${jurnalContent.media_pembelajaran || "-"}
+
+### 5. Asesmen Pembelajaran
+${jurnalContent.asesmen_pembelajaran || "-"}
+
+### 6. Refleksi Guru
+${jurnalContent.refleksi_guru || "-"}
+
+### 7. Rencana Tindak Lanjut
+${jurnalContent.tindak_lanjut || "-"}
+
+## REKAP KEHADIRAN SISWA
+- **Hadir**: ${data.jumlah_hadir || 0} siswa
+- **Izin**: ${data.jumlah_izin || 0} siswa
+- **Sakit**: ${data.jumlah_sakit || 0} siswa
+- **Alpha**: ${data.jumlah_alpha || 0} siswa
+`;
+
+    const title = `Jurnal Mengajar - ${data.mapel_nama} Kelas ${data.kelas_nama}`;
+    
+    // Generate PDF
+    const pdfBuf = await generatePdfBuffer(markdown, title);
+    pdfUrl = await uploadToR2(pdfBuf, `${Date.now()}-Jurnal.pdf`, "application/pdf");
+
+    // Generate DOC
+    const docBuf = generateDocBuffer(markdown, title);
+    docxUrl = await uploadToR2(docBuf, `${Date.now()}-Jurnal.doc`, "application/msword");
+  } catch (err) {
+    console.error("Failed to compile or upload journal files to R2:", err);
+  }
+
   // Save to database
   const today = new Date(data.tanggal);
   today.setHours(0, 0, 0, 0);
@@ -100,6 +167,10 @@ Buat dalam Bahasa Indonesia yang formal dan sesuai standar administrasi guru.
       status: 'Draft',
       auto_generated: true,
       source_schedule_id: data.schedule_id,
+      custom_values: {
+        pdf_url: pdfUrl,
+        docx_url: docxUrl
+      }
     },
   });
 

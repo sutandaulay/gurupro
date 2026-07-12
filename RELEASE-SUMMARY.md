@@ -29,7 +29,7 @@
 - ✅ Guru bisa mengajar **banyak kelas**
 - ✅ Junction tables untuk relasi M:N
 
-### 2. 8 Dimensi Profil Lulusan (Kerangka 8334)
+### 2. 8 Dimensi Profil Lulusan
 - ✅ 8 dimensi dengan checkbox selector
 - ✅ Integrasi otomatis di Modul Ajar & RPP
 - ✅ Dimensi: Imtaq, Berkebinekaan Global, Gotong Royong, Merdeka, Kreatif, Bernalar Kritis, Budi Pekerti Luhur, Kreativitas

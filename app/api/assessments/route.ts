@@ -1,6 +1,7 @@
 import { query, logAudit } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { getContextFilters } from "@/lib/session";
 
 export async function GET(req: Request) {
   try {
@@ -16,9 +17,11 @@ export async function GET(req: Request) {
     }
     const session = JSON.parse(sessionCookie);
     const userId = session.id;
+    const filters = await getContextFilters(userId);
 
+    let res;
     if (!schoolId || !classId || !subjectId) {
-      const res = await query(
+      res = await query(
         `SELECT a.*, c.nama_kelas, sb.nama_mapel, s.nama_sekolah
          FROM assessments a
          JOIN classes c ON a.class_id = c.id
@@ -28,17 +31,35 @@ export async function GET(req: Request) {
          ORDER BY a.created_at DESC`,
         [userId]
       );
-      return NextResponse.json(res.rows);
+    } else {
+      res = await query(
+        `SELECT a.*, c.nama_kelas, sb.nama_mapel, s.nama_sekolah
+         FROM assessments a
+         JOIN classes c ON a.class_id = c.id
+         JOIN subjects sb ON a.subject_id = sb.id
+         JOIN schools s ON a.school_id = s.id
+         WHERE a.school_id = $1 AND a.class_id = $2 AND a.subject_id = $3
+         ORDER BY a.created_at DESC`,
+        [schoolId, classId, subjectId]
+      );
     }
 
-    const res = await query(
-      `SELECT * FROM assessments 
-       WHERE school_id = $1 AND class_id = $2 AND subject_id = $3
-       ORDER BY created_at DESC`,
-      [schoolId, classId, subjectId]
-    );
+    let rows = res.rows;
+    if (filters.assignedMapel.length > 0 || filters.assignedKelas.length > 0) {
+      rows = rows.filter((row: any) => {
+        const matchMapel = filters.assignedMapel.length === 0 ||
+          (row.nama_mapel && filters.assignedMapel.some((m) =>
+            row.nama_mapel.toLowerCase().includes(m.toLowerCase())
+          ));
+        const matchKelas = filters.assignedKelas.length === 0 ||
+          (row.nama_kelas && filters.assignedKelas.some((k) =>
+            row.nama_kelas.toLowerCase().includes(k.toLowerCase())
+          ));
+        return matchMapel && matchKelas;
+      });
+    }
 
-    return NextResponse.json(res.rows);
+    return NextResponse.json(rows);
   } catch (error: any) {
     console.error("Assessments GET error:", error);
     return NextResponse.json({ error: error.message || "Gagal memuat asesmen." }, { status: 500 });

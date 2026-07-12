@@ -71,6 +71,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'tahun_ajaran_id dan tanggal_observasi wajib diisi' }, { status: 400 })
     }
 
+    // Get sekolah_id from user school assignment if not provided
+    let finalSekolahId = sekolahId
+    if (!finalSekolahId) {
+      const schoolResult = await query(
+        `SELECT "schoolId" FROM user_school_assignments WHERE "userId" = $1 LIMIT 1`,
+        [guruId]
+      )
+      if (schoolResult.rows.length > 0) {
+        finalSekolahId = schoolResult.rows[0].schoolId
+      }
+    }
+
     // Create observasi
     const obsResult = await query(
       `INSERT INTO observasi_kinerja (guru_id, skp_id, observer_id, tahun_ajaran_id, tanggal_observasi, jenis, suasana_pembelajaran, catatan_observer, rekomendasi, status, sekolah_id)
@@ -86,7 +98,7 @@ export async function POST(req: Request) {
         suasanaPembelajaran || null,
         catatanObserver || null,
         rekomendasi || null,
-        sekolahId || null,
+        finalSekolahId || null,
       ]
     )
 

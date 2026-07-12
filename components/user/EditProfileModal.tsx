@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
+import { useProfileStore } from "@/lib/stores";
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -16,9 +17,6 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
     username: "",
     email: "",
     whatsapp: "",
-    nama_sekolah: "",
-    jenjang: "",
-    mata_pelajaran: "",
     nip: "",
   });
   const [passwordData, setPasswordData] = useState({
@@ -30,43 +28,98 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
   const [isSaving, setIsSaving] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const profileFromStore = useProfileStore(s => s.profile);
+  const fetchProfile = useProfileStore(s => s.fetchProfile);
 
   useEffect(() => {
-    if (isOpen && currentUser) {
-      // Ambil data user terbaru dari session/server
-      fetch('/api/user/profile')
-        .then(res => res.json())
-        .then(data => {
+    if (isOpen) {
+      const source = profileFromStore || currentUser;
+      if (source) {
+        setFormData({
+          nama_lengkap: source.nama_lengkap || "",
+          username: source.username || "",
+          email: source.email || "",
+          whatsapp: source.whatsapp || "",
+          nip: source.nip || "",
+        });
+        setPhotoUrl(source.photo_url || null);
+        setIsLoading(false);
+      } else {
+        fetchProfile().then(data => {
           if (data) {
             setFormData({
               nama_lengkap: data.nama_lengkap || "",
               username: data.username || "",
               email: data.email || "",
               whatsapp: data.whatsapp || "",
-              nama_sekolah: data.nama_sekolah || "",
-              jenjang: data.jenjang || "",
-              mata_pelajaran: data.mata_pelajaran || "",
               nip: data.nip || "",
             });
+            setPhotoUrl(data.photo_url || null);
           }
           setIsLoading(false);
-        })
-        .catch(() => {
-          // Fallback ke currentUser prop
-          setFormData({
-            nama_lengkap: currentUser.nama_lengkap || "",
-            username: currentUser.username || "",
-            email: currentUser.email || "",
-            whatsapp: currentUser.whatsapp || "",
-            nama_sekolah: currentUser.nama_sekolah || "",
-            jenjang: currentUser.jenjang || "",
-            mata_pelajaran: currentUser.mata_pelajaran || "",
-            nip: currentUser.nip || "",
-          });
-          setIsLoading(false);
         });
+      }
     }
-  }, [isOpen, currentUser]);
+  }, [isOpen]);
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(file.type)) {
+      setResult({ success: false, message: "Tipe file tidak didukung. Gunakan JPEG, PNG, WebP, atau GIF." });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setResult({ success: false, message: "Ukuran file maksimal 2MB." });
+      return;
+    }
+
+    // Show preview immediately
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setPhotoUrl(ev.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload to server
+    setIsUploadingPhoto(true);
+    setResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("photo", file);
+
+      const res = await fetch("/api/user/upload-photo", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setResult({ success: true, message: "Foto profil berhasil diperbarui!" });
+        setPhotoUrl(data.photo_url);
+      } else {
+        setResult({ success: false, message: data.error || "Gagal mengupload foto." });
+        // Revert preview on failure
+        const profileData = await fetchProfile();
+        setPhotoUrl(profileData?.photo_url || null);
+      }
+    } catch (error: any) {
+      setResult({ success: false, message: error.message || "Gagal mengupload foto." });
+    } finally {
+      setIsUploadingPhoto(false);
+      // Reset file input so the same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -77,9 +130,12 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
       setFormData(prev => ({ ...prev, username: value.toLowerCase().replace(/[^a-z0-9._-]/g, "") }));
     }
 
-    // Auto-format WhatsApp (numbers only)
+    // Auto-format WhatsApp (numbers only, with 62 prefix)
     if (name === "whatsapp") {
-      setFormData(prev => ({ ...prev, whatsapp: value.replace(/\D/g, "") }));
+      let digits = value.replace(/\D/g, "");
+      if (digits.startsWith("0")) digits = "62" + digits.slice(1);
+      else if (!digits.startsWith("62")) digits = "62" + digits;
+      setFormData(prev => ({ ...prev, whatsapp: digits }));
     }
   };
 
@@ -117,6 +173,7 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
 
       if (res.ok) {
         setResult({ success: true, message: data.message || "Profil berhasil diperbarui!" });
+        useProfileStore.getState().fetchProfile();
         setTimeout(() => {
           onSuccess();
           onClose();
@@ -169,6 +226,7 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
       if (res.ok) {
         setResult({ success: true, message: data.message || "Password berhasil diubah!" });
         setPasswordData({ current_password: "", new_password: "", confirm_password: "" });
+        useProfileStore.getState().fetchProfile();
         setTimeout(() => {
           onSuccess();
         }, 1500);
@@ -243,10 +301,42 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
             <div className="text-center py-8 text-slate-400">Memuat data...</div>
           ) : activeTab === "profile" ? (
             <div className="space-y-4">
-              {/* Avatar Preview */}
+              {/* Avatar Preview with Photo Upload */}
               <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl">
-                <div className="w-16 h-16 rounded-full bg-violet-600 flex items-center justify-center text-white text-xl font-bold">
-                  {formData.nama_lengkap ? formData.nama_lengkap.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "GP"}
+                <div className="relative shrink-0">
+                  <div className="w-16 h-16 rounded-full overflow-hidden bg-violet-600 flex items-center justify-center text-white text-xl font-bold">
+                    {photoUrl ? (
+                      <img src={photoUrl} alt="Foto Profil" className="w-full h-full object-cover" />
+                    ) : (
+                      <span>{formData.nama_lengkap ? formData.nama_lengkap.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "GP"}</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingPhoto}
+                    className="absolute -bottom-1 -right-1 w-7 h-7 bg-violet-600 text-white rounded-full flex items-center justify-center text-xs shadow-md hover:bg-violet-700 transition disabled:opacity-50 cursor-pointer"
+                    title="Ubah Foto"
+                  >
+                    {isUploadingPhoto ? (
+                      <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    )}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={handlePhotoChange}
+                  />
                 </div>
                 <div>
                   <p className="font-bold text-slate-800">{formData.nama_lengkap || "Nama Lengkap"}</p>
@@ -311,44 +401,13 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
                     <input
                       type="tel"
                       name="whatsapp"
-                      value={formData.whatsapp}
+                      value={formData.whatsapp.replace(/^62/, "")}
                       onChange={handleInputChange}
                       className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 font-mono"
                       placeholder="8123456789"
                     />
                   </div>
-                </div>
-
-                <div className="col-span-2">
-                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1">
-                    Nama Sekolah
-                  </label>
-                  <input
-                    type="text"
-                    name="nama_sekolah"
-                    value={formData.nama_sekolah}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    placeholder="Nama sekolah Anda"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1">
-                    Jenjang
-                  </label>
-                  <select
-                    name="jenjang"
-                    value={formData.jenjang}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  >
-                    <option value="">Pilih Jenjang</option>
-                    <option value="sd">SD / Sederajat</option>
-                    <option value="smp">SMP / Sederajat</option>
-                    <option value="sma">SMA / Sederajat</option>
-                    <option value="smk">SMK / Sederajat</option>
-                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1">Nomor akan tersimpan dengan kode negara (+62)</p>
                 </div>
 
                 <div>
@@ -362,20 +421,6 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 font-mono"
                     placeholder="NIP"
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1">
-                    Mata Pelajaran
-                  </label>
-                  <input
-                    type="text"
-                    name="mata_pelajaran"
-                    value={formData.mata_pelajaran}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    placeholder="Contoh: Matematika, IPA, Bahasa Indonesia"
                   />
                 </div>
               </div>

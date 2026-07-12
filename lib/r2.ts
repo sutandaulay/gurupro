@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID;
 const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY;
@@ -95,4 +95,78 @@ export async function uploadBase64ToR2(base64Data: string, prefix = 'journals'):
     console.error("Failed to upload base64 to Cloudflare R2:", error);
     throw error;
   }
+}
+
+export async function uploadToR2WithKey(
+  fileBuffer: Buffer,
+  key: string,
+  contentType: string
+): Promise<string | null> {
+  if (!s3Client || !bucketName || !publicUrl) {
+    console.warn("Cloudflare R2 is not fully configured. File upload to R2 skipped.");
+    return null;
+  }
+
+  try {
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+      Body: fileBuffer,
+      ContentType: contentType,
+    });
+
+    await s3Client.send(command);
+
+    const url = `${publicUrl.replace(/\/$/, '')}/${key}`;
+    return url;
+  } catch (error) {
+    console.error("Failed to upload file to Cloudflare R2:", error);
+    throw error;
+  }
+}
+
+export async function getObjectFromR2(key: string) {
+  if (!s3Client || !bucketName) {
+    console.warn("Cloudflare R2 is not fully configured.");
+    return null;
+  }
+  try {
+    const command = new GetObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+    });
+    return await s3Client.send(command);
+  } catch (error) {
+    console.error("Failed to get file from Cloudflare R2:", error);
+    return null;
+  }
+}
+
+export async function deleteFromR2(key: string): Promise<boolean> {
+  if (!s3Client || !bucketName) {
+    console.warn("Cloudflare R2 is not fully configured. Delete from R2 skipped.");
+    return false;
+  }
+
+  try {
+    const command = new DeleteObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+    });
+
+    await s3Client.send(command);
+    return true;
+  } catch (error) {
+    console.error("Failed to delete file from Cloudflare R2:", error);
+    return false;
+  }
+}
+
+export function extractKeyFromUrl(url: string): string | null {
+  if (!publicUrl) return null;
+  const prefix = publicUrl.replace(/\/$/, '') + '/';
+  if (url.startsWith(prefix)) {
+    return url.substring(prefix.length);
+  }
+  return null;
 }

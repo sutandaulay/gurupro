@@ -128,6 +128,7 @@ export default function LandingContent({
     { id: "six_month", package_name: "6 Bulan", price: 220000, tokens: 1100, duration_days: 180, popular: false, features: ["1100 Token Kuota Utama", "Masa Aktif 180 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Prioritas"] },
     { id: "one_year", package_name: "1 Tahun", price: 400000, tokens: 2500, duration_days: 365, popular: false, features: ["2500 Token Kuota Utama", "Masa Aktif 365 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "CS VIP 24/7 & Backup Riwayat"] },
   ];
+  const visiblePlans = pricingPlans.filter(plan => !(isLoggedIn && plan.price === 0));
   const faq = faqProp || [
     {
       question: "Bagaimana cara kerja perhitungan Token kuota?",
@@ -192,7 +193,10 @@ export default function LandingContent({
         ogImage={hero.ogImage}
       />
 
-      <FeaturesSection title="Semua Kebutuhan Administrasi Guru, Dalam Satu Platform" features={features} />
+      <FeaturesSection title="⏱️ Rata-rata guru habiskan 12+ jam/minggu untuk kerjaan administratif" features={features} 
+      subtitle="Semua Kebutuhan Administrasi Guru,
+Selesai Dalam Hitungan Menit — Bukan Jam"
+      />
 
       <WhySection
         title="Emang Worth It Pakai GuruPRO AI?"
@@ -215,12 +219,12 @@ export default function LandingContent({
             </p>
           </div>
 
-          <div className={`grid gap-6 max-w-7xl mx-auto items-stretch ${gridColsClass(pricingPlans.length)}`}>
-            {pricingPlans.map((plan, idx) => {
+          <div className={`grid gap-6 max-w-7xl mx-auto items-stretch ${gridColsClass(visiblePlans.length)}`}>
+            {visiblePlans.map((plan, idx) => {
               const perMonth = plan.price > 0 && plan.duration_days > 0
                 ? Math.round(plan.price / Math.max(1, Math.round(plan.duration_days / 30)))
                 : 0;
-              const style = getCardStyle(plan, idx, pricingPlans.length);
+              const style = getCardStyle(plan, idx, visiblePlans.length);
               const emoji = getPlanEmoji(plan.package_name);
               const desc = getPlanDesc(plan.package_name, plan.price, idx);
               const checkoutId = plan.id;

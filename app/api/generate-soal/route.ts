@@ -152,8 +152,23 @@ Output harus berupa JSON murni dengan format schema berikut:
     let parsed: any;
     try {
       const text = await generateAIContent(prompt);
+      console.log("[Generate Soal] Raw AI response length:", text?.length);
+      console.log("[Generate Soal] Raw AI response preview:", text?.substring(0, 500));
+
+      if (!text || text.trim() === "") {
+        throw new Error("AI mengembalikan respons kosong");
+      }
+
       const cleanText = text.replace(/```json|```/g, "").trim();
       parsed = JSON.parse(cleanText);
+
+      // Validate response has soal array
+      if (!parsed.soal || !Array.isArray(parsed.soal)) {
+        console.error("[Generate Soal] Invalid response structure:", parsed);
+        throw new Error("Respons AI tidak memiliki format yang benar (missing soal array)");
+      }
+
+      console.log("[Generate Soal] Successfully generated", parsed.soal.length, "questions");
     } catch (aiError: any) {
       console.error("Generate Soal AI generation failed:", aiError);
       return NextResponse.json({ error: `Gagal memproses AI: ${aiError.message || aiError}` }, { status: 502 });

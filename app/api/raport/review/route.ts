@@ -1,0 +1,86 @@
+import { NextResponse } from 'next/server';
+import { query } from '@/lib/db';
+import { cookies } from 'next/headers';
+
+function isValidUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const kelasId = searchParams.get('kelas_id');
+
+    if (!kelasId) {
+      return NextResponse.json({ error: 'kelas_id wajib diisi' }, { status: 400 });
+    }
+
+    // Validate UUID format
+    if (!isValidUUID(kelasId)) {
+      return NextResponse.json({ error: 'kelas_id harus UUID yang valid' }, { status: 400 });
+    }
+
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('gurupro_session')?.value;
+    if (!sessionCookie) {
+      return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
+    }
+
+    let session;
+    try {
+      session = JSON.parse(sessionCookie);
+    } catch {
+      return NextResponse.json({ error: 'Session tidak valid' }, { status: 401 });
+    }
+
+    // Check if table exists and has data
+    const tableCheck = await query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name = 'data_raport'
+      ) as exists
+    `);
+
+    if (!tableCheck.rows[0]?.exists) {
+      return NextResponse.json({ error: 'Tabel data_raport belum ada' }, { status: 500 });
+    }
+
+    const raportRes = await query(
+      `SELECT dr.id, dr.siswa_id, dr.nisn, dr.kelas_id, dr.periode, dr.jenis_laporan, dr.status,
+              tr.nama_template, tr.mode_nilai_akademik, tr.basis_deskripsi, tr.kurikulum,
+              s.nama_siswa, c.nama_kelas
+       FROM data_raport dr
+       JOIN template_raport tr ON tr.id = dr.template_raport_id
+       JOIN students s ON s.id = dr.siswa_id
+       JOIN classes c ON c.id = dr.kelas_id
+       WHERE dr.kelas_id = $1
+       ORDER BY s.nama_siswa ASC`,
+      [kelasId]
+    );
+
+    const raports = await Promise.all(
+      raportRes.rows.map(async (raport) => {
+        const nilaiRes = await query(
+          `SELECT dnrm.*, sb.nama_mapel,
+                  im.app_user_id as guru_user_id,
+                  u.nama_lengkap as guru_nama
+           FROM data_raport_nilai_mapel dnrm
+           LEFT JOIN subjects sb ON sb.id = dnrm.mapel_id
+           LEFT JOIN institution_members im ON im.app_user_id = dnrm.guru_mapel_member_id
+           LEFT JOIN users u ON u.id = im.app_user_id
+           WHERE dnrm.data_raport_id = $1
+           ORDER BY sb.nama_mapel ASC`,
+          [raport.id]
+        );
+        return { ...raport, nilai_mapel: nilaiRes.rows };
+      })
+    );
+
+    return NextResponse.json(raports);
+  } catch (error: any) {
+    console.error('GET review raport error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

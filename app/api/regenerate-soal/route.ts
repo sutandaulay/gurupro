@@ -1,8 +1,27 @@
 import { generateAIContent } from "@/lib/ai";
 import { NextResponse } from "next/server";
+import { getSession } from "@/lib/session";
+import { getUserTokenAccess, consumeUserToken } from "@/lib/token-system";
 
 export async function POST(req: Request) {
   try {
+    // Auth check
+    const session = await getSession();
+    if (!session?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.id;
+
+    // Token check
+    const tokenAccess = await getUserTokenAccess(userId);
+    if (!tokenAccess.access.allowed) {
+      return NextResponse.json({
+        error: "Token habis atau langganan expired",
+        reason: tokenAccess.access.reason,
+        remainingTokens: 0,
+      }, { status: 403 });
+    }
+
     const { formData, oldSoal } = await req.json();
 
     const mapel = formData.mapel || "Umum";
@@ -63,19 +82,21 @@ export async function POST(req: Request) {
     }
 
     let anbkInfo = "";
-    if (oldSoal.stimulus && oldSoal.stimulus_id) {
+    if (oldSoal?.stimulus && oldSoal?.stimulus_id) {
+      const stimulusText = String(oldSoal.stimulus || "").substring(0, 300);
+      const levelAkm = oldSoal.level_akm || 'Cakap';
       anbkInfo = `
 KONTEKS ANBK/AKM:
 - Soal ini merupakan bagian dari ANBK/AKM
 - Stimulus ID: ${oldSoal.stimulus_id}
-- Level AKM: ${oldSoal.level_akm || 'Cakap'}
+- Level AKM: ${levelAkm}
 - Pertahankan relevansi dengan stimulus berikut:
-"${oldSoal.stimulus.substring(0, 300)}..."
+"${stimulusText}..."
 
 Sertakan field tambahan di JSON:
-"stimulus": "${oldSoal.stimulus.replace(/"/g, '\\"').substring(0, 300)}...",
+"stimulus": "${String(oldSoal.stimulus || "").replace(/"/g, '\\"').substring(0, 300)}...",
 "stimulus_id": "${oldSoal.stimulus_id}",
-"level_akm": "${oldSoal.level_akm || 'Cakap'}"`;
+"level_akm": "${levelAkm}"`;
     }
 
     let bahasaDaerahInfo = "";
@@ -106,7 +127,7 @@ ${anbkInfo}
 ${bahasaDaerahInfo}
 
 PENTING:
-- Buat soal BERBEDA dari soal lama: "${oldSoal.pertanyaan.substring(0, 100)}..."
+- Buat soal BERBEDA dari soal lama: "${String(oldSoal.pertanyaan || "").substring(0, 100)}..."
 - Pertahankan tipe, level kognitif, dan tingkat kesulitan yang sama
 - Nomor soal: ${oldSoal.nomor || 1}
 - Format opsi dan kunci HARUS sesuai panduan tipe di atas
@@ -127,7 +148,7 @@ Balas HANYA dalam format JSON (tanpa markdown):
   "tp": "...",
   "skor": ${oldSoal.skor || 1},
   "gambar": ${oldSoal.gambar ? `"${oldSoal.gambar}"` : "null"}
-  ${oldSoal.stimulus_id ? `, "stimulus": "${oldSoal.stimulus.replace(/"/g, '\\"')}", "stimulus_id": "${oldSoal.stimulus_id}", "level_akm": "${oldSoal.level_akm || 'Cakap'}"` : ""}
+  ${oldSoal.stimulus_id && oldSoal.stimulus ? `, "stimulus": "${String(oldSoal.stimulus).replace(/"/g, '\\"')}", "stimulus_id": "${oldSoal.stimulus_id}", "level_akm": "${oldSoal.level_akm || 'Cakap'}"` : ""}
 }`;
 
     // Call universal AI service
@@ -140,6 +161,9 @@ Balas HANYA dalam format JSON (tanpa markdown):
       console.error("Regenerate Soal AI generation failed:", aiError);
       return NextResponse.json({ error: `Gagal memproses AI: ${aiError.message || aiError}` }, { status: 502 });
     }
+
+    // Consume token after successful generation
+    await consumeUserToken(userId, 1);
 
     return NextResponse.json(parsed);
   } catch (error: any) {

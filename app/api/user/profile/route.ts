@@ -1,12 +1,36 @@
 import { query } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { getPricingConfig } from "@/lib/settings";
+import { getPricingConfig, getActivePricingPlans } from "@/lib/settings";
+import { getUserAccountMode, getUserActiveMemberships } from "@/lib/institution-members";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth.config";
+import { setDefaultSessionCookie } from "@/lib/session";
 
 export async function GET() {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
+    let sessionCookie = cookieStore.get("gurupro_session")?.value;
+
+    // Jika cookie gurupro_session tidak ada, coba sync dari NextAuth session
+    if (!sessionCookie) {
+      const nextAuthSession = await getServerSession(authOptions);
+      if (nextAuthSession?.user?.email) {
+        const userRes = await query(
+          "SELECT id, role FROM users WHERE email = $1",
+          [nextAuthSession.user.email.toLowerCase()]
+        );
+        if (userRes.rows.length > 0) {
+          const user = userRes.rows[0];
+          await setDefaultSessionCookie({
+            id: user.id,
+            role: user.role || "guru",
+          });
+          // Re-read the cookie we just set
+          sessionCookie = (await cookies()).get("gurupro_session")?.value;
+        }
+      }
+    }
 
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
@@ -17,8 +41,8 @@ export async function GET() {
 
     const userRes = await query(
       `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, addon_token_balance,
-              bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at
-       FROM users WHERE id = $1`,
+               bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at, photo_url
+        FROM users WHERE id = $1`,
       [userId]
     );
 
@@ -27,7 +51,10 @@ export async function GET() {
     }
 
     const user = userRes.rows[0];
-    const pricingConfig = await getPricingConfig();
+    const [pricingConfig, pricingPlans] = await Promise.all([
+      getPricingConfig(),
+      getActivePricingPlans(),
+    ]);
 
     if (user.role !== "admin" && user.subscription_end) {
       const isExpired = new Date(user.subscription_end).getTime() - new Date().getTime() <= 0;
@@ -50,9 +77,42 @@ export async function GET() {
       }
     }
 
+    const accountMode = await getUserAccountMode(userId);
+    const memberships = await getUserActiveMemberships(userId);
+    const institutionIds = memberships.map((m) => m.institution_id);
+    let institutions: { id: number; name: string }[] = [];
+    if (institutionIds.length > 0) {
+      const instRes = await query(
+        'SELECT id, name FROM institutions WHERE id = ANY($1::int[])',
+        [institutionIds]
+      );
+      institutions = instRes.rows;
+    }
+
+    let userRole = user.role;
+    if (session.activeContext && typeof session.activeContext === 'object' && session.activeContext.institutionId) {
+      const instId = session.activeContext.institutionId;
+      const memberRoleRes = await query(
+        `SELECT imr.value
+         FROM institution_members im
+         JOIN institution_members_role imr ON imr.parent_id = im.id
+         WHERE im.app_user_id = $1 AND im.institution_id = $2 AND im.status = 'active'
+         LIMIT 1`,
+        [userId, instId]
+      );
+      if (memberRoleRes.rows.length > 0) {
+        userRole = memberRoleRes.rows[0].value;
+      }
+    }
+
     return NextResponse.json({
       ...user,
-      pricingConfig
+      role: userRole, // Override dengan role lembaga jika konteks lembaga aktif
+      pricingConfig,
+      pricingPlans,
+      accountMode,
+      activeContext: session.activeContext ?? 'individual',
+      institutions,
     });
   } catch (error: any) {
     console.error("Profile GET API error:", error?.stack || error?.message || error);
@@ -121,15 +181,15 @@ export async function PUT(req: Request) {
     }
 
     // Handle profile update
-    const { nama_lengkap, nama_sekolah, username, bank_name, bank_account_number, bank_account_name, whatsapp, jenjang, mata_pelajaran, nip } = profileData;
+    const { nama_lengkap, username, bank_name, bank_account_number, bank_account_name, whatsapp, nip } = profileData;
 
     if (!nama_lengkap) {
       return NextResponse.json({ error: "Nama lengkap wajib diisi." }, { status: 400 });
     }
 
-    const sets: string[] = ["nama_lengkap = $1", "nama_sekolah = $2"];
-    const values: (string | null)[] = [nama_lengkap.trim(), nama_sekolah ? nama_sekolah.trim() : null];
-    let idx = 3;
+    const sets: string[] = ["nama_lengkap = $1"];
+    const values: (string | null)[] = [nama_lengkap.trim()];
+    let idx = 2;
 
     if (username !== undefined) {
       const cleanUsername = username && username.toString().trim() !== "" ? username.toString().trim().toLowerCase() : null;
@@ -197,8 +257,12 @@ export async function PUT(req: Request) {
       values
     );
 
-    // Update session cookie with the new role
-    const sessionData = JSON.stringify({ id: userId, role: session.role || 'guru' });
+    // Update session cookie with the new role (preserve activeContext)
+    const sessionData = JSON.stringify({
+      id: userId,
+      role: session.role || 'guru',
+      activeContext: session.activeContext ?? 'individual',
+    });
     cookieStore.set('gurupro_session', sessionData, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -208,16 +272,20 @@ export async function PUT(req: Request) {
 
     const updatedUser = await query(
       `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, addon_token_balance,
-              bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at
-       FROM users WHERE id = $1`,
+               bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at, photo_url
+        FROM users WHERE id = $1`,
       [userId]
     );
 
-    const pricingConfig = await getPricingConfig();
+    const [pricingConfig, pricingPlans] = await Promise.all([
+      getPricingConfig(),
+      getActivePricingPlans(),
+    ]);
     return NextResponse.json({
       message: "Profil berhasil diperbarui!",
       user: updatedUser.rows[0],
-      pricingConfig
+      pricingConfig,
+      pricingPlans,
     });
   } catch (error: any) {
     console.error("Profile PUT API error:", error);

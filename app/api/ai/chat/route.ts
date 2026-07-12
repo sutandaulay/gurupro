@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
 import { generateChatResponse, estimateCost } from '@/lib/ai/generators';
+import { getUserTokenAccess, consumeUserToken } from '@/lib/token-system';
 
 const prisma = new PrismaClient();
 
@@ -38,6 +39,16 @@ export async function POST(request: NextRequest) {
 
     const userId = user.id;
     const body = await request.json();
+
+    // Token check
+    const tokenAccess = await getUserTokenAccess(userId);
+    if (!tokenAccess.access.allowed) {
+      return NextResponse.json({
+        error: 'Token habis atau langganan expired',
+        reason: tokenAccess.access.reason,
+        remainingTokens: 0,
+      }, { status: 403 });
+    }
 
     const { message, session_id } = body;
 
@@ -140,6 +151,9 @@ export async function POST(request: NextRequest) {
 
     // Calculate cost
     const cost = result.usage ? estimateCost(result.usage) : { totalCost: 0 };
+
+    // Consume token
+    await consumeUserToken(userId, 1);
 
     return NextResponse.json({
       success: true,

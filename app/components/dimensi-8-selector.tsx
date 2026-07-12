@@ -44,7 +44,7 @@ export default function Dimensi8Selector() {
               8 Dimensi Profil Lulusan
             </h4>
             <p className="text-[10px] text-indigo-500">
-              Deep Learning Kerangka 8334 • {selectedDimensi8.length} dipilih
+              Deep Learning • {selectedDimensi8.length} dipilih
             </p>
           </div>
         </div>

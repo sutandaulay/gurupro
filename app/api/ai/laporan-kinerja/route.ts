@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai'
+import { getUserTokenAccess, consumeUserToken } from '@/lib/token-system'
 
 const genAI = process.env.GOOGLE_AI_API_KEY
   ? new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY)
@@ -23,6 +24,16 @@ export async function POST(req: Request) {
 
   const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
   const guruId = sessionData.id
+
+  // Token check
+  const tokenAccess = await getUserTokenAccess(guruId)
+  if (!tokenAccess.access.allowed) {
+    return NextResponse.json({
+      error: 'Token habis atau langganan expired',
+      reason: tokenAccess.access.reason,
+      remainingTokens: 0,
+    }, { status: 403 })
+  }
 
   const body = await req.json()
   const { tahunAjaranId, semester, catatanTambahan, kurikulum = 'merdeka', sekolahId } = body
@@ -164,6 +175,9 @@ export async function POST(req: Request) {
             sekolahId || null,
           ]
         )
+
+        // Consume token after successful generation
+        await consumeUserToken(guruId, 1)
 
         send({ step: 'complete', laporan_id: insertResult.rows[0].id })
         controller.close()

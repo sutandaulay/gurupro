@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "init:payload": "npx tsx scripts/init-payload.ts",
     "push:payload": "npx payload push",
     "token:cron": "npx tsx scripts/token-jobs.ts",
@@ -27,14 +29,19 @@
     "@prisma/client": "^6.19.3",
     "@tabler/icons-react": "^3.44.0",
     "bcrypt": "^6.0.0",
+    "jsonrepair": "^3.15.0",
+    "lucide-react": "^1.23.0",
     "next": "16.2.9",
     "next-auth": "^4.24.14",
     "nodemailer": "^9.0.1",
     "payload": "^3.85.1",
+    "pdfkit": "^0.19.1",
     "pg": "^8.22.0",
+    "pptxgenjs": "^4.0.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "server-only": "^0.0.1",
+    "xlsx": "^0.18.5",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
@@ -42,6 +49,7 @@
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",
+    "@types/pdfkit": "^0.17.6",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -51,6 +59,7 @@
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "tsx": "^4.7.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.6"
   }
 }

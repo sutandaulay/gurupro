@@ -1,4 +1,4 @@
-# PLAN: Modul Ajar Generator — Update Deep Learning (Kerangka 8334) + Multi-School Multi-Tenancy
+# PLAN: Modul Ajar Generator — Update Deep Learning + Multi-School Multi-Tenancy
 
 ## Status: PLANNING
 

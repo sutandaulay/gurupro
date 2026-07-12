@@ -23,22 +23,7 @@ const Users: CollectionConfig = {
       label: "Nama Lengkap",
       required: true,
     },
-    {
-      name: "email",
-      type: "email",
-      label: "Email",
-      required: true,
-      unique: true,
-    },
-    {
-      name: "password",
-      type: "text",
-      label: "Password",
-      required: true,
-      admin: {
-        hidden: true,
-      },
-    },
+
     {
       name: "role",
       type: "select",
@@ -61,6 +46,12 @@ const Users: CollectionConfig = {
       type: "upload",
       label: "Avatar",
       relationTo: "media",
+    },
+    {
+      name: "institutionMemberships",
+      type: "join",
+      collection: "institution-members",
+      on: "user",
     },
   ],
 };

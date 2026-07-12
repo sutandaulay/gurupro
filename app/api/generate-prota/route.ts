@@ -3,6 +3,9 @@ import { query } from "@/lib/db";
 import { consumeUserToken, getUserTokenAccess } from "@/lib/token-system";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { jsonrepair as repair } from "jsonrepair";
+import { uploadToR2 } from "@/lib/r2";
+import { generatePdfBuffer, generateDocBuffer } from "@/lib/doc-compiler";
 
 // ==========================================
 // PROTA GENERATOR - Program Tahunan
@@ -121,19 +124,39 @@ CATATAN PENTING:
 - Waktu ujian/ASESMEN: STS (~minggu 8-9), SAS (~minggu 16-17)
 - Include waktu untuk pembelajaran, penilaian, dan tindak lanjut
 
-Hasilkan dokumen PROTA lengkap dalam format Markdown yang rapi dan profesional.
-Balas HANYA dalam format JSON:
-{
-  "judul": "Program Tahunan (Prota) - ${subjectList} ${jenjang || ''} ${tahun_ajaran || ''}",
-  "konten": "(Dokumen Markdown lengkap Prota)"
-}
+Hasilkan seluruh dokumen PROTA tersebut langsung dalam format Markdown dengan tabel yang rapi. Jangan membungkus dokumen ini di dalam format JSON. Balas HANYA dengan teks Markdown lengkap tersebut.
 `;
 
     let parsed: any;
     try {
-      const text = await generateAIContent(prompt);
-      const cleanText = text.replace(/```json|```/g, "").trim();
-      parsed = JSON.parse(cleanText);
+      const text = await generateAIContent(prompt, undefined, false);
+      const cleanMarkdown = text.trim();
+      const docTitle = `Program Tahunan (Prota) - ${subjectList} ${jenjang || ''} ${tahun_ajaran || ''}`;
+
+      parsed = {
+        judul: docTitle,
+        konten: cleanMarkdown,
+      };
+
+      // Compile & Upload Prota files
+      let pdfUrl: string | null = null;
+      let docxUrl: string | null = null;
+      try {
+        const cleanMarkdown = (parsed.konten || "").trim();
+        const docTitle = parsed.judul || `Program Tahunan - ${subjectList} Kelas ${kelas || ""}`;
+
+        const pdfBuf = await generatePdfBuffer(cleanMarkdown, docTitle);
+        pdfUrl = await uploadToR2(pdfBuf, `${Date.now()}-prota.pdf`, "application/pdf");
+
+        const docBuf = generateDocBuffer(cleanMarkdown, docTitle);
+        docxUrl = await uploadToR2(docBuf, `${Date.now()}-prota.doc`, "application/msword");
+      } catch (uploadErr) {
+        console.error("Failed to compile or upload Prota files to R2:", uploadErr);
+      }
+
+      parsed.pdf_url = pdfUrl;
+      parsed.docx_url = docxUrl;
+
     } catch (aiError: any) {
       console.error("Prota AI generation failed:", aiError);
       return NextResponse.json({ error: `Gagal generate Prota: ${aiError.message}` }, { status: 502 });
@@ -150,7 +173,12 @@ Balas HANYA dalam format JSON:
         userId,
         'prota',
         parsed.judul || `Program Tahunan - ${subjectList}`,
-        JSON.stringify({ konten: parsed.konten }),
+        JSON.stringify({ 
+          markdown: parsed.konten, 
+          pptx_url: null,
+          pdf_url: parsed.pdf_url || null,
+          docx_url: parsed.docx_url || null
+        }),
         school_id || null,
         jenjang || null,
         kurikulum || null,

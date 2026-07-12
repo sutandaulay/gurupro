@@ -11,3 +11,7 @@ export {
   type Dimensi8Option,
   type TigaPengalamanOption,
 } from './teacherStore';
+
+export { useActiveSchool } from './useActiveSchool';
+
+export { useProfileStore } from './profileStore';

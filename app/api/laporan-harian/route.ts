@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
+import { getContextFilters } from '@/lib/session';
 
 const prisma = new PrismaClient();
 
@@ -21,6 +22,8 @@ export async function GET(request: NextRequest) {
     if (!user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const filters = await getContextFilters(user.id);
 
     const { searchParams } = new URL(request.url);
     const filter = searchParams.get('filter') || 'hari_ini';
@@ -82,8 +85,23 @@ export async function GET(request: NextRequest) {
       orderBy: { tanggal: 'desc' },
     });
 
-    const groupedMap = new Map<string, typeof journals>();
-    for (const j of journals) {
+    let filteredJournals = journals;
+    if (filters.assignedMapel.length > 0 || filters.assignedKelas.length > 0) {
+      filteredJournals = journals.filter((j: any) => {
+        const matchMapel = filters.assignedMapel.length === 0 ||
+          (j.subjects?.nama_mapel && filters.assignedMapel.some((m) =>
+            j.subjects.nama_mapel.toLowerCase().includes(m.toLowerCase())
+          ));
+        const matchKelas = filters.assignedKelas.length === 0 ||
+          (j.classes?.nama_kelas && filters.assignedKelas.some((k) =>
+            j.classes.nama_kelas.toLowerCase().includes(k.toLowerCase())
+          ));
+        return matchMapel && matchKelas;
+      });
+    }
+
+    const groupedMap = new Map<string, typeof filteredJournals>();
+    for (const j of filteredJournals) {
       const key = j.tanggal.toISOString().split('T')[0];
       if (!groupedMap.has(key)) groupedMap.set(key, []);
       groupedMap.get(key)!.push(j);
@@ -106,7 +124,7 @@ export async function GET(request: NextRequest) {
         })),
       }));
 
-    const totalMengajar = journals.length;
+    const totalMengajar = filteredJournals.length;
 
     return NextResponse.json({
       reports,

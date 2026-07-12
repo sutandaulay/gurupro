@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     }
 
     // 1. Get user data
-    const userRes = await query("SELECT id, email, whatsapp, nama_lengkap FROM users WHERE id = $1", [userId]);
+    const userRes = await query("SELECT id, email, whatsapp, nama_lengkap, status_langganan, subscription_end FROM users WHERE id = $1", [userId]);
     if (userRes.rows.length === 0) {
       return NextResponse.json({ error: "User tidak ditemukan!" }, { status: 404 });
     }
@@ -188,6 +188,19 @@ export async function POST(req: Request) {
 
     // Handle free plan
     if (isFree) {
+      // Cek apakah user sudah pernah mendapat free plan (via registrasi atau checkout sebelumnya)
+      const [uRes, txRes] = await Promise.all([
+        query("SELECT status_langganan, subscription_start FROM users WHERE id = $1", [userId]),
+        query("SELECT id FROM transactions WHERE user_id = $1 AND amount = 0 AND status = 'ACTIVATED' LIMIT 1", [userId]),
+      ]);
+      const userRow = uRes.rows[0];
+      if (
+        userRow?.status_langganan === "free" ||
+        userRow?.subscription_start != null ||
+        txRes.rows.length > 0
+      ) {
+        return NextResponse.json({ error: "Kamu sudah pernah menggunakan paket Free. Tidak bisa mengaktifkan ulang." }, { status: 400 });
+      }
       const transactionId = crypto.randomUUID();
       const userDateRes = await query("SELECT subscription_end, subscription_start FROM users WHERE id = $1", [userId]);
       let newEnd = new Date();

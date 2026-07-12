@@ -26,6 +26,9 @@ interface LeaderContact {
   optedOut?: boolean;
   lastNotifiedAt?: string;
   notificationFrequency?: string;
+  notificationTime?: string;
+  notificationDay?: string;
+  notificationDate?: string;
   nextScheduledNotification?: string;
 }
 
@@ -307,6 +310,18 @@ export default function PerformanceSharePanel({
     return documentGrants[linkId] || [];
   };
 
+  const getDayName = (dayValue?: string) => {
+    const days: Record<string, string> = {
+      "1": "Senin",
+      "2": "Selasa",
+      "3": "Rabu",
+      "4": "Kamis",
+      "5": "Jumat",
+      "6": "Sabtu",
+    };
+    return days[dayValue || "5"] || "Jumat";
+  };
+
   if (loading && leaderContacts.length === 0) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -405,9 +420,16 @@ export default function PerformanceSharePanel({
                           {contact.notificationFrequency === "daily" ? "Harian" :
                            contact.notificationFrequency === "weekly" ? "Mingguan" : "Bulanan"}
                         </span>
+                        <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
+                          <span>
+                            {contact.notificationFrequency === "daily" && `Setiap jam ${contact.notificationTime || "14:00"}`}
+                            {contact.notificationFrequency === "weekly" && `Setiap ${getDayName(contact.notificationDay)} jam ${contact.notificationTime || "14:00"}`}
+                            {contact.notificationFrequency === "monthly" && `Tanggal ${contact.notificationDate || "25"} jam ${contact.notificationTime || "10:00"}`}
+                          </span>
+                        </div>
                         {contact.lastNotifiedAt && (
-                          <span className="ml-2 text-xs text-gray-400">
-                            Terakhir: {new Date(contact.lastNotifiedAt).toLocaleDateString("id-ID")}
+                          <span className="text-xs text-gray-400">
+                            Terakhir: {new Date(contact.lastNotifiedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })} {new Date(contact.lastNotifiedAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
                           </span>
                         )}
                       </div>

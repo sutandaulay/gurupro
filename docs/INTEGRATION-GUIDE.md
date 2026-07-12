@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide explains how to integrate the new multi-school and Deep Learning (Kerangka 8334) features into the existing dashboard.
+This guide explains how to integrate the new multi-school and Deep Learning features into the existing dashboard.
 
 ---
 

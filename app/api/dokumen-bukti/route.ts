@@ -8,7 +8,7 @@ import { query } from '@/lib/db'
 import { uploadToR2 } from '@/lib/r2'
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
-const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+const MAX_SIZE = 5 * 1024 * 1024 // 5MB
 
 // GET /api/dokumen-bukti - List documents
 export async function GET(req: Request) {
@@ -150,5 +150,41 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error('POST /api/dokumen-bukti error:', err)
     return NextResponse.json({ error: 'Failed to upload document' }, { status: 500 })
+  }
+}
+
+// DELETE /api/dokumen-bukti - Delete document
+export async function DELETE(req: Request) {
+  try {
+    const sessionCookie = req.headers.get('cookie')?.split(';')
+      .find(c => c.trim().startsWith('gurupro_session='))
+
+    if (!sessionCookie) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
+    const guruId = sessionData.id
+
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID wajib diisi' }, { status: 400 })
+    }
+
+    const result = await query(
+      `DELETE FROM dokumen_bukti WHERE id = $1 AND guru_id = $2 RETURNING *`,
+      [id, guruId]
+    )
+
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: 'Dokumen tidak ditemukan atau bukan milik Anda' }, { status: 404 })
+    }
+
+    return NextResponse.json({ message: 'Dokumen berhasil dihapus' })
+  } catch (err) {
+    console.error('DELETE /api/dokumen-bukti error:', err)
+    return NextResponse.json({ error: 'Failed to delete document' }, { status: 500 })
   }
 }

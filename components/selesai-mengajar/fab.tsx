@@ -51,23 +51,42 @@ export default function SelesaiMengajarFAB({ className = '' }: SelesaiMengajarFA
     const fetchData = async () => {
       try {
         const response = await fetch('/api/selesai-mengajar');
-        if (response.ok) {
-          const data = await response.json();
-          setSchedules(data.allSchedules || data.schedules || []);
 
-          // Check if any session is completed today
-          const hasCompleted = data.allSchedules?.some(
-            (s: any) => s.isCompleted
-          );
-          setIsCompleted(hasCompleted || false);
-
-          // Find current schedule based on time
-          const now = new Date();
-          const current = data.allSchedules?.find((s: ScheduleInfo) =>
-            isJamMengajar([s], now, 30)
-          );
-          setCurrentSchedule(current || null);
+        // Handle non-OK responses
+        if (!response.ok) {
+          if (response.status === 401) {
+            // User not authenticated - hide the FAB
+            setSchedules([]);
+            setIsVisible(false);
+            return;
+          }
+          if (response.status === 403) {
+            // Subscription expired or other forbidden - hide the FAB
+            setSchedules([]);
+            setIsVisible(false);
+            return;
+          }
+          // Other errors - try again later
+          console.error(`API error: ${response.status}`);
+          return;
         }
+
+        const data = await response.json();
+
+        setSchedules(data.allSchedules || data.schedules || []);
+
+        // Check if any session is completed today
+        const hasCompleted = data.allSchedules?.some(
+          (s: any) => s.isCompleted
+        );
+        setIsCompleted(hasCompleted || false);
+
+        // Find current schedule based on time
+        const now = new Date();
+        const current = data.allSchedules?.find((s: ScheduleInfo) =>
+          isJamMengajar([s], now, 30)
+        );
+        setCurrentSchedule(current || null);
       } catch (err) {
         console.error('Failed to fetch schedules:', err);
       }

@@ -15,6 +15,10 @@ import {
   IconUsers,
   IconPhone,
 } from "@tabler/icons-react";
+import dynamic from "next/dynamic";
+import { useTokenError, parseTokenError } from "@/hooks/useTokenError";
+
+const TokenHabisModal = dynamic(() => import("@/app/components/ui/TokenHabisModal"), { ssr: false });
 
 interface ChatAdministrasiProps {
   onBack?: () => void;
@@ -78,6 +82,7 @@ const quickActions: QuickAction[] = [
 ];
 
 export default function ChatAdministrasi({ onBack }: ChatAdministrasiProps) {
+  const { showTokenModal, shortfall, handleTokenError, closeModal, openTopUpModal } = useTokenError();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -140,7 +145,12 @@ Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Gagal mendapatkan respons");
+        // Check if token error
+        if (result.reason === "token_habis" || result.reason === "subscription_expired") {
+          handleTokenError(parseTokenError(result));
+        } else {
+          throw new Error(result.error || "Gagal mendapatkan respons");
+        }
       }
 
       // Update session ID
@@ -207,6 +217,7 @@ Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
   };
 
   return (
+    <>
     <div className="flex flex-col h-full bg-slate-50 rounded-none sm:rounded-2xl overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-2 sm:px-4 py-2.5 sm:py-3">
@@ -363,5 +374,15 @@ Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
         </p>
       </div>
     </div>
+
+    {/* Token Habis Modal */}
+    <TokenHabisModal
+      open={showTokenModal}
+      shortfall={shortfall}
+      onClose={closeModal}
+      onBuyTopUp={openTopUpModal}
+      onUpgrade={() => window.location.href = '/profile?tab=billing'}
+    />
+    </>
   );
 }

@@ -2,6 +2,7 @@ import { query, logAudit } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { uploadBase64ToR2 } from "@/lib/r2";
+import { getContextFilters } from "@/lib/session";
 
 async function getUserId() {
   const cookieStore = await cookies();
@@ -13,14 +14,29 @@ async function getUserId() {
   return session.id;
 }
 
+async function applyContextFilter(rows: any[], filters: { assignedMapel: string[]; assignedKelas: string[] }) {
+  if (filters.assignedMapel.length === 0 && filters.assignedKelas.length === 0) return rows;
+  return rows.filter((row: any) => {
+    const matchMapel = filters.assignedMapel.length === 0 ||
+      (row.nama_mapel && filters.assignedMapel.some((m) =>
+        row.nama_mapel.toLowerCase().includes(m.toLowerCase())
+      ));
+    const matchKelas = filters.assignedKelas.length === 0 ||
+      (row.nama_kelas && filters.assignedKelas.some((k) =>
+        row.nama_kelas.toLowerCase().includes(k.toLowerCase())
+      ));
+    return matchMapel && matchKelas;
+  });
+}
+
 export async function GET(req: Request) {
   try {
     const userId = await getUserId();
+    const filters = await getContextFilters(userId);
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get("school_id");
 
     if (!schoolId) {
-      // Return all journals for this teacher
       const journals = await query(
         `SELECT tj.*, c.nama_kelas, sb.nama_mapel, u.nama_lengkap as nama_guru, us.nama_lengkap as nama_supervisor,
                 s.nama_sekolah
@@ -34,17 +50,16 @@ export async function GET(req: Request) {
          ORDER BY tj.tanggal DESC, tj.created_at DESC`,
         [userId]
       );
-      return NextResponse.json(journals.rows);
+      const result = await applyContextFilter(journals.rows, filters);
+      return NextResponse.json(result);
     }
 
-    // Get school owner
     const schoolOwnerRes = await query("SELECT user_id FROM schools WHERE id = $1", [schoolId]);
     if (schoolOwnerRes.rows.length === 0) {
       return NextResponse.json({ error: "Sekolah tidak ditemukan" }, { status: 404 });
     }
     const isOwner = schoolOwnerRes.rows[0].user_id === userId;
 
-    // Fetch journals. Teachers can see their own journals, owners and admins can see all.
     let journals;
     if (isOwner) {
       journals = await query(
@@ -88,7 +103,8 @@ export async function GET(req: Request) {
       );
     }
 
-    return NextResponse.json(journals.rows);
+    const result = await applyContextFilter(journals.rows, filters);
+    return NextResponse.json(result);
   } catch (error: any) {
     console.error("Journals GET error:", error);
     const status = error.message === "Unauthorized" ? 401 : 500;
