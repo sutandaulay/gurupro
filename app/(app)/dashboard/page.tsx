@@ -17,6 +17,7 @@ import ItemAnalysisPanel from "@/components/soal/ItemAnalysisPanel";
 import type { ScheduleInfo } from "@/lib/selesai-mengajar/types";
 import { useTeacherStore, useProfileStore } from "@/lib/stores";
 import TokenHabisModal from "@/app/components/ui/TokenHabisModal";
+import OnboardingWizard from "@/components/onboarding/OnboardingWizard";
 
 // Dynamic CDN Loader for html2pdf.js
 const loadHtml2Pdf = () => {
@@ -287,6 +288,8 @@ export default function Dashboard() {
     "soal" | "administrasi" | "jurnal" | "keuangan" | "profil" | "sekolah" | "nilai" | "kalender" | "supervisi_analitik" | "tugas_harian" | "storage_saya" | "scheduler"
   >("tugas_harian");
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [schoolsLoaded, setSchoolsLoaded] = useState(false);
   
 
   // Administrasi Module States
@@ -560,6 +563,8 @@ export default function Dashboard() {
   const [schShowTtdKepala, setSchShowTtdKepala] = useState<boolean>(true);
   const [schShowTtdPengawas, setSchShowTtdPengawas] = useState<boolean>(true);
   const [schShowTtdWali, setSchShowTtdWali] = useState<boolean>(true);
+  const [foundInstitution, setFoundInstitution] = useState<any | null>(null);
+  const [connectingInstitution, setConnectingInstitution] = useState(false);
   
   // Form Inputs Tambah Kelas/Mapel/Siswa/Jadwal
   const [newClassName, setNewClassName] = useState<string>("");
@@ -895,6 +900,71 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]);
 
+  // Detect new user and show onboarding wizard
+  useEffect(() => {
+    if (currentUser && schools.length === 0 && schoolsLoaded && !localStorage.getItem("gurupro_onboarding_done")) {
+      const timer = setTimeout(() => setShowOnboarding(true), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [currentUser?.id, schools.length, schoolsLoaded]);
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    localStorage.setItem("gurupro_onboarding_done", "true");
+    fetchSchools();
+  };
+
+  const handleOnboardingSkip = () => {
+    setShowOnboarding(false);
+    localStorage.setItem("gurupro_onboarding_done", "true");
+  };
+
+  // Lookup institution by NPSN for connect feature
+  useEffect(() => {
+    if (!schNpsn || schNpsn.trim().length < 4) {
+      setFoundInstitution(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/institutions/lookup?npsn=${encodeURIComponent(schNpsn.trim())}`);
+        const data = await res.json();
+        if (data.found) {
+          setFoundInstitution(data.institution);
+        } else {
+          setFoundInstitution(null);
+        }
+      } catch {
+        setFoundInstitution(null);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [schNpsn]);
+
+  const handleConnectInstitution = async () => {
+    if (!foundInstitution) return;
+    setConnectingInstitution(true);
+    try {
+      const res = await fetch("/api/institutions/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ npsn: schNpsn.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message);
+        setFoundInstitution(null);
+        fetchSchools();
+      } else {
+        alert(data.error || "Gagal terhubung");
+      }
+    } catch {
+      alert("Terjadi kesalahan");
+    } finally {
+      setConnectingInstitution(false);
+    }
+  };
+
   // Fetchers
   const fetchSchools = async () => {
     // 1. Try loading from cache first
@@ -944,8 +1014,11 @@ export default function Dashboard() {
           localStorage.setItem("gurupro_cached_schools", JSON.stringify(res));
         }
       }
+      
+      setSchoolsLoaded(true);
     } catch (e) {
       console.error(e);
+      setSchoolsLoaded(true); // tetap set true agar onboarding tidak stuck
     }
   };
 
@@ -4493,6 +4566,23 @@ export default function Dashboard() {
                     placeholder="Masukkan Nomor Pokok Sekolah Nasional"
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800"
                   />
+                  {foundInstitution && (
+                    <div className="mt-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                      <p className="text-[10px] font-semibold text-emerald-800 mb-2">
+                        ✅ Ditemukan: <strong>{foundInstitution.name}</strong> ({foundInstitution.jenjang})
+                      </p>
+                      <p className="text-[9px] text-emerald-600 mb-2">
+                        Sekolah Anda sudah terdaftar sebagai institusi di GuruPRO. Hubungkan akun Anda untuk mengakses data sekolah.
+                      </p>
+                      <button
+                        onClick={handleConnectInstitution}
+                        disabled={connectingInstitution}
+                        className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                      >
+                        {connectingInstitution ? "Menghubungkan..." : "🔗 Hubungkan Akun Saya"}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -9353,7 +9443,11 @@ const renderJurnalModule = () => {
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6 pb-24 lg:pb-6 flex flex-col gap-6 text-slate-800 print:bg-white print:p-0 print:gap-0 font-sans">
-      
+
+      {showOnboarding && (
+        <OnboardingWizard onComplete={handleOnboardingComplete} onSkip={handleOnboardingSkip} />
+      )}
+
       {/* CSS Cetak Khusus */}
       <style jsx global>{`
         @media print {

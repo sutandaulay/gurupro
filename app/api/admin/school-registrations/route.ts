@@ -123,29 +123,28 @@ export async function PUT(req: Request) {
         const activeYear = activeTahunAjaran?.nama || '2025/2026';
 
         // Buat institusi baru
-        await prisma.institutions.create({
+        const newInstitution = await prisma.institutions.create({
           data: {
             name: currentRegistration.nama_lembaga,
             npsn: npsn || null,
             jenjang: mappedJenjang,
             naungan: mappedNaungan,
             subscription_tier: 'trial',
-            academic_year_active: activeYear, // Menggunakan tahun ajaran aktif dinamis
+            academic_year_active: activeYear,
             approval_layer_config: 'single',
-            status: 'active', // Set aktif agar bisa langsung digunakan
+            status: 'active',
           },
         });
 
         // Buat sekolah baru di tabel schools utama (jika belum ada berdasarkan NPSN)
+        let school = null;
         if (npsn) {
-          const existingSchool = await prisma.schools.findFirst({
-            where: { npsn },
-          });
+          school = await prisma.schools.findFirst({ where: { npsn } });
 
-          if (!existingSchool) {
-            await prisma.schools.create({
+          if (!school) {
+            school = await prisma.schools.create({
               data: {
-                user_id: userId, // Dihubungkan ke admin yang memproses
+                user_id: userId,
                 nama_sekolah: currentRegistration.nama_lembaga,
                 npsn: npsn,
                 alamat: currentRegistration.alamat || null,
@@ -154,8 +153,7 @@ export async function PUT(req: Request) {
             });
           }
         } else {
-          // Jika NPSN kosong, buat sekolah baru saja berdasarkan nama
-          await prisma.schools.create({
+          school = await prisma.schools.create({
             data: {
               user_id: userId,
               nama_sekolah: currentRegistration.nama_lembaga,
@@ -164,6 +162,63 @@ export async function PUT(req: Request) {
             },
           });
         }
+
+        // Hubungkan admin yang approve sebagai anggota institusi
+        try {
+          const adminUser = await prisma.users.findUnique({ where: { id: userId } });
+          if (adminUser) {
+            let cmsUser = await prisma.cms_users.findFirst({ where: { email: adminUser.email } });
+            if (!cmsUser) {
+              cmsUser = await prisma.cms_users.create({
+                data: {
+                  name: adminUser.nama_lengkap || 'Admin',
+                  email: adminUser.email || '',
+                  password: '',
+                  role: 'admin',
+                  salt: '',
+                  hash: '',
+                },
+              });
+            }
+
+            const existingMembership = await prisma.institution_members.findFirst({
+              where: { user_id: cmsUser.id, institution_id: newInstitution.id },
+            });
+
+            if (!existingMembership) {
+              const membership = await prisma.institution_members.create({
+                data: {
+                  user_id: cmsUser.id,
+                  app_user_id: userId,
+                  institution_id: newInstitution.id,
+                  status: 'active',
+                  joined_at: new Date(),
+                },
+              });
+
+              await prisma.institution_members_role.create({
+                data: { order: 1, parent_id: membership.id, value: 'admin_sekolah' },
+              });
+            }
+
+            if (school) {
+              const existingAssign = await prisma.user_school_assignments.findFirst({
+                where: { userid: userId, schoolid: school.id },
+              });
+
+              if (!existingAssign) {
+                await prisma.user_school_assignments.create({
+                  data: { userid: userId, schoolid: school.id },
+                });
+              }
+
+              await prisma.users.update({
+                where: { id: userId },
+                data: { nama_sekolah: currentRegistration.nama_lembaga },
+              });
+            }
+          }
+        } catch { /* non-critical */ }
       }
     }
 

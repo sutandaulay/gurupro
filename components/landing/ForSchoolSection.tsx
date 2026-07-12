@@ -3,6 +3,8 @@ import {
   IconFileAnalytics,
   IconCalendarClock,
   IconCertificate,
+  IconBrandWhatsapp,
+  IconClipboardList,
 } from "@tabler/icons-react";
 
 const defaultBenefits = [
@@ -44,14 +46,16 @@ export interface ForSchoolSectionProps {
   benefits?: BenefitItem[];
   ctaText?: string;
   ctaHref?: string;
+  waNumber?: string;
+  waMessage?: string;
 }
 
 export default function ForSchoolSection({
   title = "Untuk Kepala Sekolah & Yayasan",
   subtitle = "Pantau kinerja guru, kelola dokumen administrasi sekolah, dan tingkatkan akreditasi — semua tersentralisasi.",
   benefits = defaultBenefits as unknown as BenefitItem[],
-  ctaText = "Daftarkan Sekolah Saya",
-  ctaHref = "/daftar-sekolah",
+  waNumber = "6281283960337",
+  waMessage = "Halo saya ingin mendaftarkan sekolah saya di GuruPRO",
 }: ForSchoolSectionProps) {
   return (
     <section className="py-20 md:py-28 bg-gradient-to-br from-primary-900 via-primary-800 to-purple-900 text-white relative overflow-hidden">
@@ -100,12 +104,22 @@ export default function ForSchoolSection({
         </div>
 
         {/* CTA */}
-        <div className="text-center mt-12">
+        <div className="text-center mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
-            href={ctaHref}
-            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-primary-700 font-bold text-base rounded-2xl shadow-lg shadow-primary-900/30 hover:bg-primary-50 hover:-translate-y-0.5 transition"
+            href={`https://wa.me/${waNumber}?text=${encodeURIComponent(waMessage)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-success-500 hover:bg-success-600 text-white font-bold text-base rounded-2xl shadow-lg shadow-success-900/30 hover:-translate-y-0.5 transition"
           >
-            {ctaText}
+            <IconBrandWhatsapp size={22} />
+            Hubungi via WhatsApp
+          </a>
+          <a
+            href="/daftar-sekolah"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-white/10 hover:bg-white/20 text-white font-bold text-base rounded-2xl border border-white/20 hover:border-white/40 transition"
+          >
+            <IconClipboardList size={20} />
+            Isi Form Pendaftaran
           </a>
         </div>
       </div>

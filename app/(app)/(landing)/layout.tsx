@@ -1,4 +1,5 @@
 import ChatbotWidget from "@/components/landing/ChatbotWidget";
+import FloatingWhatsApp from "@/components/landing/FloatingWhatsApp";
 import { query } from "@/lib/db";
 
 export default async function LandingLayout({
@@ -33,6 +34,7 @@ export default async function LandingLayout({
   return (
     <>
       {children}
+      <FloatingWhatsApp />
       {isEnabled && <ChatbotWidget welcomeMessage={welcomeMessage} humanCSUrl={humanCSUrl} />}
     </>
   );

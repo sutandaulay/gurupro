@@ -129,11 +129,19 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "ID asesmen wajib diisi" }, { status: 400 });
     }
 
-    const check = await query("SELECT nama_asesmen FROM assessments WHERE id = $1", [id]);
+    const check = await query(
+      `SELECT a.nama_asesmen FROM assessments a
+       JOIN schools s ON a.school_id = s.id
+       LEFT JOIN user_school_assignments usa ON usa.schoolid = s.id AND usa.userid = $2
+       WHERE a.id = $1 AND (s.user_id = $2 OR usa.userid = $2)`,
+      [id, userId]
+    );
     if (check.rows.length > 0) {
       const namaAsesmen = check.rows[0].nama_asesmen;
       await query("DELETE FROM assessments WHERE id = $1", [id]);
       await logAudit(userId, "DELETE_ASSESSMENT", `Menghapus asesmen: ${namaAsesmen}`);
+    } else {
+      return NextResponse.json({ error: "Asesmen tidak ditemukan atau bukan milik Anda" }, { status: 404 });
     }
 
     return NextResponse.json({ success: true });

@@ -252,9 +252,15 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
-    const check = await query("SELECT teacher_id FROM teacher_journals WHERE id = $1", [id]);
+    const check = await query(
+      `SELECT tj.teacher_id FROM teacher_journals tj
+       JOIN schools s ON tj.school_id = s.id
+       LEFT JOIN user_school_assignments usa ON usa.schoolid = s.id AND usa.userid = $2
+       WHERE tj.id = $1 AND (s.user_id = $2 OR usa.userid = $2)`,
+      [id, userId]
+    );
     if (check.rows.length === 0) {
-      return NextResponse.json({ error: "Jurnal tidak ditemukan" }, { status: 404 });
+      return NextResponse.json({ error: "Jurnal tidak ditemukan atau bukan milik Anda" }, { status: 404 });
     }
 
     if (check.rows[0].teacher_id !== userId) {

@@ -72,6 +72,42 @@ export async function POST(
       );
     } catch { /* notification is non-critical */ }
 
+    // Sync to user_school_assignments so the teacher can access school data
+    try {
+      const inst = await query(
+        `SELECT npsn FROM institutions WHERE id = $1`,
+        [member.rows[0].institution_id]
+      );
+
+      if (inst.rows.length > 0 && inst.rows[0].npsn) {
+        const npsn = inst.rows[0].npsn;
+
+        const school = await query(
+          `SELECT id FROM schools WHERE npsn = $1 LIMIT 1`,
+          [npsn]
+        );
+
+        if (school.rows.length > 0) {
+          const existing = await query(
+            `SELECT id FROM user_school_assignments WHERE userid = $1 AND schoolid = $2 LIMIT 1`,
+            [userId, school.rows[0].id]
+          );
+
+          if (existing.rows.length === 0) {
+            await query(
+              `INSERT INTO user_school_assignments (userid, schoolid) VALUES ($1, $2)`,
+              [userId, school.rows[0].id]
+            );
+          }
+        }
+      }
+
+      await query(
+        `UPDATE users SET nama_sekolah = $1 WHERE id = $2 AND (nama_sekolah IS NULL OR nama_sekolah = '')`,
+        [member.rows[0].institution_name, userId]
+      );
+    } catch { /* sync is non-critical */ }
+
     return NextResponse.json({
       message: 'Berhasil bergabung dengan institusi',
       member: result.rows[0],

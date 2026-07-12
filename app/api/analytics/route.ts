@@ -75,14 +75,15 @@ export async function GET(req: Request) {
       [schoolId]
     );
 
-    // 7. RPP count this month (for the current user)
+    // 7. RPP count this month (for the current user & selected school)
     let rppThisMonth = 0;
     if (userId) {
       const rppRes = await query(
         `SELECT COUNT(*) AS count FROM guru_administrasi
          WHERE user_id = $1 AND tipe_dokumen = 'rpp'
+           AND school_id = $2
            AND created_at >= date_trunc('month', CURRENT_DATE)`,
-        [userId]
+        [userId, schoolId]
       );
       rppThisMonth = Number(rppRes.rows[0].count);
     }
