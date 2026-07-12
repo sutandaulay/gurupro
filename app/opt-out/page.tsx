@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { IconCheck, IconX, IconLoader2 } from "@tabler/icons-react";
 
-export default function OptOutPage() {
+function OptOutContent() {
   const searchParams = useSearchParams();
   const contactId = searchParams.get("contact");
 
@@ -152,5 +152,20 @@ export default function OptOutPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OptOutPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center">
+          <IconLoader2 size={32} className="animate-spin text-violet-600 mx-auto mb-2" />
+          <p className="text-sm text-gray-500">Memuat...</p>
+        </div>
+      </div>
+    }>
+      <OptOutContent />
+    </Suspense>
   );
 }

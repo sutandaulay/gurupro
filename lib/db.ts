@@ -1029,6 +1029,34 @@ const initDb = async () => {
       console.error('Failed to create user_storage tables:', err);
     }
 
+    // 34. Performance Indexes for Foreign Keys (Audit Fix)
+    try {
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_classes_school_id ON classes(school_id)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_subjects_school_id ON subjects(school_id)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_schedules_lookup ON schedules(school_id, class_id, subject_id)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_students_class_id ON students(class_id)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_student_attendance_lookup ON student_attendance(schedule_id, student_id, tanggal)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_teacher_journals_lookup ON teacher_journals(school_id, class_id, subject_id, teacher_id)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_assessments_lookup ON assessments(school_id, class_id, subject_id)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_student_grades_lookup ON student_grades(assessment_id, student_id)');
+    } catch (err) {
+      console.error('Failed to create performance indexes:', err);
+    }
+
+    // 35. Conditional Foreign Key for guru_administrasi (Audit Fix)
+    try {
+      const checkInstTable = await pool.query(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'institutions')"
+      );
+      if (checkInstTable.rows[0].exists) {
+        await pool.query(`
+          ALTER TABLE guru_administrasi 
+          ADD CONSTRAINT fk_guru_administrasi_institution 
+          FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE SET NULL
+        `);
+      }
+    } catch { /* constraint might already exist */ }
+
     console.log("SaaS Academic & TAMS tables checked/initialized successfully");
   } catch (err) {
     console.error("Failed to initialize SaaS Academic & TAMS tables:", err);

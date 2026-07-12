@@ -360,25 +360,36 @@ async function getObservasiData(guruId: string, tahunAjaranId: string) {
 
   if (obsResult.rows.length === 0) return []
 
-  const observasiList = []
+  const obsIds = obsResult.rows.map(obs => obs.id);
 
-  for (const obs of obsResult.rows) {
-    const ratingResult = await query(
-      `SELECT oi.rating, oi.catatan, oi.bukti_observasi, ik.kode, ik.nama as indikator_nama
-       FROM observasi_indikator oi
-       JOIN indikator_kinerja_config ik ON ik.id = oi.indikator_id
-       WHERE oi.observasi_id = $1
-       ORDER BY ik.kode`,
-      [obs.id]
-    )
+  const ratingResult = await query(
+    `SELECT oi.observasi_id, oi.rating, oi.catatan, oi.bukti_observasi, ik.kode, ik.nama as indikator_nama
+     FROM observasi_indikator oi
+     JOIN indikator_kinerja_config ik ON ik.id = oi.indikator_id
+     WHERE oi.observasi_id = ANY($1)
+     ORDER BY ik.kode`,
+    [obsIds]
+  );
 
-    observasiList.push({
-      ...obs,
-      indikator_ratings: ratingResult.rows,
-    })
+  const ratingsByObsId: Record<string, any[]> = {};
+  for (const row of ratingResult.rows) {
+    const obsId = row.observasi_id;
+    if (!ratingsByObsId[obsId]) {
+      ratingsByObsId[obsId] = [];
+    }
+    ratingsByObsId[obsId].push({
+      rating: row.rating,
+      catatan: row.catatan,
+      bukti_observasi: row.bukti_observasi,
+      kode: row.kode,
+      indikator_nama: row.indikator_nama
+    });
   }
 
-  return observasiList
+  return obsResult.rows.map(obs => ({
+    ...obs,
+    indikator_ratings: ratingsByObsId[obs.id] || [],
+  }));
 }
 
 // ─── PROMPT BUILDER ──────────────────────────────────────────────────────────

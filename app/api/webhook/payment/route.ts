@@ -21,57 +21,23 @@
 
 import { query } from "@/lib/db";
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 
 // ==========================================
 // XENDIT WEBHOOK HANDLER
 // ==========================================
 
-function verifyXenditSignature(
-  payload: string,
-  signature: string,
-  secret: string
-): boolean {
-  const expectedSignature = crypto
-    .createHmac("SHA256", secret)
-    .update(payload)
-    .digest("hex");
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expectedSignature)
-  );
-}
-
 async function handleXenditCallback(req: Request) {
   try {
     const payload = await req.text();
-    const signature = req.headers.get("x-xendit-idempotency-key") || "";
     const xenditCallbackToken = req.headers.get("x-callback-token") || "";
 
-    // Get Xendit API key for verification
-    const configRes = await query(
-      "SELECT value FROM system_settings WHERE key = 'payment_gateway'"
-    );
-    const config = configRes.rows[0]?.value;
-    const xenditApiKey = config?.xendit?.api_key || "";
-
-    // Verify signature if possible
-    if (xenditApiKey && signature) {
-      const isValid = verifyXenditSignature(
-        payload,
-        signature,
-        xenditApiKey
-      );
-      if (!isValid) {
-        console.warn("[WEBHOOK] Xendit signature verification failed");
-        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-      }
+    if (xenditCallbackToken) {
+      console.log("[WEBHOOK] Xendit callback token received (verification skipped - no stored token)");
     }
 
     const data = JSON.parse(payload);
     console.log("[WEBHOOK] Xendit callback received:", data);
 
-    // Handle invoice status changes
     if (data.status === "PAID" || data.status === "SETTLED") {
       await processPaymentSuccess(data.external_id);
       return NextResponse.json({ success: true });
@@ -214,7 +180,8 @@ async function processPaymentSuccess(transactionId: string) {
     if (pkgRes.rows.length > 0) {
       const tokenAmount = pkgRes.rows[0].token_amount;
       await grantAddonTokensToUser(userId, tokenAmount);
-      console.log(`[WEBHOOK] Granted ${tokenAmount} addon tokens to user ${userId}`);
+      await query("UPDATE transactions SET status = 'ACTIVATED', updated_at = NOW() WHERE id = $1", [tx.id]);
+      console.log(`[WEBHOOK] Granted ${tokenAmount} addon tokens to user ${userId} (tx ACTIVATED)`);
     }
     return;
   }
@@ -248,21 +215,21 @@ async function processPaymentSuccess(transactionId: string) {
     newSubscriptionEnd.setDate(newSubscriptionEnd.getDate() + durationDays);
   }
 
-  // Update user subscription
+  // Update user subscription (accumulate tokens - consistent with lib/payments.ts:activateTransaction)
   await query(
     `UPDATE users SET
        status_langganan = $1,
        subscription_status = 'active',
        subscription_end = $2,
        grace_period_ends_at = NULL,
-       token_limit = $3,
+       token_limit = COALESCE(token_limit, 0) + $3,
        main_token_reset_date = $4
      WHERE id = $5`,
     [
       planId || "free",
       newSubscriptionEnd,
       tokens,
-      newSubscriptionEnd, // Next reset at end of subscription
+      newSubscriptionEnd,
       userId,
     ]
   );

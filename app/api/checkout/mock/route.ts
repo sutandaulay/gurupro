@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { grantUserTokens, grantAddonTokens } from "@/lib/token-system";
+import { activateTransaction } from "@/lib/payments";
 
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const invoiceId = url.searchParams.get("invoice_id");
     const userId = url.searchParams.get("userId");
+    const paymentMethod = url.searchParams.get("payment_method") || "MOCK";
 
     if (!invoiceId || !userId) {
       return NextResponse.json({ error: "invoice_id and userId required" }, { status: 400 });
@@ -34,14 +36,21 @@ export async function GET(req: Request) {
       const tokens = Number(pkgRes.rows[0].token_amount || 0);
 
       // Mark transaction as PAID and grant addon tokens
-      await query("UPDATE transactions SET status = $1, updated_at = NOW() WHERE id = $2", ["PAID", invoiceId]);
+      await query(
+        "UPDATE transactions SET status = $1, payment_method = $2, updated_at = NOW() WHERE id = $3",
+        ["PAID", paymentMethod, invoiceId]
+      );
       await grantAddonTokens(userId, tokens);
 
       return NextResponse.json({ success: true, redirect: `/dashboard?payment=success&tx=${invoiceId}` });
     }
 
-    // Default: mark as PAID but don't grant tokens automatically for subscription purchases here
-    await query("UPDATE transactions SET status = $1, updated_at = NOW() WHERE id = $2", ["PAID", invoiceId]);
+    // Subscription: mark as PAID and auto-activate immediately
+    await query(
+      "UPDATE transactions SET status = $1, payment_method = $2, updated_at = NOW() WHERE id = $3",
+      ["PAID", paymentMethod, invoiceId]
+    );
+    await activateTransaction(invoiceId);
 
     return NextResponse.json({ success: true, redirect: `/dashboard?payment=success&tx=${invoiceId}` });
   } catch (err: any) {

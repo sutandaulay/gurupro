@@ -88,7 +88,11 @@ export default function PembinaEkskulDashboard() {
           <div className="mt-6">
             <PenilaianEkstrakurikulerForm
               ekstrakurikulerId={selectedEkskul}
-              ekstrakurikuler={currentEkskul}
+              ekstrakurikuler={currentEkskul ? {
+                id: currentEkskul.id,
+                nama_ekskul: currentEkskul.namaEkskul,
+                kelasId: currentEkskul.kelasId
+              } : undefined}
               periode={periode}
               onSuccess={() => alert('Penilaian ekstrakurikuler disimpan!')}
             />
@@ -97,7 +101,7 @@ export default function PembinaEkskulDashboard() {
 
         {currentEkskul && (
           <div className="mt-8">
-            <h2 className="text-lg font-semibold mb-4">Daftar Siswa {currentEkskul.nama_ekskul}</h2>
+            <h2 className="text-lg font-semibold mb-4">Daftar Siswa {currentEkskul.namaEkskul}</h2>
             <DaftarNilaiEkskul ekstrakurikulerId={selectedEkskul} periode={periode} />
           </div>
         )}

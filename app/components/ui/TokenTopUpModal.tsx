@@ -12,7 +12,7 @@ export default function TokenTopUpModal({ open, onClose, userId }: { open: boole
   useEffect(() => {
     if (!open) return;
     setLoading(true);
-    fetch("/api/addon-packages")
+    fetch("/api/token-packages")
       .then((r) => r.json())
       .then((data) => {
         setPackages(data.packages || []);

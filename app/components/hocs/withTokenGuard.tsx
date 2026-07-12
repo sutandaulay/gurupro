@@ -17,7 +17,6 @@
 "use client";
 
 import { ComponentType, useState, useEffect, ReactNode } from "react";
-import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import TokenHabisModal from "@/app/components/ui/TokenHabisModal";
 
@@ -48,10 +47,9 @@ export function withTokenGuard<P extends object>(
   } = options;
 
   function TokenGuardedComponent(props: P & { children?: ReactNode }) {
-    const { data: session, status } = useSession();
     const router = useRouter();
     const [tokenStatus, setTokenStatus] = useState<TokenStatus>({
-      isLoading: status === "loading",
+      isLoading: true,
       hasAccess: false,
     });
     const [showErrorModal, setShowErrorModal] = useState(false);
@@ -77,21 +75,16 @@ export function withTokenGuard<P extends object>(
             data.subscription_end &&
             new Date(data.subscription_end).getTime() < Date.now();
           const isLocked = data.subscription_status === "locked";
+          const isGracePeriod = data.subscription_status === "grace_period";
 
           let reason: TokenStatus["reason"] = undefined;
           let hasAccess = true;
 
-          if (!session) {
-            reason = "no_session";
-            hasAccess = false;
-            if (redirectToLogin) {
-              router.push("/login");
-            }
-          } else if (isLocked) {
+          if (isLocked) {
             reason = "locked";
             hasAccess = false;
             setShowErrorModal(true);
-          } else if (isExpired) {
+          } else if (isExpired && !isGracePeriod) {
             reason = "expired";
             hasAccess = false;
             setShowErrorModal(true);
@@ -117,10 +110,8 @@ export function withTokenGuard<P extends object>(
         }
       }
 
-      if (status !== "loading") {
-        checkTokenAccess();
-      }
-    }, [status, session, router, redirectToLogin]);
+      checkTokenAccess();
+    }, [router, redirectToLogin]);
 
     // Loading state
     if (tokenStatus.isLoading || status === "loading") {

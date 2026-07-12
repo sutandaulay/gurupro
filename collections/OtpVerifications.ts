@@ -8,7 +8,7 @@ const OtpVerifications: CollectionConfig = {
     plural: "OTP Verifications",
   },
   admin: {
-    useAsTitle: "otpCode",
+    useAsTitle: "sentTo",
     group: "Performance Sharing",
     defaultColumns: ["performanceShareLinkId", "channel", "sentTo", "expiresAt", "verifiedAt", "attemptCount"],
   },

@@ -445,7 +445,7 @@ export default function TransactionsManager({ onSuccess, onError }: Transactions
                                   onClick={() => handleAction(tx.id, "activate")}
                                   disabled={isProcessing[tx.id]}
                                   className="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-600 rounded-lg transition disabled:opacity-50"
-                                  title="Aktifkan Paket"
+                                  title="Aktifkan Paket (manual / bypass)"
                                 >
                                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -453,7 +453,35 @@ export default function TransactionsManager({ onSuccess, onError }: Transactions
                                 </button>
                               </>
                             )}
-                            {(tx.status === "PAID" || tx.status === "ACTIVATED") && (
+                            {tx.status === "PAID" && (
+                              <>
+                                <button
+                                  onClick={() => handleAction(tx.id, "activate")}
+                                  disabled={isProcessing[tx.id]}
+                                  className="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-600 rounded-lg transition disabled:opacity-50"
+                                  title="Aktifkan Paket"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (confirm("Refund transaksi ini?")) {
+                                      handleAction(tx.id, "refund");
+                                    }
+                                  }}
+                                  disabled={isProcessing[tx.id]}
+                                  className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-600 rounded-lg transition disabled:opacity-50"
+                                  title="Refund"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                  </svg>
+                                </button>
+                              </>
+                            )}
+                            {tx.status === "ACTIVATED" && (
                               <button
                                 onClick={() => {
                                   if (confirm("Refund transaksi ini?")) {

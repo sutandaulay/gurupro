@@ -83,7 +83,14 @@ export default function ViewLaporanKinerjaPage() {
       setLaporan(data)
 
       // Fetch SKP and observasi related to this laporan
-      if (data.tahun_ajaran_id && data.semester) {
+      if (data.skp_id) {
+        const skpDetailRes = await fetch(`/api/skp/${data.skp_id}`)
+        if (skpDetailRes.ok) {
+          const skpDetail = await skpDetailRes.json()
+          setSkpData(skpDetail)
+          setObservasiList(skpDetail.observasi || [])
+        }
+      } else if (data.tahun_ajaran_id && data.semester) {
         const taId = data.tahun_ajaran_id
         const skpRes = await fetch(`/api/skp?tahun_ajaran_id=${taId}`)
         if (skpRes.ok) {

@@ -78,6 +78,9 @@ export default function RaportEksternalPage() {
       }
 
       setData(result);
+      if (result.otpVerified) {
+        setOtpVerified(true);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -154,6 +157,7 @@ export default function RaportEksternalPage() {
       setOtpVerified(true);
       setOtpModal(false);
       setOtpCode("");
+      await fetchData();
     } catch (err: any) {
       setOtpError(err.message);
     } finally {

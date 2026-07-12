@@ -120,8 +120,12 @@ export default function AdminPage() {
         const data = await res.json();
         setUsers(data);
       } else {
-        const err = await res.json();
-        setErrorMsg(err.error || "Gagal memuat daftar pengguna");
+        let errMsg = "Gagal memuat daftar pengguna";
+        try {
+          const err = await res.json();
+          errMsg = err.error || errMsg;
+        } catch {}
+        setErrorMsg(errMsg);
       }
     } catch (e) {
       console.error(e);
@@ -141,8 +145,12 @@ export default function AdminPage() {
         const txList = Array.isArray(data) ? data : (data.transactions || []);
         setTransactions(txList);
       } else {
-        const err = await res.json();
-        setErrorMsg(err.error || "Gagal memuat transaksi");
+        let errMsg = "Gagal memuat transaksi";
+        try {
+          const err = await res.json();
+          errMsg = err.error || errMsg;
+        } catch {}
+        setErrorMsg(errMsg);
       }
     } catch (e) {
       console.error(e);
@@ -214,8 +222,12 @@ export default function AdminPage() {
         setEditingUserId(null);
         fetchUsers(userSearch);
       } else {
-        const err = await res.json();
-        setErrorMsg(err.error || "Gagal memperbarui pengaturan user");
+        let errMsg = "Gagal memperbarui pengaturan user";
+        try {
+          const err = await res.json();
+          errMsg = err.error || errMsg;
+        } catch {}
+        setErrorMsg(errMsg);
       }
     } catch (e) {
       console.error(e);
@@ -242,8 +254,12 @@ export default function AdminPage() {
         fetchTransactions(txSearch);
         fetchUsers(userSearch);
       } else {
-        const err = await res.json();
-        setErrorMsg(err.error || "Gagal memproses refund");
+        let errMsg = "Gagal memproses refund";
+        try {
+          const err = await res.json();
+          errMsg = err.error || errMsg;
+        } catch {}
+        setErrorMsg(errMsg);
       }
     } catch (e) {
       console.error(e);
@@ -270,8 +286,12 @@ export default function AdminPage() {
         fetchTransactions(txSearch);
         fetchUsers(userSearch);
       } else {
-        const err = await res.json();
-        setErrorMsg(err.error || "Gagal mengaktifkan paket");
+        let errMsg = "Gagal mengaktifkan paket";
+        try {
+          const err = await res.json();
+          errMsg = err.error || errMsg;
+        } catch {}
+        setErrorMsg(errMsg);
       }
     } catch (e) {
       console.error(e);
@@ -332,7 +352,10 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, data })
       });
-      const resData = await res.json();
+      let resData: any = {};
+      try {
+        resData = await res.json();
+      } catch {}
       if (res.ok) {
         setSuccessMsg(resData.message || "Pengaturan berhasil diperbarui!");
         fetchSettings(); // Refresh settings state
@@ -364,7 +387,10 @@ export default function AdminPage() {
           data: { to: testEmailAddress }
         })
       });
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {}
       if (res.ok) {
         setSuccessMsg(data.message);
       } else {
@@ -394,7 +420,10 @@ export default function AdminPage() {
           data: { to: testWaNumber }
         })
       });
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {}
       if (res.ok) {
         setSuccessMsg(data.message);
       } else {
@@ -420,7 +449,10 @@ export default function AdminPage() {
           data: {}
         })
       });
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {}
       if (res.ok) {
         setSuccessMsg(data.message);
       } else {
@@ -466,8 +498,12 @@ export default function AdminPage() {
         fetchReferralsList();
         fetchUsers();
       } else {
-        const err = await res.json();
-        setErrorMsg(err.error || "Gagal memproses pencairan");
+        let errMsg = "Gagal memproses pencairan";
+        try {
+          const err = await res.json();
+          errMsg = err.error || errMsg;
+        } catch {}
+        setErrorMsg(errMsg);
       }
     } catch (e) {
       console.error(e);
@@ -511,8 +547,12 @@ export default function AdminPage() {
         fetchReferralsList();
         fetchUsers();
       } else {
-        const err = await res.json();
-        setErrorMsg(err.error || "Gagal memproses tindakan pencairan");
+        let errMsg = "Gagal memproses tindakan pencairan";
+        try {
+          const err = await res.json();
+          errMsg = err.error || errMsg;
+        } catch {}
+        setErrorMsg(errMsg);
       }
     } catch (e) {
       console.error(e);

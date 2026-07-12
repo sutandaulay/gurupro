@@ -215,6 +215,7 @@ export async function POST(req: Request) {
       await query(
         `UPDATE users 
          SET status_langganan = $1,
+             subscription_status = 'active',
              subscription_start = COALESCE($2, NOW()),
              subscription_end = $3
          WHERE id = $4`,

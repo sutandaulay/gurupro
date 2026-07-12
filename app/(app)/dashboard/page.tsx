@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
@@ -137,7 +137,7 @@ const getLocalDateString = () => {
 
 const generateId = () => typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2);
 
-export default function Dashboard() {
+function DashboardContent() {
   const router = useRouter();
   const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null);
 
@@ -2609,12 +2609,6 @@ export default function Dashboard() {
         try {
           const parsed = JSON.parse(cached);
           setCurrentUser(parsed);
-          setProfNama(parsed.nama_lengkap || "");
-          setProfUsername(parsed.username || "");
-          setProfSekolah(parsed.nama_sekolah || "");
-          setProfBankName(parsed.bank_name || "");
-          setProfBankAccountNumber(parsed.bank_account_number || "");
-          setProfBankAccountName(parsed.bank_account_name || "");
         } catch (_) {}
       }
     }
@@ -11898,5 +11892,20 @@ const renderJurnalModule = () => {
       />
 
     </main>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="w-10 h-10 border-3 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-gray-500">Memuat Dashboard...</p>
+        </div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }

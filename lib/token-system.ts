@@ -10,6 +10,7 @@ export function evaluateTokenAccess(args: {
   role?: string | null;
   tokenLimit?: number | null;
   subscriptionEnd?: string | Date | null;
+  subscriptionStatus?: string | null;
 }): TokenAccessResult {
   const role = args.role || "guru";
   const tokenLimit = Number(args.tokenLimit || 0);
@@ -18,7 +19,11 @@ export function evaluateTokenAccess(args: {
     return { allowed: true, reason: "ok", remainingTokens: tokenLimit };
   }
 
-  if (args.subscriptionEnd) {
+  if (args.subscriptionStatus === "locked") {
+    return { allowed: false, reason: "subscription_expired", remainingTokens: 0 };
+  }
+
+  if (args.subscriptionEnd && args.subscriptionStatus !== "grace_period") {
     const expiry = new Date(args.subscriptionEnd).getTime();
     const isExpired = Number.isFinite(expiry) && expiry <= Date.now();
 
@@ -73,6 +78,7 @@ export async function getUserTokenAccess(userId: string) {
       role: user.role,
       tokenLimit: combinedBalance,
       subscriptionEnd: user.subscription_end,
+      subscriptionStatus: user.subscription_status,
     }),
   };
 }
@@ -111,17 +117,17 @@ export async function consumeUserToken(userId: string, amount = 1) {
 }
 
 export async function grantUserTokens(userId: string, amount: number) {
-  const currentRes = await query("SELECT token_limit FROM users WHERE id = $1", [userId]);
-  const currentBalance = Number(currentRes.rows[0]?.token_limit || 0);
-  const nextBalance = applyTokenDelta(currentBalance, amount, "topup");
-  await query("UPDATE users SET token_limit = $1 WHERE id = $2", [nextBalance, userId]);
-  return nextBalance;
+  const res = await query(
+    "UPDATE users SET token_limit = GREATEST(0, COALESCE(token_limit, 0) + $1) WHERE id = $2 RETURNING token_limit",
+    [amount, userId]
+  );
+  return Number(res.rows[0]?.token_limit || 0);
 }
 
 export async function grantAddonTokens(userId: string, amount: number) {
-  const currentRes = await query("SELECT addon_token_balance FROM users WHERE id = $1", [userId]);
-  const currentBalance = Number(currentRes.rows[0]?.addon_token_balance || 0);
-  const nextBalance = applyTokenDelta(currentBalance, amount, "topup");
-  await query("UPDATE users SET addon_token_balance = $1 WHERE id = $2", [nextBalance, userId]);
-  return nextBalance;
+  const res = await query(
+    "UPDATE users SET addon_token_balance = GREATEST(0, COALESCE(addon_token_balance, 0) + $1) WHERE id = $2 RETURNING addon_token_balance",
+    [amount, userId]
+  );
+  return Number(res.rows[0]?.addon_token_balance || 0);
 }

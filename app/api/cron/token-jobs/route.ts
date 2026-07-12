@@ -25,15 +25,18 @@ const CRON_SECRET = process.env.CRON_SECRET || process.env.CRON_SECRET_TOKEN;
 
 export async function POST(request: Request) {
   try {
-    // Verify cron secret if configured
-    if (CRON_SECRET) {
-      const authHeader = request.headers.get("authorization");
-      const token = authHeader?.replace("Bearer ", "");
+    // Verify cron secret
+    if (!CRON_SECRET) {
+      console.error("[CRON] CRON_SECRET environment variable is not configured.");
+      return NextResponse.json({ error: "Cron not configured on server" }, { status: 500 });
+    }
 
-      if (token !== CRON_SECRET) {
-        console.warn("[CRON] Unauthorized cron request - invalid token");
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+    const authHeader = request.headers.get("authorization");
+    const token = authHeader?.replace("Bearer ", "");
+
+    if (token !== CRON_SECRET) {
+      console.warn("[CRON] Unauthorized cron request - invalid token");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Check for Vercel's built-in cron header

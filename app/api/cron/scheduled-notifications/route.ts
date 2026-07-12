@@ -186,7 +186,12 @@ async function getAggregatedStatsForTeacher(userId: string) {
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET || "dev-cron-secret";
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    console.error("[CRON] CRON_SECRET environment variable is not configured.");
+    return NextResponse.json({ error: "Cron not configured on server" }, { status: 500 });
+  }
 
   if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

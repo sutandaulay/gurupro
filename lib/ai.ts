@@ -147,22 +147,52 @@ export async function generateAIContent(
     console.log("[AI SERVICE] Gemini config - API Key exists:", !!apiKey, "Model:", config.gemini.model_name);
     if (!apiKey) throw new Error("GEMINI_API_KEY tidak dikonfigurasi di admin panel.");
 
-    try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({
-        model: config.gemini.model_name || "gemini-2.5-flash",
-        systemInstruction: systemInstruction,
-        generationConfig: isJson ? { responseMimeType: "application/json", maxOutputTokens: 32768 } : undefined
-      });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: config.gemini.model_name || "gemini-2.5-flash",
+      systemInstruction: systemInstruction,
+      generationConfig: isJson ? { responseMimeType: "application/json", maxOutputTokens: 32768 } : undefined
+    });
 
-      console.log("[AI SERVICE] Sending request to Gemini...");
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      console.log("[AI SERVICE] Gemini response received, length:", text?.length);
-      return text.trim();
-    } catch (geminiError: any) {
-      console.error("[AI SERVICE] Gemini error:", geminiError?.message || geminiError);
-      throw geminiError;
+    let retries = 3;
+    let delay = 1000;
+    
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        console.log(`[AI SERVICE] Sending request to Gemini (Attempt ${attempt}/${retries})...`);
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+        console.log("[AI SERVICE] Gemini response received, length:", text?.length);
+        return text.trim();
+      } catch (geminiError: any) {
+        const isTransient = 
+          geminiError.message?.includes("429") || 
+          geminiError.message?.includes("503") || 
+          geminiError.message?.includes("500") || 
+          geminiError.message?.includes("fetch failed") || 
+          geminiError.message?.includes("timeout") ||
+          geminiError.status === 429 ||
+          geminiError.status === 503;
+
+        if (attempt < retries && isTransient) {
+          console.warn(`[AI SERVICE] Gemini attempt ${attempt} failed: ${geminiError.message}. Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2;
+        } else {
+          console.error("[AI SERVICE] Gemini error after retries:", geminiError?.message || geminiError);
+          let userMessage = "Gagal memproses permintaan dengan AI. ";
+          if (geminiError.message?.includes("429") || geminiError.message?.includes("RESOURCE_EXHAUSTED")) {
+            userMessage += "Batas kuota API (Rate Limit) terlampaui. Silakan coba beberapa saat lagi.";
+          } else if (geminiError.message?.includes("503") || geminiError.message?.includes("500")) {
+            userMessage += "Server Gemini sedang sibuk atau mengalami kendala teknis. Silakan coba lagi.";
+          } else if (geminiError.message?.includes("fetch failed")) {
+            userMessage += "Gagal terhubung ke server AI (masalah koneksi internet). Silakan coba lagi.";
+          } else {
+            userMessage += geminiError.message || "Unknown error";
+          }
+          throw new Error(userMessage);
+        }
+      }
     }
   }
 

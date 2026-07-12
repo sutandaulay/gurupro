@@ -253,7 +253,7 @@ export default function AiPerformanceReportPage() {
       <div className="bg-white rounded-xl border p-6">
         <PerformanceSharePanel
           userId={user?.id || ""}
-          aggregatedStats={stats || {}}
+          aggregatedStats={(stats as any) || {}}
         />
       </div>
     </div>

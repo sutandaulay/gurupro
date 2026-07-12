@@ -1,8 +1,19 @@
 import { query } from "@/lib/db";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function POST() {
   try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("gurupro_session")?.value;
+    if (!sessionCookie) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const session = JSON.parse(sessionCookie);
+    if (session.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const results: string[] = [];
 
     // Create cms_features table

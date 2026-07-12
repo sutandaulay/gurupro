@@ -16,7 +16,7 @@ import {
   IconPhone,
 } from "@tabler/icons-react";
 import dynamic from "next/dynamic";
-import { useTokenError, parseTokenError } from "@/hooks/useTokenError";
+import { useTokenError, parseTokenError } from "@/app/hooks/useTokenError";
 
 const TokenHabisModal = dynamic(() => import("@/app/components/ui/TokenHabisModal"), { ssr: false });
 

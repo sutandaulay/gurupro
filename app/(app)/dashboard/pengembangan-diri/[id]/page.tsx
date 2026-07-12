@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { Button } from '@/app/components/ui'
 import { Input } from '@/app/components/ui/form'
@@ -34,7 +34,7 @@ const KOMPETENSI_OPTIONS = [
   { value: 'kepribadian', label: 'Kepribadian', desc: 'Pengembangan karakter dan etos kerja' },
 ]
 
-export default function EditPelatihanPage() {
+function EditPelatihanContent() {
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
@@ -418,5 +418,20 @@ export default function EditPelatihanPage() {
         </div>
       </form>
     </div>
+  )
+}
+
+export default function EditPelatihanPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-3 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-gray-500 font-medium">Memuat halaman edit...</p>
+        </div>
+      </div>
+    }>
+      <EditPelatihanContent />
+    </Suspense>
   )
 }

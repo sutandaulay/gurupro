@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Button, Card, Badge, Spinner } from '@/app/components/ui'
 import { cn } from '@/lib/utils'
@@ -70,7 +70,7 @@ function PrintFooter() {
   )
 }
 
-export default function LaporanHarianDetailPage() {
+function LaporanHarianDetailContent() {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -328,5 +328,20 @@ export default function LaporanHarianDetailPage() {
         }
       `}</style>
     </div>
+  )
+}
+
+export default function LaporanHarianDetailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Spinner className="w-12 h-12 text-violet-600 mx-auto" />
+          <p className="mt-4 text-gray-600 font-medium">Memuat laporan harian...</p>
+        </div>
+      </div>
+    }>
+      <LaporanHarianDetailContent />
+    </Suspense>
   )
 }

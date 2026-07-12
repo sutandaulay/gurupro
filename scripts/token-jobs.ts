@@ -19,7 +19,7 @@
 
 import { pool, query } from "@/lib/db";
 
-const DEFAULT_GRACE_PERIOD_DAYS = 14;
+const DEFAULT_GRACE_PERIOD_DAYS = 7;
 
 interface UserTierInfo {
   statusLangganan: string;
@@ -76,7 +76,7 @@ export async function resetMonthlyTokens(): Promise<{ processed: number; errors:
   const result = { processed: 0, errors: 0 };
 
   try {
-    // Select users with active subscription who need token reset
+    // Select users with active subscription who need monthly token reset
     const usersRes = await query(`
       SELECT
         u.id as user_id,
@@ -86,11 +86,13 @@ export async function resetMonthlyTokens(): Promise<{ processed: number; errors:
         u.addon_token_balance,
         u.subscription_start,
         u.subscription_end,
-        u.is_active
+        u.is_active,
+        u.subscription_status
       FROM users u
       WHERE u.is_active = true
         AND u.status_langganan IS NOT NULL
         AND u.status_langganan != 'free'
+        AND (u.subscription_status = 'active' OR u.subscription_status IS NULL)
         AND (u.subscription_end IS NULL OR u.subscription_end > NOW())
         AND (
           u.main_token_reset_date IS NULL
@@ -116,7 +118,7 @@ export async function resetMonthlyTokens(): Promise<{ processed: number; errors:
 
         if (uuidRegex.test(planKey)) {
           const planRes = await query(
-            "SELECT tokens, duration_days FROM pricing_plans WHERE id = $1 AND is_active = true",
+            "SELECT tokens FROM pricing_plans WHERE id = $1 AND is_active = true",
             [planKey]
           );
           if (planRes.rows.length > 0) {
@@ -124,7 +126,7 @@ export async function resetMonthlyTokens(): Promise<{ processed: number; errors:
           }
         } else {
           const planRes = await query(
-            "SELECT tokens, duration_days FROM pricing_plans WHERE package_name = $1 AND is_active = true LIMIT 1",
+            "SELECT tokens FROM pricing_plans WHERE package_name = $1 AND is_active = true LIMIT 1",
             [planKey]
           );
           if (planRes.rows.length > 0) {
@@ -137,17 +139,11 @@ export async function resetMonthlyTokens(): Promise<{ processed: number; errors:
           continue;
         }
 
-        // Calculate next reset date (30 days from now, or based on subscription duration)
-        const durationRes = await query(
-          "SELECT duration_days FROM pricing_plans WHERE tokens = $1 AND is_active = true LIMIT 1",
-          [quota]
-        );
-        const durationDays = durationRes.rows[0]?.duration_days || 30;
-
+        // Reset every 30 days (monthly)
         const nextResetDate = new Date();
-        nextResetDate.setDate(nextResetDate.getDate() + durationDays);
+        nextResetDate.setDate(nextResetDate.getDate() + 30);
 
-        // Update user's main token balance and reset date
+        // Update user's main token balance to full quota
         // NOTE: addon_token_balance is NOT touched - it carries over
         await query(
           `UPDATE users
@@ -158,7 +154,7 @@ export async function resetMonthlyTokens(): Promise<{ processed: number; errors:
         );
 
         console.log(
-          `[CRON] Reset tokens for user ${userId}: ${user.current_main_balance} → ${quota} (addon preserved: ${user.addon_token_balance})`
+          `[CRON] Reset tokens for user ${userId}: ${user.current_main_balance} → ${quota} (addon preserved: ${user.addon_token_balance}, next reset: ${nextResetDate.toISOString().split('T')[0]})`
         );
         result.processed++;
       } catch (err: any) {
@@ -250,18 +246,17 @@ export async function enforceGracePeriods(): Promise<{ graceEntered: number; loc
 
     for (const user of lockRes.rows) {
       try {
-        // Lock user and clear addon tokens
+        // Lock user — addon tokens are PRESERVED (user can use them after renewing)
         await query(
           `UPDATE users
            SET subscription_status = 'locked',
-               addon_token_balance = 0,
                grace_period_ends_at = NULL
            WHERE id = $1`,
           [user.user_id]
         );
 
         console.log(
-          `[CRON] User ${user.user_id} LOCKED - addon tokens cleared (was: ${user.addon_token_balance})`
+          `[CRON] User ${user.user_id} LOCKED - addon tokens preserved (${user.addon_token_balance})`
         );
         result.locked++;
       } catch (err: any) {

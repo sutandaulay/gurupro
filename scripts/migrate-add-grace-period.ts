@@ -5,7 +5,7 @@
  *
  * Description:
  * - Adds grace_period_days column to pricing_plans table
- * - Sets default value of 14 days for all existing plans
+ * - Sets default value of 7 days for all existing plans
  * - This allows per-tier grace period configuration
  */
 
@@ -18,17 +18,17 @@ async function migrate() {
     // 1. Add column if not exists
     await pool.query(`
       ALTER TABLE pricing_plans
-      ADD COLUMN IF NOT EXISTS grace_period_days INTEGER DEFAULT 14
+      ADD COLUMN IF NOT EXISTS grace_period_days INTEGER DEFAULT 7
     `);
     console.log("✓ Column grace_period_days added/verified");
 
-    // 2. Update existing plans with default 14 days if they have NULL
+    // 2. Update existing plans with default 7 days if they have NULL
     const updateResult = await pool.query(`
       UPDATE pricing_plans
-      SET grace_period_days = 14
+      SET grace_period_days = 7
       WHERE grace_period_days IS NULL
     `);
-    console.log(`✓ Updated ${updateResult.rowCount} plans with default grace period (14 days)`);
+    console.log(`✓ Updated ${updateResult.rowCount} plans with default grace period (7 days)`);
 
     // 3. Create index for faster lookups
     await pool.query(`

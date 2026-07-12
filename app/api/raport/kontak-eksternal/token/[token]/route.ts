@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getKontakByLinkToken, logAkses, getDataRaportForKelas } from '@/lib/raport/kontak-eksternal-repository';
+import { getKontakByLinkToken, logAkses, getDataRaportForKelas, isOtpVerified } from '@/lib/raport/kontak-eksternal-repository';
 import { isOtpExpired } from '@/lib/performance-share';
 
 export async function GET(
@@ -33,7 +33,8 @@ export async function GET(
     );
     const guruMapelNama = guruRes.rows[0]?.nama_lengkap || 'Guru';
 
-    const dataRaports = await getDataRaportForKelas(kontak.kelas_id);
+    const otpVerified = await isOtpVerified(kontak.id);
+    const dataRaports = otpVerified ? await getDataRaportForKelas(kontak.kelas_id) : [];
 
     return NextResponse.json({
       kontak: {
@@ -47,6 +48,7 @@ export async function GET(
       kelasNama,
       guruMapelNama,
       otpExpiredAt: kontak.otp_expired_at,
+      otpVerified,
       dataRaports,
     });
   } catch (error: any) {
