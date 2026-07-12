@@ -1,0 +1,302 @@
+[
+  {
+    "filePath": "d:\\gurupro\\app\\api\\admin\\landing\\seed\\route.ts",
+    "line": 138,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\admin\\landing\\seed\\route.ts",
+    "line": 150,
+    "snippet": "await query(\"DELETE FROM why_points\"); // Clear existing",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\admin\\landing\\seed\\route.ts",
+    "line": 152,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\admin\\landing\\seed\\route.ts",
+    "line": 164,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\ai\\laporan-kinerja\\route.ts",
+    "line": 366,
+    "snippet": "const ratingResult = await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\attendance\\route.ts",
+    "line": 138,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\attendance\\route.ts",
+    "line": 145,
+    "snippet": "await query(\"COMMIT\");",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\attendance\\route.ts",
+    "line": 147,
+    "snippet": "await query(\"ROLLBACK\");",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\institution\\[institutionId]\\members\\import\\route.ts",
+    "line": 186,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\institution\\[institutionId]\\members\\import\\route.ts",
+    "line": 197,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\institution\\[institutionId]\\members\\route.ts",
+    "line": 127,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\institution\\[institutionId]\\members\\route.ts",
+    "line": 138,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\institution\\[institutionId]\\members\\route.ts",
+    "line": 146,
+    "snippet": "const instResult = await query(`SELECT name FROM institutions WHERE id = $1`, [instId])",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\institution\\[institutionId]\\members\\[memberId]\\route.ts",
+    "line": 65,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\institution\\[institutionId]\\members\\[memberId]\\route.ts",
+    "line": 74,
+    "snippet": "await query(`DELETE FROM institution_members_assigned_kelas WHERE _parent_id = $1`, [memId])",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\institution\\[institutionId]\\members\\[memberId]\\route.ts",
+    "line": 79,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\landing-page\\route.ts",
+    "line": 137,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\landing-page\\route.ts",
+    "line": 145,
+    "snippet": "await query(\"DELETE FROM pricing_plans\", []);",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\landing-page\\route.ts",
+    "line": 148,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\landing-page\\route.ts",
+    "line": 156,
+    "snippet": "const existing = await query(\"SELECT id FROM landing_page_settings LIMIT 1\");",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\landing-page\\route.ts",
+    "line": 175,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\landing-page\\route.ts",
+    "line": 181,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\observasi\\route.ts",
+    "line": 110,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\observasi\\[id]\\route.ts",
+    "line": 91,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\raport\\refresh-nilai\\route.ts",
+    "line": 70,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\schedules\\import\\route.ts",
+    "line": 117,
+    "snippet": "const classRes = await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\schedules\\import\\route.ts",
+    "line": 123,
+    "snippet": "const insertClass = await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\schedules\\import\\route.ts",
+    "line": 133,
+    "snippet": "const subjectRes = await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\selesai-mengajar\\seed-all\\route.ts",
+    "line": 145,
+    "snippet": "const schedule = await prisma.schedules.create({",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\selesai-mengajar\\seed-all\\route.ts",
+    "line": 161,
+    "snippet": "const allStudents = await prisma.students.findMany({",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\skp\\route.ts",
+    "line": 92,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\skp\\route.ts",
+    "line": 100,
+    "snippet": "const fullResult = await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\skp\\route.ts",
+    "line": 108,
+    "snippet": "const indikatorResult = await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\skp\\[id]\\route.ts",
+    "line": 93,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\skp\\[id]\\route.ts",
+    "line": 101,
+    "snippet": "const indikatorResult = await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\students\\import\\route.ts",
+    "line": 89,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\students\\import\\route.ts",
+    "line": 95,
+    "snippet": "await query(\"COMMIT\");",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\students\\import\\route.ts",
+    "line": 97,
+    "snippet": "await query(\"ROLLBACK\");",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\app\\api\\teaching-session\\complete\\route.ts",
+    "line": 97,
+    "snippet": "await prisma.student_attendance.upsert({",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\lib\\db.ts",
+    "line": 529,
+    "snippet": "await pool.query(\"UPDATE users SET referral_code = $1 WHERE id = $2\", [code, r.id]);",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\lib\\db.ts",
+    "line": 534,
+    "snippet": "await pool.query('ALTER TABLE tahun_ajaran ADD COLUMN IF NOT EXISTS sekolah_id UUID');",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\lib\\db.ts",
+    "line": 535,
+    "snippet": "await pool.query(\"ALTER TABLE tahun_ajaran ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)\");",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\lib\\db.ts",
+    "line": 536,
+    "snippet": "await pool.query(\"ALTER TABLE tahun_ajaran ADD COLUMN IF NOT EXISTS semester_type VARCHAR(20) DEFAULT 'full'\");",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\lib\\db.ts",
+    "line": 537,
+    "snippet": "await pool.query(\"ALTER TABLE tahun_ajaran ADD COLUMN IF NOT EXISTS semester VARCHAR(20)\");",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\lib\\db.ts",
+    "line": 542,
+    "snippet": "await pool.query('ALTER TABLE institution_members ADD COLUMN IF NOT EXISTS \"app_user_id\" UUID');",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\lib\\db.ts",
+    "line": 543,
+    "snippet": "await pool.query('CREATE INDEX IF NOT EXISTS institution_members_app_user_idx ON institution_members (\"app_user_id\")');",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\lib\\raport\\agregatorNilai.ts",
+    "line": 203,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\lib\\selesai-mengajar\\save-absensi.ts",
+    "line": 42,
+    "snippet": "await prisma.student_attendance.upsert({",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\lib\\selesai-mengajar\\save-absensi.ts",
+    "line": 53,
+    "snippet": "await prisma.teaching_sessions.upsert({",
+    "type": "Serial query inside loop (N+1 query problem)"
+  },
+  {
+    "filePath": "d:\\gurupro\\lib\\settings.ts",
+    "line": 32,
+    "snippet": "await query(",
+    "type": "Serial query inside loop (N+1 query problem)"
+  }
+]

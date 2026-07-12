@@ -165,9 +165,9 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
   };
 
   return (
-    <div className="relative hidden lg:block">
-      <nav className="flex h-12 bg-white border-b border-gray-200 px-6">
-        <div className="flex items-center gap-1">
+    <div className="relative hidden lg:block w-full">
+      <nav className="flex h-12 bg-white border-b border-gray-200 px-6 sticky top-0 z-40">
+        <div className="flex items-center gap-1 overflow-x-auto w-full thin-scrollbar">
           {menuItems.map((item) => {
             const active = isDropdownActive(item);
 
@@ -176,7 +176,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                 <button
                   key={item.label}
                   onClick={() => handleItemClick(item)}
-                  className={`flex items-center gap-2 px-4 h-full text-sm font-medium border-b-2 transition-all duration-150 cursor-pointer ${
+                  className={`flex items-center gap-2 px-4 h-full text-sm font-medium border-b-2 transition-all duration-150 cursor-pointer whitespace-nowrap ${
                     active
                       ? "text-violet-600 border-violet-600 bg-violet-50"
                       : "text-gray-600 border-transparent hover:text-violet-500 hover:bg-violet-50"
@@ -194,7 +194,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                   key={item.label}
                   href={item.href!}
                   onClick={(e) => { e.preventDefault(); handleItemClick(item); }}
-                  className={`flex items-center gap-2 px-4 h-full text-sm font-medium border-b-2 transition-all duration-150 cursor-pointer ${
+                  className={`flex items-center gap-2 px-4 h-full text-sm font-medium border-b-2 transition-all duration-150 cursor-pointer whitespace-nowrap ${
                     active
                       ? "text-violet-600 border-violet-600 bg-violet-50"
                       : "text-gray-600 border-transparent hover:text-violet-500 hover:bg-violet-50"
@@ -209,7 +209,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
             return (
               <div key={item.label} className="relative group">
                 <div
-                  className={`flex items-center gap-2 px-4 h-full text-sm font-medium border-b-2 transition-all duration-150 cursor-pointer ${
+                  className={`flex items-center gap-2 px-4 h-full text-sm font-medium border-b-2 transition-all duration-150 cursor-pointer whitespace-nowrap ${
                     active
                       ? "text-violet-600 border-violet-600 bg-violet-50"
                       : "text-gray-600 border-transparent hover:text-violet-500 hover:bg-violet-50"
@@ -303,6 +303,31 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
           })}
         </div>
       </nav>
+      <style jsx>{`
+        .thin-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: #cbd5e1 transparent;
+        }
+        .thin-scrollbar::-webkit-scrollbar {
+          height: 8px;
+        }
+        .thin-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+          border-radius: 4px;
+        }
+        .thin-scrollbar::-webkit-scrollbar-thumb {
+          background-color: #cbd5e1;
+          border-radius: 4px;
+        }
+        @media (max-width: 1024px) {
+          .thin-scrollbar {
+            scrollbar-width: none;
+          }
+          .thin-scrollbar::-webkit-scrollbar {
+            display: none;
+          }
+        }
+      `}</style>
     </div>
   );
 }
