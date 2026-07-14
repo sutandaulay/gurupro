@@ -22,11 +22,11 @@ import {
   IconGift,
   IconCreditCardOff,
   IconCalendarCancel,
+  IconArrowLeft,
 } from "@tabler/icons-react";
 
 /* ============================ Sub-components ============================ */
 
-/** Official 4-color Google "G" logo */
 function GoogleIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
@@ -38,28 +38,23 @@ function GoogleIcon({ size = 18 }: { size?: number }) {
   );
 }
 
-/** Simple SVG illustration of a teacher at a chalkboard */
 function TeacherIllustration() {
   return (
     <svg viewBox="0 0 400 280" className="w-full max-w-xs mx-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="200" cy="140" r="120" fill="rgba(255,255,255,0.05)" />
-      {/* chalkboard */}
       <rect x="70" y="40" width="190" height="115" rx="10" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.25)" strokeWidth="2" />
       <line x1="92" y1="68" x2="180" y2="68" stroke="rgba(196,181,253,0.7)" strokeWidth="4" strokeLinecap="round" />
       <line x1="92" y1="88" x2="220" y2="88" stroke="rgba(196,181,253,0.5)" strokeWidth="4" strokeLinecap="round" />
       <rect x="92" y="105" width="36" height="28" rx="4" fill="rgba(196,181,253,0.35)" />
       <rect x="138" y="105" width="36" height="28" rx="4" fill="rgba(196,181,253,0.2)" />
-      {/* teacher */}
       <circle cx="305" cy="120" r="20" fill="rgba(255,255,255,0.95)" />
       <path d="M286 118 Q286 96 305 96 Q324 96 324 118 Q318 108 305 108 Q292 108 286 118 Z" fill="rgba(167,139,250,0.7)" />
       <path d="M272 205 Q272 158 305 158 Q338 158 338 205 Z" fill="rgba(255,255,255,0.9)" />
       <path d="M282 172 Q250 160 218 128" stroke="rgba(255,255,255,0.9)" strokeWidth="9" strokeLinecap="round" />
-      {/* desk */}
       <rect x="250" y="210" width="120" height="7" rx="2" fill="rgba(255,255,255,0.3)" />
       <line x1="262" y1="217" x2="262" y2="248" stroke="rgba(255,255,255,0.2)" strokeWidth="3" />
       <line x1="358" y1="217" x2="358" y2="248" stroke="rgba(255,255,255,0.2)" strokeWidth="3" />
       <rect x="290" y="196" width="28" height="14" rx="2" fill="rgba(196,181,253,0.5)" />
-      {/* accents */}
       <circle cx="55" cy="210" r="5" fill="rgba(196,181,253,0.45)" />
       <circle cx="365" cy="70" r="7" fill="rgba(196,181,253,0.35)" />
       <circle cx="345" cy="255" r="4" fill="rgba(196,181,253,0.55)" />
@@ -83,7 +78,6 @@ function FeatureBullet({ icon: Icon, title, desc }: { icon: TablerIcon; title: s
   );
 }
 
-/** Reusable input with icon, error state, disabled state, and optional right element */
 function TextField({
   label,
   icon: Icon,
@@ -136,7 +130,6 @@ function TextField({
   );
 }
 
-/** Reusable select with icon and chevron, styled to match TextField */
 function SelectField({
   label,
   icon: Icon,
@@ -194,18 +187,15 @@ function SelectField({
   );
 }
 
-/** 3-segment password strength bar */
 function PasswordStrength({ password }: { password: string }) {
   const { score, label, barColor } = useMemo(() => {
     if (!password) return { score: 0, label: "", barColor: "" };
     let s = 0;
-    if (password.length >= 6) s++;
-    if (password.length >= 10) s++;
-    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) s++;
-    if (/\d/.test(password)) s++;
+    if (password.length >= 8) s++;
+    if (/[a-zA-Z]/.test(password) && /\d/.test(password)) s++;
     if (/[^a-zA-Z0-9]/.test(password)) s++;
-    if (s <= 2) return { score: 1, label: "Lemah", barColor: "bg-error-500" };
-    if (s <= 3) return { score: 2, label: "Sedang", barColor: "bg-warning-500" };
+    if (s <= 1) return { score: 1, label: "Lemah (Min 8 karakter + huruf/angka)", barColor: "bg-error-500" };
+    if (s === 2) return { score: 2, label: "Sedang", barColor: "bg-warning-500" };
     return { score: 3, label: "Kuat", barColor: "bg-success-500" };
   }, [password]);
 
@@ -229,8 +219,6 @@ function PasswordStrength({ password }: { password: string }) {
     </div>
   );
 }
-
-/* ============================ Submit button with loading state ============================ */
 
 function SubmitBtn({ label, icon: Icon, loading }: { label: string; icon?: React.ComponentType<{ size?: number; stroke?: number }>; loading?: boolean }) {
   return (
@@ -257,19 +245,37 @@ function RegisterContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // UI states
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  // Invitation fields
+  const [invitationToken, setInvitationToken] = useState("");
+  const [invitationSchoolName, setInvitationSchoolName] = useState("");
+
+  // Referral code state
+  const [referralCode, setReferralCode] = useState("");
+
+  // OTP State
+  const [isOtpStep, setIsOtpStep] = useState(false);
+  const [otpUserId, setOtpUserId] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+
+  // UI inputs
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [role, setRole] = useState("guru");
 
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
   // Field errors
   const [nameError, setNameError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [termsError, setTermsError] = useState<string | null>(null);
@@ -289,13 +295,45 @@ function RegisterContent() {
   const passwordsMatch = confirmPassword.length > 0 && confirmPassword === password;
   const passwordsMismatch = confirmPassword.length > 0 && confirmPassword !== password;
 
-  // Read error from URL (returned by route handler redirect)
+  // Process invitation token on mount
   useEffect(() => {
-    const err = searchParams.get('error');
+    const token = searchParams.get("token");
+    if (token) {
+      setInvitationToken(token);
+      setLoading(true);
+      fetch(`/api/auth/invitation/verify?token=${token}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.invitation) {
+            setEmail(data.invitation.invitedEmail);
+            setPhone(data.invitation.invitedPhone.replace("+62", ""));
+            setInvitationSchoolName(data.invitation.institutionName);
+            setSuccess(`Undangan terverifikasi untuk bergabung dengan ${data.invitation.institutionName}.`);
+          } else {
+            setError(data.error || "Token undangan tidak valid atau kedaluwarsa.");
+          }
+        })
+        .catch(() => setError("Masalah jaringan saat memverifikasi undangan."))
+        .finally(() => setLoading(false));
+    }
+  }, [searchParams]);
+
+  // Process referral code on mount
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) {
+      const cleanRef = ref.toUpperCase();
+      setReferralCode(cleanRef);
+    }
+  }, [searchParams]);
+
+  // Read error from redirect
+  useEffect(() => {
+    const err = searchParams.get("error");
     if (err) {
       setError(decodeURIComponent(err));
       const newPath = window.location.pathname;
-      window.history.replaceState(null, '', newPath);
+      window.history.replaceState(null, "", newPath);
     }
   }, [searchParams]);
 
@@ -304,67 +342,123 @@ function RegisterContent() {
     setError(null);
     setNameError(null);
     setEmailError(null);
+    setPhoneError(null);
     setPasswordError(null);
     setConfirmError(null);
     setTermsError(null);
 
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-    const nameVal = formData.get("nama_lengkap")?.toString().trim();
-    const emailVal = formData.get("email")?.toString().trim();
-
     let valid = true;
-    if (!nameVal) {
+    if (!fullName.trim()) {
       setNameError("Nama lengkap wajib diisi.");
       valid = false;
     }
-    if (!emailVal) {
+    if (!email.trim()) {
       setEmailError("Email wajib diisi.");
       valid = false;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       setEmailError("Format email tidak valid.");
+      valid = false;
+    }
+    if (!phone.trim()) {
+      setPhoneError("Nomor WhatsApp wajib diisi.");
       valid = false;
     }
     if (!password) {
       setPasswordError("Password wajib diisi.");
       valid = false;
-    } else if (password.length < 6) {
-      setPasswordError("Password minimal 6 karakter.");
+    } else if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(password)) {
+      setPasswordError("Kata sandi minimal 8 karakter dengan kombinasi huruf dan angka.");
       valid = false;
     }
     if (confirmPassword !== password) {
-      setConfirmError("Konfirmasi password tidak cocok.");
+      setConfirmError("Konfirmasi kata sandi tidak cocok.");
       valid = false;
     }
     if (!agreed) {
-      setTermsError("Anda harus menyetujui Syarat & Ketentuan.");
+      setTermsError("Persetujuan UU PDP wajib dicentang.");
       valid = false;
     }
-    if (!valid) {
-      return;
-    }
 
-    // Submit via fetch API
+    if (!valid) return;
+
     setLoading(true);
+
+    // Prepare normalized E.164 phone
+    const formattedPhone = phone.startsWith("+") ? phone : `+62${phone.replace(/^0+/, "")}`;
+
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
         headers: {
-          'X-Requested-With': 'XMLHttpRequest',
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
         },
-        body: formData,
+        body: JSON.stringify({
+          nama_lengkap: fullName,
+          email: email,
+          whatsapp: formattedPhone,
+          password: password,
+          confirm_password: confirmPassword,
+          pdp_consent: agreed,
+          pdp_policy_version: "1.0",
+          invitation_token: invitationToken,
+          account_type: invitationToken ? "institutional" : "individual",
+          role: role,
+        }),
       });
 
       const data = await res.json();
 
       if (res.ok && data.success) {
-        router.push(data.redirectUrl);
+        if (data.requiresOtp) {
+          setOtpUserId(data.userId);
+          setIsOtpStep(true);
+          setSuccess(data.message || "Registrasi tertunda. Kode OTP verifikasi telah dikirim.");
+        } else {
+          router.push(data.redirectUrl);
+        }
       } else {
-        setError(data.error || 'Terjadi kesalahan. Silakan coba lagi.');
+        setError(data.error || "Gagal melakukan registrasi.");
       }
     } catch (err) {
-      console.error('Register Error:', err);
-      setError('Masalah koneksi jaringan. Silakan coba lagi.');
+      console.error("Register error:", err);
+      setError("Terjadi masalah jaringan.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyAccountOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpCode) {
+      setError("Kode OTP wajib diisi!");
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: otpUserId,
+          otp: otpCode,
+          purpose: "account_verification",
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccess(data.message || "Akun Anda berhasil diverifikasi!");
+        setIsOtpStep(false);
+        setOtpCode("");
+        router.push(data.redirectUrl || "/dashboard");
+      } else {
+        setError(data.error || "Kode OTP salah atau kedaluwarsa.");
+      }
+    } catch (err) {
+      setError("Masalah jaringan saat verifikasi OTP.");
     } finally {
       setLoading(false);
     }
@@ -377,14 +471,12 @@ function RegisterContent() {
         <div className="absolute top-0 right-0 w-72 h-72 bg-violet-500/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-violet-400/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Logo */}
         <div className="relative z-10">
           <h1 className="text-2xl font-black tracking-tight text-white">
             Guru<span className="text-violet-200">PRO</span>
           </h1>
         </div>
 
-        {/* Illustration + tagline */}
         <div className="relative z-10 flex flex-col items-center text-center">
           <TeacherIllustration />
           <h2 className="mt-6 text-2xl font-bold text-white leading-snug">
@@ -395,11 +487,10 @@ function RegisterContent() {
           </p>
         </div>
 
-        {/* Feature bullets */}
         <div className="relative z-10 space-y-4">
-          <FeatureBullet icon={IconGift} title="Gratis 14 Hari" desc="Coba semua fitur premium tanpa biaya apa pun." />
-          <FeatureBullet icon={IconCreditCardOff} title="Tanpa Kartu Kredit" desc="Tidak perlu metode pembayaran untuk mulai." />
-          <FeatureBullet icon={IconCalendarCancel} title="Batalkan Kapan Saja" desc="Berhenti berlangganan kapan pun Anda mau." />
+          <FeatureBullet icon={IconGift} title="Dual-Mode Fleksibel" desc="Kelola akun personal & terhubung ke institusi Anda sekaligus." />
+          <FeatureBullet icon={IconCreditCardOff} title="Penyimpanan Data Aman" desc="Sesuai standar UU PDP dan tersertifikasi enkripsi SSL." />
+          <FeatureBullet icon={IconCalendarCancel} title="Generator Soal Bloom" desc="Susun administrasi, RPP & bank soal berstandar HOTS." />
         </div>
       </div>
 
@@ -415,8 +506,24 @@ function RegisterContent() {
 
           {/* Title + subtitle */}
           <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-900">Buat Akun Baru</h2>
-            <p className="text-sm text-slate-500 mt-1">Mulai perjalanan mengajar yang lebih cerdas</p>
+            {isOtpStep ? (
+              <>
+                <h2 className="text-2xl font-bold text-slate-900">Verifikasi Akun Anda</h2>
+                <p className="text-sm text-slate-500 mt-1">Masukkan kode OTP yang dikirim ke nomor WhatsApp Anda</p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-2xl font-bold text-slate-900">Buat Akun Baru</h2>
+                {invitationSchoolName ? (
+                  <div className="mt-2 p-3 bg-violet-50 border border-violet-100 rounded-lg text-xs font-semibold text-violet-850 flex items-center gap-2">
+                    <IconSchool size={16} className="text-violet-600 shrink-0" />
+                    <span>Undangan bergabung ke: <strong>{invitationSchoolName}</strong></span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500 mt-1">Mulai perjalanan mengajar yang lebih cerdas</p>
+                )}
+              </>
+            )}
           </div>
 
           {/* Error banner */}
@@ -427,180 +534,297 @@ function RegisterContent() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {/* Success banner */}
+          {success && (
+            <div className="mb-5 p-3.5 bg-success-50 border border-success-200 text-success-700 rounded-button text-xs font-semibold flex items-start gap-2.5">
+              <IconCircleCheck size={18} stroke={1.75} className="flex-shrink-0 mt-px" />
+              <p className="leading-normal">{success}</p>
+            </div>
+          )}
 
-            {/* Nama Lengkap */}
-            <TextField
-              label="Nama Lengkap & Gelar"
-              icon={IconUser}
-              type="text"
-              name="nama_lengkap"
-              required
-              placeholder="Contoh: ElHanum, S.Pd."
-              error={nameError}
-              disabled={loading}
-            />
+          {isOtpStep ? (
+            /* ===== OTP VERIFICATION SCREEN ===== */
+            <form onSubmit={handleVerifyAccountOtp} className="flex flex-col gap-4">
+              <TextField
+                label="Kode OTP Verifikasi (6 Digit)"
+                type="text"
+                required
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
+                placeholder="123456"
+                disabled={loading}
+                inputClassName="text-center tracking-[0.3em] font-bold"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-success-600 hover:bg-success-700 text-white font-bold text-sm rounded-button shadow-md shadow-success-200 transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {loading ? <IconLoader2 size={18} stroke={2} className="animate-spin" /> : "Verifikasi & Aktifkan Akun"}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setError(null);
+                  setSuccess(null);
+                  setLoading(true);
+                  try {
+                    const res = await fetch("/api/auth/otp/request", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ userId: otpUserId, purpose: "account_verification" }),
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      setSuccess(data.message || "OTP berhasil dikirim ulang ke WhatsApp!");
+                    } else {
+                      setError(data.error || "Gagal mengirim ulang OTP.");
+                    }
+                  } catch {
+                    setError("Masalah jaringan saat mengirim ulang OTP.");
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                className="flex items-center justify-center gap-1.5 text-xs font-bold text-violet-600 hover:text-violet-750 transition-colors cursor-pointer mt-1"
+              >
+                Kirim Ulang Kode OTP
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsOtpStep(false); setError(null); setSuccess(null); }}
+                className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer mt-1"
+              >
+                <IconArrowLeft size={14} stroke={2} /> Kembali ke Form Pendaftaran
+              </button>
+            </form>
+          ) : (
+            /* ===== REGISTRATION FORM SCREEN ===== */
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              {/* Nama Lengkap */}
+              <TextField
+                label="Nama Lengkap & Gelar"
+                icon={IconUser}
+                type="text"
+                name="nama_lengkap"
+                value={fullName}
+                onChange={(e) => { setFullName(e.target.value); setNameError(null); }}
+                required
+                placeholder="Contoh: ElHanum, S.Pd."
+                error={nameError}
+                disabled={loading}
+              />
 
-            {/* Email */}
-            <TextField
-              label="Alamat Email"
-              icon={IconMail}
-              type="email"
-              name="email"
-              required
-              placeholder="email"
-              error={emailError}
-              disabled={loading}
-            />
+              {/* Email */}
+              <TextField
+                label="Alamat Email Aktif"
+                icon={IconMail}
+                type="email"
+                name="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setEmailError(null); }}
+                required
+                placeholder="nama@email.com"
+                error={emailError}
+                disabled={loading || !!invitationToken}
+              />
 
-            {/* WhatsApp (opsional) */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                No. WhatsApp <span className="text-slate-400 font-normal">(opsional)</span>
-              </label>
-              <div className="relative">
-                <IconPhone
-                  size={18}
-                  stroke={1.75}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                />
-                <span className="absolute left-10 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-bold pointer-events-none">
-                  +62
-                </span>
-                <input
-                  type="tel"
-                  name="whatsapp"
-                  placeholder="81234567xx"
-                  disabled={loading}
-                  className="w-full rounded-button border border-slate-200 bg-white py-2.5 pl-[4.5rem] pr-3.5 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition-all duration-150 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                />
+              {/* WhatsApp */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">No. WhatsApp Aktif</label>
+                <div className="relative">
+                  <IconPhone
+                    size={18}
+                    stroke={1.75}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                  />
+                  <span className="absolute left-10 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-bold pointer-events-none">+62</span>
+                  <input
+                    type="tel"
+                    name="whatsapp"
+                    value={phone}
+                    onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "")); setPhoneError(null); }}
+                    required
+                    placeholder="81234567xx"
+                    disabled={loading || !!invitationToken}
+                    className={`w-full rounded-button border bg-white py-2.5 pl-[4.5rem] pr-3.5 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition-all duration-150
+                      ${phoneError 
+                        ? "border-error-400 focus:border-error-500 focus:ring-2 focus:ring-error-500/20" 
+                        : "border-slate-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
+                      }
+                      ${(loading || !!invitationToken) ? "opacity-50 cursor-not-allowed bg-slate-50" : ""}`}
+                  />
+                </div>
+                {phoneError && <p className="mt-1 text-xs font-medium text-error-600">{phoneError}</p>}
+                <p className="mt-1 text-[10px] text-slate-400 font-medium">Wajib diisi untuk pengiriman kode OTP verifikasi akun.</p>
               </div>
-              <p className="mt-1 text-[10px] text-slate-400 font-medium">Untuk notifikasi, OTP, dan info pencairan.</p>
-            </div>
 
-            {/* Role */}
-            <SelectField
-              label="Pilih Peran"
-              icon={IconSchool}
-              name="role"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              disabled={loading}
-              options={[
-                { value: "guru", label: "Guru" },
-                { value: "kepala_sekolah", label: "Kepala Sekolah" },
-                { value: "admin", label: "Admin" },
-              ]}
-            />
-
-            {/* Password */}
-            <div>
-              <TextField
-                label="Kata Sandi"
-                icon={IconLock}
-                type={showPassword ? "text" : "password"}
-                name="password"
-                required
-                placeholder="Minimal 6 karakter"
-                error={passwordError}
-                disabled={loading}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                rightElement={passwordToggle(showPassword, setShowPassword)}
-              />
-              <PasswordStrength password={password} />
-            </div>
-
-            {/* Confirm Password */}
-            <div>
-              <TextField
-                label="Konfirmasi Kata Sandi"
-                icon={IconLock}
-                type={showConfirm ? "text" : "password"}
-                name="confirm_password"
-                required
-                placeholder="Ulangi kata sandi Anda"
-                error={confirmError}
-                disabled={loading}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                rightElement={passwordToggle(showConfirm, setShowConfirm)}
-              />
-              {passwordsMatch && (
-                <div className="mt-2 flex items-center gap-1.5">
-                  <IconCircleCheck size={14} stroke={2} className="text-success-500" />
-                  <span className="text-[10px] font-medium text-success-600">Password cocok</span>
-                </div>
-              )}
-              {passwordsMismatch && (
-                <div className="mt-2 flex items-center gap-1.5">
-                  <IconCircleX size={14} stroke={2} className="text-error-500" />
-                  <span className="text-[10px] font-medium text-error-600">Password tidak cocok</span>
-                </div>
-              )}
-            </div>
-
-            {/* Terms checkbox */}
-            <div>
-              <label className="flex items-start gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={agreed}
+              {/* Peran (Hanya jika bukan via undangan) */}
+              {!invitationToken && (
+                <SelectField
+                  label="Pilih Peran"
+                  icon={IconSchool}
+                  name="role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
                   disabled={loading}
-                  onChange={(e) => {
-                    setAgreed(e.target.checked);
-                    setTermsError(null);
-                  }}
-                  className="w-4 h-4 mt-0.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500 cursor-pointer disabled:opacity-50"
+                  options={[
+                    { value: "guru", label: "Guru Mandiri" },
+                    { value: "kepala_sekolah", label: "Kepala Sekolah" },
+                    { value: "admin_sekolah", label: "Admin Sekolah" },
+                  ]}
                 />
-                <span className="text-xs text-slate-600 leading-relaxed">
-                  Saya setuju dengan{" "}
-                  <a href="#" className="font-bold text-violet-600 hover:underline">
-                    Syarat &amp; Ketentuan
-                  </a>{" "}
-                  dan{" "}
-                  <a href="#" className="font-bold text-violet-600 hover:underline">
-                    Kebijakan Privasi
-                  </a>
-                </span>
-              </label>
-              {termsError && <p className="mt-1 text-xs font-medium text-error-600">{termsError}</p>}
+              )}
+
+              {/* Password */}
+              <div>
+                <TextField
+                  label="Kata Sandi"
+                  icon={IconLock}
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  required
+                  placeholder="Minimal 8 karakter (kombinasi huruf/angka)"
+                  error={passwordError}
+                  disabled={loading}
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setPasswordError(null); }}
+                  rightElement={passwordToggle(showPassword, setShowPassword)}
+                />
+                <PasswordStrength password={password} />
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <TextField
+                  label="Konfirmasi Kata Sandi"
+                  icon={IconLock}
+                  type={showConfirm ? "text" : "password"}
+                  name="confirm_password"
+                  required
+                  placeholder="Ulangi kata sandi Anda"
+                  error={confirmError}
+                  disabled={loading}
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setConfirmError(null); }}
+                  rightElement={passwordToggle(showConfirm, setShowConfirm)}
+                />
+                {passwordsMatch && (
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <IconCircleCheck size={14} stroke={2} className="text-success-500" />
+                    <span className="text-[10px] font-medium text-success-600">Password cocok</span>
+                  </div>
+                )}
+                {passwordsMismatch && (
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <IconCircleX size={14} stroke={2} className="text-error-500" />
+                    <span className="text-[10px] font-medium text-error-600">Password tidak cocok</span>
+                  </div>
+                )}
+              </div>
+
+              {/* PDP Consent Checkbox */}
+              <div>
+                <label className="flex items-start gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={agreed}
+                    disabled={loading}
+                    onChange={(e) => {
+                      setAgreed(e.target.checked);
+                      setTermsError(null);
+                    }}
+                    className="w-4 h-4 mt-0.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500 cursor-pointer disabled:opacity-50"
+                  />
+                  <span className="text-xs text-slate-600 leading-relaxed">
+                    Saya menyetujui pemrosesan data pribadi saya sesuai dengan{" "}
+                    <a href="/privacy-policy" target="_blank" className="font-bold text-violet-600 hover:underline">
+                      Kebijakan Privasi
+                    </a>{" "}
+                    dan mematuhi regulasi perlindungan data UU PDP No. 27/2022.
+                  </span>
+                </label>
+                {termsError && <p className="mt-1 text-xs font-medium text-error-600">{termsError}</p>}
+              </div>
+
+              {/* Submit button */}
+              <SubmitBtn
+                label="Daftar & Kirim OTP"
+                icon={IconArrowRight}
+                loading={loading}
+              />
+            </form>
+          )}
+
+          {/* Invitation info banner */}
+          {invitationSchoolName && (
+            <div className="mb-4 p-3 bg-violet-50 border border-violet-200 rounded-lg flex items-center gap-3">
+              <IconSchool size={20} className="text-violet-600 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-violet-900">Undangan dari {invitationSchoolName}</p>
+                <p className="text-xs text-violet-700">
+                  Form di bawah akan menghubungkan akun Anda ke sekolah ini setelah verifikasi.
+                </p>
+              </div>
             </div>
+          )}
 
-            {/* Submit button */}
-            <SubmitBtn
-              label="Daftar Sekarang"
-              icon={IconArrowRight}
-              loading={loading}
-            />
-          </form>
-
-          {/* Divider + Google button */}
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-xs font-medium text-slate-400">atau daftar dengan</span>
-            <div className="flex-1 h-px bg-slate-200" />
-          </div>
-          <button
-            type="button"
-            onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-sm font-semibold text-slate-700 rounded-button transition-colors duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <GoogleIcon size={18} />
-            <span>Daftar dengan Google</span>
-          </button>
+          {/* Divider + Google signup */}
+          {!isOtpStep && (
+            <>
+              <div className="flex items-center gap-3 my-6">
+                <div className="flex-1 h-px bg-slate-200" />
+                <span className="text-xs font-medium text-slate-400">atau daftar dengan</span>
+                <div className="flex-1 h-px bg-slate-200" />
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  const token = searchParams.get("token");
+                  // Store invitation info if present
+                  if (token && invitationSchoolName) {
+                    localStorage.setItem("pending_invitation_token", token);
+                    localStorage.setItem("pending_invitation_school", invitationSchoolName);
+                  }
+                  // Store referral code if present
+                  const ref = searchParams.get("ref");
+                  if (ref) {
+                    localStorage.setItem("referral_code", ref.toUpperCase());
+                  }
+                  signIn("google", { callbackUrl: "/dashboard" });
+                }}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-sm font-semibold text-slate-700 rounded-button transition-colors duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <GoogleIcon size={18} />
+                <span>Daftar dengan Google</span>
+              </button>
+              {(invitationSchoolName || referralCode) && (
+                <p className="mt-2 text-xs text-center text-slate-500">
+                  {invitationSchoolName && (
+                    <>Anda akan otomatis terhubung ke {invitationSchoolName}. </>
+                  )}
+                  {referralCode && (
+                    <>Kode referral {referralCode} akan otomatis terproses.</>
+                  )}
+                </p>
+              )}
+            </>
+          )}
 
           {/* Link to login */}
-          <p className="mt-6 text-center text-sm text-slate-500">
-            Sudah punya akun?{" "}
-            <Link
-              href="/login"
-              className="font-bold text-violet-600 hover:text-violet-700 transition-colors"
-            >
-              Masuk
-            </Link>
-          </p>
+          {!isOtpStep && (
+            <p className="mt-6 text-center text-sm text-slate-500">
+              Sudah punya akun?{" "}
+              <Link
+                href="/login"
+                className="font-bold text-violet-600 hover:text-violet-750 transition-colors"
+              >
+                Masuk
+              </Link>
+            </p>
+          )}
         </div>
       </div>
     </div>

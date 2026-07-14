@@ -133,7 +133,7 @@ const tabs: { id: TabId; label: string }[] = [
   { id: "features", label: "Fitur" },
   { id: "why", label: "Kenapa" },
   { id: "pricing", label: "Paket" },
-  { id: "addons", label: "Token Eceran" },
+  { id: "addons", label: "Token Ekstra" },
   { id: "school", label: "Sekolah" },
   { id: "cta", label: "CTA" },
   { id: "footer", label: "Footer" },
@@ -218,7 +218,7 @@ export default function CmsLandingEditor() {
             number: s.value || s.number || "",
             label: s.label || "",
           })),
-          heroCTAPrimary: heroData.heroCTAPrimary || { label: "Mulai Gratis Sekarang", url: "/login?mode=register" },
+          heroCTAPrimary: heroData.heroCTAPrimary || { label: "Mulai Gratis Sekarang", url: "/register" },
           heroCTASecondary: heroData.heroCTASecondary || { label: "Lihat Demo", url: "#demo" },
           seoTitle: heroData.seoTitle || "",
           seoDescription: heroData.seoDescription || "",
@@ -329,7 +329,7 @@ export default function CmsLandingEditor() {
         headline: hero.heroHeadline || "",
         subheadline: hero.heroSubheadline || "",
         stats,
-        heroCTAPrimary: hero.heroCTAPrimary || { label: "Mulai Gratis Sekarang", url: "/login?mode=register" },
+        heroCTAPrimary: hero.heroCTAPrimary || { label: "Mulai Gratis Sekarang", url: "/register" },
         heroCTASecondary: hero.heroCTASecondary || { label: "Lihat Demo", url: "#demo" },
         seoTitle: hero.seoTitle || "",
         seoDescription: hero.seoDescription || "",
@@ -573,12 +573,12 @@ export default function CmsLandingEditor() {
         body: JSON.stringify(editAddon),
       });
       if (res.ok) {
-        showToast("success", editAddon.id ? "Paket eceran diperbarui!" : "Paket eceran ditambahkan!");
+        showToast("success", editAddon.id ? "Paket ekstra diperbarui!" : "Paket ekstra ditambahkan!");
         setShowAddonModal(false);
         setEditAddon(null);
         const d = await fetch("/api/admin/token-packages").then((r) => r.json());
         setAddonPackages(d.docs || []);
-      } else showToast("error", "Gagal menyimpan paket eceran");
+      } else showToast("error", "Gagal menyimpan paket ekstra");
     } catch { showToast("error", "Koneksi gagal"); }
     finally { setSaving(null); }
   };
@@ -591,7 +591,7 @@ export default function CmsLandingEditor() {
         body: JSON.stringify({ ...addon, is_active: !addon.is_active }),
       });
       if (res.ok) {
-        showToast("success", `Paket eceran ${addon.name} ${addon.is_active ? "dinonaktifkan" : "diaktifkan"}!`);
+        showToast("success", `Paket ekstra ${addon.name} ${addon.is_active ? "dinonaktifkan" : "diaktifkan"}!`);
         setAddonPackages((prev) => prev.map((p) => p.id === addon.id ? { ...p, is_active: !p.is_active } : p));
         const d = await fetch("/api/admin/token-packages").then((r) => r.json());
         setAddonPackages(d.docs || []);
@@ -600,13 +600,13 @@ export default function CmsLandingEditor() {
   };
 
   const deleteAddonPackage = async (id: string) => {
-    if (!confirm("Hapus paket eceran ini?")) return;
+    if (!confirm("Hapus paket ekstra ini?")) return;
     try {
       const res = await fetch(`/api/admin/token-packages?id=${id}`, { method: "DELETE" });
       if (res.ok) {
-        showToast("success", "Paket eceran dihapus!");
+        showToast("success", "Paket ekstra dihapus!");
         setAddonPackages((prev) => prev.filter((p) => p.id !== id));
-      } else showToast("error", "Gagal menghapus paket eceran");
+      } else showToast("error", "Gagal menghapus paket ekstra");
     } catch { showToast("error", "Koneksi gagal"); }
   };
 
@@ -1283,12 +1283,12 @@ export default function CmsLandingEditor() {
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-black text-neutral-900 flex items-center gap-2">
             <IconCreditCard size={20} className="text-primary-600" />
-            Paket Token Eceran (Top-Up)
+            Paket Token Ekstra (Top-Up)
           </h3>
           <button onClick={() => { setEditAddon({ name: "", token_amount: 50, price: 15000, description: "", is_active: true }); setShowAddonModal(true); }}
             className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl transition cursor-pointer">
             <IconPlus size={16} />
-            Tambah Paket Eceran
+            Tambah Paket Ekstra
           </button>
         </div>
 
@@ -1306,7 +1306,7 @@ export default function CmsLandingEditor() {
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {addonPackages.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-12 text-center text-neutral-400 italic">Belum ada paket eceran.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-12 text-center text-neutral-400 italic">Belum ada paket ekstra.</td></tr>
               ) : addonPackages.map((addon) => (
                 <tr key={addon.id} className="hover:bg-neutral-50/50">
                   <td className="px-4 py-3 font-bold text-neutral-800">
@@ -1347,7 +1347,7 @@ export default function CmsLandingEditor() {
         {showAddonModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 animate-fadeIn">
             <div className="bg-white rounded-2xl shadow-modal p-6 w-full max-w-lg mx-4 space-y-4 max-h-[80vh] overflow-y-auto">
-              <h3 className="text-sm font-black text-neutral-900">{editAddon?.id ? "Edit Paket Eceran" : "Tambah Paket Eceran Baru"}</h3>
+              <h3 className="text-sm font-black text-neutral-900">{editAddon?.id ? "Edit Paket Ekstra" : "Tambah Paket Ekstra Baru"}</h3>
               <Field label="Nama Paket">
                 <input type="text" value={editAddon?.name || ""} onChange={(e) => setEditAddon({ ...editAddon, name: e.target.value })}
                   className="input-field" placeholder="Paket 50 Token" />
@@ -1444,7 +1444,7 @@ export default function CmsLandingEditor() {
                 </Field>
                 <Field label="URL">
                   <input type="text" value={hero.heroCTAPrimary?.url || ""} onChange={(e) => setHero({ ...hero, heroCTAPrimary: { ...hero.heroCTAPrimary, url: e.target.value } })}
-                    className="input-field" placeholder="/login?mode=register" />
+                    className="input-field" placeholder="/register" />
                 </Field>
               </div>
             </div>

@@ -104,7 +104,7 @@ const defaultColumns: FooterColumn[] = [
   {
     title: "Untuk Sekolah",
     links: [
-      { label: "Daftar Sekolah", href: "/login?mode=register&sekolah=1" },
+      { label: "Daftar Sekolah", href: "/register" },
       { label: "Demo", href: "/demo" },
       { label: "Kontak Sales", href: "/kontak" },
       { label: "Kemitraan", href: "/kemitraan" },

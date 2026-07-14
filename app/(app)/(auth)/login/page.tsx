@@ -162,11 +162,16 @@ function LoginContent() {
   const router = useRouter();
   const [isRegister, setIsRegister] = useState(false);
 
-  // Forgot password flow states: 'none' | 'request_otp' | 'verify_otp'
-  const [forgotStep, setForgotStep] = useState<'none' | 'request_otp' | 'verify_otp'>('none');
+  // Invitation states
+  const [invitationToken, setInvitationToken] = useState<string | null>(null);
+  const [invitationSchoolName, setInvitationSchoolName] = useState<string | null>(null);
+
+  // Forgot password flow states: 'none' | 'request_otp' | 'verify_otp' | 'verify_account'
+  const [forgotStep, setForgotStep] = useState<'none' | 'request_otp' | 'verify_otp' | 'verify_account'>('none');
   const [forgotEmail, setForgotEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [otpUserId, setOtpUserId] = useState('');
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -183,6 +188,7 @@ function LoginContent() {
   useEffect(() => {
     const mode = searchParams.get('mode');
     const ref = searchParams.get('ref');
+    const token = searchParams.get('token');
     if (mode === 'register' || ref) {
       setIsRegister(true);
     } else {
@@ -190,6 +196,18 @@ function LoginContent() {
     }
     if (ref) {
       setRefCode(ref.toUpperCase());
+    }
+    // Check for invitation token
+    if (token) {
+      setInvitationToken(token);
+      fetch(`/api/auth/invitation/verify?token=${token}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.invitation) {
+            setInvitationSchoolName(data.invitation.institutionName);
+          }
+        })
+        .catch(() => {});
     }
   }, [searchParams]);
 
@@ -242,6 +260,10 @@ function LoginContent() {
       if (res.ok && data.success) {
         // Redirect to dashboard or admin based on response
         router.push(data.redirectUrl);
+      } else if (data.requiresOtp) {
+        setOtpUserId(data.userId);
+        setForgotStep('verify_account');
+        setSuccess(data.message || 'Silakan masukkan kode OTP yang dikirim.');
       } else {
         // Show error message
         setError(data.error || 'Terjadi kesalahan. Silakan coba lagi.');
@@ -249,6 +271,43 @@ function LoginContent() {
     } catch (err) {
       console.error('Login/Register Error:', err);
       setError('Masalah koneksi jaringan. Silakan coba lagi.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Verify Account OTP
+  const handleVerifyAccountOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpCode) {
+      setError('Kode OTP wajib diisi!');
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/auth/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: otpUserId,
+          otp: otpCode,
+          purpose: 'account_verification',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccess(data.message || 'Akun Anda berhasil diverifikasi!');
+        setForgotStep('none');
+        setOtpCode('');
+        router.push(data.redirectUrl || '/dashboard');
+      } else {
+        setError(data.error || 'Gagal verifikasi OTP.');
+      }
+    } catch (err) {
+      setError('Masalah koneksi jaringan.');
     } finally {
       setLoading(false);
     }
@@ -421,6 +480,19 @@ function LoginContent() {
             </div>
           )}
 
+          {/* Invitation info banner */}
+          {invitationSchoolName && forgotStep === 'none' && (
+            <div className="mb-5 p-3 bg-violet-50 border border-violet-200 rounded-lg flex items-center gap-3">
+              <IconSchool size={20} className="text-violet-600 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-violet-900">Undangan dari {invitationSchoolName}</p>
+                <p className="text-xs text-violet-700">
+                  Login atau daftar untuk terhubung dengan sekolah ini
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* ===== FORGOT: REQUEST OTP ===== */}
           {forgotStep === 'request_otp' && (
             <form onSubmit={handleRequestOtp} className="flex flex-col gap-4">
@@ -489,6 +561,65 @@ function LoginContent() {
                 className="flex items-center justify-center gap-1.5 text-xs font-bold text-violet-600 hover:text-violet-700 transition-colors cursor-pointer mt-1"
               >
                 <IconArrowLeft size={14} stroke={2} /> Kirim Ulang Kode OTP
+              </button>
+            </form>
+          )}
+
+          {/* ===== VERIFY ACCOUNT OTP ===== */}
+          {forgotStep === 'verify_account' && (
+            <form onSubmit={handleVerifyAccountOtp} className="flex flex-col gap-4">
+              <TextField
+                label="Kode OTP Verifikasi Akun (6 Digit)"
+                type="text"
+                required
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="123456"
+                disabled={loading}
+                inputClassName="text-center tracking-[0.3em] font-bold"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-success-600 hover:bg-success-700 text-white font-bold text-sm rounded-button shadow-md shadow-success-200 transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {loading ? <IconLoader2 size={18} stroke={2} className="animate-spin" /> : 'Verifikasi Akun'}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setError(null);
+                  setSuccess(null);
+                  setLoading(true);
+                  try {
+                    const res = await fetch('/api/auth/otp/request', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ userId: otpUserId, purpose: 'account_verification' }),
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      setSuccess(data.message || 'OTP berhasil dikirim ulang!');
+                    } else {
+                      setError(data.error || 'Gagal mengirim ulang OTP.');
+                    }
+                  } catch {
+                    setError('Masalah koneksi jaringan.');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                className="flex items-center justify-center gap-1.5 text-xs font-bold text-violet-600 hover:text-violet-700 transition-colors cursor-pointer mt-1"
+              >
+                Kirim Ulang Kode OTP
+              </button>
+              <button
+                type="button"
+                onClick={() => { setForgotStep('none'); setError(null); setSuccess(null); }}
+                className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer mt-1"
+              >
+                <IconArrowLeft size={14} stroke={2} /> Kembali ke Halaman Masuk
               </button>
             </form>
           )}
@@ -580,6 +711,28 @@ function LoginContent() {
                   />
                 )}
 
+                {isRegister && (
+                  <div className="mt-1">
+                    <label className="flex items-start gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        name="pdp_consent"
+                        required
+                        disabled={loading}
+                        className="w-4 h-4 mt-0.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500 cursor-pointer"
+                      />
+                      <span className="text-xs text-slate-600 leading-relaxed">
+                        Saya menyetujui pemrosesan data pribadi saya sesuai dengan{" "}
+                        <a href="/privacy-policy" target="_blank" className="font-bold text-violet-600 hover:underline">
+                          Kebijakan Privasi
+                        </a>{" "}
+                        dan ketentuan UU PDP No. 27/2022.
+                      </span>
+                    </label>
+                    <input type="hidden" name="pdp_policy_version" value="1.0" />
+                  </div>
+                )}
+
                 {/* Forgot password (login only) */}
                 {!isRegister && (
                   <div className="flex items-center justify-between -mt-1">
@@ -612,12 +765,34 @@ function LoginContent() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+                    onClick={() => {
+                      // Store invitation info if present
+                      if (invitationToken && invitationSchoolName) {
+                        localStorage.setItem("pending_invitation_token", invitationToken);
+                        localStorage.setItem("pending_invitation_school", invitationSchoolName);
+                      }
+                      // Store referral code if present
+                      const ref = searchParams.get('ref');
+                      if (ref) {
+                        localStorage.setItem("referral_code", ref.toUpperCase());
+                      }
+                      signIn('google', { callbackUrl: '/dashboard' });
+                    }}
                     className="w-full flex items-center justify-center gap-2.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-sm font-semibold text-slate-700 rounded-button transition-colors duration-150 cursor-pointer"
                   >
                     <GoogleIcon size={18} />
                     <span>Masuk dengan Google</span>
                   </button>
+                  {(invitationSchoolName || searchParams.get('ref')) && (
+                    <p className="mt-2 text-xs text-center text-slate-500">
+                      {invitationSchoolName && (
+                        <>Anda akan otomatis terhubung ke {invitationSchoolName}. </>
+                      )}
+                      {searchParams.get('ref') && (
+                        <>Kode referral {searchParams.get('ref')?.toUpperCase()} akan otomatis terproses.</>
+                      )}
+                    </p>
+                  )}
                 </>
               )}
 

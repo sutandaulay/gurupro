@@ -101,7 +101,7 @@ export default async function LandingPage({
           headline: h.headline || fallbackHero.headline,
           subheadline: h.subheadline || fallbackHero.subheadline,
           stats: h.stats || fallbackHero.stats,
-          ctaPrimary: { label: h.heroCTAPrimary?.label || "Mulai Gratis Sekarang", url: h.heroCTAPrimary?.url || "/login?mode=register" },
+          ctaPrimary: { label: h.heroCTAPrimary?.label || "Mulai Gratis Sekarang", url: h.heroCTAPrimary?.url || "/register" },
           ctaSecondary: { label: h.heroCTASecondary?.label || "Lihat Demo", url: h.heroCTASecondary?.url || "#demo" },
           ogImage: h.ogImage || null,
         };
@@ -181,16 +181,16 @@ export default async function LandingPage({
       answer: "Setiap paket langganan GuruPRO dilengkapi dengan Kuota Token bulanan. Token ini dipakai setiap kali Anda menggunakan fitur AI seperti Generator Soal, RPP, atau fitur cerdas lainnya. Kuota utama akan reset otomatis setiap siklus bulanan (dihitung dari tanggal mulai langganan). Sisa token utama tidak diakumulasi ke bulan berikutnya.",
     },
     {
-      question: "Apa bedanya Kuota Utama dan Token Eceran?",
-      answer: "Kuota Utama adalah token yang diberikan setiap awal siklus langganan. Token Eceran adalah token tambahan yang bisa Anda beli kapan saja saat kuota utama habis sebelum reset berikutnya. Token eceran tidak hangus saat reset bulanan dan berlaku selama langganan aktif.",
+      question: "Apa bedanya Kuota Utama dan Token Ekstra?",
+      answer: "Kuota Utama adalah token yang diberikan setiap awal siklus langganan. Token Ekstra adalah token tambahan yang bisa Anda beli kapan saja saat kuota utama habis sebelum reset berikutnya. Token ekstra tidak hangus saat reset bulanan dan berlaku selama langganan aktif.",
     },
     {
-      question: "Apakah Token Eceran bisa hangus?",
-      answer: "Token Eceran akan tetap tersimpan selama masa langganan aktif. Jika langganan berakhir dan tidak diperpanjang dalam masa tenggang (grace period) 14 hari, maka token eceran akan hangus. Pastikan memperpanjang langganan sebelum grace period berakhir.",
+      question: "Apakah Token Ekstra bisa hangus?",
+      answer: "Token Ekstra akan tetap tersimpan selama masa langganan aktif. Jika langganan berakhir dan tidak diperpanjang dalam masa tenggang (grace period) 14 hari, maka token ekstra akan hangus. Pastikan memperpanjang langganan sebelum grace period berakhir.",
     },
     {
-      question: "Berapa harga Token Eceran?",
-      answer: "Token Eceran dijual dalam paket nominal tetap (50, 100, atau 250 token) dengan harga flat yang sama untuk semua tier. Pembelian token eceran bisa dilakukan kapan saja langsung dari dashboard.",
+      question: "Berapa harga Token Ekstra?",
+      answer: "Token Ekstra dijual dalam paket nominal tetap (50, 100, atau 250 token) dengan harga flat yang sama untuk semua tier. Pembelian token ekstra bisa dilakukan kapan saja langsung dari dashboard.",
     },
     {
       question: "Apakah metode pembayaran mendukung e-Wallet lokal?",

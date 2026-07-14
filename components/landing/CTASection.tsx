@@ -6,17 +6,32 @@ export interface CTASectionProps {
   secondaryCTA?: string;
   secondaryHref?: string;
   badge?: string;
+  refCode?: string | null;
+  isLoggedIn?: boolean;
 }
 
 export default function CTASection({
   headline = "Mulai Perjalanan Tanpa Administrasi yang Membebankan",
   subheadline = "Bergabunglah bersama ribuan guru Indonesia yang sudah merasakan manfaat GuruPRO AI",
   primaryCTA = "Coba Gratis 14 Hari",
-  primaryHref = "/login?mode=register",
+  primaryHref = "/register",
   secondaryCTA = "Hubungi Kami",
   secondaryHref = "/kontak",
   badge = "Tidak perlu kartu kredit",
+  refCode = null,
+  isLoggedIn = false,
 }: CTASectionProps) {
+  // Generate register href with refCode
+  const registerHref = refCode
+    ? `/register?ref=${refCode}`
+    : "/register";
+
+  // Determine final primary href
+  const finalPrimaryHref = isLoggedIn
+    ? "/dashboard"
+    : primaryHref === "/register"
+      ? registerHref
+      : primaryHref;
   return (
     <section className="py-20 md:py-28 bg-gradient-to-br from-primary-600 via-primary-700 to-purple-800 text-white relative overflow-hidden">
       {/* Decorative circles */}
@@ -44,7 +59,7 @@ export default function CTASection({
         {/* CTA Buttons */}
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
           <a
-            href={primaryHref}
+            href={finalPrimaryHref}
             className="px-8 py-4 bg-white text-primary-700 font-bold text-base rounded-2xl shadow-lg shadow-primary-900/30 hover:bg-primary-50 hover:-translate-y-0.5 transition text-center"
           >
             {primaryCTA}

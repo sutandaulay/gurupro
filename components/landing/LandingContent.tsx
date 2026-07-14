@@ -303,7 +303,13 @@ Selesai Dalam Hitungan Menit — Bukan Jam"
           </div>
           <div className="mt-10">
             <Link
-              href={referral.ctaLink || (isLoggedIn ? "/dashboard" : refCode ? `/login?ref=${refCode}` : "/login?mode=register")}
+              href={
+                isLoggedIn
+                  ? "/dashboard"
+                  : refCode
+                    ? `/register?ref=${refCode}`
+                    : referral.ctaLink || "/register"
+              }
               className="inline-block px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold text-base rounded-2xl shadow-lg transition duration-200"
             >
               {referral.ctaText}
@@ -333,10 +339,12 @@ Selesai Dalam Hitungan Menit — Bukan Jam"
         headline="Mulai Perjalanan Tanpa Administrasi yang Membebankan"
         subheadline="Bergabunglah bersama ribuan guru Indonesia yang sudah merasakan manfaat GuruPRO AI"
         primaryCTA={hero.ctaPrimary?.label || "Coba Gratis 14 Hari"}
-        primaryHref={hero.ctaPrimary?.url || "/login?mode=register"}
+        primaryHref={hero.ctaPrimary?.url || "/register"}
         secondaryCTA={hero.ctaSecondary?.label || "Hubungi Kami"}
         secondaryHref={hero.ctaSecondary?.url || "/kontak"}
         badge="Tidak perlu kartu kredit"
+        refCode={refCode}
+        isLoggedIn={isLoggedIn}
       />
 
       <Footer

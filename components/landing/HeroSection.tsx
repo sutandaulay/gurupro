@@ -29,13 +29,13 @@ export default function HeroSection({
   ],
   isLoggedIn = false,
   refCode = null,
-  ctaPrimary = { label: "Mulai Gratis Sekarang", url: "/login?mode=register" },
+  ctaPrimary = { label: "Mulai Gratis Sekarang", url: "/register" },
   ctaSecondary = { label: "Lihat Demo", url: "#demo" },
   ogImage,
 }: HeroSectionProps) {
   const registerHref = refCode
-    ? `/login?ref=${refCode}&mode=register`
-    : "/login?mode=register";
+    ? `/register?ref=${refCode}`
+    : "/register";
 
   return (
     <section className="relative pt-36 pb-20 md:pt-48 md:pb-28 overflow-hidden">
@@ -76,7 +76,13 @@ export default function HeroSection({
             {/* CTA Buttons */}
             <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <Link
-                href={isLoggedIn ? "/dashboard" : (ctaPrimary?.url === "/login?mode=register" && refCode ? registerHref : ctaPrimary?.url || "/login?mode=register")}
+                href={
+                  isLoggedIn
+                    ? "/dashboard"
+                    : refCode
+                      ? registerHref
+                      : ctaPrimary?.url || "/register"
+                }
                 className="px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold text-base rounded-2xl shadow-lg shadow-primary-100 hover:shadow-primary-200 hover:-translate-y-0.5 transition text-center"
               >
                 {ctaPrimary.label}

@@ -31,8 +31,8 @@ export default function Navbar({
 
   const loginHref = refCode ? `/login?ref=${refCode}` : "/login";
   const registerHref = refCode
-    ? `/login?ref=${refCode}&mode=register`
-    : "/login?mode=register";
+    ? `/register?ref=${refCode}`
+    : "/register";
 
   return (
     <header className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md border-b border-neutral-200/80 z-40">
