@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import PenilaianSikapForm from '@/app/components/PenilaianSikapForm';
 import CatatanWaliKelasForm from '@/app/components/CatatanWaliKelasForm';
 
@@ -15,12 +16,22 @@ interface TahunAjaran {
   semester: string;
 }
 
-export default function WaliKelasDashboard() {
+function WaliKelasDashboardContent() {
   const [kelasList, setKelasList] = useState<Kelas[]>([]);
   const [selectedKelas, setSelectedKelas] = useState<string>('');
   const [periode, setPeriode] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'sikap' | 'catatan'>('sikap');
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'catatan' || tabParam === 'laporan') {
+      setActiveTab('catatan');
+    } else {
+      setActiveTab('sikap');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     // Get current tahun ajaran and semester
@@ -136,5 +147,17 @@ export default function WaliKelasDashboard() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function WaliKelasDashboard() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Memuat...</p>
+      </div>
+    }>
+      <WaliKelasDashboardContent />
+    </Suspense>
   );
 }

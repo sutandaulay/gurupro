@@ -25,6 +25,15 @@ import LeaderContacts from "./collections/LeaderContacts";
 import PerformanceShareLinks from "./collections/PerformanceShareLinks";
 import DocumentAccessGrants from "./collections/DocumentAccessGrants";
 import OtpVerifications from "./collections/OtpVerifications";
+import Invitations from "./collections/Invitations";
+// Import koleksi presensi baru
+import { 
+  TeacherInstitutionAssignments, 
+  AttendanceDevices, 
+  AttendanceLogs, 
+  AttendanceSummary, 
+  LeaveRequests 
+} from "./collections/Attendance";
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -71,6 +80,13 @@ export default buildConfig({
     PerformanceShareLinks,
     DocumentAccessGrants,
     OtpVerifications,
+    Invitations,
+    // Koleksi presensi baru
+    TeacherInstitutionAssignments,
+    AttendanceDevices,
+    AttendanceLogs,
+    AttendanceSummary,
+    LeaveRequests,
   ],
 
   globals: [LandingPage, FooterContent, ChatbotConfig],

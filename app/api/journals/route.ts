@@ -255,8 +255,8 @@ export async function DELETE(req: Request) {
     const check = await query(
       `SELECT tj.teacher_id FROM teacher_journals tj
        JOIN schools s ON tj.school_id = s.id
-       LEFT JOIN user_school_assignments usa ON usa.schoolid = s.id AND usa.userid = $2
-       WHERE tj.id = $1 AND (s.user_id = $2 OR usa.userid = $2)`,
+       LEFT JOIN user_school_assignments usa ON usa."schoolId" = s.id AND usa."userId" = $2
+       WHERE tj.id = $1 AND (s.user_id = $2 OR usa."userId" = $2)`,
       [id, userId]
     );
     if (check.rows.length === 0) {

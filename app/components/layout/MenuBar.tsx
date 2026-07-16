@@ -24,6 +24,17 @@ const menuItems: MenuItem[] = [
     href: "/dashboard?module=sekolah",
   },
   {
+    label: "Presensi",
+    icon: "⏱️",
+    submenu: [
+      { label: "Presensi Saya", href: "/attendance" },
+      { label: "Presensi Mengajar", href: "/attendance/teaching" },
+      { label: "Pengajuan Izin", href: "/attendance/leave" },
+      { label: "Laporan Presensi", href: "/reports/attendance" },
+      { label: "Rekap TPG", href: "/reports/tpg" },
+    ],
+  },
+  {
     label: "Administrasi",
     icon: "📋",
     submenu: [
@@ -35,6 +46,7 @@ const menuItems: MenuItem[] = [
       { label: "AI RPP", href: "/dashboard/administrasi?tipe=rpp" },
       { label: "AI LKPD", href: "/dashboard/administrasi?tipe=lkpd" },
       { label: "AI Bahan Ajar", href: "/dashboard/bahan-ajar" },
+      { label: "Buat Soal AI", href: "/dashboard?module=soal" },
     ],
   },
   {
@@ -56,6 +68,11 @@ const menuItems: MenuItem[] = [
       { label: "AI Performance Report", href: "/dashboard/ai-performance-report" },
       { label: "Deep Learning", href: "/dashboard" },
     ],
+  },
+  {
+    label: "Buku Nilai",
+    icon: "📚",
+    href: "/dashboard?module=nilai",
   },
   {
     label: "Laporan",
@@ -88,22 +105,33 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
-    label: "Buku Nilai",
-    icon: "📚",
-    href: "/dashboard?module=nilai",
-  },
-  {
-    label: "Rapor",
-    icon: "📋",
+    label: "Wali Kelas",
+    icon: "👥",
     submenu: [
-      { label: "Status Raport", href: "/dashboard/raport-status" },
-      { label: "Review Nilai Raport", href: "/dashboard/rapor-review" },
-      { label: "Layout Raport", href: "/dashboard/layout-raport" },
+      { label: "Dashboard Wali Kelas", href: "/dashboard/wali-kelas" },
+      { label: "Daftar Siswa", href: "/dashboard/wali-kelas?tab=siswa" },
+      { label: "Catatan Wali Kelas", href: "/dashboard/wali-kelas?tab=catatan" },
+      { label: "Laporan Wali Kelas", href: "/dashboard/wali-kelas?tab=laporan" },
     ],
   },
   {
-    label: "Brankas",
-    icon: "🗂️",
+    label: "Pembina Eskul",
+    icon: "🏅",
+    submenu: [
+      { label: "Dashboard Pembina", href: "/dashboard/pembina-ekskul" },
+      { label: "Daftar Kegiatan", href: "/dashboard/pembina-ekskul?tab=daftar" },
+      { label: "Penilaian", href: "/dashboard/pembina-ekskul?tab=penilaian" },
+      { label: "Laporan", href: "/dashboard/pembina-ekskul?tab=laporan" },
+    ],
+  },
+  {
+    label: "Institusi",
+    icon: "🏛️",
+    submenu: [
+      { label: "Manajemen Institusi", href: "/dashboard/institution" },
+      { label: "Anggota Institusi", href: "/dashboard/institution/members" },
+      { label: "Pengaturan Institusi", href: "/dashboard/institution/settings" },
+    ],
   },
   {
     label: "Keuangan",
@@ -115,15 +143,18 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
-    label: "Profil",
-    icon: "👤",
-    submenu: [
-      { label: "Profil Saya", href: "/profile" },
-      { label: "Billing & Langganan", href: "/profile?tab=billing" },
-      { label: "Pengaturan", href: "/settings" },
-      { label: "Pemetaan Kolom", href: "/settings#pemetaan-kolom" },
-      { label: "Keluar", href: "#" },
-    ],
+    label: "Brankas",
+    icon: "🗂️",
+  },
+  {
+    label: "Pengaturan",
+    icon: "⚙️",
+    href: "/settings",
+  },
+  {
+    label: "Billing",
+    icon: "💳",
+    href: "/dashboard/billing",
   },
 ];
 
@@ -166,8 +197,8 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
 
   return (
     <div className="relative hidden lg:block w-full">
-      <nav className="flex h-12 bg-white border-b border-gray-200 px-6 sticky top-0 z-40">
-        <div className="flex items-center gap-1 overflow-x-auto w-full thin-scrollbar">
+      <nav className="flex h-12 bg-white border-b border-gray-200 px-6 sticky top-0 z-50 max-w-[1400px] mx-auto">
+        <div className="flex items-center gap-1 w-full overflow-x-auto thin-scrollbar">
           {menuItems.map((item) => {
             const active = isDropdownActive(item);
 
@@ -176,7 +207,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                 <button
                   key={item.label}
                   onClick={() => handleItemClick(item)}
-                  className={`flex items-center gap-2 px-4 h-full text-sm font-medium border-b-2 transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-4 h-full text-sm font-medium border-b-2 transition-all duration-150 cursor-pointer whitespace-nowrap min-w-max ${
                     active
                       ? "text-violet-600 border-violet-600 bg-violet-50"
                       : "text-gray-600 border-transparent hover:text-violet-500 hover:bg-violet-50"
@@ -194,7 +225,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                   key={item.label}
                   href={item.href!}
                   onClick={(e) => { e.preventDefault(); handleItemClick(item); }}
-                  className={`flex items-center gap-2 px-4 h-full text-sm font-medium border-b-2 transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-4 h-full text-sm font-medium border-b-2 transition-all duration-150 cursor-pointer whitespace-nowrap min-w-max ${
                     active
                       ? "text-violet-600 border-violet-600 bg-violet-50"
                       : "text-gray-600 border-transparent hover:text-violet-500 hover:bg-violet-50"
@@ -207,9 +238,9 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
             }
 
             return (
-              <div key={item.label} className="relative group">
+              <div key={item.label} className="relative group shrink-0">
                 <div
-                  className={`flex items-center gap-2 px-4 h-full text-sm font-medium border-b-2 transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-4 h-full text-sm font-medium border-b-2 transition-all duration-150 cursor-pointer whitespace-nowrap min-w-max ${
                     active
                       ? "text-violet-600 border-violet-600 bg-violet-50"
                       : "text-gray-600 border-transparent hover:text-violet-500 hover:bg-violet-50"
@@ -222,7 +253,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                   </svg>
                 </div>
 
-                <div className="absolute top-full left-0 w-56 bg-white rounded-xl shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="absolute top-full left-0 min-w-[220px] bg-white rounded-xl shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] overflow-hidden">
                   <div className="p-2 pt-3">
                     {item.submenu.map((sub) => {
                       if ("submenu" in sub && sub.submenu) {
@@ -230,18 +261,18 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                         return (
                           <div key={sub.label} className="relative group/sub">
                             <div
-                              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer ${
+                              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer whitespace-nowrap ${
                                 parentActive
                                   ? "bg-violet-50 text-violet-700"
                                   : "text-gray-700 hover:bg-gray-50"
                               }`}
                             >
-                              <span className="flex-1">{sub.label}</span>
-                              <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <span className="flex-1 truncate">{sub.label}</span>
+                              <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>
                             </div>
-                            <div className="absolute left-full top-0 w-48 bg-white rounded-xl shadow-xl border border-gray-200 opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible transition-all duration-200 z-50">
+                            <div className="absolute left-full top-0 min-w-[180px] bg-white rounded-xl shadow-xl border border-gray-200 opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible transition-all duration-200 z-[101] overflow-hidden">
                               <div className="p-2 pl-3">
                                 {sub.submenu.map((s) => {
                                   const sActive = isActive(s.href);
@@ -250,13 +281,13 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                                       key={s.label}
                                       href={s.href}
                                       onClick={(e) => { e.preventDefault(); router.push(s.href); }}
-                                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer ${
+                                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer whitespace-nowrap ${
                                         sActive
                                           ? "bg-violet-50 text-violet-700"
                                           : "text-gray-700 hover:bg-gray-50"
                                       }`}
                                     >
-                                      {s.label}
+                                      <span className="truncate">{s.label}</span>
                                     </a>
                                   );
                                 })}
@@ -274,7 +305,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                           <button
                             key={s.label}
                             onClick={handleLogout}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer text-left"
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer text-left whitespace-nowrap"
                           >
                             {s.label}
                           </button>
@@ -286,13 +317,13 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                           key={s.label}
                           href={s.href}
                           onClick={(e) => { e.preventDefault(); router.push(s.href); }}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer ${
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer whitespace-nowrap ${
                             sActive
                               ? "bg-violet-50 text-violet-700"
                               : "text-gray-700 hover:bg-gray-50"
                           }`}
                         >
-                          {s.label}
+                          <span className="truncate">{s.label}</span>
                         </a>
                       );
                     })}
@@ -319,11 +350,17 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
           background-color: #cbd5e1;
           border-radius: 4px;
         }
+        
+        /* Responsive adjustments */
         @media (max-width: 1024px) {
-          .thin-scrollbar {
-            scrollbar-width: none;
+          nav {
+            padding-left: 1rem;
+            padding-right: 1rem;
           }
-          .thin-scrollbar::-webkit-scrollbar {
+        }
+        
+        @media (max-width: 768px) {
+          nav {
             display: none;
           }
         }

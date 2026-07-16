@@ -63,7 +63,7 @@ export function validateDocumentCategory(category: string): {
   }
 
   const allowedValues = ALLOWED_DOCUMENT_CATEGORIES.map((c) => c.value);
-  if (!allowedValues.includes(category)) {
+  if (!(allowedValues as readonly string[]).includes(category)) {
     return { valid: false, reason: "Kategori tidak valid" };
   }
 

@@ -8,7 +8,7 @@ import { getDataRaportForKelas, getNilaiMapelForRaport } from '@/lib/raport/kont
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { guruMapelMemberId, namaKontak, kontakWA, kontakEmail, kelasId } = body;
+    const { guruMapelMemberId, namaKontak, kontakWA, kontakEmail, kelasId, role = 'wali_kelas' } = body; // Default role to wali_kelas
 
     if (!guruMapelMemberId || !namaKontak || !kelasId) {
       return NextResponse.json({ error: 'guruMapelMemberId, namaKontak, dan kelasId wajib diisi' }, { status: 400 });
@@ -16,6 +16,12 @@ export async function POST(request: NextRequest) {
 
     if (!kontakWA && !kontakEmail) {
       return NextResponse.json({ error: 'WA atau email wajib diisi' }, { status: 400 });
+    }
+
+    // Validate role
+    const validRoles = ['kepala_sekolah', 'pengawas', 'wali_kelas', 'lainnya'];
+    if (!validRoles.includes(role)) {
+      return NextResponse.json({ error: 'role tidak valid. Gunakan: kepala_sekolah, pengawas, wali_kelas, atau lainnya' }, { status: 400 });
     }
 
     const result = await createKontakEksternal({
@@ -57,11 +63,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (kontakWA) {
+      const roleLabel = role === 'wali_kelas' ? 'Wali Kelas' : 
+                       role === 'kepala_sekolah' ? 'Kepala Sekolah' : 
+                       role === 'pengawas' ? 'Pengawas' : 'Penerima';
+      
       const waMessage = `Yth. ${namaKontak},
 
-${guruMapelNama} telah membagikan data raport kelas ${kelasNama} melalui GuruPRO AI.
+${guruMapelNama} telah membagikan data nilai siswa kelas ${kelasNama} melalui GuruPRO AI.
 
-Lihat data raport di: ${linkUrl}
+Lihat data nilai di: ${linkUrl}
 
 Link berlaku 72 jam demi keamanan data siswa.`;
       await sendWhatsAppNotification(kontakWA, waMessage);

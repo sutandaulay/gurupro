@@ -10,7 +10,7 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const session = JSON.parse(sessionCookie);
-    if (session.role !== "admin") {
+    if (!['admin', 'super_admin', 'manager'].includes(session.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

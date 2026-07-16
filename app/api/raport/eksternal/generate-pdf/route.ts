@@ -1,103 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getKontakByLinkToken, getDataRaportForKelas, getNilaiMapelForRaport, isOtpVerified } from '@/lib/raport/kontak-eksternal-repository';
 import { query } from '@/lib/db';
-
-const DISCLAIMER_PDF = `
-Dokumen ini dihasilkan oleh GuruPRO AI sebagai bantuan penyusunan rapor.
-Dokumen resmi yang tercatat di sistem e-Rapor/RDM sekolah adalah rujukan utama.
-Dicetak pada: {tanggal}
-`;
-
-function generateHtmlRaport(siswa: any, nilaiMapel: any[], sekolahInfo: any, tanggal: string) {
-  const disclaimer = DISCLAIMER_PDF.replace('{tanggal}', tanggal);
-
-  const nilaiRows = nilaiMapel
-    .map(
-      (nm: any) => `
-    <tr>
-      <td style="padding:8px;border:1px solid #ddd;">${nm.nama_mapel || '-'}</td>
-      <td style="padding:8px;border:1px solid #ddd;text-align:center;">${nm.nilai_akhir ?? '-'}</td>
-      <td style="padding:8px;border:1px solid #ddd;text-align:center;">${nm.kkm ?? '-'}</td>
-      <td style="padding:8px;border:1px solid #ddd;">${nm.deskripsi_capaian || '-'}</td>
-    </tr>`
-    )
-    .join('');
-
-  return `<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    @page { margin: 20mm 15mm; }
-    body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #111; }
-    .header { text-align: center; margin-bottom: 20px; }
-    .header h1 { font-size: 16pt; margin: 0 0 4px; }
-    .header p { margin: 2px 0; font-size: 11pt; }
-    .identitas { margin-bottom: 16px; }
-    .identitas table { width: 100%; border-collapse: collapse; }
-    .identitas td { padding: 2px 8px; font-size: 11pt; }
-    .nilai { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    .nilai th { background: #f3f4f6; padding: 8px; border: 1px solid #ddd; font-size: 11pt; text-align: center; }
-    .nilai td { padding: 6px 8px; border: 1px solid #ddd; font-size: 11pt; }
-    .catatan { margin-top: 20px; }
-    .catatan h3 { font-size: 12pt; margin-bottom: 6px; }
-    .catatan p { font-size: 11pt; line-height: 1.5; }
-    .ttd { margin-top: 40px; display: flex; justify-content: space-between; }
-    .ttd div { text-align: center; width: 200px; }
-    .ttd p { margin: 4px 0; font-size: 11pt; }
-    .footer { margin-top: 30px; padding-top: 12px; border-top: 1px solid #ccc; }
-    .footer p { font-size: 8pt; color: #666; text-align: center; line-height: 1.4; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>RAPOR</h1>
-    <p>${sekolahInfo?.nama_sekolah || 'LAPORAN HASIL BELAJAR SISWA'}</p>
-    <p>${sekolahInfo?.alamat || ''}</p>
-    <p>${sekolahInfo?.npsn ? `NPSN: ${sekolahInfo.npsn}` : ''}</p>
-  </div>
-
-  <div class="identitas">
-    <table>
-      <tr><td width="120"><strong>Nama Siswa</strong></td><td>: ${siswa.nama_siswa}</td></tr>
-      <tr><td><strong>NISN</strong></td><td>: ${siswa.nisn || '-'}</td></tr>
-      <tr><td><strong>Kelas</strong></td><td>: ${siswa.nama_kelas}</td></tr>
-      <tr><td><strong>Periode</strong></td><td>: ${siswa.periode}</td></tr>
-    </table>
-  </div>
-
-  <h3 style="font-size:12pt;margin-bottom:8px;">Nilai Akademik</h3>
-  <table class="nilai">
-    <thead>
-      <tr>
-        <th>Mata Pelajaran</th>
-        <th>Nilai</th>
-        <th>KKM</th>
-        <th>Deskripsi Capaian</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${nilaiRows}
-    </tbody>
-  </table>
-
-  ${siswa.catatan_wali_kelas ? `
-  <div class="catatan">
-    <h3>Catatan Wali Kelas</h3>
-    <p>${siswa.catatan_wali_kelas}</p>
-  </div>` : ''}
-
-  <div class="footer">
-    <p>${disclaimer}</p>
-  </div>
-</body>
-</html>`;
-}
+import { getKontakByLinkToken, getDataRaportForKelas, getNilaiMapelForRaport, isOtpVerified } from '@/lib/raport/kontak-eksternal-repository';
+import { getPenilaianEkstrakurikuler } from '@/lib/sikap-ekskul';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { token, dataRaportIds } = body;
+    const { token, dataRaportIds, contentType = 'raport' } = body;
 
     if (!token) {
       return NextResponse.json({ error: 'Token wajib diisi' }, { status: 400 });
@@ -118,43 +27,98 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Verifikasi OTP diperlukan sebelum mengakses data' }, { status: 403 });
     }
 
-    const sekolahRes = await query(
-      `SELECT s.* FROM schools s
-       JOIN classes c ON c.school_id = s.id
-       WHERE c.id = $1 LIMIT 1`,
-      [kontak.kelas_id]
-    );
-    const sekolahInfo = sekolahRes.rows[0] || null;
+    if (contentType === 'raport') {
+      // Get raport data
+      const raportsToExport = dataRaportIds && dataRaportIds.length > 0
+        ? (await Promise.all(
+            dataRaportIds.map(async (id: string) => {
+              const allRaports = await getDataRaportForKelas(kontak.kelas_id);
+              return allRaports.find((r: any) => r.id === id);
+            })
+          )).filter(Boolean)
+        : await getDataRaportForKelas(kontak.kelas_id);
 
-    const tanggal = new Date().toLocaleDateString('id-ID', {
-      day: 'numeric', month: 'long', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
+      const allNilai = await Promise.all(
+        raportsToExport.map(async (siswa: any) => {
+          const nilaiMapel = await getNilaiMapelForRaport(siswa.id);
+          return { siswa, nilaiMapel };
+        })
+      );
 
-    const raportsToRender = dataRaportIds && dataRaportIds.length > 0
-      ? (await Promise.all(
-          dataRaportIds.map(async (id: string) => {
-            const allRaports = await getDataRaportForKelas(kontak.kelas_id);
-            return allRaports.find((r: any) => r.id === id);
-          })
-        )).filter(Boolean)
-      : await getDataRaportForKelas(kontak.kelas_id);
+      // Format data for PDF
+      const pdfData = allNilai.map(({ siswa, nilaiMapel }) => ({
+        namaSiswa: siswa.nama_siswa,
+        nisn: siswa.nisn,
+        nomorAbsen: siswa.nomor_absen,
+        kelas: siswa.nama_kelas,
+        template: siswa.nama_template,
+        periode: siswa.periode,
+        nilaiMapel: nilaiMapel.map((nm: any) => ({
+          mapel: nm.nama_mapel,
+          nilai: nm.nilai_akhir,
+          deskripsi: nm.deskripsi_capaian,
+          predikat: nm.nilai_akhir != null
+            ? (nm.nilai_akhir >= (nm.kkm || 70) ? 'Tuntas' : 'Belum Tuntas')
+            : '',
+          kkm: nm.kkm
+        }))
+      }));
 
-    const htmlParts: string[] = [];
+      return NextResponse.json({
+        pdfData,
+        totalSiswa: pdfData.length,
+        contentType: 'raport',
+        message: 'Data raport siap untuk di-generate ke PDF',
+      });
+    } else if (contentType === 'ekskul') {
+      // Get extracurricular data for the class
+      const ekskulData = await query(
+        `SELECT pe.*, s.nama_siswa, e.nama_ekskul
+         FROM penilaian_ekstrakurikuler pe
+         JOIN students s ON s.id = pe.siswa_id
+         JOIN ekstrakurikuler e ON e.id = pe.ekstrakurikuler_id
+         WHERE e.kelas_id = $1
+         ORDER BY s.nama_siswa, e.nama_ekskul`,
+        [kontak.kelas_id]
+      );
 
-    for (const siswa of raportsToRender) {
-      const nilaiMapel = await getNilaiMapelForRaport(siswa.id);
-      htmlParts.push(generateHtmlRaport(siswa, nilaiMapel, sekolahInfo, tanggal));
+      // Group by student
+      const groupedByStudent: Record<string, any[]> = {};
+      ekskulData.rows.forEach((row: any) => {
+        if (!groupedByStudent[row.nama_siswa]) {
+          groupedByStudent[row.nama_siswa] = [];
+        }
+        groupedByStudent[row.nama_siswa].push(row);
+      });
+
+      // Format data for PDF
+      const pdfData = Object.entries(groupedByStudent).map(([studentName, studentEkskulData]) => ({
+        namaSiswa: studentName,
+        ekskul: studentEkskulData.map((ekskulItem: any) => ({
+          nama: ekskulItem.nama_ekskul,
+          nilai: ekskulItem.predikat,
+          deskripsi: ekskulItem.deskripsi,
+        })),
+      }));
+
+      return NextResponse.json({
+        pdfData,
+        totalSiswa: pdfData.length,
+        contentType: 'ekskul',
+        message: 'Data ekstrakurikuler siap untuk di-generate ke PDF',
+      });
+    } else if (contentType === 'project') {
+      // For now, we'll return a placeholder since the project module might not be fully implemented
+      // In a real implementation, this would query the project-related tables
+      return NextResponse.json({
+        pdfData: [],
+        totalSiswa: 0,
+        contentType: 'project',
+        message: 'Modul project belum diimplementasikan dalam versi ini',
+      });
+    } else {
+      return NextResponse.json({ error: 'contentType tidak valid. Gunakan: raport, ekskul, atau project' }, { status: 400 });
     }
-
-    const fullHtml = htmlParts.join('<div style="page-break-after:always;"></div>');
-
-    return new NextResponse(fullHtml, {
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': `attachment; filename="raport-${kontak.kelas_id}.html"`,
-      },
-    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

@@ -1,3 +1,4 @@
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 
 // Inisialisasi pool koneksi database postgresql lokal Anda
@@ -7,7 +8,11 @@ export const pool = new Pool({
   database: 'gurupro_db',    // nama database lokal Anda
   password: 'nus4nt4r4', // sesuaikan dengan password postgres Anda
   port: 5432,
+  options: '-c search_path=payload,public',
 });
+
+// Export drizzle instance for use with schemas
+export const db = drizzle(pool);
 
 export const query = (text: string, params?: any[]) => {
   return pool.query(text, params);
@@ -253,6 +258,7 @@ const initDb = async () => {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS main_token_reset_date TIMESTAMP');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS grace_period_ends_at TIMESTAMP');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(30) DEFAULT \'active\'');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_expiry_warning_sent VARCHAR(10)');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by UUID REFERENCES users(id) ON DELETE SET NULL');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS cashback_balance INTEGER DEFAULT 0');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100)');
@@ -321,6 +327,33 @@ const initDb = async () => {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_code VARCHAR(10)');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMP');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS pdp_consent_given BOOLEAN DEFAULT FALSE');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS pdp_consent_version VARCHAR(50)');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS pdp_consent_date TIMESTAMP');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT FALSE');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type VARCHAR(50) DEFAULT \'individual\'');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS login_attempts INTEGER DEFAULT 0');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS lock_until TIMESTAMP');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_invitation_token VARCHAR(255)');
+
+    // Ensure payload schema changes are applied
+    await pool.query('ALTER TABLE payload.otp_verifications ADD COLUMN IF NOT EXISTS purpose VARCHAR(50) DEFAULT \'password_reset\'');
+    await pool.query('ALTER TABLE payload.otp_verifications ALTER COLUMN performance_share_link_id DROP NOT NULL');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payload.invitations (
+        id SERIAL PRIMARY KEY,
+        institution_id INTEGER REFERENCES payload.institutions(id) ON DELETE CASCADE,
+        invited_email VARCHAR(255),
+        invited_phone VARCHAR(255),
+        token VARCHAR(255) UNIQUE,
+        expires_at TIMESTAMP,
+        status VARCHAR(50) DEFAULT 'pending',
+        invited_by_id INTEGER REFERENCES payload.cms_users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
     // Ensure transactions table exists with correct schema
     await pool.query(`
@@ -1029,6 +1062,114 @@ const initDb = async () => {
       console.error('Failed to create user_storage tables:', err);
     }
 
+    // 34. Tabel TAMS (Attendance Devices, Logs, Summary, Leave Requests)
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS attendance_devices (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          browser_fingerprint VARCHAR(255) NOT NULL,
+          device_label VARCHAR(100),
+          registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          last_seen_at TIMESTAMP,
+          is_active BOOLEAN DEFAULT TRUE
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_attendance_devices_teacher ON attendance_devices (teacher_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_attendance_devices_fingerprint ON attendance_devices (browser_fingerprint)`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS attendance_logs (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          institution_id INTEGER NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+          assignment_id VARCHAR(255) NOT NULL,
+          type VARCHAR(20) NOT NULL,
+          class_session_id UUID,
+          subject_id UUID,
+          timestamp TIMESTAMP NOT NULL,
+          latitude DOUBLE PRECISION,
+          longitude DOUBLE PRECISION,
+          accuracy DOUBLE PRECISION,
+          ip_address VARCHAR(45),
+          distance_from_institution DOUBLE PRECISION,
+          face_match_score DOUBLE PRECISION,
+          liveness_passed BOOLEAN NOT NULL,
+          qr_code_verified BOOLEAN,
+          browser_fingerprint VARCHAR(255),
+          trust_score DOUBLE PRECISION,
+          status VARCHAR(20) NOT NULL DEFAULT 'valid',
+          flag_reasons JSONB,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_attendance_logs_teacher_time ON attendance_logs (teacher_id, timestamp)`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS attendance_summary (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          institution_id INTEGER NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+          date TIMESTAMP NOT NULL,
+          check_in_time TIMESTAMP,
+          check_out_time TIMESTAMP,
+          teaching_sessions_completed INTEGER DEFAULT 0,
+          teaching_minutes_total INTEGER DEFAULT 0,
+          teaching_minutes_by_subject JSONB,
+          attendance_status VARCHAR(20) NOT NULL,
+          late_minutes INTEGER DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          UNIQUE (teacher_id, institution_id, date)
+        )
+      `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS leave_requests (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          institution_id INTEGER NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+          type VARCHAR(20) NOT NULL,
+          start_date TIMESTAMP NOT NULL,
+          end_date TIMESTAMP NOT NULL,
+          reason VARCHAR NOT NULL,
+          attachment_url VARCHAR,
+          status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          approved_by UUID REFERENCES users(id),
+          approved_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_leave_requests_teacher ON leave_requests (teacher_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_leave_requests_institution ON leave_requests (institution_id)`);
+    } catch (err) {
+      console.error('Failed to create TAMS attendance tables:', err);
+    }
+
+    // 34. Create teacher_institution_assignments table (NEW - for attendance API)
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS teacher_institution_assignments (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          institution_id INTEGER NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+          subject_ids JSONB DEFAULT '[]'::jsonb,
+          weekly_schedule JSONB,
+          status VARCHAR(20) NOT NULL DEFAULT 'aktif',
+          start_date TIMESTAMP,
+          end_date TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_teacher_institution_assignments_teacher ON teacher_institution_assignments (teacher_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_teacher_institution_assignments_institution ON teacher_institution_assignments (institution_id)`);
+      console.log('teacher_institution_assignments table created/verified');
+    } catch (err) {
+      console.error('Failed to create teacher_institution_assignments table:', err);
+    }
+
     // 34. Performance Indexes for Foreign Keys (Audit Fix)
     try {
       await pool.query('CREATE INDEX IF NOT EXISTS idx_classes_school_id ON classes(school_id)');
@@ -1043,15 +1184,57 @@ const initDb = async () => {
       console.error('Failed to create performance indexes:', err);
     }
 
-    // 35. Conditional Foreign Key for guru_administrasi (Audit Fix)
+    // 35. Create user_face_enrollment table
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS user_face_enrollment (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          face_image_1 TEXT,
+          face_image_2 TEXT,
+          face_image_3 TEXT,
+          face_image_4 TEXT,
+          face_image_5 TEXT,
+          face_descriptor JSONB,
+          is_enrolled BOOLEAN NOT NULL DEFAULT false,
+          enrolled_at TIMESTAMP,
+          pdp_consent_given BOOLEAN NOT NULL DEFAULT false,
+          pdp_consent_version VARCHAR(50),
+          pdp_consent_date TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_face_enrollment_user ON user_face_enrollment (user_id)`);
+    } catch (err) {
+      console.error('Failed to create user_face_enrollment table:', err);
+    }
+
+    // 35b. Add face_descriptor column if not exists (for existing tables)
+    try {
+      const colCheck = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'user_face_enrollment' AND column_name = 'face_descriptor'
+      `);
+      if (colCheck.rows.length === 0) {
+        await pool.query(`
+          ALTER TABLE user_face_enrollment ADD COLUMN face_descriptor JSONB
+        `);
+        console.log('Added face_descriptor column to user_face_enrollment');
+      }
+    } catch (err) {
+      console.error('Failed to add face_descriptor column:', err);
+    }
+
+    // 36. Conditional Foreign Key for guru_administrasi (Audit Fix)
     try {
       const checkInstTable = await pool.query(
         "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'institutions')"
       );
       if (checkInstTable.rows[0].exists) {
         await pool.query(`
-          ALTER TABLE guru_administrasi 
-          ADD CONSTRAINT fk_guru_administrasi_institution 
+          ALTER TABLE guru_administrasi
+          ADD CONSTRAINT fk_guru_administrasi_institution
           FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE SET NULL
         `);
       }

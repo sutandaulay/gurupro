@@ -156,7 +156,7 @@ async function createFeatures(payload: any) {
     {
       title: 'Jurnal Mengajar',
       description: 'Catat aktivitas harian kelas dengan mudah',
-n      icon: 'IconBook2',
+      icon: 'IconBook2',
       is_active: true,
       sort_order: 1,
     },

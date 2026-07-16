@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   IconMenu2,
   IconCapRounded,
@@ -13,6 +14,8 @@ import {
   IconHelp,
   IconLogout,
   IconCreditCard,
+  IconMaximize,
+  IconMinimize,
 } from "@tabler/icons-react";
 import dynamic from "next/dynamic";
 import InstitutionSwitcher from "@/app/components/institution-switcher";
@@ -20,22 +23,86 @@ import { useTeacherStore, useProfileStore } from "@/lib/stores";
 
 const TokenTopUpModal = dynamic(() => import("@/app/components/ui/TokenTopUpModal"), { ssr: false });
 
+// Helper function to format time ago
+function formatTimeAgo(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) return "Baru saja";
+  if (diffMins < 60) return `${diffMins} menit lalu`;
+  if (diffHours < 24) return `${diffHours} jam lalu`;
+  if (diffDays < 7) return `${diffDays} hari lalu`;
+
+  return date.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+  });
+}
+
 interface TopBarProps {
   onToggleSidebar?: () => void;
 }
 
 export default function TopBar({ onToggleSidebar }: TopBarProps) {
   const { data: session } = useSession();
+  const router = useRouter();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const profile = useProfileStore(s => s.profile);
   const fetchProfile = useProfileStore(s => s.fetchProfile);
-  const [notifications, setNotifications] = useState<any[]>([
-    { id: "welcome", title: "Selamat Datang!", body: "Terima kasih telah bergabung dengan GuruPRO.", time: "Baru saja", read: false },
-  ]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
   const [showTopUp, setShowTopUp] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Fetch notifications from API
+  const fetchNotifications = async () => {
+    if (!profile?.id) return;
+
+    setIsLoadingNotifications(true);
+    try {
+      const res = await fetch("/api/user/notifications?limit=10");
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications || []);
+        setUnreadCount(data.unreadCount || 0);
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  };
+
+  // Mark all notifications as read
+  const markAllNotificationsRead = async () => {
+    try {
+      await fetch("/api/user/notifications?markAllRead=true", { method: "PUT" });
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setUnreadCount(0);
+    } catch (err) {
+      console.error("Failed to mark notifications as read:", err);
+    }
+  };
+
+  // Fetch notifications when profile loads
+  useEffect(() => {
+    if (profile?.id) {
+      fetchNotifications();
+
+      // Refresh notifications every 30 seconds
+      const interval = setInterval(fetchNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [profile?.id]);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -47,6 +114,28 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     };
   }, []);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.error("Gagal mengubah mode layar penuh:", err);
+    }
+  };
 
   const triggerPwaInstall = async () => {
     if (!deferredPrompt) {
@@ -68,27 +157,77 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
   const setStoreActiveSchool = useTeacherStore((s) => s.setActiveSchool);
   const setStoreSchools = useTeacherStore((s) => s.setSchools);
 
+  // Fetch profile on mount
   useEffect(() => {
     fetchProfile();
+  }, [fetchProfile]);
+
+  const isLoading = useProfileStore(s => s.isLoading);
+
+  // Session-aware school selection
+  useEffect(() => {
+    // Only proceed if profile is loaded and not loading
+    if (!profile || isLoading) return;
 
     fetch("/api/schools")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setSchools(data);
-          setStoreSchools(data);
-          const savedSchoolId = sessionStorage.getItem("gurupro_school_selected");
-          if (savedSchoolId && data.some((s) => s.id === savedSchoolId)) {
+      .then(async (r) => {
+        if (!r.ok) return [];
+        const data = await r.json();
+        if (!Array.isArray(data)) return [];
+
+        // Get current session user ID for validation
+        const currentUserId = profile?.id;
+        if (!currentUserId) return data;
+
+        // Filter schools to only those belonging to current user
+        const userSchools = data.filter((s: any) =>
+          s.user_id === currentUserId || s.userId === currentUserId
+        );
+
+        // Use user's schools, or all schools if filter returns empty
+        const validSchools = userSchools.length > 0 ? userSchools : data;
+
+        setSchools(validSchools);
+        setStoreSchools(validSchools);
+
+        // Get saved school ID from session storage
+        const savedSchoolId = sessionStorage.getItem("gurupro_school_selected");
+
+        // Validate saved school exists for current user
+        if (savedSchoolId) {
+          const savedSchoolExists = validSchools.some((s: any) => String(s.id) === String(savedSchoolId));
+          if (savedSchoolExists) {
             setSelectedSchoolId(savedSchoolId);
             setStoreActiveSchool(savedSchoolId);
-          } else if (data.length > 0) {
-            setSelectedSchoolId(data[0].id);
-            setStoreActiveSchool(data[0].id);
+            return;
           }
+        }
+
+        // Get school from profile's activeSchool
+        const profileActiveSchool = profile?.activeSchool?.id;
+        if (profileActiveSchool) {
+          const profileSchoolExists = validSchools.some((s: any) => String(s.id) === String(profileActiveSchool));
+          if (profileSchoolExists) {
+            setSelectedSchoolId(String(profileActiveSchool));
+            setStoreActiveSchool(String(profileActiveSchool));
+            sessionStorage.setItem("gurupro_school_selected", String(profileActiveSchool));
+            return;
+          }
+        }
+
+        // Only set first school if user has exactly one school
+        if (validSchools.length === 1) {
+          setSelectedSchoolId(String(validSchools[0].id));
+          setStoreActiveSchool(String(validSchools[0].id));
+          sessionStorage.setItem("gurupro_school_selected", String(validSchools[0].id));
+        } else if (validSchools.length > 1) {
+          // For multiple schools, require explicit selection - don't auto-select
+          // Clear any previous selection
+          sessionStorage.removeItem("gurupro_school_selected");
         }
       })
       .catch(() => {});
-  }, []);
+  }, [profile, isLoading]);
 
   // Listen to external school changes (e.g. from welcome modal)
   useEffect(() => {
@@ -111,10 +250,14 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
     }
   };
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  const markAllRead = useCallback(() => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  const markAllRead = useCallback(async () => {
+    try {
+      await fetch("/api/user/notifications?markAllRead=true", { method: "PUT" });
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setUnreadCount(0);
+    } catch (err) {
+      console.error("Failed to mark notifications as read:", err);
+    }
   }, []);
 
   useEffect(() => {
@@ -169,270 +312,246 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
   );
 
   return (
-    <header className="sticky top-0 z-50 h-16 bg-white border-b border-gray-200 shadow-sm">
-      <div className="flex items-center justify-between h-full px-4 lg:px-6">
-        {/* Left */}
+    <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-30 flex items-center px-4 shadow-sm">
+      <div className="flex items-center justify-between w-full max-w-[1400px] mx-auto">
         <div className="flex items-center gap-3">
-          {/* Token indicator */}
-          <div className="hidden sm:flex items-center gap-2">
-            <button
-              onClick={() => setShowTopUp(true)}
-              className="flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 border border-violet-100 text-violet-700 text-sm font-semibold hover:bg-violet-100"
-            >
-              <span className="text-xs">Token:</span>
-              <span className="text-sm">{profile ? Number(profile.token_limit || 0) : "—"}</span>
-              <span className="text-xs text-gray-400">+</span>
-              <span className="text-sm">{profile ? Number(profile.addon_token_balance || 0) : "—"}</span>
-            </button>
-          </div>
           <button
             onClick={onToggleSidebar}
-            className="lg:hidden p-2 -ml-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
-            aria-label="Toggle sidebar"
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 cursor-pointer"
+            aria-label="Toggle menu"
           >
-            <IconMenu2 size={22} stroke={1.5} />
+            <IconMenu2 size={20} />
           </button>
-          <a href="/dashboard" className="flex items-center gap-2">
-            <IconCapRounded size={26} stroke={1.5} className="text-violet-600" />
-            <span className="text-lg font-bold text-gray-900">
+          
+          <div className="flex items-center gap-2">
+            <div className="bg-violet-600 p-2 rounded-lg">
+              <IconCapRounded size={20} className="text-white" />
+            </div>
+            <h1 className="text-lg font-bold text-gray-900 hidden sm:block">
               Guru<span className="text-violet-600">PRO</span>
-            </span>
-          </a>
+            </h1>
+          </div>
         </div>
 
-        {/* Center - Search */}
-        <div className="hidden md:flex flex-1 max-w-md mx-6">
-          <div className="relative w-full">
-            <IconSearch
-              size={18}
-              stroke={1.5}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
+        <div className="flex items-center gap-3">
+          {/* Search bar hanya ditampilkan di layar besar */}
+          <div className="hidden md:flex items-center bg-gray-100 rounded-lg px-3 py-2 w-64">
+            <IconSearch size={16} className="text-gray-400 mr-2" />
             <input
               type="text"
+              placeholder="Cari..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari fitur, dokumen..."
-              className="w-full pl-10 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              className="bg-transparent outline-none text-sm flex-1 text-gray-700"
             />
           </div>
-        </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Institution Switcher (Ruang Kerja) */}
+            <InstitutionSwitcher />
 
-        {/* School Selector (Pemilih Sekolah Mandiri - Custom Dropdown) */}
-        {schools.length > 0 && (
-          <div className="hidden sm:flex relative mr-2" ref={schoolDropdownRef}>
+            {/* Beli Token Ekstra Quick Button */}
             <button
-              onClick={() => {
-                setIsSchoolDropdownOpen(!isSchoolDropdownOpen);
-                setShowDropdown(false);
-                setShowNotif(false);
-              }}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-sm transition-colors cursor-pointer"
+              onClick={() => setShowTopUp(true)}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 hover:bg-violet-100 text-xs font-bold transition-all border border-violet-100 cursor-pointer shrink-0"
             >
-              <IconBuilding size={16} stroke={1.5} className="text-violet-600 shrink-0" />
-              <span className="text-gray-800 font-medium max-w-[145px] truncate">
-                {schools.find(s => s.id === selectedSchoolId)?.nama_sekolah || "Pilih Sekolah"}
-              </span>
-              <svg
-                className={`w-4 h-4 text-gray-400 transition-transform ${isSchoolDropdownOpen ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <svg className="w-3.5 h-3.5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
+              <span>Beli Token</span>
             </button>
 
-            {isSchoolDropdownOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setIsSchoolDropdownOpen(false)} />
-                <div className="absolute left-0 top-full mt-1 z-50 w-64 bg-white border border-gray-200 rounded-xl shadow-dropdown py-1 animate-fade-in">
-                  <div className="px-3 py-2 border-b border-gray-100">
-                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
-                      Ruang Kerja Pribadi / Sekolah
+            {/* Fullscreen Toggle Button */}
+            <button
+              onClick={toggleFullscreen}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 relative cursor-pointer"
+              aria-label="Toggle Fullscreen"
+              title={isFullscreen ? "Keluar Layar Penuh" : "Mode Layar Penuh"}
+            >
+              {isFullscreen ? <IconMinimize size={20} /> : <IconMaximize size={20} />}
+            </button>
+
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setShowNotif(!showNotif);
+                  // Refresh notifications when opening
+                  if (!showNotif) fetchNotifications();
+                }}
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 relative cursor-pointer"
+                aria-label="Notifications"
+              >
+                <IconBell size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {showNotif && (
+                <div
+                  ref={notifRef}
+                  className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 max-h-[420px] overflow-hidden flex flex-col"
+                >
+                  <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-violet-50 to-indigo-50">
+                    <h3 className="font-bold text-gray-900">🔔 Notifikasi</h3>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllNotificationsRead}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
+                      >
+                        Tandai semua dibaca
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex-1 overflow-y-auto">
+                    {isLoadingNotifications ? (
+                      <div className="p-8 text-center text-gray-400">
+                        <div className="animate-spin w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                        <p className="text-xs">Memuat...</p>
+                      </div>
+                    ) : notifications.length === 0 ? (
+                      <div className="p-8 text-center">
+                        <span className="text-4xl">📭</span>
+                        <p className="text-gray-500 text-sm mt-2">Tidak ada notifikasi</p>
+                      </div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <div
+                          key={notif.id}
+                          className={`p-4 border-b border-gray-50 last:border-b-0 cursor-pointer hover:bg-gray-50 transition-colors ${
+                            !notif.is_read ? "bg-blue-50/50 border-l-2 border-l-indigo-500" : ""
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            {!notif.is_read && (
+                              <span className="w-2 h-2 bg-indigo-500 rounded-full mt-2 shrink-0"></span>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-gray-900 text-sm">{notif.title}</h4>
+                              <p className="text-xs text-gray-600 mt-1 line-clamp-2">{notif.body}</p>
+                              <p className="text-[10px] text-gray-400 mt-2">
+                                {formatTimeAgo(notif.created_at)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setShowDropdown(!showDropdown)}
+                className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 cursor-pointer"
+              >
+                {profile?.photo_url || session?.user?.image ? (
+                  <img
+                    src={profile?.photo_url || session?.user?.image || ""}
+                    alt={session?.user?.name || "User"}
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-bold">
+                    {initials}
+                  </div>
+                )}
+                <span className="hidden md:inline text-sm font-medium text-gray-700 max-w-[100px] truncate">
+                  {session?.user?.name?.split(" ")[0] || "Pengguna"}
+                </span>
+              </button>
+              
+              {showDropdown && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
+                  <div className="p-4 border-b border-gray-200">
+                    <p className="font-medium text-gray-900 truncate">
+                      {session?.user?.name || "Pengguna"}
+                    </p>
+                    <p className="text-sm text-gray-500 truncate">
+                      {session?.user?.email || ""}
                     </p>
                   </div>
-                  <div className="max-h-64 overflow-y-auto">
-                    {schools.map((school) => (
-                      <button
-                        key={school.id}
-                        onClick={() => {
-                          handleSchoolChange(school.id);
-                          setIsSchoolDropdownOpen(false);
-                        }}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-gray-50 transition-colors cursor-pointer ${
-                          selectedSchoolId === school.id
-                            ? 'bg-violet-50 text-violet-700 font-semibold'
-                            : 'text-gray-700'
-                        }`}
-                      >
-                        <IconBuilding size={16} stroke={1.5} className="shrink-0" />
-                        <span className="truncate">{school.nama_sekolah}</span>
-                        {selectedSchoolId === school.id && (
-                          <span className="ml-auto">
-                            <svg className="w-4 h-4 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </span>
-                        )}
-                      </button>
-                    ))}
+                  <div className="py-1">
+                    <button
+                      onClick={() => { setShowDropdown(false); router.push('/profile'); }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                    >
+                      <IconUser size={16} />
+                      Profil Saya
+                    </button>
+                    <button
+                      onClick={() => { setShowDropdown(false); setShowTopUp(true); }}
+                      className="w-full text-left px-4 py-2 text-sm text-violet-750 hover:bg-violet-50 flex items-center gap-2 font-semibold cursor-pointer"
+                    >
+                      <svg className="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      Beli Token Ekstra
+                    </button>
+                    <button
+                      onClick={() => { setShowDropdown(false); router.push('/settings'); }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                    >
+                      <IconSettings size={16} />
+                      Pengaturan
+                    </button>
+                    <button
+                      onClick={triggerPwaInstall}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                    >
+                      <IconCreditCard size={16} />
+                      Instal Aplikasi
+                    </button>
+                    <button
+                      onClick={() => { setShowDropdown(false); router.push('/help'); }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                    >
+                      <IconHelp size={16} />
+                      Bantuan
+                    </button>
+                    <button
+                      onClick={async () => {
+                        // Clear client-side stores first
+                        useProfileStore.getState().clearProfile();
+                        useTeacherStore.getState().resetContext();
+
+                        // Clear sessionStorage and localStorage
+                        if (typeof window !== 'undefined') {
+                          sessionStorage.clear();
+                          localStorage.removeItem('gurupro-profile-store');
+                          localStorage.removeItem('gurupro-teacher-store');
+                        }
+
+                        try {
+                          await fetch("/api/auth/logout", { method: "POST" });
+                        } catch (err) {
+                          console.error("Logout error:", err);
+                        }
+                        await signOut({ redirect: true, callbackUrl: "/" });
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer"
+                    >
+                      <IconLogout size={16} />
+                      Keluar
+                    </button>
                   </div>
                 </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Institution Switcher */}
-        <div className="hidden md:flex items-center mr-2">
-          <InstitutionSwitcher />
-        </div>
-
-        {/* Right */}
-        <div className="flex items-center gap-3">
-          {/* PWA Install Button */}
-          <button
-            onClick={triggerPwaInstall}
-            className={`bg-indigo-650 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all cursor-pointer ${
-              deferredPrompt ? "animate-bounce ring-2 ring-indigo-200" : ""
-            }`}
-          >
-            <span>📲</span>
-            <span className="hidden sm:inline">Instal Aplikasi</span>
-          </button>
-
-          {/* Admin Panel Button */}
-          {profile?.role === "admin" && (
-            <a
-              href="/admin"
-              className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
-            >
-              <span>🛡️</span>
-              <span className="hidden sm:inline">Admin Panel</span>
-            </a>
-          )}
-
-          <div className="relative" ref={notifRef}>
-            <button
-              onClick={() => { setShowNotif(!showNotif); setShowDropdown(false); }}
-              className="relative p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 cursor-pointer"
-            >
-              <IconBell size={22} stroke={1.5} />
-              {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
               )}
-            </button>
-
-            {showNotif && (
-              <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-dropdown py-2 animate-fade-in z-50">
-                <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-700 uppercase">Notifikasi</span>
-                  {unreadCount > 0 && (
-                    <button onClick={markAllRead} className="text-[10px] text-violet-600 hover:text-violet-700 font-semibold cursor-pointer">
-                      Tandai dibaca
-                    </button>
-                  )}
-                </div>
-                <div className="max-h-64 overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <div className="p-6 text-center text-xs text-gray-400">Tidak ada notifikasi</div>
-                  ) : (
-                    notifications.map((n) => (
-                      <div
-                        key={n.id}
-                        className={`px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer ${!n.read ? "bg-violet-50/30" : ""}`}
-                        onClick={() => setNotifications((prev) => prev.map((x) => x.id === n.id ? { ...x, read: true } : x))}
-                      >
-                        <p className="text-xs font-semibold text-gray-800">{n.title}</p>
-                        <p className="text-[11px] text-gray-500 mt-0.5">{n.body}</p>
-                        <p className="text-[9px] text-gray-400 mt-1">{n.time}</p>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <a
-                  href="/dashboard"
-                  className="block px-4 py-2.5 text-center text-xs font-semibold text-violet-600 hover:bg-gray-50 border-t border-gray-100"
-                >
-                  Lihat Semua →
-                </a>
-              </div>
-            )}
-          </div>
-
-          <div className="relative" ref={dropdownRef}>
-            {showTopUp && (
-              // Lazy load modal to avoid SSR issues
-              // @ts-ignore
-              <TokenTopUpModal open={showTopUp} onClose={() => setShowTopUp(false)} userId={profile?.id} />
-            )}
-            <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 cursor-pointer"
-            >
-              {avatarContent}
-            </button>
-
-            {showDropdown && (
-              <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-dropdown py-2 animate-fade-in">
-                <div className="px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-semibold text-gray-900 truncate">
-                    {displayName}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {displayEmail}
-                  </p>
-                </div>
-                <div className="py-1">
-                  <a
-                    href="/profile?tab=billing"
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    <IconCreditCard size={18} stroke={1.5} className="text-gray-400" />
-                    Billing & Langganan
-                  </a>
-                  <a
-                    href="/profile"
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    <IconUser size={18} stroke={1.5} className="text-gray-400" />
-                    Profil Saya
-                  </a>
-                  <a
-                    href="/settings"
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    <IconSettings size={18} stroke={1.5} className="text-gray-400" />
-                    Pengaturan
-                  </a>
-                  <a
-                    href="https://wa.me/6281283960337"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    <IconHelp size={18} stroke={1.5} className="text-gray-400" />
-                    Bantuan
-                  </a>
-                </div>
-                <div className="border-t border-gray-100 pt-1">
-                  <button
-                    onClick={async () => {
-                      await fetch("/api/auth/logout", { method: "POST" });
-                      signOut({ callbackUrl: "/login" });
-                    }}
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full text-left cursor-pointer"
-                  >
-                    <IconLogout size={18} stroke={1.5} />
-                    Keluar
-                  </button>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
+      {showTopUp && (
+        <TokenTopUpModal
+          open={showTopUp}
+          onClose={() => setShowTopUp(false)}
+          userId={session?.user?.id || (session as any)?.id || null}
+        />
+      )}
     </header>
   );
 }

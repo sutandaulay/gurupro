@@ -1,6 +1,9 @@
 /**
  * Silabus/ATP Prompt for AI Generation
  * System prompt with context caching support
+ *
+ * Updated: 14 Juli 2026 - Menambahkan batas karakter, larangan markdown, dan few-shot example
+ * Reference: docs/ai-generation-standard.md
  */
 
 import { z } from 'zod';
@@ -18,7 +21,82 @@ ATURAN WAJIB:
 3. kataKunciMateri BUKAN uraian materi — cukup 3-5 kata kunci per unit untuk efisiensi token (uraian lengkap ada di Modul Ajar tiap unit, bukan di sini).
 4. catatanKokurikuler diisi HANYA jika unit tersebut relevan dengan kolaborasi lintas mapel atau Gerakan 7 Kebiasaan Anak Indonesia Hebat — jangan dipaksakan di semua unit.
 5. Jangan tumpang tindih kompetensi antar unit — tiap unit progresif dari unit sebelumnya.
-6. Keluarkan HANYA JSON valid sesuai schema, tanpa teks pembuka/penutup/markdown fence.`;
+
+BATASAN PANJANG PER-FIELD (WAJIB DIIKUTI):
+- topik (setiap unit): MAKSIMAL 100 KARAKTER
+- tujuanPembelajaran (setiap item): MAKSIMAL 200 KARAKTER
+- kataKunciMateri (setiap item): MAKSIMAL 50 KARAKTER
+- catatanKokurikuler: MAKSIMAL 300 KARAKTER
+- capaianPembelajaran: MAKSIMAL 2000 KARAKTER
+
+LARANGAN FORMAT MARKDOWN DI DALAM JSON VALUE:
+- ❌ Jangan pakai **bold**, *italic*, # heading
+- ❌ Jangan pakai bullet list ( - , * ) di dalam string
+- ❌ Jangan pakai \`code block\` di dalam string
+- ✅ Gunakan plain text biasa dengan punctuation standar Indonesia
+
+OUTPUT JSON SCHEMA:
+{
+  "identitas": {
+    "mataPelajaran": "string",
+    "fase": "A/B/C/D/E/F",
+    "kelas": "string",
+    "semester": 1 | 2,
+    "tahunAjaran": "string | null"
+  },
+  "capaianPembelajaran": "string (maks 2000 karakter)",
+  "alurTujuanPembelajaran": [
+    {
+      "unitKe": 1,
+      "topik": "string (maks 100 karakter)",
+      "tujuanPembelajaran": ["TP-1: tujuan (maks 200 karakter)", "TP-2: tujuan"],
+      "dimensiProfilLulusanTerhubung": ["Dimensi 1", "Dimensi 2"],
+      "estimasiPertemuan": 2,
+      "estimasiMinggu": 1,
+      "kataKunciMateri": ["kata kunci 1 (maks 50 karakter)", "kata kunci 2"],
+      "catatanKokurikuler": null | "string (maks 300 karakter)"
+    }
+  ],
+  "totalEstimasi": {
+    "totalPertemuan": number,
+    "totalMinggu": number
+  }
+}
+
+CONTOH OUTPUT YANG BENAR:
+{
+  "identitas": {
+    "mataPelajaran": "Bahasa Indonesia",
+    "fase": "D",
+    "kelas": "Kelas VII",
+    "semester": 1,
+    "tahunAjaran": "2026/2027"
+  },
+  "capaianPembelajaran": "Peserta didik mampu memahami dan menganalisis teks narasi sederhana...",
+  "alurTujuanPembelajaran": [
+    {
+      "unitKe": 1,
+      "topik": "Teks Narasi: Ciri dan Struktur",
+      "tujuanPembelajaran": [
+        "TP-1: Mengidentifikasi ciri-ciri teks narasi",
+        "TP-2: Menjelaskan struktur teks narasi"
+      ],
+      "dimensiProfilLulusanTerhubung": ["Bernalar Kritis", "Kreatif"],
+      "estimasiPertemuan": 4,
+      "estimasiMinggu": 2,
+      "kataKunciMateri": ["narasi", "struktur teks", "alur"],
+      "catatanKokurikuler": null
+    }
+  ],
+  "totalEstimasi": {
+    "totalPertemuan": 4,
+    "totalMinggu": 2
+  }
+}
+
+CATATAN: AI TIDAK SELALU PATUH BATASAN KARAKTER. LAKUKAN TRUNCATE DI LAYER VALIDASI.
+
+Keluarkan HANYA JSON valid sesuai schema, tanpa teks pembuka/penutup/markdown fence.`;
 
 // ============================================
 // USER PROMPT TEMPLATE (Dynamic Input)
@@ -200,6 +278,67 @@ function buildPaiContext(paiMode?: string): string {
 // VALIDATION
 // ============================================
 
+import { truncateText } from './validation-utils';
+
+/**
+ * Enforce character limits on Silabus output
+ * - AI tidak selalu patuh batas di prompt, jadi enforce di sini
+ */
+export function enforceSilabusLimits(output: unknown): SilabusOutput {
+  if (!output || typeof output !== 'object') {
+    throw new Error('Invalid Silabus output');
+  }
+
+  const data = output as Record<string, unknown>;
+
+  // Truncate fields
+  const processed = {
+    identitas: {
+      mataPelajaran: String(data.identitas?.mataPelajaran || ''),
+      fase: String(data.identitas?.fase || ''),
+      kelas: String(data.identitas?.kelas || ''),
+      semester: Number(data.identitas?.semester || 1),
+      tahunAjaran: data.identitas?.tahunAjaran ?? null,
+    },
+    capaianPembelajaran: truncateText(
+      data.capaianPembelajaran,
+      2000,
+      '... [catatan:超出了 batas maksimum 2000 karakter]'
+    ) || 'Data capaian pembelajaran tidak tersedia',
+    alurTujuanPembelajaran: Array.isArray(data.alurTujuanPembelajaran)
+      ? data.alurTujuanPembelajaran.map((unit: any, idx: number) => ({
+          unitKe: Number(unit?.unitKe ?? idx + 1),
+          topik: truncateText(unit?.topik, 100) || `Unit ${idx + 1}`,
+          tujuanPembelajaran: Array.isArray(unit?.tujuanPembelajaran)
+            ? unit.tujuanPembelajaran.map((tp: string) =>
+                truncateText(tp, 200) || 'Tujuan pembelajaran tidak tersedia'
+              )
+            : [],
+          dimensiProfilLulusanTerhubung: Array.isArray(unit?.dimensiProfilLulusanTerhubung)
+            ? unit.dimensiProfilLulusanTerhubung.slice(0, 2)
+            : [],
+          estimasiPertemuan: Number(unit?.estimasiPertemuan ?? 1),
+          estimasiMinggu: Number(unit?.estimasiMinggu ?? 1),
+          kataKunciMateri: Array.isArray(unit?.kataKunciMateri)
+            ? unit.kataKunciMateri.slice(0, 5).map((kw: string) =>
+                truncateText(kw, 50) || ''
+              ).filter(Boolean)
+            : [],
+          catatanKokurikuler: unit?.catatanKokurikuler
+            ? truncateText(unit.catatanKokurikuler, 300)
+            : null,
+        }))
+      : [],
+    totalEstimasi: {
+      totalPertemuan: Number(data.totalEstimasi?.totalPertemuan ?? 0),
+      totalMinggu: Number(data.totalEstimasi?.totalMinggu ?? 0),
+    },
+  };
+
+  // Validate with schema
+  return validateSilabusOutput(processed);
+}
+
 export function validateSilabusOutput(output: unknown): SilabusOutput {
   const result = silabusOutputSchema.safeParse(output);
 
@@ -227,6 +366,27 @@ export function parseSilabusFromAIResponse(text: string): SilabusOutput {
     cleanText = cleanText.slice(0, -3);
   }
 
-  const parsed = JSON.parse(cleanText.trim());
-  return validateSilabusOutput(parsed);
+  try {
+    const parsed = JSON.parse(cleanText.trim());
+    // Enforce limits dan validate
+    return enforceSilabusLimits(parsed);
+  } catch (parseError) {
+    console.error('[Silabus] Parse/enforce failed:', parseError);
+    // Fallback - return minimal valid structure
+    return {
+      identitas: {
+        mataPelajaran: 'Tidak tersedia',
+        fase: 'E',
+        kelas: 'Kelas',
+        semester: 1,
+        tahunAjaran: null,
+      },
+      capaianPembelajaran: 'Data tidak tersedia',
+      alurTujuanPembelajaran: [],
+      totalEstimasi: {
+        totalPertemuan: 0,
+        totalMinggu: 0,
+      },
+    };
+  }
 }

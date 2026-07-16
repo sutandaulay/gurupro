@@ -732,7 +732,7 @@ function GenerateConfirmationModal({
                         }}
                         className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition-colors"
                       >
-                        Beli Token Eceran
+                        Beli Token Ekstra
                       </button>
                     </div>
                   </div>

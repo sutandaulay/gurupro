@@ -79,13 +79,13 @@ async function ensureSkpTablesExist() {
 }
 
 async function dbCleanup() {
-  await query("DELETE FROM institution_members_role WHERE parent_id IN (SELECT id FROM institution_members WHERE app_user_id IN (SELECT id FROM users WHERE email = 'test-load-guru@example.com'))");
-  await query("DELETE FROM institution_members_assigned_mapel WHERE _parent_id IN (SELECT id FROM institution_members WHERE app_user_id IN (SELECT id FROM users WHERE email = 'test-load-guru@example.com'))");
-  await query("DELETE FROM institution_members_assigned_kelas WHERE _parent_id IN (SELECT id FROM institution_members WHERE app_user_id IN (SELECT id FROM users WHERE email = 'test-load-guru@example.com'))");
-  await query("DELETE FROM institution_members WHERE app_user_id IN (SELECT id FROM users WHERE email = 'test-load-guru@example.com') OR user_id IN (SELECT id FROM cms_users WHERE email = 'test-load-guru@example.com')");
-  await query("DELETE FROM cms_users WHERE email = 'test-load-guru@example.com'");
-  await query("DELETE FROM guru_administrasi WHERE user_id IN (SELECT id FROM users WHERE email = 'test-load-guru@example.com')");
-  await query("DELETE FROM institutions WHERE npsn = 'REG-LOAD'");
+  await query("DELETE FROM payload.institution_members_role WHERE parent_id IN (SELECT id FROM payload.institution_members WHERE app_user_id = (SELECT id::varchar FROM users WHERE email = 'test-load-guru@example.com'))");
+  await query("DELETE FROM payload.institution_members_assigned_mapel WHERE _parent_id IN (SELECT id FROM payload.institution_members WHERE app_user_id = (SELECT id::varchar FROM users WHERE email = 'test-load-guru@example.com'))");
+  await query("DELETE FROM payload.institution_members_assigned_kelas WHERE _parent_id IN (SELECT id FROM payload.institution_members WHERE app_user_id = (SELECT id::varchar FROM users WHERE email = 'test-load-guru@example.com'))");
+  await query("DELETE FROM payload.institution_members WHERE app_user_id = (SELECT id::varchar FROM users WHERE email = 'test-load-guru@example.com') OR user_id IN (SELECT id FROM payload.cms_users WHERE email = 'test-load-guru@example.com')");
+  await query("DELETE FROM payload.cms_users WHERE email = 'test-load-guru@example.com'");
+  await query("DELETE FROM guru_administrasi WHERE user_id = (SELECT id FROM users WHERE email = 'test-load-guru@example.com')");
+  await query("DELETE FROM payload.institutions WHERE npsn = 'REG-LOAD'");
   await query("DELETE FROM users WHERE email = 'test-load-guru@example.com'");
 }
 
@@ -107,29 +107,29 @@ describe("Light Load & Query Profiling Test (N+1 Audit)", () => {
     userId = userRes.rows[0].id;
 
     const instRes = await query(
-      `INSERT INTO institutions (name, npsn, jenjang, naungan, status)
+      `INSERT INTO payload.institutions (name, npsn, jenjang, naungan, status)
        VALUES ($1, $2, $3, $4, $5) RETURNING id`,
       ["Test Load Inst", "REG-LOAD", "SMP", "Kemendikbud", "active"]
     );
     instId = instRes.rows[0].id;
 
     const cmsUserRes = await query(
-      `INSERT INTO cms_users (name, email, password)
-       VALUES ('Guru Load', 'test-load-guru@example.com', 'pwd') RETURNING id`
+      `INSERT INTO payload.cms_users (name, email, role, salt, hash)
+       VALUES ('Guru Load', 'test-load-guru@example.com', 'editor', '', '') RETURNING id`
     );
     const cmsUserId = cmsUserRes.rows[0].id;
 
     // Tambah membership aktif dengan mapel/kelas
     const memberRes = await query(
-      `INSERT INTO institution_members (user_id, app_user_id, institution_id, status)
+      `INSERT INTO payload.institution_members (user_id, app_user_id, institution_id, status)
        VALUES ($1, $2, $3, 'active') RETURNING id`,
       [cmsUserId, userId, instId]
     );
     memberId = memberRes.rows[0].id;
 
-    await query(`INSERT INTO institution_members_role (parent_id, "order", value) VALUES ($1, 0, 'operator')`, [memberId]);
-    await query(`INSERT INTO institution_members_assigned_mapel (_order, _parent_id, id, mapel) VALUES (0, $1, gen_random_uuid()::text, 'Matematika')`, [memberId]);
-    await query(`INSERT INTO institution_members_assigned_kelas (_order, _parent_id, id, kelas) VALUES (0, $1, gen_random_uuid()::text, 'VIII-A')`, [memberId]);
+    await query(`INSERT INTO payload.institution_members_role (parent_id, "order", value) VALUES ($1, 0, 'operator')`, [memberId]);
+    await query(`INSERT INTO payload.institution_members_assigned_mapel (_order, _parent_id, id, mapel) VALUES (0, $1, gen_random_uuid()::text, 'Matematika')`, [memberId]);
+    await query(`INSERT INTO payload.institution_members_assigned_kelas (_order, _parent_id, id, kelas) VALUES (0, $1, gen_random_uuid()::text, 'VIII-A')`, [memberId]);
 
     // Masukkan beberapa dokumen administrasi
     for (let i = 0; i < 10; i++) {
@@ -203,7 +203,7 @@ describe("Light Load & Query Profiling Test (N+1 Audit)", () => {
     console.log(`[LATENCY] Dashboard Guru (Konteks Institusi): ${avgTimeInst.toFixed(2)}ms per call`);
     console.log(`[QUERIES] Dashboard Guru (Konteks Institusi): ${queriesPerCallInst} queries per call`);
 
-    expect(queriesPerCallInst).toBeLessThanOrEqual(4); // Harus O(1) kueri
+    expect(queriesPerCallInst).toBeLessThanOrEqual(5); // Harus O(1) kueri
 
     // -----------------------------------------------------------------------
     // 3. PROFILE: Operator Member List

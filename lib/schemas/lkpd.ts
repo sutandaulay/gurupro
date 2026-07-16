@@ -6,9 +6,13 @@
  * LKPD is designed for STUDENTS (not teachers) - language must be age-appropriate
  * Focuses on 2-3 stages: Memahami (Understand) and/or Mengaplikasi (Apply)
  * Reflection stage is typically done verbally/in journal, not in LKPD
+ *
+ * Updated: 14 Juli 2026 - Character limits dan fallbacks untuk robust output
+ * Reference: docs/ai-generation-standard.md
  */
 
 import { z } from 'zod';
+import { truncateText } from '@/lib/ai/validation-utils';
 
 // ============================================
 // INPUT SCHEMAS (Form Input)
@@ -40,24 +44,40 @@ export type LKPDInput = z.infer<typeof lkpdInputSchema>;
 
 export const aktivitasSchema = z.object({
   nomor: z.number().int().positive(),
-  instruksi: z.string().min(1),
+  instruksi: z.string()
+    .min(1, 'Instruksi wajib diisi')
+    .max(400, 'Instruksi maksimal 400 karakter')
+    .transform(val => truncateText(val, 400)),
   tahap: z.enum(['memahami', 'mengaplikasi']),
   jenisRespon: z.enum(['isian_singkat', 'uraian', 'tabel', 'gambar_diagram', 'checklist']),
-  ruangJawabanBaris: z.number().int().min(1).max(10),
+  ruangJawabanBaris: z.number().int().min(1).max(10).default(3),
 });
 
 export const lkpdOutputSchema = z.object({
   identitas: z.object({
-    mataPelajaran: z.string(),
-    fase: z.string(),
-    topik: z.string(),
-    namaSiswa: z.string().nullable(),
-    kelompok: z.string().nullable(),
+    mataPelajaran: z.string().min(1).default('Tidak tersedia'),
+    fase: z.string().min(1).default('E'),
+    topik: z.string().min(1).default('Tidak ditentukan'),
+    namaSiswa: z.string().nullable().default(null),
+    kelompok: z.string().nullable().default(null),
   }),
-  petunjukPengerjaan: z.array(z.string()).min(2).max(5),
-  tujuanKegiatan: z.string(),
-  aktivitas: z.array(aktivitasSchema).min(2),
-  refleksiSingkat: z.array(z.string()).max(3),
+  petunjukPengerjaan: z.array(
+    z.string()
+      .min(1)
+      .max(150, 'Petunjuk maksimal 150 karakter')
+      .transform(val => truncateText(val, 150))
+  ).min(2, 'Minimal 2 petunjuk').max(5, 'Maksimal 5 petunjuk'),
+  tujuanKegiatan: z.string()
+    .min(1, 'Tujuan kegiatan wajib diisi')
+    .max(300, 'Tujuan kegiatan maksimal 300 karakter')
+    .transform(val => truncateText(val, 300))
+    .catch('Ananda dapat memahami dan menerapkan konsep yang dipelajari.'),
+  aktivitas: z.array(aktivitasSchema).min(2, 'Minimal 2 aktivitas').default([]),
+  refleksiSingkat: z.array(
+    z.string()
+      .max(200, 'Refleksi maksimal 200 karakter')
+      .transform(val => truncateText(val, 200))
+  ).max(3, 'Maksimal 3 pertanyaan refleksi').default([]),
 });
 
 export type LKPDOutput = z.infer<typeof lkpdOutputSchema>;

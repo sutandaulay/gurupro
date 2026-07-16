@@ -22,11 +22,23 @@ const OtpVerifications: CollectionConfig = {
     {
       name: "performanceShareLinkId",
       type: "text",
-      required: true,
+      required: false,
       label: "Share Link",
       admin: {
-        description: "ID share link terkait",
+        description: "ID share link terkait (kosong jika untuk verifikasi akun/reset password)",
       },
+    },
+    {
+      name: "purpose",
+      type: "select",
+      required: true,
+      defaultValue: "document_access",
+      label: "Purpose",
+      options: [
+        { label: "Document Access", value: "document_access" },
+        { label: "Account Verification", value: "account_verification" },
+        { label: "Password Reset", value: "password_reset" },
+      ],
     },
     {
       name: "otpHash",

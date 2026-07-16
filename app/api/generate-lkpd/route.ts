@@ -7,6 +7,7 @@ import { uploadToR2 } from "@/lib/r2";
 import { generateLkpdPdfBuffer, generateLkpdDocBuffer } from "@/lib/doc-compiler";
 import { lkpdOutputSchema, lkpdFormInputSchema } from "@/lib/schemas/lkpd";
 import { z } from "zod";
+import { truncateText } from "@/lib/ai/validation-utils";
 
 // ==========================================
 // LKPD GENERATOR - Lembar Kerja Peserta Didik
@@ -22,9 +23,20 @@ ATURAN WAJIB:
 3. Tiap aktivitas punya jenisRespon yang sesuai isinya — variasikan sesuai kebutuhan (isian singkat untuk fakta, tabel untuk perbandingan, dst).
 4. refleksiSingkat maksimal 3 pertanyaan, singkat dan personal (contoh: "Bagian mana yang paling sulit buatmu? Kenapa?") — bukan pertanyaan formal seperti asesmen.
 5. Jika sumber dari Modul Ajar, SELARASKAN dengan tujuanPembelajaran dan aktivitas inti yang sudah ada di sana — jangan buat LKPD yang temanya melenceng dari Modul Ajar induknya.
-6. Keluarkan HANYA JSON valid sesuai schema, tanpa teks pembuka/penutup/markdown fence.
 
-SKEMA OUTPUT JSON:
+BATASAN PANJANG PER-FIELD (WAJIB DIIKUTI):
+- petunjukPengerjaan (setiap item): MAKSIMAL 150 KARAKTER
+- tujuanKegiatan: MAKSIMAL 300 KARAKTER
+- instruksi aktivitas (setiap item): MAKSIMAL 400 KARAKTER
+- refleksiSingkat (setiap item): MAKSIMAL 200 KARAKTER
+
+LARANGAN FORMAT MARKDOWN DI DALAM JSON VALUE:
+- ❌ Jangan pakai **bold**, *italic*, # heading
+- ❌ Jangan pakai bullet list ( - , * ) di dalam string
+- ❌ Jangan pakai \`code block\` di dalam string
+- ✅ Gunakan plain text biasa saja
+
+OUTPUT JSON SCHEMA:
 {
   "identitas": {
     "mataPelajaran": "string",
@@ -33,19 +45,60 @@ SKEMA OUTPUT JSON:
     "namaSiswa": null,
     "kelompok": null
   },
-  "petunjukPengerjaan": ["string (2-5 items)"],
-  "tujuanKegiatan": "string (paragraf singkat)",
+  "petunjukPengerjaan": ["string (2-5 items, maks 150 karakter per item)"],
+  "tujuanKegiatan": "string (maks 300 karakter)",
   "aktivitas": [
     {
       "nomor": number,
-      "instruksi": "string (jelas, untuk siswa)",
+      "instruksi": "string (jelas, untuk siswa, maks 400 karakter)",
       "tahap": "memahami | mengaplikasi",
       "jenisRespon": "isian_singkat | uraian | tabel | gambar_diagram | checklist",
       "ruangJawabanBaris": number (1-10)
     }
   ],
-  "refleksiSingkat": ["string (1-3 items)"]
-}`;
+  "refleksiSingkat": ["string (1-3 items, maks 200 karakter per item)"]
+}
+
+CONTOH OUTPUT YANG BENAR:
+{
+  "identitas": {
+    "mataPelajaran": "Matematika",
+    "fase": "D",
+    "topik": "Bangun Datar Segitiga",
+    "namaSiswa": null,
+    "kelompok": null
+  },
+  "petunjukPengerjaan": [
+    "Baca soal dengan teliti sebelum menjawab.",
+    "Kerjakan soal yang mudah terlebih dahulu.",
+    "Tulis jawaban di ruang yang tersedia."
+  ],
+  "tujuanKegiatan": "Ananda dapat menghitung luas dan keliling segitiga dengan tepat.",
+  "aktivitas": [
+    {
+      "nomor": 1,
+      "instruksi": "Amati gambar segitiga di bawah. Hitung luasnya dengan rumus L = ½ × alas × tinggi.",
+      "tahap": "memahami",
+      "jenisRespon": "isian_singkat",
+      "ruangJawabanBaris": 2
+    },
+    {
+      "nomor": 2,
+      "instruksi": "Buat soal cerita tentang penerapan segitiga dalam kehidupan sehari-hari, lalu selesaikan.",
+      "tahap": "mengaplikasi",
+      "jenisRespon": "uraian",
+      "ruangJawabanBaris": 5
+    }
+  ],
+  "refleksiSingkat": [
+    "Apa yang sudah kamu pahami dari materi ini?",
+    "Apa yang masih membingungkan?"
+  ]
+}
+
+CATATAN: AI TIDAK SELALU PATUH BATASAN KARAKTER. LAKUKAN TRUNCATE DI LAYER VALIDASI.
+
+Keluarkan HANYA JSON valid sesuai schema, tanpa teks pembuka/penutup/markdown fence.`;
 
 export async function POST(req: Request) {
   try {

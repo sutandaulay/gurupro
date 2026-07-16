@@ -2,13 +2,13 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { RichText } from "@payloadcms/richtext-lexical/react";
-import { getPostBySlug, getPosts } from "@/lib/payload";
+import { getBlogPostBySlug, getBlogPosts } from "@/lib/blog-queries";
 
 export const revalidate = 60;
 
 export async function generateStaticParams() {
-  const posts = await getPosts({ limit: 100 });
-  return posts.docs.map((post: any) => ({ slug: post.slug || post.id }));
+  const posts = await getBlogPosts({ limit: 100 });
+  return posts.map((post) => ({ slug: post.slug || String(post.id) }));
 }
 
 export default async function BlogDetailPage({
@@ -17,7 +17,7 @@ export default async function BlogDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const post = (await getPostBySlug(slug)) as any;
+  const post = await getBlogPostBySlug(slug);
 
   if (!post) {
     notFound();

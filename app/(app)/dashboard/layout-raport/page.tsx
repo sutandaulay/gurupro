@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, startTransition, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import LayoutBuilder from '@/components/raport/LayoutBuilder';
 import type { LayoutSection } from '@/lib/raport/schemas';
@@ -54,7 +54,7 @@ interface SchoolOption {
   npsn: string;
 }
 
-export default function LayoutRaportPage() {
+function LayoutRaportContent() {
   const router = useRouter();
 
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
@@ -139,13 +139,13 @@ export default function LayoutRaportPage() {
         ]);
 
         if (!schoolRes.ok) {
-          router.push('/login');
+          startTransition(() => router.push('/login'));
           return;
         }
 
         const schoolData = await schoolRes.json();
         if (!Array.isArray(schoolData)) {
-          router.push('/login');
+          startTransition(() => router.push('/login'));
           return;
         }
 
@@ -182,7 +182,7 @@ export default function LayoutRaportPage() {
         if (cachedSchools) {
           setIsInitialized(true);
         } else {
-          router.push('/login');
+          startTransition(() => router.push('/login'));
         }
       }
     }
@@ -702,5 +702,17 @@ export default function LayoutRaportPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function LayoutRaportPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <LayoutRaportContent />
+    </Suspense>
   );
 }

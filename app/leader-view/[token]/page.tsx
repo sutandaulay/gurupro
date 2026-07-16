@@ -70,6 +70,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   jurnal_harian: "Jurnal Harian",
   bank_soal: "Bank Soal / Evaluasi",
   lkpd_bahan_ajar: "LKPD / Bahan Ajar",
+  presensi_kinerja: "Laporan Presensi & Kinerja",
 };
 
 export default function LeaderViewPage() {

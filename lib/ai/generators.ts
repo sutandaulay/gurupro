@@ -1,9 +1,13 @@
 /**
  * GuruPRO AI Generator Utilities
  * Fungsi-fungsi untuk generate konten AI
+ *
+ * Updated: 14 Juli 2026 - Truncation and fallback logic
+ * Reference: docs/ai-generation-standard.md
  */
 
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import { truncateText } from './validation-utils';
 
 // Initialize Gemini AI
 const googleAIKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || '';
@@ -119,6 +123,81 @@ export async function generateAIContent<T>(
 }
 
 /**
+ * Enforce Journal output limits - truncate sesuai batas karakter
+ */
+function enforceJournalLimits(data: any): GenerationResult<{
+  materi_pembelajaran: string;
+  tujuan_pembelajaran: string[];
+  aktivitas_pembelajaran: string;
+  media_pembelajaran: string;
+  asesmen_pembelajaran: string;
+  refleksi_guru: string;
+  tindak_lanjut: string;
+}> {
+  if (!data || typeof data !== 'object') {
+    return {
+      success: false,
+      error: 'Invalid journal data',
+      data: {
+        materi_pembelajaran: 'Data tidak tersedia',
+        tujuan_pembelajaran: [],
+        aktivitas_pembelajaran: 'Data tidak tersedia',
+        media_pembelajaran: '-',
+        asesmen_pembelajaran: 'Data tidak tersedia',
+        refleksi_guru: 'Data tidak tersedia',
+        tindak_lanjut: 'Tidak ada tindak lanjut',
+      }
+    };
+  }
+
+  const result = {
+    materi_pembelajaran: truncateText(data.materi_pembelajaran, 255) || 'Data tidak tersedia',
+    tujuan_pembelajaran: Array.isArray(data.tujuan_pembelajaran)
+      ? data.tujuan_pembelajaran.map((tp: string) => truncateText(tp, 150)).slice(0, 5)
+      : [],
+    aktivitas_pembelajaran: truncateText(data.aktivitas_pembelajaran, 500) || 'Data tidak tersedia',
+    media_pembelajaran: truncateText(data.media_pembelajaran, 200) || '-',
+    asesmen_pembelajaran: truncateText(data.asesmen_pembelajaran, 300) || 'Data tidak tersedia',
+    refleksi_guru: truncateText(data.refleksi_guru, 400) || 'Data tidak tersedia',
+    tindak_lanjut: truncateText(data.tindak_lanjut, 300) || 'Tidak ada tindak lanjut',
+  };
+
+  return { success: true, data: result };
+}
+
+/**
+ * Enforce Reflection output limits - truncate sesuai batas karakter
+ */
+function enforceReflectionLimits(data: any): GenerationResult<{
+  berjalan_baik: string;
+  hambatan: string;
+  solusi: string;
+  improvement: string;
+}> {
+  if (!data || typeof data !== 'object') {
+    return {
+      success: false,
+      error: 'Invalid reflection data',
+      data: {
+        berjalan_baik: 'Data tidak tersedia',
+        hambatan: 'Data tidak tersedia',
+        solusi: 'Data tidak tersedia',
+        improvement: 'Data tidak tersedia',
+      }
+    };
+  }
+
+  const result = {
+    berjalan_baik: truncateText(data.berjalan_baik, 300) || 'Data tidak tersedia',
+    hambatan: truncateText(data.hambatan, 300) || 'Data tidak tersedia',
+    solusi: truncateText(data.solusi, 300) || 'Data tidak tersedia',
+    improvement: truncateText(data.improvement, 300) || 'Data tidak tersedia',
+  };
+
+  return { success: true, data: result };
+}
+
+/**
  * Generate Journal with AI
  */
 export async function generateJournal(params: {
@@ -154,7 +233,7 @@ export async function generateJournal(params: {
     jenjang: params.jenjang,
   });
 
-  return generateAIContent(prompt, {
+  const result = await generateAIContent(prompt, {
     materi_pembelajaran: '',
     tujuan_pembelajaran: [],
     aktivitas_pembelajaran: '',
@@ -163,6 +242,14 @@ export async function generateJournal(params: {
     refleksi_guru: '',
     tindak_lanjut: '',
   });
+
+  if (!result.success || !result.data) {
+    return result;
+  }
+
+  // Enforce limits after generation
+  const data = result.data as any;
+  return enforceJournalLimits(data);
 }
 
 /**
@@ -196,12 +283,20 @@ export async function generateReflection(params: {
     catatan: params.catatan,
   });
 
-  return generateAIContent(prompt, {
+  const result = await generateAIContent(prompt, {
     berjalan_baik: '',
     hambatan: '',
     solusi: '',
     improvement: '',
   });
+
+  if (!result.success || !result.data) {
+    return result;
+  }
+
+  // Enforce limits after generation
+  const data = result.data as any;
+  return enforceReflectionLimits(data);
 }
 
 /**

@@ -3,6 +3,30 @@ import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { consumeUserToken, getUserTokenAccess } from "@/lib/token-system";
 import { cookies } from "next/headers";
+import { truncateText } from "@/lib/ai/validation-utils";
+
+/**
+ * Enforce Bank Soal output limits - truncate sesuai batas karakter
+ */
+function enforceSoalLimits(soal: any[]): any[] {
+  if (!Array.isArray(soal)) return [];
+
+  return soal.map((item: any) => ({
+    ...item,
+    pertanyaan: truncateText(item.pertanyaan, 500) || 'Pertanyaan tidak tersedia',
+    opsi: Array.isArray(item.opsi)
+      ? item.opsi.map((o: string) => truncateText(o, 150)).slice(0, 6)
+      : null,
+    kunci: item.kunci,
+    pembahasan: truncateText(item.pembahasan, 300) || null,
+    indikator: truncateText(item.indikator, 200) || null,
+    elemen: truncateText(item.elemen, 150) || null,
+    cp: truncateText(item.cp, 200) || null,
+    tp: truncateText(item.tp, 200) || null,
+    skor: item.skor || 1,
+    gambar: item.gambar ? truncateText(item.gambar, 200) : null,
+  }));
+}
 
 export async function POST(req: Request) {
   try {
@@ -126,27 +150,45 @@ Buatlah kumpulan soal ujian berkualitas tinggi berdasarkan spesifikasi berikut i
 ${visualInstructions}
 
 Output harus berupa JSON murni dengan format schema berikut:
+
+BATASAN PANJANG PER-FIELD (WAJIB DIIKUTI):
+- pertanyaan (per soal): MAKSIMAL 500 KARAKTER
+- opsi (setiap item): MAKSIMAL 150 KARAKTER
+- pembahasan: MAKSIMAL 300 KARAKTER
+- indikator: MAKSIMAL 200 KARAKTER
+- elemen: MAKSIMAL 150 KARAKTER
+- cp: MAKSIMAL 200 KARAKTER
+- tp: MAKSIMAL 200 KARAKTER
+- gambar (deskripsi): MAKSIMAL 200 KARAKTER
+
+LARANGAN FORMAT MARKDOWN DI DALAM JSON VALUE:
+- ❌ Jangan pakai **bold**, *italic*, # heading di dalam string
+- ❌ Jangan pakai bullet list ( - , * ) di dalam string
+- ✅ Gunakan plain text biasa saja
+
+JSON SCHEMA:
 {
   "soal": [
     {
       "nomor": 1,
-      "pertanyaan": "...",
+      "pertanyaan": "string (maks 500 karakter)",
       "tipe": "pg" | "isian" | "essay" | "pg-kompleks" | "bs" | "jodoh" | "urutan" | "tabel" | "sebab-akibat",
       "tingkat": "mudah" | "sedang" | "sulit",
       "kognitif": "C1" | "C2" | "C3" | "C4" | "C5" | "C6",
-      "opsi": ["A...", "B...", "C...", "D..."] | null,
-      "kunci": "..." | ["A", "B", ...] | [{"kunci": "...", "nilai": "..."}],
-      "pembahasan": "...",
-      "indikator": "...",
-      "elemen": "...",
-      "cp": "...",
-      "tp": "...",
+      "opsi": ["A (maks 150 karakter)", "B", "C", "D"] | null,
+      "kunci": "A" | ["A", "C"] | [{"kunci": "...", "nilai": "..."}],
+      "pembahasan": "string (maks 300 karakter) | null",
+      "indikator": "string (maks 200 karakter) | null",
+      "elemen": "string (maks 150 karakter) | null",
+      "cp": "string (maks 200 karakter) | null",
+      "tp": "string (maks 200 karakter) | null",
       "skor": 1 | 2 | 3 | 5,
-      "gambar": "..." | null // berikan deskripsi ilustrasi visual detail untuk text-to-image jika tipe visual (ilustrasi/diagram/mindmap) diaktifkan, jika tidak set null
+      "gambar": "deskripsi visual (maks 200 karakter) | null"
     }
   ]
 }
-`;
+
+CATATAN: AI TIDAK SELALU PATUH BATASAN KARAKTER. LAKUKAN TRUNCATE DI LAYER VALIDASI.`;
 
     // Call universal AI service and parse response before token deduction
     let parsed: any;
@@ -168,7 +210,10 @@ Output harus berupa JSON murni dengan format schema berikut:
         throw new Error("Respons AI tidak memiliki format yang benar (missing soal array)");
       }
 
-      console.log("[Generate Soal] Successfully generated", parsed.soal.length, "questions");
+      // Enforce character limits on all soal
+      parsed.soal = enforceSoalLimits(parsed.soal);
+
+      console.log("[Generate Soal] Successfully generated and validated", parsed.soal.length, "questions");
     } catch (aiError: any) {
       console.error("Generate Soal AI generation failed:", aiError);
       return NextResponse.json({ error: `Gagal memproses AI: ${aiError.message || aiError}` }, { status: 502 });

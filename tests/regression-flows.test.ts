@@ -1,10 +1,14 @@
-/**
- * Integration / Regression Tests for Phase 0 Verification
- * Run: npx vitest run tests/regression-flows.test.ts
- */
-
 import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
-import { query } from "@/lib/db";
+import { pool } from "@/lib/db";
+
+let client: any = null;
+
+async function query(text: string, params?: any[]) {
+  if (!client) {
+    client = await pool.connect();
+  }
+  return client.query(text, params);
+}
 import { POST as registerHandler } from "@/app/api/auth/register/route";
 import { GET as activeContextGet, PUT as activeContextPut } from "@/app/api/auth/active-context/route";
 import { POST as inviteHandler } from "@/app/api/institutions/members/invite/route";
@@ -111,25 +115,26 @@ async function dbCleanup() {
   await query("DELETE FROM skp_tahunan WHERE guru_id IN (SELECT id FROM users WHERE email LIKE 'test-regression-%')");
   await query("DELETE FROM teacher_journals WHERE teacher_id IN (SELECT id FROM users WHERE email LIKE 'test-regression-%')");
   await query("DELETE FROM guru_administrasi WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'test-regression-%')");
-  await query("DELETE FROM institution_members_role WHERE parent_id IN (SELECT id FROM institution_members WHERE app_user_id IN (SELECT id FROM users WHERE email LIKE 'test-regression-%'))");
-  await query("DELETE FROM institution_members_assigned_mapel WHERE _parent_id IN (SELECT id FROM institution_members WHERE app_user_id IN (SELECT id FROM users WHERE email LIKE 'test-regression-%'))");
-  await query("DELETE FROM institution_members_assigned_kelas WHERE _parent_id IN (SELECT id FROM institution_members WHERE app_user_id IN (SELECT id FROM users WHERE email LIKE 'test-regression-%'))");
-  await query("DELETE FROM institution_members WHERE app_user_id IN (SELECT id FROM users WHERE email LIKE 'test-regression-%') OR user_id IN (SELECT id FROM cms_users WHERE email LIKE 'test-regression-%')");
-  await query("DELETE FROM cms_users WHERE email LIKE 'test-regression-%'");
+  await query("DELETE FROM payload.institution_members_role WHERE parent_id IN (SELECT id FROM payload.institution_members WHERE app_user_id IN (SELECT id::varchar FROM users WHERE email LIKE 'test-regression-%'))");
+  await query("DELETE FROM payload.institution_members_assigned_mapel WHERE _parent_id IN (SELECT id FROM payload.institution_members WHERE app_user_id IN (SELECT id::varchar FROM users WHERE email LIKE 'test-regression-%'))");
+  await query("DELETE FROM payload.institution_members_assigned_kelas WHERE _parent_id IN (SELECT id FROM payload.institution_members WHERE app_user_id IN (SELECT id::varchar FROM users WHERE email LIKE 'test-regression-%'))");
+  await query("DELETE FROM payload.institution_members WHERE app_user_id IN (SELECT id::varchar FROM users WHERE email LIKE 'test-regression-%') OR user_id IN (SELECT id FROM payload.cms_users WHERE email LIKE 'test-regression-%')");
+  await query("DELETE FROM payload.cms_users WHERE email LIKE 'test-regression-%'");
   await query("DELETE FROM schools WHERE npsn LIKE 'REG-%'");
   
   // Hapus relasi anggota institusi yang akan dihapus untuk menghindari pelanggaran constraint NOT NULL
-  await query("DELETE FROM institution_members_role WHERE parent_id IN (SELECT id FROM institution_members WHERE institution_id IN (SELECT id FROM institutions WHERE npsn LIKE 'REG-%' OR name LIKE 'Test Regression %'))");
-  await query("DELETE FROM institution_members_assigned_mapel WHERE _parent_id IN (SELECT id FROM institution_members WHERE institution_id IN (SELECT id FROM institutions WHERE npsn LIKE 'REG-%' OR name LIKE 'Test Regression %'))");
-  await query("DELETE FROM institution_members_assigned_kelas WHERE _parent_id IN (SELECT id FROM institution_members WHERE institution_id IN (SELECT id FROM institutions WHERE npsn LIKE 'REG-%' OR name LIKE 'Test Regression %'))");
-  await query("DELETE FROM institution_members WHERE institution_id IN (SELECT id FROM institutions WHERE npsn LIKE 'REG-%' OR name LIKE 'Test Regression %')");
+  await query("DELETE FROM payload.institution_members_role WHERE parent_id IN (SELECT id FROM payload.institution_members WHERE institution_id IN (SELECT id FROM payload.institutions WHERE npsn LIKE 'REG-%' OR name LIKE 'Test Regression %'))");
+  await query("DELETE FROM payload.institution_members_assigned_mapel WHERE _parent_id IN (SELECT id FROM payload.institution_members WHERE institution_id IN (SELECT id FROM payload.institutions WHERE npsn LIKE 'REG-%' OR name LIKE 'Test Regression %'))");
+  await query("DELETE FROM payload.institution_members_assigned_kelas WHERE _parent_id IN (SELECT id FROM payload.institution_members WHERE institution_id IN (SELECT id FROM payload.institutions WHERE npsn LIKE 'REG-%' OR name LIKE 'Test Regression %'))");
+  await query("DELETE FROM payload.institution_members WHERE institution_id IN (SELECT id FROM payload.institutions WHERE npsn LIKE 'REG-%' OR name LIKE 'Test Regression %')");
   
-  await query("DELETE FROM institutions WHERE npsn LIKE 'REG-%' OR name LIKE 'Test Regression %'");
+  await query("DELETE FROM payload.institutions WHERE npsn LIKE 'REG-%' OR name LIKE 'Test Regression %'");
   await query("DELETE FROM users WHERE email LIKE 'test-regression-%'");
 }
 
 describe("Phase 0 - Regression Tests", () => {
   beforeAll(async () => {
+    client = await pool.connect();
     await ensureSkpTablesExist();
   });
 
@@ -140,6 +145,9 @@ describe("Phase 0 - Regression Tests", () => {
 
   afterAll(async () => {
     await dbCleanup();
+    if (client) {
+      client.release();
+    }
   });
 
   // =========================================================================
@@ -151,9 +159,12 @@ describe("Phase 0 - Regression Tests", () => {
       const formData = new FormData();
       formData.append("email", "test-regression-guru-new@example.com");
       formData.append("password", "password123");
-      formData.append("whatsapp", "08999111222");
+      formData.append("confirm_password", "password123");
+      formData.append("whatsapp", "+628999111222");
       formData.append("nama_lengkap", "Guru Baru Test");
       formData.append("username", "guru_baru_test");
+      formData.append("pdp_consent", "on");
+      formData.append("pdp_policy_version", "1.0");
 
       const req = new Request("http://localhost/api/auth/register", {
         method: "POST",
@@ -173,7 +184,7 @@ describe("Phase 0 - Regression Tests", () => {
       const user = userRes.rows[0];
 
       // Akun terdaftar tanpa institusi apapun
-      const membersRes = await query("SELECT * FROM institution_members WHERE app_user_id = $1", [user.id]);
+      const membersRes = await query("SELECT * FROM payload.institution_members WHERE app_user_id = $1", [user.id]);
       expect(membersRes.rows.length).toBe(0);
 
       // Cek mode akun
@@ -273,7 +284,7 @@ describe("Phase 0 - Regression Tests", () => {
     it("Alur Undangan: Invite -> Terima -> Context Switch -> Dokumen Terpisah -> Reject -> Leave", async () => {
       // 1. Setup Data: Institusi, Operator Sekolah, Guru
       const instRes = await query(
-        `INSERT INTO institutions (name, npsn, jenjang, naungan, subscription_tier, status)
+        `INSERT INTO payload.institutions (name, npsn, jenjang, naungan, subscription_tier, status)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
         ["Test Regression Inst A", "REG-0001", "SMP", "Kemendikbud", "premium", "active"]
@@ -283,25 +294,25 @@ describe("Phase 0 - Regression Tests", () => {
       const opRes = await query(
         `INSERT INTO users (email, whatsapp, nama_lengkap)
          VALUES ($1, $2, $3) RETURNING id`,
-        ["test-regression-op@example.com", "08999111999", "Operator Inst A"]
+        ["test-regression-op@example.com", "+628999111999", "Operator Inst A"]
       );
       const op = opRes.rows[0];
 
       const cmsOpRes = await query(
-        `INSERT INTO cms_users (name, email, password, role)
-         VALUES ($1, $2, 'pwd', 'editor') RETURNING id`,
+        `INSERT INTO payload.cms_users (name, email, role, salt, hash)
+         VALUES ($1, $2, 'editor', '', '') RETURNING id`,
         ["Operator Inst A", "test-regression-op@example.com"]
       );
       const cmsOp = cmsOpRes.rows[0];
 
       // Jadikan Operator Aktif di Institusi
       const opMember = await query(
-        `INSERT INTO institution_members (user_id, app_user_id, institution_id, status)
+        `INSERT INTO payload.institution_members (user_id, app_user_id, institution_id, status)
          VALUES ($1, $2, $3, 'active') RETURNING id`,
         [cmsOp.id, op.id, inst.id]
       );
       await query(
-        `INSERT INTO institution_members_role (parent_id, "order", value)
+        `INSERT INTO payload.institution_members_role (parent_id, "order", value)
          VALUES ($1, 0, 'operator')`,
         [opMember.rows[0].id]
       );
@@ -352,7 +363,7 @@ describe("Phase 0 - Regression Tests", () => {
 
       // Ambil ID member undangan
       const memberInvitation = await query(
-        "SELECT id FROM institution_members WHERE app_user_id = $1 AND institution_id = $2 AND status = 'invited'",
+        "SELECT id FROM payload.institution_members WHERE app_user_id = $1 AND institution_id = $2 AND status = 'invited'",
         [guru.id, inst.id]
       );
       expect(memberInvitation.rows.length).toBe(1);
@@ -372,7 +383,7 @@ describe("Phase 0 - Regression Tests", () => {
       expect(acceptRes.status).toBe(200);
 
       // Verifikasi status keanggotaan menjadi active di DB
-      const memberCheck = await query("SELECT status FROM institution_members WHERE id = $1", [memberId]);
+      const memberCheck = await query("SELECT status FROM payload.institution_members WHERE id = $1", [memberId]);
       expect(memberCheck.rows[0].status).toBe("active");
 
       // Verifikasi accountMode menjadi DUAL
@@ -430,7 +441,7 @@ describe("Phase 0 - Regression Tests", () => {
       expect(leaveRes.status).toBe(200);
 
       // Status keanggotaan menjadi left
-      const memberLeftCheck = await query("SELECT status FROM institution_members WHERE id = $1", [memberId]);
+      const memberLeftCheck = await query("SELECT status FROM payload.institution_members WHERE id = $1", [memberId]);
       expect(memberLeftCheck.rows[0].status).toBe("left");
 
       // Coba ubah konteks kembali ke institusi -> harus gagal/403 karena bukan anggota aktif
@@ -451,7 +462,7 @@ describe("Phase 0 - Regression Tests", () => {
     it("Undangan Ditolak (Reject Invite)", async () => {
       // Setup Institusi & Operator
       const instRes = await query(
-        `INSERT INTO institutions (name, npsn, jenjang, naungan, status)
+        `INSERT INTO payload.institutions (name, npsn, jenjang, naungan, status)
          VALUES ($1, $2, $3, $4, $5) RETURNING id`,
         ["Test Regression Inst B", "REG-0002", "SMA", "Kemendikbud", "active"]
       );
@@ -465,17 +476,17 @@ describe("Phase 0 - Regression Tests", () => {
       const opId = opRes.rows[0].id;
 
       const cmsOpRes = await query(
-        `INSERT INTO cms_users (name, email, password)
-         VALUES ('Operator B', 'test-regression-op2@example.com', 'pwd') RETURNING id`
+        `INSERT INTO payload.cms_users (name, email, role, salt, hash)
+         VALUES ('Operator B', 'test-regression-op2@example.com', 'editor', '', '') RETURNING id`
       );
       const cmsOpId = cmsOpRes.rows[0].id;
 
       const opMember = await query(
-        `INSERT INTO institution_members (user_id, app_user_id, institution_id, status)
+        `INSERT INTO payload.institution_members (user_id, app_user_id, institution_id, status)
          VALUES ($1, $2, $3, 'active') RETURNING id`,
         [cmsOpId, opId, instId]
       );
-      await query(`INSERT INTO institution_members_role (parent_id, "order", value) VALUES ($1, 0, 'operator')`, [opMember.rows[0].id]);
+      await query(`INSERT INTO payload.institution_members_role (parent_id, "order", value) VALUES ($1, 0, 'operator')`, [opMember.rows[0].id]);
 
       // Setup Guru
       const guruRes = await query(
@@ -502,7 +513,7 @@ describe("Phase 0 - Regression Tests", () => {
       await inviteHandler(inviteReq as any);
 
       const memberInv = await query(
-        "SELECT id FROM institution_members WHERE app_user_id = $1 AND institution_id = $2 AND status = 'invited'",
+        "SELECT id FROM payload.institution_members WHERE app_user_id = $1 AND institution_id = $2 AND status = 'invited'",
         [guruId, instId]
       );
       const memberId = memberInv.rows[0].id;
@@ -518,7 +529,7 @@ describe("Phase 0 - Regression Tests", () => {
       expect(rejectRes.status).toBe(200);
 
       // Verifikasi status ditolak di DB
-      const memberRejCheck = await query("SELECT status FROM institution_members WHERE id = $1", [memberId]);
+      const memberRejCheck = await query("SELECT status FROM payload.institution_members WHERE id = $1", [memberId]);
       expect(memberRejCheck.rows[0].status).toBe("rejected");
     });
   });
@@ -552,7 +563,7 @@ describe("Phase 0 - Regression Tests", () => {
     it("2. Operator Inst A ditolak (403/404) ketika mencoba reset password Guru di Inst B", async () => {
       // 1. Setup Inst A & Operator A
       const instARes = await query(
-        `INSERT INTO institutions (name, npsn, jenjang, naungan, status)
+        `INSERT INTO payload.institutions (name, npsn, jenjang, naungan, status)
          VALUES ($1, $2, $3, $4, $5) RETURNING id`,
         ["Test Regression Inst A", "REG-000A", "SMP", "Kemendikbud", "active"]
       );
@@ -566,21 +577,21 @@ describe("Phase 0 - Regression Tests", () => {
       const opAId = opARes.rows[0].id;
 
       const cmsOpARes = await query(
-        `INSERT INTO cms_users (name, email, password)
-         VALUES ('Operator A', 'test-regression-op-a@example.com', 'pwd') RETURNING id`
+        `INSERT INTO payload.cms_users (name, email, role, salt, hash)
+         VALUES ('Operator A', 'test-regression-op-a@example.com', 'editor', '', '') RETURNING id`
       );
       const cmsOpAId = cmsOpARes.rows[0].id;
 
       const opAMember = await query(
-        `INSERT INTO institution_members (user_id, app_user_id, institution_id, status)
+        `INSERT INTO payload.institution_members (user_id, app_user_id, institution_id, status)
          VALUES ($1, $2, $3, 'active') RETURNING id`,
         [cmsOpAId, opAId, instAId]
       );
-      await query(`INSERT INTO institution_members_role (parent_id, "order", value) VALUES ($1, 0, 'operator')`, [opAMember.rows[0].id]);
+      await query(`INSERT INTO payload.institution_members_role (parent_id, "order", value) VALUES ($1, 0, 'operator')`, [opAMember.rows[0].id]);
 
       // 2. Setup Inst B & Guru B
       const instBRes = await query(
-        `INSERT INTO institutions (name, npsn, jenjang, naungan, status)
+        `INSERT INTO payload.institutions (name, npsn, jenjang, naungan, status)
          VALUES ($1, $2, $3, $4, $5) RETURNING id`,
         ["Test Regression Inst B", "REG-000B", "SMP", "Kemendikbud", "active"]
       );
@@ -594,13 +605,13 @@ describe("Phase 0 - Regression Tests", () => {
       const guruBId = guruBRes.rows[0].id;
 
       const cmsGuruBRes = await query(
-        `INSERT INTO cms_users (name, email, password)
-         VALUES ('Guru B', 'test-regression-guru-b@example.com', 'pwd') RETURNING id`
+        `INSERT INTO payload.cms_users (name, email, role, salt, hash)
+         VALUES ('Guru B', 'test-regression-guru-b@example.com', 'editor', '', '') RETURNING id`
       );
       const cmsGuruBId = cmsGuruBRes.rows[0].id;
 
       const guruBMember = await query(
-        `INSERT INTO institution_members (user_id, app_user_id, institution_id, status)
+        `INSERT INTO payload.institution_members (user_id, app_user_id, institution_id, status)
          VALUES ($1, $2, $3, 'active') RETURNING id`,
         [cmsGuruBId, guruBId, instBId]
       );
@@ -643,7 +654,7 @@ describe("Phase 0 - Regression Tests", () => {
     it("3. Bendahara ditolak (403) saat menyetujui dokumen SKP", async () => {
       // 1. Setup Inst, Bendahara, Guru, Sekolah, SKP
       const instRes = await query(
-        `INSERT INTO institutions (name, npsn, jenjang, naungan, status)
+        `INSERT INTO payload.institutions (name, npsn, jenjang, naungan, status)
          VALUES ($1, $2, $3, $4, $5) RETURNING id`,
         ["Test Regression Inst C", "REG-000C", "SMP", "Kemendikbud", "active"]
       );
@@ -663,17 +674,17 @@ describe("Phase 0 - Regression Tests", () => {
       const bendaharaId = bendaharaRes.rows[0].id;
 
       const cmsBendaharaRes = await query(
-        `INSERT INTO cms_users (name, email, password)
-         VALUES ('Bendahara C', 'test-regression-bendahara@example.com', 'pwd') RETURNING id`
+        `INSERT INTO payload.cms_users (name, email, role, salt, hash)
+         VALUES ('Bendahara C', 'test-regression-bendahara@example.com', 'editor', '', '') RETURNING id`
       );
       const cmsBendaharaId = cmsBendaharaRes.rows[0].id;
 
       const bendaharaMember = await query(
-        `INSERT INTO institution_members (user_id, app_user_id, institution_id, status)
+        `INSERT INTO payload.institution_members (user_id, app_user_id, institution_id, status)
          VALUES ($1, $2, $3, 'active') RETURNING id`,
         [cmsBendaharaId, bendaharaId, instId]
       );
-      await query(`INSERT INTO institution_members_role (parent_id, "order", value) VALUES ($1, 0, 'bendahara')`, [bendaharaMember.rows[0].id]);
+      await query(`INSERT INTO payload.institution_members_role (parent_id, "order", value) VALUES ($1, 0, 'bendahara')`, [bendaharaMember.rows[0].id]);
 
       // Setup Guru
       const guruRes = await query(

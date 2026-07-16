@@ -1,10 +1,13 @@
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+ 
 /**
  * Utility functions
  */
 
-// Class name merger (like clsx but simpler)
-export function cn(...classes: (string | boolean | undefined | null)[]): string {
-  return classes.filter(Boolean).join(' ')
+// Class name merger (using clsx and tailwind-merge like shadcn/ui)
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
 }
 
 // Format date to Indonesian locale

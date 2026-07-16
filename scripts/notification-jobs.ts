@@ -5,6 +5,12 @@ import { sendWhatsAppNotification, sendEmailNotification } from "../lib/notifica
 import { SHARE_LINK_DEFAULT_EXPIRY_DAYS } from "../collections/config";
 import { query } from "../lib/db";
 
+// Get app URL with fallback
+function getAppUrl(): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://gurupro.id";
+  return appUrl.replace(/\/$/, "");
+}
+
 const FREQUENCY_MAP: Record<string, number> = {
   daily: 1,
   weekly: 7,
@@ -166,7 +172,7 @@ export async function runScheduledNotifications() {
         },
       });
 
-      const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/leader-view/${shareToken}`;
+      const shareUrl = `${getAppUrl()}/leader-view/${shareToken}`;
       const leaderName = (contact as any).leaderName || "Pimpinan";
       const shareMessage = generateShareMessage(leaderName, "Guru", shareUrl);
 

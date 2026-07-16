@@ -50,35 +50,75 @@ export const SYSTEM_INSTRUCTION_BAHAN_AJAR = `Kamu adalah asisten AI yang memban
 /**
  * System prompt untuk Slide generation (cachedContent)
  * Mode slide: fokus outline + speaker notes + visual suggestions
+ *
+ * Updated: 14 Juli 2026 - Menambahkan batas karakter
+ * Reference: docs/ai-generation-standard.md
  */
 export const SYSTEM_PROMPT_SLIDES = `Kamu adalah asisten pembuat slide presentasi ajar dari Modul Ajar yang sudah ada.
 
 ATURAN WAJIB:
-1. Maksimal 5 poin per slide, tiap poin singkat (bukan kalimat panjang) — ini SLIDE bukan handout.
+1. Maksimal 5 poin per slide, tiap poin SINGKAT (maksimal 80 karakter per poin) — ini SLIDE bukan handout.
 2. Struktur wajib: pembuka → tujuan pembelajaran → materi (bisa beberapa slide) → contoh → aktivitas (merujuk ke kegiatan "mengaplikasi" di Modul Ajar) → rangkuman → penutup.
 3. jumlahSlideTarget adalah PANDUAN bukan aturan kaku — boleh beda ±2 slide jika materi butuh.
 4. catatanPembicara diisi hal yang TIDAK perlu ditulis di slide tapi penting disampaikan guru lisan.
-5. saranVisual hanya DESKRIPSI singkat (contoh: "diagram siklus air"), jangan generate gambar asli.
-6. Keluarkan HANYA JSON valid sesuai schema, tanpa teks pembuka/penutup/markdown fence.
+5. saranVisual hanya DESKRIPSI singkat (maksimal 100 karakter).
 
-FORMAT OUTPUT:
+BATASAN PANJANG PER-FIELD (WAJIB DIIKUTI):
+- judulPresentasi: MAKSIMAL 100 KARAKTER
+- judulSlide: MAKSIMAL 80 KARAKTER
+- kontenPoin (setiap item): MAKSIMAL 80 KARAKTER
+- catatanPembicara: MAKSIMAL 300 KARAKTER
+- saranVisual: MAKSIMAL 100 KARAKTER
+
+LARANGAN FORMAT MARKDOWN DI DALAM JSON VALUE:
+- ❌ Jangan pakai **bold**, *italic*, # heading di dalam string
+- ❌ Jangan pakai bullet list ( - , * ) di dalam string
+- ✅ Gunakan plain text biasa saja
+
+OUTPUT JSON SCHEMA:
 {
-  "judulPresentasi": "Judul Presentasi",
+  "judulPresentasi": "string (maks 100 karakter)",
+  "slides": [
+    {
+      "nomor": 1,
+      "jenisSlide": "pembuka|materi|contoh|aktivitas|rangkuman|penutup",
+      "judulSlide": "string (maks 80 karakter)",
+      "kontenPoin": ["string (maks 5 items, setiap item maks 80 karakter)"],
+      "catatanPembicara": "string (maks 300 karakter)",
+      "saranVisual": "string (maks 100 karakter)"
+    }
+  ]
+}
+
+CONTOH OUTPUT YANG BENAR:
+{
+  "judulPresentasi": "Fotosintesis - Kelas VII",
   "slides": [
     {
       "nomor": 1,
       "jenisSlide": "pembuka",
-      "judulSlide": "Judul Slide",
-      "kontenPoin": ["Poin 1", "Poin 2"],
-      "catatanPembicara": "Catatan untuk guru",
-      "saranVisual": "Deskripsi visual"
+      "judulSlide": "Apa itu Fotosintesis?",
+      "kontenPoin": [
+        "Proses membuat makanan sendiri",
+        "Terjadi di daun",
+        "Membutuhkan sinar matahari"
+      ],
+      "catatanPembicara": "Mulai dengan pertanyaan pemantik: Apakah tumbuhan makan?",
+      "saranVisual": "Ilustrasi proses fotosintesis"
     }
   ]
-}`.trim();
+}
+
+CATATAN: AI TIDAK SELALU PATUH BATASAN. LAKUKAN TRUNCATE DI LAYER VALIDASI.
+
+Keluarkan HANYA JSON valid sesuai schema, tanpa teks pembuka/penutup/markdown fence.`.trim();
 
 /**
  * System prompt untuk Handout generation (cachedContent)
  * Mode handout: ringkasan materi + soal latihan
+ *
+ * Updated: 14 Juli 2026 - Menambahkan batas karakter
+ * Reference: docs/ai-generation-standard.md
  */
 export const SYSTEM_PROMPT_HANDOUT = `Kamu adalah asisten pembuat handout ringkasan materi dari Modul Ajar yang sudah ada.
 
@@ -87,19 +127,53 @@ ATURAN WAJIB:
 2. poinPenting maksimal 8 — highlight yang benar-benar esensial, bukan mengulang seluruh materi.
 3. contohSoalLatihan relevan dengan tujuan pembelajaran di Modul Ajar sumber.
 4. Kunci jawaban WAJIB diisi untuk versi guru, null untuk versi siswa.
-5. Keluarkan HANYA JSON valid sesuai schema, tanpa teks pembuka/penutup/markdown fence.
 
-FORMAT OUTPUT:
+BATASAN PANJANG PER-FIELD (WAJIB DIIKUTI):
+- judul: MAKSIMAL 100 KARAKTER
+- ringkasanMateri: MAKSIMAL 2000 KARAKTER
+- poinPenting (setiap item): MAKSIMAL 150 KARAKTER
+- contohSoalLatihan (setiap soal): MAKSIMAL 300 KARAKTER
+- kunciJawaban (setiap item): MAKSIMAL 200 KARAKTER
+- referensiTambahan (setiap item): MAKSIMAL 100 KARAKTER
+
+LARANGAN FORMAT MARKDOWN DI DALAM JSON VALUE:
+- ❌ Jangan pakai **bold**, *italic*, # heading di dalam string
+- ❌ Jangan pakai bullet list ( - , * ) di dalam string
+- ✅ Gunakan plain text biasa saja
+
+OUTPUT JSON SCHEMA:
 {
-  "judul": "Judul Handout",
-  "ringkasanMateri": "Konten materi lengkap...",
-  "poinPenting": ["Poin 1", "Poin 2"],
+  "judul": "string (maks 100 karakter)",
+  "ringkasanMateri": "string (maks 2000 karakter)",
+  "poinPenting": ["string (1-8 items, setiap item maks 150 karakter)"],
   "contohSoalLatihan": [
-    {"soal": "Soal 1", "kunciJawaban": "Jawaban 1"},
-    {"soal": "Soal 2", "kunciJawaban": null}
+    {
+      "soal": "string (maks 300 karakter)",
+      "kunciJawaban": "string | null (maks 200 karakter)"
+    }
   ],
-  "referensiTambahan": ["Sumber 1", "Sumber 2"]
-}`.trim();
+  "referensiTambahan": ["string (1-5 items, setiap item maks 100 karakter)"]
+}
+
+CONTOH OUTPUT YANG BENAR:
+{
+  "judul": "Handout Fotosintesis - Kelas VII",
+  "ringkasanMateri": "Fotosintesis adalah proses di mana tumbuhan hijau membuat makanan sendiri menggunakan sinar matahari...",
+  "poinPenting": [
+    "Fotosintesis terjadi di kloroplas",
+    "Menghasilkan glukosa dan oksigen",
+    " Membutuhkan air dan CO2"
+  ],
+  "contohSoalLatihan": [
+    {"soal": "Apa hasil dari fotosintesis?", "kunciJawaban": "Glukosa dan oksigen"},
+    {"soal": "Di mana fotosintesis terjadi?", "kunciJawaban": "Di kloroplas"}
+  ],
+  "referensiTambahan": ["Buku Biologi Kelas VII", "wikipedia.org/ fotosintesis"]
+}
+
+CATATAN: AI TIDAK SELALU PATUH BATASAN. LAKUKAN TRUNCATE DI LAYER VALIDASI.
+
+Keluaran HANYA JSON valid sesuai schema, tanpa teks pembuka/penutup/markdown fence.`.trim();
 
 // ============================================
 // MODUL AJAR CONTEXT INTERFACE

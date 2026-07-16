@@ -26,6 +26,11 @@ export const ALLOWED_DOCUMENT_CATEGORIES = [
     label: "LKPD / Bahan Ajar",
     description: "Lembar Kerja Peserta Didik dan Bahan Ajar",
   },
+  {
+    value: "presensi_kinerja",
+    label: "Laporan Presensi & Kinerja",
+    description: "Laporan kehadiran dan kinerja mengajar mingguan",
+  },
 ] as const;
 
 export const DOCUMENT_CATEGORY_BLOCKED_KEYWORDS = [

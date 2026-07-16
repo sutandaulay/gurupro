@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, startTransition, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -64,7 +64,7 @@ interface ClassOption {
   nama_kelas: string;
 }
 
-export default function RaportStatusPage() {
+function RaportStatusContent() {
   const router = useRouter();
 
   const [raports, setRaports] = useState<RaportStatus[]>([]);
@@ -109,7 +109,7 @@ export default function RaportStatusPage() {
         const data = await res.json();
 
         if (!res.ok || !Array.isArray(data)) {
-          router.push('/login');
+          startTransition(() => router.push('/login'));
           return;
         }
 
@@ -139,7 +139,7 @@ export default function RaportStatusPage() {
         if (cachedSchools) {
           setIsInitialized(true);
         } else {
-          router.push('/login');
+          startTransition(() => router.push('/login'));
         }
       }
     }
@@ -516,5 +516,17 @@ export default function RaportStatusPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function RaportStatusPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <RaportStatusContent />
+    </Suspense>
   );
 }

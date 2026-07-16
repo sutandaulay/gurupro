@@ -1,8 +1,9 @@
 import { pool, query } from "./db";
+import { sendInAppNotification } from "./institution-members";
 
 export type TokenAccessResult = {
   allowed: boolean;
-  reason?: "token_habis" | "subscription_expired" | "ok" | "user_not_found";
+  reason?: "token_habis" | "subscription_expired" | "ok" | "user_not_found" | "token_low";
   remainingTokens?: number;
 };
 
@@ -107,7 +108,26 @@ export async function consumeUserToken(userId: string, amount = 1) {
 
     await client.query("UPDATE users SET token_limit = $1, addon_token_balance = $2 WHERE id = $3", [nextMain, nextAddon, userId]);
     await client.query("COMMIT");
-    return nextMain + nextAddon;
+
+    // Check if tokens are now low (<= 5) and send in-app notification
+    const newTotal = nextMain + nextAddon;
+    if (newTotal <= 5 && newTotal >= 0) {
+      try {
+        await sendInAppNotification(
+          userId,
+          "⚠️ Kuota Token Menipis!",
+          `Sisa token Anda tinggal ${newTotal}. Pertimbangkan untuk melakukan top-up agar tidak terganggu aktivitas.`,
+          "token_low",
+          "token_balance",
+          null
+        );
+        console.log(`[TokenSystem] Sent low token warning to user ${userId}`);
+      } catch (notifErr) {
+        console.error("[TokenSystem] Failed to send low token notification:", notifErr);
+      }
+    }
+
+    return newTotal;
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

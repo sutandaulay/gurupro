@@ -140,6 +140,43 @@ const generateId = () => typeof crypto !== 'undefined' && crypto.randomUUID ? cr
 function DashboardContent() {
   const router = useRouter();
   const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const isMobile = window.innerWidth < 768;
+      let initialOpen = true;
+      if (isMobile) {
+        initialOpen = false;
+      } else {
+        const saved = localStorage.getItem("gurupro_sidebar_open");
+        if (saved !== null) {
+          initialOpen = saved === "true";
+        }
+      }
+      setIsSidebarOpen(initialOpen);
+
+      const handleSidebarToggle = (e: any) => {
+        setIsSidebarOpen(e.detail);
+      };
+      
+      const handleResize = () => {
+        if (window.innerWidth < 768) {
+          setIsSidebarOpen(false);
+        } else {
+          const saved = localStorage.getItem("gurupro_sidebar_open");
+          setIsSidebarOpen(saved === null ? true : saved === "true");
+        }
+      };
+
+      window.addEventListener("gurupro_sidebar_toggled", handleSidebarToggle);
+      window.addEventListener("resize", handleResize);
+      return () => {
+        window.removeEventListener("gurupro_sidebar_toggled", handleSidebarToggle);
+        window.removeEventListener("resize", handleResize);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -821,17 +858,30 @@ function DashboardContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schedulers, schedules, notifiedScheduleIds]);
 
-  // Listen for module switch events from FloatingActionButton (always active)
+  // Listen for module switch events (always active)
   useEffect(() => {
     const handleSwitchModule = (e: Event) => {
       const customEvent = e as CustomEvent;
       const module = customEvent.detail?.module;
+      console.log("[page.tsx] handleSwitchModule custom event received:", module);
       if (module) {
         setCurrentModule(module as any);
       }
     };
+    const handleSwitchFinanceTab = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const tab = customEvent.detail?.tab;
+      console.log("[page.tsx] handleSwitchFinanceTab custom event received:", tab);
+      if (tab) {
+        setActiveFinanceTab(tab as any);
+      }
+    };
     window.addEventListener('switchModule', handleSwitchModule);
-    return () => window.removeEventListener('switchModule', handleSwitchModule);
+    window.addEventListener('switchFinanceTab', handleSwitchFinanceTab);
+    return () => {
+      window.removeEventListener('switchModule', handleSwitchModule);
+      window.removeEventListener('switchFinanceTab', handleSwitchFinanceTab);
+    };
   }, []);
 
   const searchParams = useSearchParams();
@@ -839,11 +889,36 @@ function DashboardContent() {
   // Handle module param from URL (works even when navigating on same page)
   useEffect(() => {
     const moduleParam = searchParams.get("module");
-    const validModules = ["nilai", "administrasi", "soal", "sekolah", "keuangan", "pengembangan", "laporan", "peserta_didik", "perencanaan", "komunikasi", "presensi", "ekstrakurikuler", "rencana_penilaian"];
+    console.log("[page.tsx] searchParams useEffect triggered, moduleParam:", moduleParam);
+    const validModules = [
+      "soal",
+      "administrasi",
+      "jurnal",
+      "keuangan",
+      "profil",
+      "sekolah",
+      "nilai",
+      "kalender",
+      "supervisi_analitik",
+      "tugas_harian",
+      "storage_saya",
+      "scheduler"
+    ];
     if (moduleParam && validModules.includes(moduleParam)) {
       setCurrentModule(moduleParam as any);
+      
+      // Handle active sub-tab for keuangan if specified
+      const tabParam = searchParams.get("tab");
+      if (moduleParam === "keuangan" && tabParam) {
+        const validFinanceTabs = ["arus_kas", "tabungan", "investasi", "analisis"];
+        if (validFinanceTabs.includes(tabParam)) {
+          setActiveFinanceTab(tabParam as any);
+        }
+      }
+
       const url = new URL(window.location.href);
       url.searchParams.delete("module");
+      url.searchParams.delete("tab");
       window.history.replaceState({}, "", url.pathname + url.search);
     }
   }, [searchParams]);
@@ -2619,10 +2694,18 @@ function DashboardContent() {
         const data = await response.json();
         setCurrentUser(data);
         useProfileStore.getState().setProfile(data);
-        
+
         // 2. Update background cache
         if (typeof window !== "undefined") {
           localStorage.setItem("gurupro_cached_profile", JSON.stringify(data));
+        }
+      } else if (response.status === 404 || response.status === 401) {
+        // Session invalid - just clear local cache, don't redirect
+        // Let the page continue with empty/default state
+        console.warn("Session invalid, clearing cache...");
+        useProfileStore.getState().clearProfile();
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("gurupro_cached_profile");
         }
       } else {
         const text = await response.text().catch(() => "");
@@ -9514,71 +9597,79 @@ const renderJurnalModule = () => {
         </div>
 
         {/* Module Navigation Tabs */}
-        <nav className="flex flex-wrap items-center justify-center bg-slate-100 p-1.5 rounded-2xl gap-0.5">
-          {[
-             ...(currentUser?.role === 'admin' || currentUser?.role === 'operator' || currentUser?.role === 'guru' || currentUser?.role === 'kepala_sekolah' || !currentUser?.role ? [
-              { id: "sekolah", label: "🏫 Master Data", icon: "" }
-            ] : []),
-            ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
-              { id: "soal", label: "📝 Buat Soal AI", icon: "" }
-            ] : []),
-            ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
-              { id: "administrasi", label: "📚 RPP / Silabus", icon: "" }
-            ] : []),
-            ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || currentUser?.role === 'kepala_sekolah' || !currentUser?.role ? [
-              { id: "jurnal", label: "📓 Jurnal & Ceklis", icon: "" }
-            ] : []),
-            ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
-              { id: "nilai", label: "📊 Buku Nilai", icon: "" }
-            ] : []),
-            ...(currentUser?.role === 'admin' || currentUser?.role === 'operator' ? [
-              { id: "kalender", label: "📅 Kalender", icon: "" }
-            ] : []),
-            ...(currentUser?.role === 'admin' || currentUser?.role === 'kepala_sekolah' || currentUser?.role === 'pengawas' ? [
-              { id: "supervisi_analitik", label: "🛡️ Supervisi & Analitik", icon: "" }
-            ] : []),
-            ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
-              { id: "keuangan", label: "💰 Keuangan", icon: "" }
-            ] : []),
-            { id: "tugas_harian", label: "⚡ Tugas Harian", icon: "" },
-            { id: "storage_saya", label: "📂 Storage Saya", icon: "" },
-            { id: "scheduler", label: "⏰ Pengingat", icon: "" },
-            { id: "profil", label: "👤 Profil", icon: "", isLink: true, href: "/profile" },
-            { id: "laporan_harian", label: "📋 Laporan Harian", icon: "", isLink: true, href: "/dashboard/laporan-harian" },
-            { id: "laporan_kinerja", label: "📋 Laporan Kinerja", icon: "", isLink: true, href: "/dashboard/laporan-kinerja" },
-            { id: "pengembangan_diri", label: "🎓 Pengembangan Diri", icon: "", isLink: true, href: "/dashboard/pengembangan-diri" },
-            { id: "rapor", label: "📑 Status Raport", icon: "", isLink: true, href: "/dashboard/raport-status" },
-          ].map((tab) => {
-            const isActive = currentModule === tab.id;
-            const cls = `px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-              isActive
-                ? "bg-white text-indigo-600 shadow-sm"
-                : "text-slate-500 hover:text-slate-800"
-            }`;
-            if (tab.isLink) {
+        {!isSidebarOpen && (
+          <nav className="flex flex-wrap items-center justify-center bg-slate-100 p-1.5 rounded-2xl gap-0.5 animate-fade-in no-print">
+            {[
+               ...(currentUser?.role === 'admin' || currentUser?.role === 'operator' || currentUser?.role === 'guru' || currentUser?.role === 'kepala_sekolah' || !currentUser?.role ? [
+                { id: "sekolah", label: "🏫 Master Data", icon: "" }
+              ] : []),
+              ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
+                { id: "soal", label: "📝 Buat Soal AI", icon: "" }
+              ] : []),
+              ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
+                { id: "administrasi", label: "📚 RPP / Silabus", icon: "" }
+              ] : []),
+              { id: "presensi", label: "⏱️ Presensi", icon: "", isLink: true, href: "/attendance" },
+              ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || currentUser?.role === 'kepala_sekolah' || !currentUser?.role ? [
+                { id: "jurnal", label: "📓 Jurnal & Ceklis", icon: "" }
+              ] : []),
+              ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
+                { id: "nilai", label: "📊 Buku Nilai", icon: "" }
+              ] : []),
+              ...(currentUser?.role === 'admin' || currentUser?.role === 'operator' ? [
+                { id: "kalender", label: "📅 Kalender", icon: "" }
+              ] : []),
+              ...(currentUser?.role === 'admin' || currentUser?.role === 'kepala_sekolah' || currentUser?.role === 'pengawas' ? [
+                { id: "supervisi_analitik", label: "🛡️ Supervisi & Analitik", icon: "" }
+              ] : []),
+              ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
+                { id: "keuangan", label: "💰 Keuangan", icon: "" }
+              ] : []),
+              { id: "tugas_harian", label: "⚡ Tugas Harian", icon: "" },
+              { id: "storage_saya", label: "📂 Storage Saya", icon: "", isLink: true, href: "/dashboard/brankas" },
+              { id: "scheduler", label: "⏰ Pengingat", icon: "" },
+              { id: "profil", label: "👤 Profil", icon: "", isLink: true, href: "/profile" },
+              { id: "laporan_harian", label: "📋 Laporan Harian", icon: "", isLink: true, href: "/dashboard/laporan-harian" },
+              { id: "laporan_kinerja", label: "📋 Laporan Kinerja", icon: "", isLink: true, href: "/dashboard/laporan-kinerja" },
+              { id: "pengembangan_diri", label: "🎓 Pengembangan Diri", icon: "", isLink: true, href: "/dashboard/pengembangan-diri" },
+              { id: "rapor", label: "📑 Status Raport", icon: "", isLink: true, href: "/dashboard/raport-status" },
+              { id: "wali_kelas", label: "👥 Wali Kelas", icon: "", isLink: true, href: "/dashboard/wali-kelas" },
+              { id: "pembina_ekskul", label: "🏅 Pembina Eskul", icon: "", isLink: true, href: "/dashboard/pembina-ekskul" },
+              { id: "institusi", label: "🏛️ Institusi", icon: "", isLink: true, href: "/dashboard/institution" },
+              { id: "pengaturan", label: "⚙️ Pengaturan", icon: "", isLink: true, href: "/settings" },
+              { id: "billing", label: "💳 Billing", icon: "", isLink: true, href: "/dashboard/billing" },
+            ].map((tab) => {
+              const isActive = currentModule === tab.id;
+              const cls = `px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                isActive
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-800"
+              }`;
+              if (tab.isLink) {
+                return (
+                  <Link
+                    key={tab.id}
+                    href={tab.href || "#"}
+                    className={cls}
+                  >
+                    <span>{tab.icon}</span>
+                    <span>{tab.label}</span>
+                  </Link>
+                );
+              }
               return (
-                <Link
+                <button
                   key={tab.id}
-                  href={tab.href || "#"}
+                  onClick={() => setCurrentModule(tab.id as any)}
                   className={cls}
                 >
                   <span>{tab.icon}</span>
                   <span>{tab.label}</span>
-                </Link>
+                </button>
               );
-            }
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setCurrentModule(tab.id as any)}
-                className={cls}
-              >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+            })}
+          </nav>
+        )}
 
 
       </header>

@@ -19,6 +19,13 @@
 
 import { pool, query } from "@/lib/db";
 
+// Get app URL with fallback
+function getAppUrl(): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://gurupro.id";
+  return appUrl.replace(/\/$/, "");
+}
+import { sendWhatsAppNotification, sendEmailNotification } from "../lib/notifications";
+
 const DEFAULT_GRACE_PERIOD_DAYS = 7;
 
 interface UserTierInfo {
@@ -182,8 +189,127 @@ export async function resetMonthlyTokens(): Promise<{ processed: number; errors:
  * - subscription_status = 'locked'
  * - addon_token_balance = 0 (token eceran hangus)
  */
+/**
+ * Check and send warnings (WhatsApp & Email) for users whose subscriptions end in 3 days or 1 day.
+ */
+export async function sendSubscriptionWarnings(): Promise<{ sent: number; errors: number }> {
+  console.log("[CRON] Checking for approaching subscription expirations...");
+  const result = { sent: 0, errors: 0 };
+  const appUrl = getAppUrl();
+
+  try {
+    const usersRes = await query(`
+      SELECT
+        id,
+        email,
+        whatsapp,
+        nama_lengkap,
+        subscription_end,
+        last_expiry_warning_sent
+      FROM users
+      WHERE is_active = true
+        AND status_langganan IS NOT NULL
+        AND status_langganan != 'free'
+        AND (subscription_status = 'active' OR subscription_status IS NULL)
+        AND subscription_end > NOW()
+        AND subscription_end <= NOW() + INTERVAL '3 days'
+    `);
+
+    console.log(`[CRON] Found ${usersRes.rows.length} users with ending subscriptions in 3-day window`);
+
+    for (const user of usersRes.rows) {
+      try {
+        const now = new Date();
+        const subEnd = new Date(user.subscription_end);
+        const msDiff = subEnd.getTime() - now.getTime();
+        const hoursRemaining = msDiff / (1000 * 60 * 60);
+
+        let warningLevel: "h1" | "h3" | null = null;
+
+        if (hoursRemaining <= 24) {
+          if (user.last_expiry_warning_sent !== "h1") {
+            warningLevel = "h1";
+          }
+        } else if (hoursRemaining <= 72) {
+          if (user.last_expiry_warning_sent !== "h3" && user.last_expiry_warning_sent !== "h1") {
+            warningLevel = "h3";
+          }
+        }
+
+        if (!warningLevel) {
+          continue; // Warning already sent for this level or not within timeframe
+        }
+
+        const daysLeftText = warningLevel === "h1" ? "1 hari" : "3 hari";
+        const formattedEndDate = subEnd.toLocaleDateString("id-ID", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
+
+        // 1. Send WhatsApp Notification
+        if (user.whatsapp) {
+          const waMessage = `[PENTING] Masa Langganan GuruPRO Segera Berakhir!
+
+Yth. Guru *${user.nama_lengkap}*,
+
+Masa aktif paket berlangganan GuruPRO Anda akan berakhir dalam *${daysLeftText}* (pada *${formattedEndDate}*).
+
+Silakan lakukan perpanjangan paket melalui halaman Billing akun Anda untuk tetap menggunakan generator AI GuruPRO tanpa terputus.
+
+Perpanjang di: ${appUrl}/dashboard/billing`;
+
+          await sendWhatsAppNotification(user.whatsapp, waMessage);
+        }
+
+        // 2. Send Email Notification
+        if (user.email) {
+          const emailSubject = `[PENTING] Masa Langganan GuruPRO Anda Segera Berakhir dalam ${daysLeftText}`;
+          const emailHtml = `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+              <h2 style="color: #4f46e5; margin-bottom: 16px;">Masa Langganan Segera Berakhir</h2>
+              <p>Yth. Guru <strong>${user.nama_lengkap}</strong>,</p>
+              <p>Kami ingin menginformasikan bahwa masa aktif paket berlangganan GuruPRO Anda akan berakhir dalam <strong>${daysLeftText}</strong> (pada <strong>${formattedEndDate}</strong>).</p>
+              <p>Untuk tetap dapat menikmati akses tanpa batas ke semua generator AI (Modul Ajar, Silabus, LKPD, Soal, dll.) serta menghindari reset kuota token utama Anda, silakan lakukan perpanjangan paket sekarang.</p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${appUrl}/dashboard/billing" style="display: inline-block; padding: 12px 24px; background: #4f46e5; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                  Perpanjang Langganan Sekarang
+                </a>
+              </div>
+              <p style="color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+                Abaikan email ini jika Anda sudah melakukan perpanjangan.
+              </p>
+            </div>
+          `;
+
+          await sendEmailNotification(user.email, emailSubject, emailHtml);
+        }
+
+        // Update database that warning has been sent
+        await query(
+          "UPDATE users SET last_expiry_warning_sent = $1 WHERE id = $2",
+          [warningLevel, user.id]
+        );
+
+        console.log(`[CRON] Subscription warning (${warningLevel}) sent to ${user.nama_lengkap} (${user.email})`);
+        result.sent++;
+      } catch (err: any) {
+        console.error(`[CRON] Failed to send subscription warning to user ${user.id}:`, err.message);
+        result.errors++;
+      }
+    }
+  } catch (err: any) {
+    console.error("[CRON] Subscription warning check failed:", err.message);
+  }
+
+  return result;
+}
+
 export async function enforceGracePeriods(): Promise<{ graceEntered: number; locked: number }> {
   console.log("[CRON] Starting grace period enforcement...");
+
+  // Send warnings to users whose subscriptions are ending soon
+  await sendSubscriptionWarnings();
 
   const result = { graceEntered: 0, locked: 0 };
 

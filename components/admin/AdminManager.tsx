@@ -23,6 +23,7 @@ export default function AdminManager({ onSuccess, onError }: AdminManagerProps) 
     nama_lengkap: "",
     whatsapp: "",
     password: "",
+    role: "manager" as "super_admin" | "manager",
     is_active: true,
   });
 
@@ -59,6 +60,7 @@ export default function AdminManager({ onSuccess, onError }: AdminManagerProps) 
       nama_lengkap: "",
       whatsapp: "",
       password: "",
+      role: "manager",
       is_active: true,
     });
     setShowModal(true);
@@ -73,6 +75,7 @@ export default function AdminManager({ onSuccess, onError }: AdminManagerProps) 
       nama_lengkap: admin.nama_lengkap || "",
       whatsapp: admin.whatsapp || "",
       password: "",
+      role: admin.role === "super_admin" ? "super_admin" : "manager",
       is_active: admin.is_active !== false,
     });
     setShowModal(true);
@@ -268,6 +271,7 @@ export default function AdminManager({ onSuccess, onError }: AdminManagerProps) 
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="px-4 py-3 text-left text-slate-600 font-bold uppercase tracking-wide">Admin</th>
+                <th className="px-4 py-3 text-center text-slate-600 font-bold uppercase tracking-wide">Role</th>
                 <th className="px-4 py-3 text-left text-slate-600 font-bold uppercase tracking-wide">Kontak</th>
                 <th className="px-4 py-3 text-center text-slate-600 font-bold uppercase tracking-wide">Status</th>
                 <th className="px-4 py-3 text-left text-slate-600 font-bold uppercase tracking-wide">Terdaftar</th>
@@ -288,6 +292,17 @@ export default function AdminManager({ onSuccess, onError }: AdminManagerProps) 
                         <p className="text-slate-400 text-[10px]">{admin.email}</p>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {admin.role === "super_admin" ? (
+                      <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-amber-50 border border-amber-200 text-amber-700">
+                        🛡️ Super Admin
+                      </span>
+                    ) : (
+                      <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-blue-50 border border-blue-200 text-blue-600">
+                        📋 Manager
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-slate-600 font-mono">{admin.whatsapp ? formatWA(admin.whatsapp) : "-"}</p>
@@ -420,6 +435,26 @@ export default function AdminManager({ onSuccess, onError }: AdminManagerProps) 
                     placeholder="8123456789"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1">
+                  Role <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  name="role"
+                  value={formData.role}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                >
+                  <option value="manager">📋 Manager — Kelola Pembayaran, Approval, Komplain</option>
+                  <option value="super_admin">🛡️ Super Admin — Akses Penuh ke Semua Fitur</option>
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {formData.role === "super_admin"
+                    ? "Super Admin dapat mengelola semua fitur termasuk pengaturan teknis sistem."
+                    : "Manager hanya dapat mengelola pembayaran, approval, komplain, dan fitur non-teknis."}
+                </p>
               </div>
 
               <div>

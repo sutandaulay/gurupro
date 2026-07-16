@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/app/components/ui'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
@@ -46,11 +47,21 @@ const LINGKUP_LABELS: Record<string, string> = {
   mandiri: '📱 Mandiri',
 }
 
-export default function PengembanganDiriPage() {
+function PengembanganDiriContent() {
   const router = useRouter()
   const [pelatihan, setPelatihan] = useState<Pelatihan[]>([])
   const [documents, setDocuments] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'pelatihan' | 'documents'>('pelatihan')
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    if (tabParam === 'documents' || tabParam === 'sertifikat') {
+      setActiveTab('documents')
+    } else {
+      setActiveTab('pelatihan')
+    }
+  }, [searchParams])
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedSemester, setSelectedSemester] = useState<string>('')
@@ -388,6 +399,19 @@ export default function PengembanganDiriPage() {
           </div>
         )
       )}
+      {/* end of content */}
     </div>
   )
+}
+
+export default function PengembanganDiriPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <PengembanganDiriContent />
+    </Suspense>
+  );
 }

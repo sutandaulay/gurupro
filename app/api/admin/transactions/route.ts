@@ -14,7 +14,7 @@ async function verifyAdmin() {
   }
 
   const session = JSON.parse(sessionCookie);
-  if (session.role !== "admin") {
+  if (!['admin', 'super_admin', 'manager'].includes(session.role)) {
     throw new Error("Forbidden");
   }
 }

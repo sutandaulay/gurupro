@@ -22,6 +22,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
+      userId: userId, // Return userId for session validation
       activeContext: session.activeContext ?? 'individual',
       mode,
       institutions,

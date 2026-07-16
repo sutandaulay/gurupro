@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
 import PWARegister from "@/app/components/PWARegister";
 import PWAInstallPrompt from "@/app/components/PWAInstallPrompt";
-import Providers from "./providers";
+import SessionValidator from "@/app/components/SessionValidator";
+import ProvidersWrapper from "./providers-wrapper";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -70,11 +72,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function AppLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
+  const cookieStore = await cookies();
+  const session = cookieStore.get("gurupro_session")?.value;
+  const school = cookieStore.get("gurupro_school_selected")?.value;
+
   return (
     <html
       lang="id"
@@ -97,7 +103,10 @@ export default function RootLayout({
       <body className="font-sans min-h-full flex flex-col bg-neutral-50 text-neutral-900 selection:bg-primary-600 selection:text-white">
         <PWARegister />
         <PWAInstallPrompt />
-        <Providers>{children}</Providers>
+        <SessionValidator />
+        <ProvidersWrapper gurupro_session={session} gurupro_school_selected={school}>
+          {children}
+        </ProvidersWrapper>
       </body>
     </html>
   );

@@ -2,10 +2,14 @@
  * Silabus Export Library
  * PDF and DOCX export for Alur Tujuan Pembelajaran (ATP)
  * Landscape orientation for table readability
+ *
+ * Updated: 14 Juli 2026 - Word-wrap dan auto-height untuk robust rendering
+ * Reference: docs/ai-generation-standard.md
  */
 
 import PDFDocument from 'pdfkit';
 import type { SilabusOutput } from '@/lib/schemas/silabus';
+import { truncateText } from '@/lib/ai/validation-utils';
 
 // ============================================
 // PDF EXPORT
@@ -92,6 +96,8 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
 
     // Table Header
     const tableY = cpY + 40 + ((cpLines as number) > 1 ? 10 : 0);
+
+    // Table column widths
     const colWidths = {
       no: 35,
       topik: 150,
@@ -99,6 +105,14 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
       dimensi: 100,
       pertemuan: 55,
       minggu: 45,
+    };
+
+    // Helper: Calculate text height with word-wrap
+    const calculateTextHeight = (text: string, maxWidth: number, fontSize: number = 7): number => {
+      // Rough estimate: ~3 chars per "unit" width at fontSize 7
+      const charsPerLine = Math.floor(maxWidth / (fontSize * 0.5));
+      const lines = Math.ceil(text.length / charsPerLine);
+      return Math.max(lines * (fontSize + 2), 20); // Minimum 20px
     };
 
     // Draw header row
@@ -171,31 +185,39 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
       );
       xPos += colWidths.no;
 
+      // Topik - with truncation for long text
+      const safeTopik = truncateText(unit.topik, 80);
       doc.font('Helvetica').fontSize(7).fillColor('#1F2937').text(
-        unit.topik,
+        safeTopik,
         xPos + 2,
         rowY + 5,
-        { width: colWidths.topik - 4, lineGap: 1 }
+        { width: colWidths.topik - 4, lineGap: 1, ellipsis: true }
       );
       xPos += colWidths.topik;
 
-      // Tujuan pembelajaran (multiple lines)
-      const tpText = unit.tujuanPembelajaran.slice(0, 2).join('; ');
+      // Tujuan pembelajaran (multiple lines) - with truncation
+      const tpText = truncateText(
+        unit.tujuanPembelajaran.slice(0, 2).join('; '),
+        300
+      );
       doc.font('Helvetica').fontSize(6.5).fillColor('#374151').text(
         tpText,
         xPos + 2,
         rowY + 3,
-        { width: colWidths.tujuan - 4, lineGap: 1 }
+        { width: colWidths.tujuan - 4, lineGap: 1, ellipsis: true }
       );
       xPos += colWidths.tujuan;
 
-      // Dimensi
-      const dimensiText = unit.dimensiProfilLulusanTerhubung.slice(0, 2).join(', ');
+      // Dimensi - with truncation
+      const dimensiText = truncateText(
+        unit.dimensiProfilLulusanTerhubung.slice(0, 2).join(', '),
+        100
+      );
       doc.font('Helvetica').fontSize(6.5).fillColor('#4B5563').text(
         dimensiText,
         xPos + 2,
         rowY + 12,
-        { width: colWidths.dimensi - 4 }
+        { width: colWidths.dimensi - 4, ellipsis: true }
       );
       xPos += colWidths.dimensi;
 
@@ -360,6 +382,11 @@ export async function generateSilabusDocBuffer(data: SilabusOutput): Promise<Buf
       padding: 8px 4px;
       border: 1px solid #334155;
       vertical-align: top;
+      /* Word-wrap for long text - ROBUST RENDERING */
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      white-space: normal;
+      word-break: break-word;
     }
     tr:nth-child(even) {
       background-color: #F9FAFB;
@@ -370,6 +397,13 @@ export async function generateSilabusDocBuffer(data: SilabusOutput): Promise<Buf
     .col-dimensi { width: 13%; font-size: 7pt; }
     .col-pert { width: 5%; text-align: center; }
     .col-minggu { width: 5%; text-align: center; }
+    /* Add ellipsis for truncated text */
+    .truncate {
+      max-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .total-row {
       background-color: #E0E7FF !important;
       font-weight: bold;

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getUserTokenAccess, consumeUserToken } from '@/lib/token-system';
 import { cookies } from 'next/headers';
+import { truncateText } from '@/lib/ai/validation-utils';
 
 export const GenerateDeskripsiCapaianRequestSchema = z.object({
   siswaId: z.string().uuid(),
@@ -23,16 +24,46 @@ export type GenerateDeskripsiCapaianRequest = z.infer<typeof GenerateDeskripsiCa
  * System prompt untuk deskripsi capaian (dapat digunakan dengan cachedContent).
  * Cache key: `${kurikulum}-${mapelId}` — reuse pola context caching existing.
  * Untuk PAUD/modeNaratif, prompt user menyertakan instruksi spesifik naratif.
+ *
+ * Updated: 14 Juli 2026 - Menambahkan batas karakter, larangan markdown, dan few-shot examples
+ * Reference: docs/ai-generation-standard.md
  */
 export const SYSTEM_PROMPT_DESKRIPSI_CAPAIAN = `Kamu adalah asisten AI yang membantu guru menulis deskripsi capaian kompetensi siswa untuk rapor di Indonesia.
 
-Aturan penulisan:
-- Bahasa Indonesia formal, positif, spesifik, dan membangun
-- JANGAN membuat klaim capaian yang tidak didukung data yang diberikan
-- JANGAN memberi label/diagnosis di luar konteks akademik
-- Panjang 2-4 kalimat
-- Gunakan "Ananda" untuk menyebut siswa
-- Output langsung teks deskripsi tanpa prefix atau markup`;
+ATURAN WAJIB:
+1. Bahasa Indonesia formal, positif, spesifik, dan membangun
+2. JANGAN membuat klaim capaian yang tidak didukung data yang diberikan
+3. JANGAN memberi label/diagnosis di luar konteks akademik
+4. Gunakan "Ananda [nama_siswa]" di awal kalimat pertama
+5. GAYA: Sopan, mendukung, inspiratif
+
+BATASAN PANJANG (WAJIB DIIKUTI):
+- deskripsi: MAKSIMAL 500 KARAKTER TOTAL
+- saran: MAKSIMAL 200 KARAKTER
+
+OUTPUT JSON SCHEMA:
+{
+  "deskripsi": "string (maks 500 karakter)",
+  "saran": "string (maks 200 karakter, opsional)"
+}
+
+CONTOH OUTPUT (NILAI BAIK - KKM 75):
+Input: nama=Andi, mapel=Matematika, nilai=88, kkm=75
+Output:
+{
+  "deskripsi": "Ananda Andi menunjukkan kemampuan yang sangat baik dalam memahami operasi hitung pecahan. Siswa mampu menyelesaikan soal aplikasi dengan langkah yang tepat dan mandiri. Apresiasi atas konsistensi dan usahanya dalam belajar matematika.",
+  "saran": "Terus berlatih variasi soal untuk memperdalam pemahaman konsep."
+}
+
+CONTOH OUTPUT (NILAI KURANG - KKM 75):
+Input: nama=Sari, mapel=Bahasa Indonesia, nilai=62, kkm=75
+Output:
+{
+  "deskripsi": "Ananda Sari masih membutuhkan bimbingan tambahan dalam memahami kosakata baru. Dengan latihan membaca rutin dan bertanya saat menemukan kesulitan, kemampuan ini dapat segera ditingkatkan.",
+  "saran": "Disarankan membaca buku cerita 15 menit setiap hari dan mencatat kosakata baru."
+}
+
+CATATAN: AI TIDAK SELALU PATUH BATASAN KARAKTER. LAKUKAN TRUNCATE DI LAYER VALIDASI.`;
 
 async function validateGuruRole(memberId: string): Promise<boolean> {
   const res = await query(
@@ -45,7 +76,7 @@ async function validateGuruRole(memberId: string): Promise<boolean> {
 async function generateAIDeskripsi(
   prompt: string,
   modeNaratif: boolean
-): Promise<string> {
+): Promise<{ deskripsi: string; saran: string }> {
   const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = await import('@google/generative-ai');
 
   const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || '';
@@ -78,7 +109,37 @@ async function generateAIDeskripsi(
     generationConfig,
   });
 
-  return result.response.text();
+  const rawText = result.response.text();
+
+  // Parse JSON dengan cleanup dan enforce limits
+  let cleanText = rawText.trim()
+    .replace(/```json\s*|```\s*/gi, '')
+    .trim();
+
+  try {
+    const parsed = JSON.parse(cleanText);
+    return enforceOutputLimits(parsed);
+  } catch {
+    // Fallback jika JSON parse gagal - truncate raw text
+    console.warn('[Deskripsi Capaian] JSON parse failed, using truncated fallback');
+    return {
+      deskripsi: truncateText(rawText, 500) || 'Ananda menunjukkan pemahaman terhadap materi pembelajaran.',
+      saran: ''
+    };
+  }
+}
+
+/**
+ * Enforce output limits - truncate sesuai batas karakter
+ */
+function enforceOutputLimits(output: { deskripsi?: unknown; saran?: unknown }): { deskripsi: string; saran: string } {
+  const rawDeskripsi = typeof output.deskripsi === 'string' ? output.deskripsi : '';
+  const rawSaran = typeof output.saran === 'string' ? output.saran : '';
+
+  return {
+    deskripsi: truncateText(rawDeskripsi, 500) || 'Ananda menunjukkan pemahaman yang baik terhadap materi pembelajaran.',
+    saran: truncateText(rawSaran, 200) || ''
+  };
 }
 
 function buildPrompt(params: GenerateDeskripsiCapaianRequest): string {
@@ -96,7 +157,7 @@ function buildPrompt(params: GenerateDeskripsiCapaianRequest): string {
   };
   const kurikulumLabel = kurikulumLabels[params.kurikulum] || params.kurikulum;
 
-  let promptText = `## Data Masuk:
+  let promptText = `## DATA MASUK:
 - Kurikulum: ${kurikulumLabel}
 - Basis Deskripsi: ${basisDeskripsiLabel}
 - Capaian Pembelajaran: ${params.capaianPembelajaranText}
@@ -112,26 +173,37 @@ function buildPrompt(params: GenerateDeskripsiCapaianRequest): string {
 
   if (params.modeNaratif) {
     promptText += `
-## Aturan Penulisan (Mode Naratif/PAUD):
+## ATURAN PENULISAN (Mode Naratif/PAUD):
 - Fokus pada PROSES dan OBSERVASI perkembangan anak, bukan skor
 - Gunakan bahasa yang menggambarkan perkembangan, minat, dan partisipasi anak
 - 2-4 kalimat
 - Positif, suportif, dan membangun
-- Contoh observasi PAUD: "Ananda menunjukkan antusiasme saat mengikuti kegiatan mewarnai. Ananda mulai mampu mengenali warna-warna dasar dan menuangkan ide melalui gambar."`;
+- Contoh observasi PAUD: "Ananda menunjukkan antusiasme saat mengikuti kegiatan mewarnai."`;
   } else {
     promptText += `
-## Aturan Penulisan (Mode Akademik):
+## ATURAN PENULISAN (Mode Akademik):
 - Bahasa Indonesia formal, positif, spesifik
 - JANGAN membuat klaim capaian yang tidak didukung data yang diberikan
 - JANGAN memberi label/diagnosis di luar konteks akademik
-- Panjang 2-4 kalimat
-- Langsung tulis deskripsi tanpa prefix`;
+- Gunakan "Ananda [nama]" di awal kalimat
+- Panjang deskripsi: MAKSIMAL 500 KARAKTER
+- Panjang saran: MAKSIMAL 200 KARAKTER
+- OUTPUT JSON SESUAI SCHEMA DI BAWAH`;
   }
 
   promptText += `
 
-## Output:
-Tulis deskripsi capaian dalam 2-4 kalimat. Langsung teks deskripsi tanpa prefix.`;
+## OUTPUT JSON SCHEMA:
+{
+  "deskripsi": "string (maks 500 karakter)",
+  "saran": "string (maks 200 karakter, opsional)"
+}
+
+## INSTRUKSI:
+1. Parse data di atas
+2. Tulis deskripsi dalam format JSON sesuai schema
+3. JANGAN tambahkan markdown fence atau teks lain
+4. Langsung output JSON saja`;
 
   return promptText;
 }
@@ -180,9 +252,9 @@ export async function POST(req: Request) {
 
     const prompt = buildPrompt(params);
 
-    let deskripsi: string;
+    let result: { deskripsi: string; saran: string };
     try {
-      deskripsi = await generateAIDeskripsi(prompt, params.modeNaratif);
+      result = await generateAIDeskripsi(prompt, params.modeNaratif);
     } catch (aiError: any) {
       console.error('AI generation failed:', aiError);
       return NextResponse.json({
@@ -196,7 +268,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      deskripsi: deskripsi.trim(),
+      deskripsi: result.deskripsi.trim(),
+      saran: result.saran.trim(),
       sumberAi: true,
     });
 

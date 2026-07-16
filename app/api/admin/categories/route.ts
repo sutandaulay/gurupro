@@ -8,7 +8,7 @@ async function verifyAdmin() {
   const sessionCookie = cookieStore.get("gurupro_session")?.value;
   if (!sessionCookie) throw new Error("Unauthorized");
   const session = JSON.parse(sessionCookie);
-  if (session.role !== "admin") throw new Error("Forbidden");
+  if (!['admin', 'super_admin', 'manager'].includes(session.role)) throw new Error("Forbidden");
 }
 
 const categorySchema = z.object({

@@ -57,6 +57,7 @@ const DOCUMENT_CATEGORIES = [
   { value: "jurnal_harian", label: "Jurnal Harian", description: "Jurnal Mengajar Harian" },
   { value: "bank_soal", label: "Bank Soal / Evaluasi", description: "Kumpulan soal dan instrumen evaluasi" },
   { value: "lkpd_bahan_ajar", label: "LKPD / Bahan Ajar", description: "Lembar Kerja Peserta Didik dan Bahan Ajar" },
+  { value: "presensi_kinerja", label: "Laporan Presensi & Kinerja", description: "Laporan kehadiran dan kinerja mengajar mingguan" },
 ];
 
 const ROLE_LABELS: Record<string, string> = {

@@ -13,15 +13,15 @@ export async function GET(request: Request) {
     }
 
     const session = JSON.parse(sessionCookie);
-    if (session.role !== "admin") {
+    if (!['admin', 'super_admin', 'manager'].includes(session.role)) {
       return NextResponse.json({ error: "Akses ditolak. Hanya admin yang dapat mengakses." }, { status: 403 });
     }
 
     // Get all admins
     const result = await query(
-      `SELECT id, email, username, nama_lengkap, whatsapp, is_active, created_at, updated_at
+      `SELECT id, email, username, nama_lengkap, whatsapp, role, is_active, created_at
        FROM users
-       WHERE role = 'admin'
+       WHERE role IN ('admin', 'super_admin', 'manager')
        ORDER BY created_at DESC`
     );
 
@@ -44,12 +44,16 @@ export async function POST(request: Request) {
     }
 
     const session = JSON.parse(sessionCookie);
-    if (session.role !== "admin") {
+    if (!['admin', 'super_admin', 'manager'].includes(session.role)) {
       return NextResponse.json({ error: "Akses ditolak. Hanya admin yang dapat mengakses." }, { status: 403 });
     }
 
     const body = await request.json();
-    const { action, email, username, nama_lengkap, whatsapp, password, is_active } = body;
+    const { action, email, username, nama_lengkap, whatsapp, password, is_active, role: requestedRole } = body;
+
+    // Validate role
+    const validRoles = ['super_admin', 'manager'];
+    const adminRole = validRoles.includes(requestedRole) ? requestedRole : 'manager';
 
     // Create new admin
     if (action === "create") {
@@ -85,15 +89,16 @@ export async function POST(request: Request) {
 
       // Create admin user
       const result = await query(
-        `INSERT INTO users (email, username, password, nama_lengkap, whatsapp, role, is_active, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, 'admin', $6, NOW(), NOW())
-         RETURNING id, email, username, nama_lengkap, whatsapp, is_active, created_at`,
+        `INSERT INTO users (email, username, password_hash, nama_lengkap, whatsapp, role, is_active, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+         RETURNING id, email, username, nama_lengkap, whatsapp, role, is_active, created_at`,
         [
           email.toLowerCase().trim(),
           username?.toLowerCase().trim() || null,
           hashedPassword,
-          nama_lengkap?.trim() || null,
-          whatsapp?.replace(/\D/g, "") || null,
+          nama_lengkap?.trim() || '',
+          whatsapp?.replace(/\D/g, "") || '',
+          adminRole,
           is_active !== false
         ]
       );
@@ -110,7 +115,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Email admin wajib diisi" }, { status: 400 });
       }
 
-      const sets: string[] = ["updated_at = NOW()"];
+      const sets: string[] = [];
       const values: any[] = [];
       let idx = 1;
 
@@ -132,18 +137,28 @@ export async function POST(request: Request) {
         idx++;
       }
 
+      if (requestedRole && validRoles.includes(requestedRole)) {
+        sets.push(`role = $${idx}`);
+        values.push(requestedRole);
+        idx++;
+      }
+
       if (password) {
         const bcrypt = await import("bcrypt");
         const hashedPassword = await bcrypt.hash(password, 12);
-        sets.push(`password = $${idx}`);
+        sets.push(`password_hash = $${idx}`);
         values.push(hashedPassword);
         idx++;
+      }
+
+      if (sets.length === 0) {
+        return NextResponse.json({ error: "Tidak ada data yang diubah" }, { status: 400 });
       }
 
       values.push(email.toLowerCase().trim());
 
       const result = await query(
-        `UPDATE users SET ${sets.join(", ")} WHERE email = $${idx} AND role = 'admin' RETURNING id, email, username, nama_lengkap, whatsapp, is_active`,
+        `UPDATE users SET ${sets.join(", ")} WHERE email = $${idx} AND role IN ('admin', 'super_admin', 'manager') RETURNING id, email, username, nama_lengkap, whatsapp, role, is_active`,
         values
       );
 
@@ -165,7 +180,7 @@ export async function POST(request: Request) {
 
       // Check if this is the last admin
       const adminCount = await query(
-        "SELECT COUNT(*) as count FROM users WHERE role = 'admin'"
+        "SELECT COUNT(*) as count FROM users WHERE role IN ('admin', 'super_admin', 'manager')"
       );
 
       if (parseInt(adminCount.rows[0].count) <= 1) {
@@ -178,7 +193,7 @@ export async function POST(request: Request) {
       }
 
       const result = await query(
-        "DELETE FROM users WHERE email = $1 AND role = 'admin' RETURNING id",
+        "DELETE FROM users WHERE email = $1 AND role IN ('admin', 'super_admin', 'manager') RETURNING id",
         [email.toLowerCase().trim()]
       );
 

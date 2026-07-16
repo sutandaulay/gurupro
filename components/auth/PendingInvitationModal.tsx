@@ -36,11 +36,29 @@ export default function PendingInvitationModal({
   const [checking, setChecking] = useState(true);
   const [localStorageToken, setLocalStorageToken] = useState<string | null>(null);
 
-  // Check for pending invitation on mount
+  // Check for pending invitation on mount — but only AFTER session cookie is set
   useEffect(() => {
+    // Poll/observe for gurupro_session cookie (set by SessionSync)
+    // We need to wait for SessionSync to complete first
     const checkPendingInvitation = async () => {
       try {
-        // First check localStorage for token
+        // Wait briefly for SessionSync to set the gurupro_session cookie
+        // (it runs in parallel with this useEffect on first render)
+        let cookieSet = false;
+        for (let i = 0; i < 10; i++) {
+          const cookies = document.cookie.split("; ");
+          cookieSet = cookies.some((c) => c.startsWith("gurupro_session="));
+          if (cookieSet) break;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+
+        if (!cookieSet) {
+          // SessionSync hasn't run yet — skip for now (will re-check on page refresh)
+          setChecking(false);
+          return;
+        }
+
+        // First check localStorage for token (covers Google OAuth + invitation URL case)
         const storedToken = localStorage.getItem("pending_invitation_token");
         const storedSchoolName = localStorage.getItem("pending_invitation_school");
         const storedSchoolLogo = localStorage.getItem("pending_invitation_logo");

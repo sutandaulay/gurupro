@@ -42,6 +42,54 @@ const Users: CollectionConfig = {
       label: "Nomor Telepon",
     },
     {
+      name: "pdpConsent",
+      type: "group",
+      label: "Persetujuan UU PDP",
+      fields: [
+        {
+          name: "given",
+          type: "checkbox",
+          label: "Persetujuan Diberikan",
+          required: true,
+          defaultValue: false,
+        },
+        {
+          name: "version",
+          type: "text",
+          label: "Versi Kebijakan",
+          required: true,
+        },
+        {
+          name: "consentedAt",
+          type: "date",
+          label: "Tanggal Persetujuan",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "phoneVerified",
+      type: "checkbox",
+      label: "No. HP Terverifikasi",
+      defaultValue: false,
+    },
+    {
+      name: "emailVerified",
+      type: "checkbox",
+      label: "Email Terverifikasi",
+      defaultValue: false,
+    },
+    {
+      name: "accountType",
+      type: "select",
+      label: "Tipe Akun",
+      options: [
+        { label: "Individual", value: "individual" },
+        { label: "Institutional", value: "institutional" },
+      ],
+      defaultValue: "individual",
+    },
+    {
       name: "avatar",
       type: "upload",
       label: "Avatar",

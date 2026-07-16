@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import CmsLandingEditor from "@/components/admin/CmsLandingEditor";
 import TransactionsManager from "@/components/admin/TransactionsManager";
 import AdminManager from "@/components/admin/AdminManager";
 import SchoolRegistrationsManager from "@/components/admin/SchoolRegistrationsManager";
 import InstitutionsManager from "@/components/admin/InstitutionsManager";
+import NotificationBell from "@/components/admin/NotificationBell";
+import { ToastProvider, useToast } from "@/components/admin/ToastNotification";
 
-export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"users" | "transactions" | "cms" | "registrations" | "institutions" | "referrals" | "admins" | "settings">("users");
+function AdminPageContent() {
+  const [activeTab, setActiveTab] = useState<"users" | "transactions" | "cms" | "registrations" | "institutions" | "referrals" | "admins" | "settings" | "notifications">("users");
   
   // Data States
   const [users, setUsers] = useState<any[]>([]);
@@ -77,6 +79,124 @@ export default function AdminPage() {
     totalNotifications: 0
   });
 
+  // Notification Broadcast States
+  const [notificationTitle, setNotificationTitle] = useState("");
+  const [notificationBody, setNotificationBody] = useState("");
+  const [notificationTarget, setNotificationTarget] = useState<"single" | "all" | "free_users" | "premium_users">("all");
+  const [notificationTargetEmail, setNotificationTargetEmail] = useState("");
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
+  const [broadcastHistory, setBroadcastHistory] = useState<Array<{ title: string; body: string; sentCount: number; timestamp: Date }>>([]);
+
+  // Toast hook
+  const { addToast } = useToast();
+
+  // Ref untuk tracking notifikasi baru
+  const previousPendingTxRef = useRef(0);
+  const previousPendingPayoutsRef = useRef(0);
+
+  // Format currency helper
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  // Handle notification click
+  const handleNotificationClick = useCallback((notification: any) => {
+    if (notification.type === "transaction" || notification.status) {
+      setActiveTab("transactions");
+      setTxSearch(notification.external_id || notification.id);
+    } else if (notification.type === "payout") {
+      setActiveTab("referrals");
+    }
+  }, []);
+
+  // Handle sending notification to users
+  const handleSendNotification = async () => {
+    if (!notificationTitle || !notificationBody) {
+      addToast({
+        type: "error",
+        title: "Gagal",
+        message: "Judul dan isi pesan wajib diisi",
+        duration: 4000,
+        icon: "❌"
+      });
+      return;
+    }
+
+    if (notificationTarget === "single" && !notificationTargetEmail) {
+      addToast({
+        type: "error",
+        title: "Gagal",
+        message: "Email atau username wajib diisi untuk pengiriman single user",
+        duration: 4000,
+        icon: "❌"
+      });
+      return;
+    }
+
+    setIsSendingNotification(true);
+    try {
+      const res = await fetch("/api/admin/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send_notification",
+          title: notificationTitle,
+          body: notificationBody,
+          targetType: notificationTarget,
+          targetEmail: notificationTarget === "single" ? notificationTargetEmail : undefined,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        addToast({
+          type: "success",
+          title: "Berhasil!",
+          message: `Notifikasi berhasil dikirim ke ${data.sentCount} pengguna`,
+          duration: 5000,
+          icon: "✅"
+        });
+
+        // Add to broadcast history
+        setBroadcastHistory(prev => [{
+          title: notificationTitle,
+          body: notificationBody,
+          sentCount: data.sentCount,
+          timestamp: new Date(),
+        }, ...prev.slice(0, 9)]);
+
+        // Reset form
+        setNotificationTitle("");
+        setNotificationBody("");
+        setNotificationTargetEmail("");
+      } else {
+        addToast({
+          type: "error",
+          title: "Gagal",
+          message: data.error || "Gagal mengirim notifikasi",
+          duration: 4000,
+          icon: "❌"
+        });
+      }
+    } catch (err) {
+      console.error("Send notification error:", err);
+      addToast({
+        type: "error",
+        title: "Error",
+        message: "Terjadi kesalahan saat mengirim notifikasi",
+        duration: 4000,
+        icon: "❌"
+      });
+    } finally {
+      setIsSendingNotification(false);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchTransactions();
@@ -86,16 +206,64 @@ export default function AdminPage() {
   }, []);
 
   const pollingCancelled = useRef(false);
+
   useEffect(() => {
     const fetchNotifications = async () => {
       const controller = new AbortController();
       try {
         const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const res = await fetch("/api/admin/notifications", { signal: controller.signal });
+        const res = await fetch("/api/admin/notifications?limit=5", { signal: controller.signal });
         clearTimeout(timeoutId);
         if (res.ok) {
           const data = await res.json();
-          setAdminNotifications(data);
+          const newPendingTx = data.counts?.pendingTransactions || 0;
+          const newPendingPayouts = data.counts?.pendingPayouts || 0;
+
+          // Deteksi pembayaran baru
+          if (newPendingTx > previousPendingTxRef.current) {
+            const newPayments = newPendingTx - previousPendingTxRef.current;
+            // Ambil detail transaksi terbaru untuk toast
+            if (data.notifications && data.notifications.length > 0) {
+              const latestTx = data.notifications.find((n: any) => n.status === "PAID" || n.status === "PENDING");
+              if (latestTx) {
+                addToast({
+                  type: "payment",
+                  title: "💳 Pembayaran Baru!",
+                  message: `${latestTx.nama_lengkap || "User"} - Rp ${formatCurrency(latestTx.amount)}`,
+                  duration: 6000,
+                  icon: latestTx.status === "PAID" ? "✅" : "⏳"
+                });
+              }
+            } else if (newPayments > 0) {
+              addToast({
+                type: "payment",
+                title: `📋 ${newPayments} Transaksi Baru`,
+                message: `Ada ${newPayments} pembayaran baru yang menunggu diproses`,
+                duration: 5000,
+                icon: "💳"
+              });
+            }
+          }
+
+          // Deteksi payout request baru
+          if (newPendingPayouts > previousPendingPayoutsRef.current) {
+            const newPayouts = newPendingPayouts - previousPendingPayoutsRef.current;
+            addToast({
+              type: "warning",
+              title: "💸 Request Payout Baru!",
+              message: `Ada ${newPayouts} permintaan pencairan saldo baru`,
+              duration: 6000,
+              icon: "💸"
+            });
+          }
+
+          previousPendingTxRef.current = newPendingTx;
+          previousPendingPayoutsRef.current = newPendingPayouts;
+          setAdminNotifications(data.counts || {
+            pendingPayouts: newPendingPayouts,
+            pendingTransactions: newPendingTx,
+            totalNotifications: newPendingTx + newPendingPayouts
+          });
         }
       } catch {
         // silent
@@ -105,12 +273,12 @@ export default function AdminPage() {
     fetchNotifications();
     const interval = setInterval(() => {
       if (!pollingCancelled.current) fetchNotifications();
-    }, 60000);
+    }, 15000); // Poll every 15 seconds
     return () => {
       pollingCancelled.current = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [addToast, formatCurrency]);
 
   const fetchUsers = async (queryStr = "") => {
     setIsLoadingUsers(true);
@@ -618,6 +786,16 @@ export default function AdminPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Notification Bell */}
+          <NotificationBell
+            onNotificationClick={handleNotificationClick}
+            onBadgeClick={() => {
+              if (activeTab !== "transactions" && activeTab !== "referrals") {
+                setActiveTab("transactions");
+              }
+            }}
+          />
+
           <a
             href="/dashboard"
             className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-2xl transition cursor-pointer"
@@ -740,6 +918,15 @@ export default function AdminPage() {
               }`}
             >
               ⚙️ Integrasi Sistem
+            </button>
+
+            <button
+              onClick={() => setActiveTab("notifications")}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
+                activeTab === "notifications" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              🔔 Kirim Notifikasi
             </button>
           </div>
 
@@ -1202,6 +1389,148 @@ export default function AdminPage() {
                 onSuccess={(msg) => setSuccessMsg(msg)}
                 onError={(msg) => setErrorMsg(msg)}
               />
+            </div>
+          ) : activeTab === "notifications" ? (
+            <div className="animate-fadeIn">
+              {/* Notification Sender Panel */}
+              <div className="p-6 space-y-8">
+                <div className="border-b border-slate-100 pb-4">
+                  <h2 className="text-lg font-black text-slate-800 font-sans">🔔 Kirim Notifikasi ke Pengguna</h2>
+                  <p className="text-xs text-slate-400 mt-1">Kirim notifikasi ke Bell pengguna secara manual - untuk pengumuman atau informasi penting.</p>
+                </div>
+
+                {/* Quick Templates */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+                    <span>📋</span> Template Cepat
+                  </h3>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      { label: "🎉 Promo Berlangganan", title: "Diskon 20%!", body: "Dapatkan diskon 20% untuk paket tahunan. Promo terbatas!" },
+                      { label: "📢 Maintenance", title: "Pemeliharaan Sistem", body: "Akan ada pemeliharaan sistem pada tanggal..." },
+                      { label: "💎 Token Bonus", title: "Bonus Token Gratis!", body: "Klaim bonus token gratis untuk aktivitas tertentu!" },
+                      { label: "📚 Tips & Trick", title: "Tips Menggunakan GuruPRO", body: "Berikut tips untuk memaksimalkan penggunaan platform..." },
+                    ].map((template, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setNotificationTitle(template.title);
+                          setNotificationBody(template.body);
+                        }}
+                        className="p-3 border border-slate-200 rounded-xl text-xs text-left hover:border-indigo-300 hover:bg-indigo-50 transition cursor-pointer"
+                      >
+                        {template.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Send Notification Form */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+                    <span>✉️</span> Form Kirim Notifikasi
+                  </h3>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Judul Notifikasi</label>
+                      <input
+                        type="text"
+                        value={notificationTitle}
+                        onChange={(e) => setNotificationTitle(e.target.value)}
+                        placeholder="Contoh: Promo Spesial!"
+                        className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-medium text-slate-800 focus:border-indigo-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Isi Pesan</label>
+                      <textarea
+                        value={notificationBody}
+                        onChange={(e) => setNotificationBody(e.target.value)}
+                        placeholder="Tulis pesan notifikasi di sini..."
+                        rows={4}
+                        className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-medium text-slate-800 focus:border-indigo-500 focus:outline-none resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Target Pengiriman</label>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {[
+                          { value: "single", label: "👤 Satu User", icon: "single" },
+                          { value: "all", label: "👥 Semua User", icon: "all" },
+                          { value: "free_users", label: "🆓 User Gratis", icon: "free" },
+                          { value: "premium_users", label: "💎 User Premium", icon: "premium" },
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => setNotificationTarget(option.value)}
+                            className={`p-3 border rounded-xl text-xs text-center transition cursor-pointer ${
+                              notificationTarget === option.value
+                                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                : "border-slate-200 hover:border-slate-300 text-slate-600"
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {notificationTarget === "single" && (
+                      <div className="animate-fadeIn">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Email atau Username User</label>
+                        <input
+                          type="text"
+                          value={notificationTargetEmail}
+                          onChange={(e) => setNotificationTargetEmail(e.target.value)}
+                          placeholder="user@email.com atau username"
+                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-medium text-slate-800 focus:border-indigo-500 focus:outline-none"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                      <p className="text-[10px] text-slate-400">
+                        Notifikasi akan muncul di Bell (🔔) pengguna yang dituju.
+                      </p>
+                      <button
+                        onClick={handleSendNotification}
+                        disabled={isSendingNotification || !notificationTitle || !notificationBody}
+                        className={`px-6 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                          isSendingNotification || !notificationTitle || !notificationBody
+                            ? "bg-slate-300 text-slate-500 cursor-not-allowed"
+                            : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                        }`}
+                      >
+                        {isSendingNotification ? "Mengirim..." : "📤 Kirim Notifikasi"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recent Broadcasts */}
+                {broadcastHistory.length > 0 && (
+                  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+                      <span>📜</span> Riwayat Broadcast Terakhir
+                    </h3>
+                    <div className="space-y-2">
+                      {broadcastHistory.map((item, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs">
+                          <div>
+                            <p className="font-bold text-slate-800">{item.title}</p>
+                            <p className="text-slate-500">{item.body}</p>
+                          </div>
+                          <span className="text-slate-400">{item.sentCount} user</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div className="p-6 space-y-8 animate-fadeIn">
@@ -2101,5 +2430,14 @@ export default function AdminPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Wrapper with ToastProvider
+export default function AdminPage() {
+  return (
+    <ToastProvider>
+      <AdminPageContent />
+    </ToastProvider>
   );
 }

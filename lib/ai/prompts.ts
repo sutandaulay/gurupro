@@ -1,6 +1,9 @@
 /**
  * GuruPRO AI Prompt Templates
  * Kumpulan prompt untuk berbagai fitur AI
+ *
+ * Updated: 14 Juli 2026 - Character limits dan few-shot examples
+ * Reference: docs/ai-generation-standard.md
  */
 
 // ============================================
@@ -36,31 +39,48 @@ ${input.materi ? `- Materi yang Diajarkan: ${input.materi}` : ''}
 ${input.topik ? `- Topik: ${input.topik}` : ''}
 ${input.catatan_guru ? `- Catatan Guru: ${input.catatan_guru}` : ''}
 
-## Format Output JSON
-Buatkan JSON dengan struktur berikut (HANYA JSON, tanpa teks lain di luar JSON):
+BATASAN PANJANG PER-FIELD (WAJIB DIIKUTI):
+- materi_pembelajaran: MAKSIMAL 255 KARAKTER
+- tujuan_pembelajaran (setiap item): MAKSIMAL 150 KARAKTER
+- aktivitas_pembelajaran: MAKSIMAL 500 KARAKTER
+- media_pembelajaran: MAKSIMAL 200 KARAKTER
+- asesmen_pembelajaran: MAKSIMAL 300 KARAKTER
+- refleksi_guru: MAKSIMAL 400 KARAKTER
+- tindak_lanjut: MAKSIMAL 300 KARAKTER
 
+LARANGAN FORMAT MARKDOWN DI DALAM JSON VALUE:
+- ❌ Jangan pakai **bold**, *italic*, # heading
+- ❌ Jangan pakai bullet list ( - , * ) di dalam string
+- ✅ Gunakan plain text biasa saja
+
+OUTPUT JSON SCHEMA:
 {
-  "materi_pembelajaran": "Deskripsi materi yang diajarkan (maks 255 karakter)",
-  "tujuan_pembelajaran": [
-    "Tujuan 1 - spesifik dan terukur",
-    "Tujuan 2 - spesifik dan terukur",
-    "Tujuan 3 - spesifik dan terukur"
-  ],
-  "aktivitas_pembelajaran": "Langkah-langkah pembelajaran yang dilakukan (minimal 3 fase: pendahuluan, inti, penutup)",
-  "media_pembelajaran": "Media yang digunakan",
-  "asesmen_pembelajaran": "Cara menilai pemahaman siswa",
-  "refleksi_guru": "Refleksi diri tentang pembelajaran hari ini (hambatan, keberhasilan, solusi)",
-  "tindak_lanjut": "Rencana tindak lanjut untuk pertemuan berikutnya"
+  "materi_pembelajaran": "string (maks 255 karakter)",
+  "tujuan_pembelajaran": ["string (1-5 items, setiap item maks 150 karakter)"],
+  "aktivitas_pembelajaran": "string (maks 500 karakter)",
+  "media_pembelajaran": "string (maks 200 karakter)",
+  "asesmen_pembelajaran": "string (maks 300 karakter)",
+  "refleksi_guru": "string (maks 400 karakter)",
+  "tindak_lanjut": "string (maks 300 karakter)"
 }
 
-## Aturan:
-1. Gunakan bahasa Indonesia formal yang sesuai untuk administrasi guru
-2. Tujuan pembelajaran harus SMART (Spesifik, Measurable, Achievable, Relevant, Time-bound)
-3. Aktivitas pembelajaran harus mencakup 3 fase: Pendahuluan, Inti, Penutup
-4. Refleksi harus mencakup: apa yang berjalan baik, hambatan, dan solusi
-5. Tindak lanjut harus actionable dan spesifik
-6. Respons dalam format JSON valid saja, tanpa markdown code block
-`.trim();
+CONTOH OUTPUT YANG BENAR:
+{
+  "materi_pembelajaran": "Operasi Hitung Pecahan Sederhana",
+  "tujuan_pembelajaran": [
+    "Siswa mampu menjumlahkan pecahan dengan penyebut sama",
+    "Siswa mampu mengurangkan pecahan dengan penyebut berbeda"
+  ],
+  "aktivitas_pembelajaran": "Pembelajaran dimulai dengan apersepsi melalui pertanyaan. Siswa diberikan LKPD untuk latihan penjumlahan pecahan. Kegiatan ditutup dengan refleksi dan tugas rumah.",
+  "media_pembelajaran": "LKPD, papan tulis, manipulatif pecahan",
+  "asesmen_pembelajaran": "Observasi partisipasi dan latihan terbimbing",
+  "refleksi_guru": "Secara umum pembelajaran berjalan lancar. Siswa antusias saat menggunakan manipulatif. Perlu tambahan latihan untukpecahan dengan penyebut berbeda.",
+  "tindak_lanjut": "Berikan latihan remedial individu dan pengayaan untuk siswa avanzado."
+}
+
+CATATAN: AI TIDAK SELALU PATUH BATASAN. LAKUKAN TRUNCATE DI LAYER VALIDASI.
+
+Keluaran HANYA JSON valid, tanpa markdown code block.`.trim();
 }
 
 // ============================================
@@ -91,38 +111,36 @@ export function generateReflectionPrompt(input: ReflectionGenerateInput): string
 - Kehadiran: ${input.jumlah_hadir} hadir, ${input.jumlah_tidak_hadir} tidak hadir
 ${input.catatan ? `- Catatan: ${input.catatan}` : ''}
 
-## Format Output
-Buatkan refleksi diri dalam format paragraf bahasa Indonesia formal yang mencakup:
+BATASAN PANJANG PER-FIELD (WAJIB DIIKUTI):
+- berjalan_baik: MAKSIMAL 300 KARAKTER
+- hambatan: MAKSIMAL 300 KARAKTER
+- solusi: MAKSIMAL 300 KARAKTER
+- improvement: MAKSIMAL 300 KARAKTER
 
-1. **Hal yang Berjalan dengan Baik**
-   - Jelaskan apa yang berhasil dalam pembelajaran hari ini
-   - Sertakan contoh spesifik
+LARANGAN FORMAT MARKDOWN DI DALAM JSON VALUE:
+- ❌ Jangan pakai **bold**, *italic*, # heading
+- ❌ Jangan pakai bullet list ( - , * ) di dalam string
+- ✅ Gunakan plain text biasa saja
 
-2. **Hambatan/Kendala**
-   - Identifikasi kendala yang dihadapi
-   - Jelaskan penyebabnya
-
-3. **Solusi yang Dilakukan**
-   - Langkah konkret yang sudah diambil untuk mengatasi kendala
-
-4. **Langkah Improvement**
-   - Rencana perbaikan untuk pertemuan berikutnya
-
-## Aturan:
-1. Gunakan bahasa formal Indonesia untuk administrasi
-2. Setiap poin ditulis dalam paragraf yang terpisah
-3. Bersikap objektif dan reflektif
-4. Sertakan contoh konkret yang bisa diverifikasi
-5. Total output maksimal 500 kata
-
-## Output Format:
+OUTPUT JSON SCHEMA:
 {
-  "berjalan_baik": "paragraf tentang keberhasilan",
-  "hambatan": "paragraf tentang kendala",
-  "solusi": "paragraf tentang solusi yang dilakukan",
-  "improvement": "paragraf tentang rencana improvement"
+  "berjalan_baik": "string (maks 300 karakter)",
+  "hambatan": "string (maks 300 karakter)",
+  "solusi": "string (maks 300 karakter)",
+  "improvement": "string (maks 300 karakter)"
 }
-`.trim();
+
+CONTOH OUTPUT YANG BENAR:
+{
+  "berjalan_baik": "Siswa sangat antusias saat kegiatan kelompok. Diskusi berjalan aktif dan semua siswa berpartisipasi. Hasil latihan menunjukkan 80% siswa memahami konsep.",
+  "hambatan": "Beberapa siswa kesulitan memahami konsep awal karena belum punya fondasi yang kuat. Waktu untuk diskusi terbatas.",
+  "solusi": "Saya memberikan penjelasan tambahan secara individual dan memfasilitasi kelompok diskusi campuran kemampuan.",
+  "improvement": "Perlu alokasi waktu lebih untuk pendahuluan. Pertemuan depan akan mulai dengan penguatan konsep dasar terlebih dahulu."
+}
+
+CATATAN: AI TIDAK SELALU PATUH BATASAN. LAKUKAN TRUNCATE DI LAYER VALIDASI.
+
+Keluaran HANYA JSON valid, tanpa markdown code block.`.trim();
 }
 
 // ============================================

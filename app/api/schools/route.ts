@@ -16,6 +16,7 @@ export async function GET() {
   try {
     const userId = await getUserId();
     // Get schools from junction table OR owned schools (multi-school support)
+    // Include userId in response for client-side filtering
     const schools = await query(`
       SELECT DISTINCT ON (s.id)
         s.id,
@@ -25,10 +26,11 @@ export async function GET() {
         s.npsn,
         s.nama_kepala_sekolah,
         s.created_at,
+        s.user_id,
         CASE WHEN s.user_id = $1 THEN true ELSE false END as is_owner
       FROM schools s
-      LEFT JOIN user_school_assignments usa ON usa.schoolid = s.id AND usa.userid = $1
-      WHERE s.user_id = $1 OR usa.userid = $1
+      LEFT JOIN user_school_assignments usa ON usa."schoolId" = s.id AND usa."userId" = $1
+      WHERE s.user_id = $1 OR usa."userId" = $1
       ORDER BY s.id, is_owner DESC
     `, [userId]);
     return NextResponse.json(schools.rows);

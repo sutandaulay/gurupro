@@ -90,7 +90,8 @@ export async function activateTransaction(transactionId: string): Promise<{ succ
          subscription_status = 'active',
          subscription_start = COALESCE($3, NOW()),
          subscription_end = $4,
-         grace_period_ends_at = NULL
+         grace_period_ends_at = NULL,
+         last_expiry_warning_sent = NULL
      WHERE id = $5`,
     [tokensToAdd, newPlanKey, currentStart, newEnd, userId]
   );

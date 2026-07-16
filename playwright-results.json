@@ -1,0 +1,255 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "D:\\gurupro\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "tests/e2e/batch-input-nilai.spec.ts",
+      "-g",
+      "invalid nilai in middle of batch",
+      "--project=chromium"
+    ],
+    "configFile": "D:\\gurupro\\playwright.config.ts",
+    "rootDir": "D:/gurupro/tests/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "D:\\gurupro\\tests\\e2e\\global-setup.ts",
+    "globalTeardown": "D:\\gurupro\\tests\\e2e\\global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "D:/gurupro/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "D:/gurupro/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "D:/gurupro/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "D:/gurupro/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "D:/gurupro/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "D:/gurupro/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "D:/gurupro/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "Mobile Chrome",
+        "name": "Mobile Chrome",
+        "testDir": "D:/gurupro/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "D:/gurupro/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "Mobile Safari",
+        "name": "Mobile Safari",
+        "testDir": "D:/gurupro/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "html",
+        {
+          "outputFolder": "playwright-report"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "playwright-results.json"
+        }
+      ],
+      [
+        "list",
+        null
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 2,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:3000",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "batch-input-nilai.spec.ts",
+      "file": "batch-input-nilai.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "MV-03: Batch Input Edge Cases",
+          "file": "batch-input-nilai.spec.ts",
+          "line": 436,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should handle invalid nilai in middle of batch - ALL-OR-NOTHING vs PARTIAL behavior",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 34288,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at D:\\gurupro\\tests\\e2e\\batch-input-nilai.spec.ts:437:8",
+                        "location": {
+                          "file": "D:\\gurupro\\tests\\e2e\\batch-input-nilai.spec.ts",
+                          "column": 8,
+                          "line": 437
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 435 |\u001b[39m \u001b[90m// Edge case tests for MV-03\u001b[39m\n \u001b[90m 436 |\u001b[39m test\u001b[33m.\u001b[39mdescribe(\u001b[32m'MV-03: Batch Input Edge Cases'\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 437 |\u001b[39m   test\u001b[33m.\u001b[39mbeforeEach(\u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\n \u001b[90m     |\u001b[39m        \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 438 |\u001b[39m     \u001b[36mawait\u001b[39m login(page\u001b[33m,\u001b[39m\n \u001b[90m 439 |\u001b[39m       \u001b[32m`${TEST_PREFIX}guru-3bulan@test.gurupro.id`\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 440 |\u001b[39m       \u001b[32m'TestPassword123!'\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "D:\\gurupro\\tests\\e2e\\batch-input-nilai.spec.ts",
+                            "column": 8,
+                            "line": 437
+                          },
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n\u001b[0m \u001b[90m 435 |\u001b[39m \u001b[90m// Edge case tests for MV-03\u001b[39m\n \u001b[90m 436 |\u001b[39m test\u001b[33m.\u001b[39mdescribe(\u001b[32m'MV-03: Batch Input Edge Cases'\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 437 |\u001b[39m   test\u001b[33m.\u001b[39mbeforeEach(\u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\n \u001b[90m     |\u001b[39m        \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 438 |\u001b[39m     \u001b[36mawait\u001b[39m login(page\u001b[33m,\u001b[39m\n \u001b[90m 439 |\u001b[39m       \u001b[32m`${TEST_PREFIX}guru-3bulan@test.gurupro.id`\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 440 |\u001b[39m       \u001b[32m'TestPassword123!'\u001b[39m\u001b[0m\n\u001b[2m    at D:\\gurupro\\tests\\e2e\\batch-input-nilai.spec.ts:437:8\u001b[22m"
+                        },
+                        {
+                          "location": {
+                            "file": "D:\\gurupro\\tests\\e2e\\batch-input-nilai.spec.ts",
+                            "column": 14,
+                            "line": 41
+                          },
+                          "message": "Error: page.waitForURL: Test timeout of 30000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard**\" until \"load\"\n============================================================\n\n\u001b[0m \u001b[90m 39 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m password)\u001b[33m;\u001b[39m\n \u001b[90m 40 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 41 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m'**/dashboard**'\u001b[39m\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m30000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 42 |\u001b[39m }\n \u001b[90m 43 |\u001b[39m\n \u001b[90m 44 |\u001b[39m \u001b[36masync\u001b[39m \u001b[36mfunction\u001b[39m navigateToBukuNilai(page\u001b[33m:\u001b[39m \u001b[33mPage\u001b[39m) {\u001b[0m\n\u001b[2m    at login (D:\\gurupro\\tests\\e2e\\batch-input-nilai.spec.ts:41:14)\u001b[22m\n\u001b[2m    at D:\\gurupro\\tests\\e2e\\batch-input-nilai.spec.ts:438:5\u001b[22m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-15T08:00:23.984Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "D:\\gurupro\\test-results\\batch-input-nilai-MV-03-Ba-9efea-NOTHING-vs-PARTIAL-behavior-chromium\\test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "D:\\gurupro\\test-results\\batch-input-nilai-MV-03-Ba-9efea-NOTHING-vs-PARTIAL-behavior-chromium\\video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "D:\\gurupro\\test-results\\batch-input-nilai-MV-03-Ba-9efea-NOTHING-vs-PARTIAL-behavior-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "D:\\gurupro\\tests\\e2e\\batch-input-nilai.spec.ts",
+                        "column": 8,
+                        "line": 437
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "fdfed568f0b54082824b-e7d9eececf2c0468bc41",
+              "file": "batch-input-nilai.spec.ts",
+              "line": 444,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-15T08:00:03.630Z",
+    "duration": 101922.977,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

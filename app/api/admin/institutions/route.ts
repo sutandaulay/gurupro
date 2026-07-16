@@ -15,7 +15,7 @@ async function requireAdmin() {
   const userId = session.id;
 
   const result = await query('SELECT role FROM users WHERE id = $1', [userId]);
-  if (result.rows.length === 0 || result.rows[0].role !== 'admin') {
+  if (result.rows.length === 0 || !['admin', 'super_admin', 'manager'].includes(result.rows[0].role)) {
     throw new Error('Forbidden');
   }
 

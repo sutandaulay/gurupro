@@ -6,6 +6,12 @@ import { sendWhatsAppNotification, sendEmailNotification } from "@/lib/notificat
 import { SHARE_LINK_DEFAULT_EXPIRY_DAYS } from "@/collections/config";
 import { query } from "@/lib/db";
 
+// Get app URL with fallback
+function getAppUrl(): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://gurupro.id";
+  return appUrl.replace(/\/$/, "");
+}
+
 // Helper function to parse time string "HH:MM" to minutes since midnight
 function parseTimeToMinutes(timeStr: string): number {
   const parts = timeStr.split(":");
@@ -271,7 +277,7 @@ export async function GET(req: Request) {
           },
         });
 
-        const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/leader-view/${shareToken}`;
+        const shareUrl = `${getAppUrl()}/leader-view/${shareToken}`;
         const leaderName = (contact as any).leaderName || "Pimpinan";
         const shareMessage = generateShareMessage(leaderName, "Guru", shareUrl);
 

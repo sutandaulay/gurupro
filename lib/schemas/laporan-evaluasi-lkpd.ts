@@ -7,9 +7,13 @@
  * - Formal/administrative language for school leadership
  * - Aggregate data only (no individual student names in narrative)
  * - Actionable recommendations
+ *
+ * Updated: 14 Juli 2026 - Character limits dan fallbacks untuk robust output
+ * Reference: docs/ai-generation-standard.md
  */
 
 import { z } from 'zod';
+import { truncateText } from '@/lib/ai/validation-utils';
 
 // ============================================
 // INPUT SCHEMAS (Form Input from Teacher)
@@ -54,31 +58,51 @@ export type LaporanEvaluasiLkpdInput = z.infer<typeof laporanEvaluasiLkpdInputSc
 // ============================================
 
 export const capaianPerKKTPSchema = z.object({
-  kktp: z.string(),
+  kktp: z.string()
+    .min(1, 'KKTP wajib diisi')
+    .max(200, 'KKTP maksimal 200 karakter')
+    .transform(val => truncateText(val, 200)),
   persentaseTuntas: z.number().min(0).max(100),
   kategoriCapaian: z.enum(['sangat_baik', 'baik', 'cukup', 'perlu_perhatian']),
 });
 
 export const siswaPerluPerhatianSchema = z.object({
   // Catatan agregat, BUKAN nama siswa individual
-  catatan: z.string(),
-  jumlahSiswaTerdampak: z.number(),
+  catatan: z.string()
+    .min(1)
+    .max(500, 'Catatan maksimal 500 karakter')
+    .transform(val => truncateText(val, 500)),
+  jumlahSiswaTerdampak: z.number().int().nonnegative(),
 });
 
 export const laporanEvaluasiLkpdOutputSchema = z.object({
   identitas: z.object({
-    mataPelajaran: z.string(),
-    kelas: z.string(),
-    periodeEvaluasi: z.string(),
-    jumlahSiswa: z.number(),
-    guruPengampu: z.string().nullable(),
-    lkpdRef: z.string().nullable(),
+    mataPelajaran: z.string().min(1).default('Tidak tersedia'),
+    kelas: z.string().min(1).default('Tidak ditentukan'),
+    periodeEvaluasi: z.string().min(1).default('Tidak ditentukan'),
+    jumlahSiswa: z.number().int().positive().default(0),
+    guruPengampu: z.string().nullable().default(null),
+    lkpdRef: z.string().nullable().default(null),
   }),
-  ringkasanEksekutif: z.string().max(500),
-  capaianPerKKTP: z.array(capaianPerKKTPSchema).min(1),
-  temuanUtama: z.array(z.string()).max(5),
-  siswaPerluPerhatian: siswaPerluPerhatianSchema.nullable(),
-  rekomendasiTindakLanjut: z.array(z.string()).min(1).max(5),
+  ringkasanEksekutif: z.string()
+    .min(1, 'Ringkasan wajib diisi')
+    .max(600, 'Ringkasan maksimal 600 karakter')
+    .transform(val => truncateText(val, 500)) // Enforce strict 500
+    .catch('Data ringkasan tidak tersedia.'),
+  capaianPerKKTP: z.array(capaianPerKKTPSchema).min(1).default([]),
+  temuanUtama: z.array(
+    z.string()
+      .min(1)
+      .max(400, 'Temuan maksimal 400 karakter')
+      .transform(val => truncateText(val, 300))
+  ).max(5, 'Maksimal 5 temuan').default([]),
+  siswaPerluPerhatian: siswaPerluPerhatianSchema.nullable().optional(),
+  rekomendasiTindakLanjut: z.array(
+    z.string()
+      .min(1)
+      .max(350, 'Rekomendasi maksimal 350 karakter')
+      .transform(val => truncateText(val, 250))
+  ).min(1, 'Minimal 1 rekomendasi').max(5, 'Maksimal 5 rekomendasi').default([]),
   // Metadata
   isEstimasiKualitatif: z.boolean().default(false),
 });

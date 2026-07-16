@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { getPosts, getCategories } from "@/lib/payload";
+import { getBlogPosts, getBlogCategories } from "@/lib/blog-queries";
 
 export const revalidate = 60;
 
@@ -12,12 +12,10 @@ export default async function BlogPage({
   const sp = await searchParams;
   const categorySlug = typeof sp.kategori === "string" ? sp.kategori : undefined;
 
-  const [postsData, categories] = await Promise.all([
-    getPosts({ category: categorySlug, limit: 50 }),
-    getCategories(),
+  const [posts, categories] = await Promise.all([
+    getBlogPosts({ category: categorySlug, limit: 50 }),
+    getBlogCategories(),
   ]);
-
-  const posts = postsData.docs as any[];
 
   return (
     <div className="min-h-screen bg-slate-50">

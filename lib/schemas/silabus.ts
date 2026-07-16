@@ -2,9 +2,13 @@
  * Silabus/ATP Schema
  * Zod schemas for Alur Tujuan Pembelajaran (Silabus Semester)
  * Follows Permendikdasmen No. 1/2026 and No. 13/2025
+ *
+ * Updated: 14 Juli 2026 - Character limits dan fallbacks untuk robust output
+ * Reference: docs/ai-generation-standard.md
  */
 
 import { z } from 'zod';
+import { truncateText, PRESET_LIMITS, PRESET_FALLBACKS } from '@/lib/ai/validation-utils';
 
 // ============================================
 // INPUT SCHEMAS (Form Input)
@@ -32,28 +36,49 @@ export type SilabusInput = z.infer<typeof silabusInputSchema>;
 
 export const alurUnitSchema = z.object({
   unitKe: z.number().int().positive(),
-  topik: z.string().min(1),
-  tujuanPembelajaran: z.array(z.string()).min(1),
-  dimensiProfilLulusanTerhubung: z.array(z.string()).max(2),
-  estimasiPertemuan: z.number().int().positive(),
-  estimasiMinggu: z.number().int().positive(),
-  kataKunciMateri: z.array(z.string()).max(5),
-  catatanKokurikuler: z.string().nullable().optional(),
+  topik: z.string()
+    .min(1, 'Topik wajib diisi')
+    .max(100, 'Topik maksimal 100 karakter')
+    .transform(val => truncateText(val, 100)),
+  tujuanPembelajaran: z.array(
+    z.string()
+      .min(1, 'Tujuan pembelajaran wajib diisi')
+      .max(200, 'Maksimal 200 karakter')
+      .transform(val => truncateText(val, 200))
+  ).min(1, 'Minimal 1 tujuan pembelajaran').max(5, 'Maksimal 5 tujuan pembelajaran'),
+  dimensiProfilLulusanTerhubung: z.array(z.string()).max(2).default([]),
+  estimasiPertemuan: z.number().int().positive().default(2),
+  estimasiMinggu: z.number().int().positive().default(1),
+  kataKunciMateri: z.array(
+    z.string()
+      .max(50, 'Kata kunci maksimal 50 karakter')
+      .transform(val => truncateText(val, 50))
+  ).max(5).default([]),
+  catatanKokurikuler: z.string()
+    .max(300, 'Catatan kokurikuler maksimal 300 karakter')
+    .transform(val => truncateText(val, 300))
+    .nullable()
+    .optional()
+    .transform(val => val || null),
 });
 
 export const silabusOutputSchema = z.object({
   identitas: z.object({
-    mataPelajaran: z.string(),
-    fase: z.string(),
-    kelas: z.string(),
-    semester: z.number(),
-    tahunAjaran: z.string().nullable(),
+    mataPelajaran: z.string().min(1, 'Mata pelajaran wajib diisi').default('Tidak tersedia'),
+    fase: z.string().min(1, 'Fase wajib diisi').default('E'),
+    kelas: z.string().min(1, 'Kelas wajib diisi').default('Kelas X'),
+    semester: z.union([z.literal(1), z.literal(2)]).default(1),
+    tahunAjaran: z.string().nullable().default(null),
   }),
-  capaianPembelajaran: z.string(),
-  alurTujuanPembelajaran: z.array(alurUnitSchema).min(1),
+  capaianPembelajaran: z.string()
+    .min(1, 'Capaian pembelajaran wajib diisi')
+    .max(2000, 'Capaian pembelajaran maksimal 2000 karakter')
+    .transform(val => truncateText(val, 2000))
+    .catch('Data capaian pembelajaran tidak tersedia'),
+  alurTujuanPembelajaran: z.array(alurUnitSchema).min(1, 'Minimal 1 unit').default([]),
   totalEstimasi: z.object({
-    totalPertemuan: z.number(),
-    totalMinggu: z.number(),
+    totalPertemuan: z.number().int().nonnegative().default(0),
+    totalMinggu: z.number().int().nonnegative().default(0),
   }),
 });
 

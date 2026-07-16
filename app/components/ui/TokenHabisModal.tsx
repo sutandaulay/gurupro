@@ -126,8 +126,8 @@ export default function TokenHabisModal({
                   </p>
                   <p className="text-xs text-amber-700">
                     {currentAddon > 0
-                      ? `Anda masih punya ${currentAddon} token eceran yang bisa dipakai setelah kuota utama habis.`
-                      : "Kuota utama reset setiap awal bulan. Beli token eceran untuk kebutuhan tambahan."}
+                      ? `Anda masih punya ${currentAddon} token ekstra yang bisa dipakai setelah kuota utama habis.`
+                      : "Kuota utama reset setiap awal bulan. Beli token ekstra untuk kebutuhan tambahan."}
                   </p>
                 </div>
               </div>
@@ -135,7 +135,7 @@ export default function TokenHabisModal({
 
             {/* Options */}
             <div className="space-y-3">
-              {/* Option 1: Beli Token Eceran */}
+              {/* Option 1: Beli Token Ekstra */}
               <button
                 onClick={handleBuyTopUp}
                 className="w-full flex items-center gap-4 p-4 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-xl transition-all group"
@@ -144,7 +144,7 @@ export default function TokenHabisModal({
                   <IconCreditCard size={24} />
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="font-semibold text-gray-900">Beli Token Eceran</p>
+                  <p className="font-semibold text-gray-900">Beli Token Ekstra</p>
                   <p className="text-xs text-gray-500">
                     Top-up instan, langsung bisa dipakai
                   </p>
@@ -191,7 +191,7 @@ export default function TokenHabisModal({
 
             {/* Footer Note */}
             <p className="mt-5 text-center text-xs text-gray-400">
-              Token eceran tidak hangus saat reset bulanan.
+              Token ekstra tidak hangus saat reset bulanan.
               <br />
               Sisa token utama tidak diakumulasi ke bulan berikutnya.
             </p>

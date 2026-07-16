@@ -23,13 +23,12 @@ export async function POST(request: Request) {
   try {
     const userId = await getUserId();
     const body = await request.json();
-    const { referralCode } = body;
+    const { referralCode, referral_code } = body;
+    const cleanCode = (referralCode || referral_code || "").trim().toUpperCase();
 
-    if (!referralCode) {
+    if (!cleanCode) {
       return NextResponse.json({ error: 'Kode referral diperlukan' }, { status: 400 });
     }
-
-    const cleanCode = referralCode.trim().toUpperCase();
 
     // 1. Check if user already has a referrer
     const userCheck = await query(

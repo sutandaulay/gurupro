@@ -1,3 +1,33 @@
+/**
+ * AI Document Generation Monitoring
+ * Track output lengths and rendering issues
+ *
+ * In development: logs truncation events to console
+ * In production: sends to analytics service
+ */
+export function trackDocumentOutput(
+  feature: string,
+  data: {
+    field: string;
+    originalLength: number;
+    maxAllowed: number;
+  }
+): void {
+  // Only track in development or if analytics is configured
+  if (process.env.NODE_ENV !== 'production' || process.env.AI_ANALYTICS_URL) {
+    const truncated = data.originalLength > data.maxAllowed;
+    if (truncated) {
+      console.warn(
+        `[${feature}] Truncated "${data.field}":`,
+        `${data.originalLength} → ${data.maxAllowed} chars`
+      );
+    }
+  }
+
+  // TODO: Send to analytics service in production
+  // e.g., await fetch(process.env.AI_ANALYTICS_URL, { method: 'POST', body: JSON.stringify({ feature, ...data }) });
+}
+
 import pptxgen from "pptxgenjs";
 import PDFDocument from "pdfkit";
 import { LKPDOutput, Aktivitas } from "./schemas/lkpd";
@@ -8,6 +38,7 @@ import {
   getKategoriColor,
   formatPersentase,
 } from "./schemas/laporan-evaluasi-lkpd";
+import { truncateText } from "./ai/validation-utils";
 
 interface SlideData {
   title: string;
@@ -163,6 +194,7 @@ export async function generatePptxBuffer(slideMarkdown: string, topic: string): 
 
 /**
  * Generate PDF buffer from Markdown
+ * With robust overflow handling
  */
 export async function generatePdfBuffer(markdown: string, title: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -200,15 +232,19 @@ export async function generatePdfBuffer(markdown: string, title: string): Promis
         doc.font("Helvetica-Bold").fontSize(10).text(line.substring(4));
         doc.moveDown(0.4);
       } else if (line.startsWith("- ")) {
-        doc.font("Helvetica").fontSize(9).text("• " + line.substring(2), { indent: 15 });
+        // Truncate bullet items for safety
+        const truncated = truncateText(line.substring(2), 100);
+        doc.font("Helvetica").fontSize(9).text("• " + truncated, { indent: 15 });
         doc.moveDown(0.2);
       } else {
-        // Plain text: strip out bold/italic styling tags for simplicity in PDFkit text
+        // Plain text: strip out bold/italic styling tags and truncate
         const cleanText = line
           .replace(/\*\*(.*?)\*\*/g, "$1")
           .replace(/\*(.*?)\*/g, "$1");
 
-        doc.font("Helvetica").fontSize(9).text(cleanText, { align: "justify" });
+        // Truncate very long lines
+        const truncated = truncateText(cleanText, 500);
+        doc.font("Helvetica").fontSize(9).text(truncated, { align: "justify" });
         doc.moveDown(0.3);
       }
     };
@@ -236,15 +272,15 @@ export function generateDocBuffer(markdown: string, title: string): Buffer {
     .replace(/\n\n/g, "</p><p style='font-family: Arial, sans-serif; font-size: 11pt; color: #334155; line-height: 1.5; text-align: justify; margin-bottom: 6pt;'>")
     .replace(/\n/g, "<br>");
 
-  // Handle markdown tables
+  // Handle markdown tables with word-wrap
   bodyHtml = bodyHtml.replace(/\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g, (match: string, header: string, body: string) => {
     const headerCells = header.split('|').filter((c: string) => c.trim()).map((c: string) => `<th style="border: 1px solid #333333; padding: 6pt; background-color: #f0f0f0; font-weight: bold; text-align: center;">${c.trim()}</th>`).join('');
     const headerRow = `<tr>${headerCells}</tr>`;
     const bodyRows = body.trim().split('\n').map((row: string) => {
-      const cells = row.split('|').filter((c: string | undefined) => c !== undefined).slice(1, -1).map((c: string) => `<td style="border: 1px solid #333333; padding: 6pt;">${c.trim()}</td>`).join('');
+      const cells = row.split('|').filter((c: string | undefined) => c !== undefined).slice(1, -1).map((c: string) => `<td style="border: 1px solid #333333; padding: 6pt; word-wrap: break-word; overflow-wrap: break-word;">${truncateText(c.trim(), 100)}</td>`).join('');
       return `<tr>${cells}</tr>`;
     }).join('');
-    return `<table style="width: 100%; border-collapse: collapse; margin: 12pt 0; font-size: 10pt;">${headerRow}${bodyRows}</table>`;
+    return `<table style="width: 100%; border-collapse: collapse; margin: 12pt 0; font-size: 10pt; table-layout: fixed;">${headerRow}${bodyRows}</table>`;
   });
 
   const html = `
@@ -260,6 +296,11 @@ export function generateDocBuffer(markdown: string, title: string): Buffer {
         </w:WordDocument>
       </xml>
       <![endif]-->
+      <style>
+        body { font-family: Arial, sans-serif; padding: 40px; }
+        td { word-wrap: break-word; overflow-wrap: break-word; }
+        p { word-wrap: break-word; overflow-wrap: break-word; }
+      </style>
     </head>
     <body style="padding: 40px; font-family: Arial, sans-serif;">
       ${bodyHtml}
@@ -276,6 +317,7 @@ export function generateDocBuffer(markdown: string, title: string): Buffer {
 
 /**
  * Generate print-ready PDF for structured LKPD
+ * With robust overflow handling
  */
 export async function generateLkpdPdfBuffer(lkpdData: LKPDOutput, title: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -292,16 +334,15 @@ export async function generateLkpdPdfBuffer(lkpdData: LKPDOutput, title: string)
     doc.font("Helvetica-Bold").fontSize(14).text("LEMBAR KERJA PESERTA DIDIK (LKPD)", { align: "center" });
     doc.moveDown(0.5);
 
-    // Identitas
+    // Identitas - with truncation for safety
     doc.font("Helvetica").fontSize(10);
-    doc.text(`Mata Pelajaran : ${identitas.mataPelajaran}`, { indent: 0 });
+    doc.text(`Mata Pelajaran : ${truncateText(identitas.mataPelajaran, 50)}`, { indent: 0 });
     doc.text(`Fase           : ${identitas.fase}`, { indent: 0 });
-    doc.text(`Topik          : ${identitas.topik}`, { indent: 0 });
+    doc.text(`Topik          : ${truncateText(identitas.topik, 60)}`, { indent: 0 });
     doc.moveDown(0.3);
 
     // Name/Group fields (empty for handwriting)
     const col1X = 50;
-    const col2X = 280;
     doc.font("Helvetica").fontSize(10);
     doc.text(`Nama Siswa     : ________________________`, { indent: 0 });
     doc.text(`Kelas          : ________`, { continued: true, indent: 0 });
@@ -312,16 +353,16 @@ export async function generateLkpdPdfBuffer(lkpdData: LKPDOutput, title: string)
     doc.moveTo(50, doc.y).lineTo(560, doc.y).stroke();
     doc.moveDown(0.5);
 
-    // Tujuan Kegiatan
+    // Tujuan Kegiatan - with truncation
     doc.font("Helvetica-Bold").fontSize(11).text("TUJUAN KEGIATAN", { underline: true });
-    doc.font("Helvetica").fontSize(10).text(tujuanKegiatan);
+    doc.font("Helvetica").fontSize(10).text(truncateText(tujuanKegiatan, 280), { align: "justify" });
     doc.moveDown(0.5);
 
-    // Petunjuk Pengerjaan
+    // Petunjuk Pengerjaan - with truncation
     doc.font("Helvetica-Bold").fontSize(11).text("PETUNJUK PENGERJAAN", { underline: true });
     doc.font("Helvetica").fontSize(10);
     petunjukPengerjaan.forEach((petunjuk, idx) => {
-      doc.text(`${idx + 1}. ${petunjuk}`);
+      doc.text(`${idx + 1}. ${truncateText(petunjuk, 140)}`);
     });
     doc.moveDown(0.5);
 
@@ -332,7 +373,8 @@ export async function generateLkpdPdfBuffer(lkpdData: LKPDOutput, title: string)
     aktivitas.forEach((act: Aktivitas) => {
       // Activity header
       doc.font("Helvetica-Bold").fontSize(10).text(`Aktivitas ${act.nomor} - ${act.tahap === 'memahami' ? 'MEMAHAMI' : 'MENGAPLIKASI'}`);
-      doc.font("Helvetica").fontSize(10).text(act.instruksi);
+      // Instruksi with truncation
+      doc.font("Helvetica").fontSize(10).text(truncateText(act.instruksi, 380), { align: "justify" });
       doc.moveDown(0.3);
 
       // Render response space based on jenisRespon
@@ -348,7 +390,7 @@ export async function generateLkpdPdfBuffer(lkpdData: LKPDOutput, title: string)
       doc.moveDown(0.3);
 
       refleksiSingkat.forEach((refleksi, idx) => {
-        doc.font("Helvetica").fontSize(10).text(`${idx + 1}. ${refleksi}`);
+        doc.font("Helvetica").fontSize(10).text(`${idx + 1}. ${truncateText(refleksi, 190)}`);
         // Draw lines for answers
         for (let i = 0; i < 3; i++) {
           doc.moveDown(0.2);
@@ -439,6 +481,7 @@ function getTableHeader(col: number): string {
 
 /**
  * Generate DOCX buffer for structured LKPD
+ * With robust overflow handling and word-wrap
  */
 export function generateLkpdDocBuffer(lkpdData: LKPDOutput, title: string): Buffer {
   const { identitas, petunjukPengerjaan, tujuanKegiatan, aktivitas, refleksiSingkat } = lkpdData;
@@ -448,7 +491,7 @@ export function generateLkpdDocBuffer(lkpdData: LKPDOutput, title: string): Buff
     return `
       <div style="margin-bottom: 15pt;">
         <p style="font-family: Arial, sans-serif; font-size: 11pt; font-weight: bold;">Aktivitas ${act.nomor} - ${act.tahap === 'memahami' ? 'MEMAHAMI' : 'MENGAPLIKASI'}</p>
-        <p style="font-family: Arial, sans-serif; font-size: 10pt;">${act.instruksi}</p>
+        <p style="font-family: Arial, sans-serif; font-size: 10pt; word-wrap: break-word; overflow-wrap: break-word;">${truncateText(act.instruksi, 380)}</p>
         ${spaceHtml}
       </div>
     `;
@@ -458,7 +501,7 @@ export function generateLkpdDocBuffer(lkpdData: LKPDOutput, title: string): Buff
     <div style="page-break-before: always;">
       <h3 style="font-family: Arial, sans-serif; font-size: 12pt; border-bottom: 1px solid #333;">REFLEKSI DIRI</h3>
       ${refleksiSingkat.map((r, i) => `
-        <p style="font-family: Arial, sans-serif; font-size: 10pt;">${i + 1}. ${r}</p>
+        <p style="font-family: Arial, sans-serif; font-size: 10pt; word-wrap: break-word; overflow-wrap: break-word;">${i + 1}. ${truncateText(r, 190)}</p>
         <p style="font-family: Arial, sans-serif; font-size: 10pt; color: #666;">Jawaban: _________________________________________________________________</p>
         <p style="font-family: Arial, sans-serif; font-size: 10pt; color: #666;">_________________________________________________________________</p>
       `).join('')}
@@ -478,17 +521,21 @@ export function generateLkpdDocBuffer(lkpdData: LKPDOutput, title: string): Buff
         </w:WordDocument>
       </xml>
       <![endif]-->
+      <style>
+        td { word-wrap: break-word; overflow-wrap: break-word; }
+        p { word-wrap: break-word; overflow-wrap: break-word; }
+      </style>
     </head>
     <body style="padding: 40px; font-family: Arial, sans-serif;">
       <h1 style="font-family: Arial, sans-serif; font-size: 16pt; text-align: center; margin-bottom: 10pt;">
         LEMBAR KERJA PESERTA DIDIK (LKPD)
       </h1>
 
-      <table style="font-family: Arial, sans-serif; font-size: 10pt; margin-bottom: 15pt;">
+      <table style="font-family: Arial, sans-serif; font-size: 10pt; margin-bottom: 15pt; table-layout: fixed;">
         <tr>
-          <td style="padding: 3pt;">Mata Pelajaran</td>
+          <td style="padding: 3pt; width: 100px;">Mata Pelajaran</td>
           <td style="padding: 3pt;">:</td>
-          <td style="padding: 3pt;">${identitas.mataPelajaran}</td>
+          <td style="padding: 3pt; word-wrap: break-word;">${truncateText(identitas.mataPelajaran, 50)}</td>
         </tr>
         <tr>
           <td style="padding: 3pt;">Fase</td>
@@ -498,7 +545,7 @@ export function generateLkpdDocBuffer(lkpdData: LKPDOutput, title: string): Buff
         <tr>
           <td style="padding: 3pt;">Topik</td>
           <td style="padding: 3pt;">:</td>
-          <td style="padding: 3pt;">${identitas.topik}</td>
+          <td style="padding: 3pt; word-wrap: break-word;">${truncateText(identitas.topik, 60)}</td>
         </tr>
         <tr>
           <td style="padding: 3pt;">Nama Siswa</td>
@@ -518,11 +565,11 @@ export function generateLkpdDocBuffer(lkpdData: LKPDOutput, title: string): Buff
       <hr style="border: 1px solid #333; margin: 10pt 0;">
 
       <h3 style="font-family: Arial, sans-serif; font-size: 12pt;">TUJUAN KEGIATAN</h3>
-      <p style="font-family: Arial, sans-serif; font-size: 10pt; text-align: justify;">${tujuanKegiatan}</p>
+      <p style="font-family: Arial, sans-serif; font-size: 10pt; text-align: justify; word-wrap: break-word; overflow-wrap: break-word;">${truncateText(tujuanKegiatan, 280)}</p>
 
       <h3 style="font-family: Arial, sans-serif; font-size: 12pt;">PETUNJUK PENGERJAAN</h3>
       <ol style="font-family: Arial, sans-serif; font-size: 10pt;">
-        ${petunjukPengerjaan.map(p => `<li style="margin-bottom: 5pt;">${p}</li>`).join('')}
+        ${petunjukPengerjaan.map(p => `<li style="margin-bottom: 5pt; word-wrap: break-word; overflow-wrap: break-word;">${truncateText(p, 140)}</li>`).join('')}
       </ol>
 
       <h3 style="font-family: Arial, sans-serif; font-size: 12pt;">AKTIVITAS</h3>
@@ -650,19 +697,26 @@ export async function generateLaporanEvaluasiPdfBuffer(
 
     doc.moveDown(1);
 
-    // Ringkasan Eksekutif - Highlight Box (Amber)
+    // Ringkasan Eksekutif - Highlight Box (Amber) with auto-height
     doc.font("Helvetica-Bold").fontSize(11).fillColor(AMBER).text("B. RINGKASAN EKSEKUTIF");
     doc.fillColor("black");
     doc.moveDown(0.3);
 
-    // Draw amber box
+    // Truncate ringkasan to safe length before rendering
+    const safeRingkasan = truncateText(ringkasanEksekutif, 480);
+
+    // Calculate approximate height needed
+    const boxHeight = Math.max(60, Math.min(100, 40 + (safeRingkasan.length / 3)));
+
+    // Draw amber box with auto-height
     const boxY = doc.y;
-    doc.rect(50, boxY, 510, 60).fill(AMBER_LIGHT);
-    doc.font("Helvetica").fontSize(10).text(ringkasanEksekutif, 55, boxY + 5, {
+    doc.rect(50, boxY, 510, boxHeight).fill(AMBER_LIGHT);
+    doc.font("Helvetica").fontSize(10).text(safeRingkasan, 55, boxY + 5, {
       width: 500,
-      height: 50,
+      height: boxHeight - 10,
+      align: "left",
     });
-    doc.y = boxY + 70;
+    doc.y = boxY + boxHeight + 10;
     doc.moveDown(1);
 
     // Capaian per KKTP Table
@@ -683,7 +737,7 @@ export async function generateLaporanEvaluasiPdfBuffer(
     doc.text("% Tuntas", 50 + colWidths[0] + 10, tableTop + 6);
     doc.text("Kategori", 50 + colWidths[0] + colWidths[1] + 10, tableTop + 6);
 
-    // Data rows
+    // Data rows with truncation
     let rowY = tableTop + rowHeight;
     capaianPerKKTP.forEach((capaian, idx) => {
       const bgColor = idx % 2 === 0 ? "#F9FAFB" : "white";
@@ -695,7 +749,9 @@ export async function generateLaporanEvaluasiPdfBuffer(
       // Fill row background
       doc.rect(50, rowY, 510, rowHeight).fill(bgColor);
 
-      doc.font("Helvetica").fontSize(9).text(capaian.kktp, 52, rowY + 6, { width: colWidths[0] - 5 });
+      // Truncate kktp for display
+      const safeKktp = truncateText(capaian.kktp, 45);
+      doc.font("Helvetica").fontSize(9).text(safeKktp, 52, rowY + 6, { width: colWidths[0] - 5, ellipsis: true });
       doc.text(formatPersentase(capaian.persentaseTuntas), 50 + colWidths[0] + 10, rowY + 6);
 
       // Color-coded category
@@ -779,12 +835,13 @@ export function generateLaporanEvaluasiDocBuffer(
 ): Buffer {
   const { identitas, ringkasanEksekutif, capaianPerKKTP, temuanUtama, siswaPerluPerhatian, rekomendasiTindakLanjut } = data;
 
-  // Build table rows
+  // Build table rows with truncation
   const tableRows = capaianPerKKTP.map((capaian) => {
     const colorStyle = getKategoriColorStyle(capaian.kategoriCapaian);
+    const safeKktp = truncateText(capaian.kktp, 45);
     return `
       <tr>
-        <td style="border: 1px solid #333; padding: 8pt; font-size: 9pt;">${capaian.kktp}</td>
+        <td style="border: 1px solid #333; padding: 8pt; font-size: 9pt; word-wrap: break-word; overflow-wrap: break-word;">${safeKktp}</td>
         <td style="border: 1px solid #333; padding: 8pt; font-size: 9pt; text-align: center;">${formatPersentase(capaian.persentaseTuntas)}</td>
         <td style="border: 1px solid #333; padding: 8pt; font-size: 9pt; ${colorStyle}">${getKategoriLabel(capaian.kategoriCapaian)}</td>
       </tr>
@@ -802,9 +859,11 @@ export function generateLaporanEvaluasiDocBuffer(
         h2 { font-size: 12pt; color: #333; border-bottom: 1px solid #ccc; padding-bottom: 4pt; margin-top: 16pt; }
         h3 { font-size: 11pt; color: #333; }
         .highlight-box { background-color: #FEF3C7; border: 2px solid #F59E0B; padding: 12pt; margin: 12pt 0; }
-        table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
+        table { width: 100%; border-collapse: collapse; margin: 12pt 0; table-layout: fixed; }
         th { background-color: #1E3A8A; color: white; border: 1px solid #333; padding: 8pt; font-size: 9pt; text-align: center; }
-        td { border: 1px solid #333; padding: 8pt; font-size: 9pt; }
+        td { border: 1px solid #333; padding: 8pt; font-size: 9pt; word-wrap: break-word; overflow-wrap: break-word; }
+        td.kategori { word-wrap: break-word; }
+        p { word-wrap: break-word; overflow-wrap: break-word; }
         .signature-section { margin-top: 40pt; }
         .sig-left { float: left; width: 45%; }
         .sig-right { float: right; width: 45%; text-align: center; }
@@ -821,7 +880,7 @@ export function generateLaporanEvaluasiDocBuffer(
 
       <h2>A. IDENTITAS</h2>
       <table style="font-size: 10pt;">
-        <tr><td style="border: none; padding: 3pt; width: 30%;">Mata Pelajaran</td><td style="border: none; padding: 3pt;">:</td><td style="border: none; padding: 3pt;">${identitas.mataPelajaran}</td></tr>
+        <tr><td style="border: none; padding: 3pt; width: 30%;">Mata Pelajaran</td><td style="border: none; padding: 3pt;">:</td><td style="border: none; padding: 3pt; word-wrap: break-word;">${identitas.mataPelajaran}</td></tr>
         <tr><td style="border: none; padding: 3pt;">Kelas</td><td style="border: none; padding: 3pt;">:</td><td style="border: none; padding: 3pt;">${identitas.kelas}</td></tr>
         <tr><td style="border: none; padding: 3pt;">Periode Evaluasi</td><td style="border: none; padding: 3pt;">:</td><td style="border: none; padding: 3pt;">${identitas.periodeEvaluasi}</td></tr>
         <tr><td style="border: none; padding: 3pt;">Jumlah Siswa</td><td style="border: none; padding: 3pt;">:</td><td style="border: none; padding: 3pt;">${identitas.jumlahSiswa}</td></tr>
@@ -830,7 +889,7 @@ export function generateLaporanEvaluasiDocBuffer(
 
       <h2>B. RINGKASAN EKSEKUTIF</h2>
       <div class="highlight-box">
-        <p style="font-size: 10pt; line-height: 1.5;">${ringkasanEksekutif}</p>
+        <p style="font-size: 10pt; line-height: 1.5; word-wrap: break-word; overflow-wrap: break-word;">${truncateText(ringkasanEksekutif, 480)}</p>
       </div>
 
       <h2>C. CAPAIAN PER KKTP</h2>
@@ -846,19 +905,19 @@ export function generateLaporanEvaluasiDocBuffer(
       ${temuanUtama.length > 0 ? `
         <h2>D. TEMUAN UTAMA</h2>
         <ol style="font-size: 10pt;">
-          ${temuanUtama.map(t => `<li style="margin-bottom: 6pt;">${t}</li>`).join('')}
+          ${temuanUtama.map(t => `<li style="margin-bottom: 6pt; word-wrap: break-word; overflow-wrap: break-word;">${truncateText(t, 280)}</li>`).join('')}
         </ol>
       ` : ''}
 
       ${siswaPerluPerhatian ? `
         <h2>E. SISWA PERLU PERHATIAN</h2>
         <p style="font-size: 10pt;">Jumlah siswa yang perlu perhatian khusus: <strong>${siswaPerluPerhatian.jumlahSiswaTerdampak} siswa</strong></p>
-        <p style="font-size: 10pt;">Catatan: ${siswaPerluPerhatian.catatan}</p>
+        <p style="font-size: 10pt; word-wrap: break-word; overflow-wrap: break-word;">Catatan: ${truncateText(siswaPerluPerhatian.catatan, 480)}</p>
       ` : ''}
 
       <h2>F. REKOMENDASI TINDAK LANJUT</h2>
       <ol style="font-size: 10pt;">
-        ${rekomendasiTindakLanjut.map(r => `<li style="margin-bottom: 6pt;">${r}</li>`).join('')}
+        ${rekomendasiTindakLanjut.map(r => `<li style="margin-bottom: 6pt; word-wrap: break-word; overflow-wrap: break-word;">${truncateText(r, 240)}</li>`).join('')}
       </ol>
 
       <div class="signature-section">

@@ -37,9 +37,20 @@ ATURAN WAJIB:
    data mentah, bukan di narasi laporan ini.
 5. rekomendasiTindakLanjut harus actionable dan spesifik untuk kelas/topik ini, bukan saran umum
    seperti "tingkatkan motivasi belajar".
-6. Keluarkan HANYA JSON valid sesuai schema, tanpa teks pembuka/penutup/markdown fence.
 
-SKEMA OUTPUT JSON:
+BATASAN PANJANG PER-FIELD (WAJIB DIIKUTI):
+- ringkasanEksekutif: MAKSIMAL 500 KARAKTER
+- temuanUtama (setiap item): MAKSIMAL 300 KARAKTER
+- rekomendasiTindakLanjut (setiap item): MAKSIMAL 250 KARAKTER
+- siswaPerluPerhatian.catatan: MAKSIMAL 500 KARAKTER
+
+LARANGAN FORMAT MARKDOWN DI DALAM JSON VALUE:
+- ❌ Jangan pakai **bold**, *italic*, # heading
+- ❌ Jangan pakai bullet list ( - , * ) di dalam string
+- ❌ Jangan pakai \`code block\` di dalam string
+- ✅ Gunakan plain text biasa saja
+
+OUTPUT JSON SCHEMA:
 {
   "identitas": {
     "mataPelajaran": "string",
@@ -49,22 +60,57 @@ SKEMA OUTPUT JSON:
     "guruPengampu": "string | null",
     "lkpdRef": "string | null"
   },
-  "ringkasanEksekutif": "string (maksimal 500 karakter, 3-5 kalimat)",
+  "ringkasanEksekutif": "string (maksimal 500 karakter)",
   "capaianPerKKTP": [
     {
-      "kktp": "string",
+      "kktp": "string (maksimal 200 karakter)",
       "persentaseTuntas": number (0-100),
       "kategoriCapaian": "sangat_baik | baik | cukup | perlu_perhatian"
     }
   ],
-  "temuanUtama": ["string (maksimal 5 insight konkret)"],
+  "temuanUtama": ["string (1-5 items, maksimal 300 karakter per item)"],
   "siswaPerluPerhatian": {
-    "catatan": "string (agregat, bukan nama individual)",
+    "catatan": "string (maksimal 500 karakter, agregat bukan nama individual)",
     "jumlahSiswaTerdampak": number
   } | null,
-  "rekomendasiTindakLanjut": ["string (1-5 action items spesifik)"],
+  "rekomendasiTindakLanjut": ["string (1-5 items, maksimal 250 karakter per item)"],
   "isEstimasiKualitatif": boolean
-}`;
+}
+
+CONTOH OUTPUT YANG BENAR:
+{
+  "identitas": {
+    "mataPelajaran": "Matematika",
+    "kelas": "VII-A",
+    "periodeEvaluasi": "Semester Ganjil 2026/2027",
+    "jumlahSiswa": 32,
+    "guruPengampu": "Budi Santoso, S.Pd.",
+    "lkpdRef": "LKPD-BNG-VII-2026"
+  },
+  "ringkasanEksekutif": "Secara umum, 75% siswa (24 dari 32) telah tuntas pada LKPD Bangun Datar. Capaian paling tinggi pada topik segitiga (87%) namun perlu perhatian pada topik lingkaran (58%).",
+  "capaianPerKKTP": [
+    {"kktp": "Mengidentifikasi jenis bangun datar", "persentaseTuntas": 87, "kategoriCapaian": "sangat_baik"},
+    {"kktp": "Menghitung luas bangun datar", "persentaseTuntas": 72, "kategoriCapaian": "baik"},
+    {"kktp": "Menghitung keliling bangun datar", "persentaseTuntas": 58, "kategoriCapaian": "perlu_perhatian"}
+  ],
+  "temuanUtama": [
+    "Sebagian besar siswa sudah mampu mengidentifikasi jenis bangun datar dengan baik.",
+    "Kemampuan menghitung keliling masih perlu ditingkatkan."
+  ],
+  "siswaPerluPerhatian": {
+    "catatan": "8 siswa memerlukan remedial pada topik keliling lingkaran.",
+    "jumlahSiswaTerdampak": 8
+  },
+  "rekomendasiTindakLanjut": [
+    "Lakukan remedial terbimbing untuk 8 siswa.",
+    "Sediakan latihan soal bertingkat."
+  ],
+  "isEstimasiKualitatif": false
+}
+
+CATATAN: AI TIDAK SELALU PATUH BATASAN KARAKTER. LAKUKAN TRUNCATE DI LAYER VALIDASI.
+
+Keluarkan HANYA JSON valid sesuai schema, tanpa teks pembuka/penutup/markdown fence.`;
 
 export async function POST(req: Request) {
   try {

@@ -3,16 +3,25 @@ import { z } from 'zod';
 // =====================================================
 // Enums
 // =====================================================
+//
+// FIX-OBS-01: Align enum values with Payload CMS collections (Silabus, LKPD)
+// - Payload uses 'imtaq' instead of 'beriman_bertakwa'
+// - Payload includes additional values: 'merdeka', 'budi_pekerti_luhur'
+// - Note: 'kreatif' (Profil Pancasila) differs from 'kreativitas' (Profil Madrasah)
+// =====================================================
 
 export const PredikatSikapEnum = z.enum(['sangat_baik', 'baik', 'cukup', 'perlu_bimbingan']);
 
+// Updated to match Payload CMS Silabus/LKPD collections
 export const DimensiPancasilaEnum = z.enum([
-  'beriman_bertakwa',
+  'imtaq',                    // Formerly 'beriman_bertakwa' - Payload uses 'imtaq'
   'berkebinekaan_global',
   'bergotong_royong',
-  'mandiri',
+  'merdeka',                  // Additional value in Payload
+  'kreatif',                  // Profil Pancasila
   'bernalar_kritis',
-  'kreatif',
+  'budi_pekerti_luhur',       // Additional value in Payload
+  'kreativitas',             // Deep Learning variant
 ]);
 
 export const DimensiProfilLulusanMadrasahEnum = z.enum([
@@ -200,7 +209,7 @@ export const CatatanWaliKelasCreateSchema = z.object({
   siswaId: z.string().uuid(),
   kelasId: z.string().uuid(),
   periode: z.string().min(1),
-  catatan: z.string().min(1),
+  catatan: z.string().min(10, "Catatan minimal 10 karakter"),
 });
 
 export const CatatanWaliKelasUpdateSchema = z.object({

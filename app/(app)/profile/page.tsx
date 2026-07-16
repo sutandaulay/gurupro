@@ -1,15 +1,31 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import EditProfileModal from "@/components/user/EditProfileModal";
 import { useProfileStore } from "@/lib/stores";
+import FaceEnrollmentSection from "@/components/settings/FaceEnrollmentSection";
+import { Switch } from "@/components/ui/switch";
+import { toast as sonnerToast } from "sonner";
 
-type TabType = "profil" | "billing" | "referral" | "role";
+type TabType = "profil" | "billing" | "referral" | "pengaturan";
+
+interface UserPreferences {
+  bahasa: string;
+  tema: string;
+  zonaWaktu: string;
+}
+
+interface NotificationSettings {
+  email: boolean;
+  push: boolean;
+  sms: boolean;
+}
 
 function ProfileContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const tabFromUrl = searchParams.get("tab");
 
   const [activeTab, setActiveTab] = useState<TabType>("profil");
@@ -23,6 +39,7 @@ function ProfileContent() {
   const [profNama, setProfNama] = useState("");
   const [profUsername, setProfUsername] = useState("");
   const [profSekolah, setProfSekolah] = useState("");
+  const [activeSchool, setActiveSchool] = useState<any>(null);
   const [profBankName, setProfBankName] = useState("");
   const [profBankAccountNumber, setProfBankAccountNumber] = useState("");
   const [profBankAccountName, setProfBankAccountName] = useState("");
@@ -35,6 +52,33 @@ function ProfileContent() {
   const [payoutBankName, setPayoutBankName] = useState("");
   const [payoutBankAccountNumber, setPayoutBankAccountNumber] = useState("");
   const [payoutBankAccountName, setPayoutBankAccountName] = useState("");
+
+  const NOTIF_DEFAULTS: NotificationSettings = { email: true, push: true, sms: false };
+  const PREF_DEFAULTS: UserPreferences = { bahasa: "id", tema: "system", zonaWaktu: "Asia/Jakarta" };
+
+  // Notification preferences
+  const [notifications, setNotifications] = useState<NotificationSettings>(NOTIF_DEFAULTS);
+  const notificationsRef = useRef(notifications);
+
+  // Preferences
+  const [preferences, setPreferences] = useState<UserPreferences>(PREF_DEFAULTS);
+  const preferencesRef = useRef(preferences);
+
+  // Load from localStorage after hydration (avoid SSR mismatch)
+  useEffect(() => {
+    const savedNotif = localStorage.getItem("gurupro_notification_settings");
+    if (savedNotif) {
+      try { setNotifications(JSON.parse(savedNotif)); } catch (e) { console.error(e); }
+    }
+    const savedPref = localStorage.getItem("gurupro_user_preferences");
+    if (savedPref) {
+      try { setPreferences(JSON.parse(savedPref)); } catch (e) { console.error(e); }
+    }
+  }, []);
+
+  // Keep refs in sync with state
+  useEffect(() => { notificationsRef.current = notifications; }, [notifications]);
+  useEffect(() => { preferencesRef.current = preferences; }, [preferences]);
 
   useEffect(() => {
     if (tabFromUrl === "billing") setActiveTab("billing");
@@ -49,13 +93,15 @@ function ProfileContent() {
         setUser(data);
         setProfNama(data.nama_lengkap || "");
         setProfUsername(data.username || "");
-        setProfSekolah(data.nama_sekolah || "");
+        setProfSekolah(data.activeSchool?.nama_sekolah || data.nama_sekolah || "");
+        setActiveSchool(data.activeSchool || null);
         setProfBankName(data.bank_name || "");
         setProfBankAccountNumber(data.bank_account_number || "");
         setProfBankAccountName(data.bank_account_name || "");
         useProfileStore.getState().setProfile(data);
       } else {
-        const err = await res.json();
+        // Session invalid - show error message
+        const err = await res.json().catch(() => ({ error: "Gagal memuat profil" }));
         setError(err.error || "Gagal memuat profil");
       }
     } catch (e: any) {
@@ -78,6 +124,60 @@ function ProfileContent() {
     fetchUserProfile();
     fetchReferrals();
   }, []);
+
+  // Apply theme — re-runs when preferences.tema changes (e.g. after localStorage load)
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove("dark", "light");
+
+    if (preferences.tema === "dark") {
+      root.classList.add("dark");
+      document.body.classList.add("dark");
+    } else if (preferences.tema === "light") {
+      root.classList.add("light");
+      document.body.classList.remove("dark");
+    } else {
+      const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      if (isSystemDark) {
+        root.classList.add("dark");
+        document.body.classList.add("dark");
+      } else {
+        root.classList.add("light");
+        document.body.classList.remove("dark");
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        const currentPrefs = preferencesRef.current;
+        const root = document.documentElement;
+        root.classList.remove("dark", "light");
+
+        if (currentPrefs.tema === "dark") {
+          root.classList.add("dark");
+          document.body.classList.add("dark");
+        } else if (currentPrefs.tema === "light") {
+          root.classList.add("light");
+          document.body.classList.remove("dark");
+        } else {
+          const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          if (isSystemDark) {
+            root.classList.add("dark");
+            document.body.classList.add("dark");
+          } else {
+            root.classList.add("light");
+            document.body.classList.remove("dark");
+          }
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [preferences.tema]);
 
   const showToast = (type: "success" | "error", message: string) => {
     setToast({ type, message });
@@ -117,24 +217,6 @@ function ProfileContent() {
       showToast("error", err.message);
     } finally {
       setIsSavingProfile(false);
-    }
-  };
-
-  const handleRoleChange = async (newRole: string) => {
-    try {
-      const response = await fetch("/api/user/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nama_lengkap: profNama, nama_sekolah: profSekolah, role: newRole })
-      });
-      if (!response.ok) throw new Error("Gagal mengubah peran.");
-      const updated = await response.json();
-      setUser(updated);
-      useProfileStore.getState().setProfile(updated);
-      showToast("success", `Simulasi Peran Aktif: ${newRole.toUpperCase()}`);
-      window.location.reload();
-    } catch (err: any) {
-      showToast("error", err.message);
     }
   };
 
@@ -190,6 +272,54 @@ function ProfileContent() {
     }
   };
 
+  // Notification toggle handler
+  const handleNotificationToggle = (key: keyof NotificationSettings) => {
+    // Gunakan ref untuk mendapatkan nilai terbaru
+    const currentNotifications = notificationsRef.current;
+    const newNotifications = { ...currentNotifications, [key]: !currentNotifications[key] };
+    setNotifications(newNotifications);
+    notificationsRef.current = newNotifications;
+    localStorage.setItem("gurupro_notification_settings", JSON.stringify(newNotifications));
+    showToast("success", "Pengaturan notifikasi disimpan");
+  };
+
+  // Preference change handler
+  const handlePreferenceChange = (key: keyof UserPreferences, value: string) => {
+    // Gunakan ref untuk mendapatkan nilai terbaru
+    const currentPreferences = preferencesRef.current;
+    const newPreferences = { ...currentPreferences, [key]: value };
+    setPreferences(newPreferences);
+    preferencesRef.current = newPreferences;
+    localStorage.setItem("gurupro_user_preferences", JSON.stringify(newPreferences));
+    showToast("success", "Preferensi berhasil disimpan");
+
+    if (key === "tema") {
+      const root = document.documentElement;
+      // Hapus kelas tema sebelumnya
+      root.classList.remove("dark", "light");
+
+      if (value === "dark") {
+        root.classList.add("dark");
+        document.body.classList.add("dark");
+      } else if (value === "light") {
+        root.classList.add("light");
+        document.body.classList.remove("dark");
+      } else { // "system"
+        const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (isSystemDark) {
+          root.classList.add("dark");
+          document.body.classList.add("dark");
+        } else {
+          root.classList.add("light");
+          document.body.classList.remove("dark");
+        }
+      }
+    }
+
+    // Untuk bahasa dan zona waktu, kita bisa menambahkan logika tambahan di sini
+    // jika diperlukan untuk menerapkan efek langsung
+  };
+
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "-";
     return new Date(dateStr).toLocaleDateString("id-ID", {
@@ -212,7 +342,7 @@ function ProfileContent() {
     { id: "profil", label: "Profil Saya", icon: "👤" },
     { id: "billing", label: "Billing & Langganan", icon: "💳" },
     { id: "referral", label: "Referral & Cashback", icon: "🎁" },
-    { id: "role", label: "Simulasi Peran", icon: "🔄" },
+    { id: "pengaturan", label: "Pengaturan", icon: "⚙️" },
   ];
 
   if (isLoading) {
@@ -301,12 +431,39 @@ function ProfileContent() {
                 </div>
               </div>
               <div className="p-4 space-y-4">
-                <button
-                  onClick={() => setShowEditModal(true)}
-                  className="w-full py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  ✏️ Edit Profil
-                </button>
+                {/* Quick Actions */}
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => setShowEditModal(true)}
+                    className="w-full py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-xl font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20 cursor-pointer"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit Profil Saya
+                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setShowEditModal(true)}
+                      className="py-2 bg-white border border-violet-200 hover:bg-violet-50 text-violet-700 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      Ganti Foto
+                    </button>
+                    <button
+                      onClick={() => { setShowEditModal(true); }}
+                      className="py-2 bg-white border border-amber-200 hover:bg-amber-50 text-amber-700 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                      </svg>
+                      Ubah Password
+                    </button>
+                  </div>
+                </div>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                     <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-600">📧</div>
@@ -389,12 +546,69 @@ function ProfileContent() {
                   <input
                     type="text"
                     value={profSekolah}
-                    onChange={(e) => setProfSekolah(e.target.value)}
-                    placeholder="Contoh: SMA Negeri 1 Jakarta"
-                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-500 focus:outline-none bg-white font-medium text-slate-800"
+                    disabled
+                    placeholder="Belum memilih sekolah"
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50 font-medium text-slate-500 cursor-not-allowed"
                   />
+                  <p className="text-[10px] text-slate-400 mt-1 font-medium">
+                    Nama sekolah disinkronkan dari sekolah aktif terpilih. Untuk mengedit data sekolah, silakan buka menu <span className="font-semibold text-violet-600">Master Data &rarr; Sekolah</span>.
+                  </p>
                 </div>
               </div>
+            </div>
+
+            {/* Active School Detail Card */}
+            <div className="bg-white rounded-2xl shadow-sm p-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">🏫 Detail Sekolah Terpilih</h3>
+              {activeSchool ? (
+                <div className="bg-slate-50 border border-slate-200/60 rounded-3xl p-6 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Nama Sekolah</span>
+                      <span className="text-sm font-bold text-slate-800">{activeSchool.nama_sekolah}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">NPSN</span>
+                      <span className="text-sm font-bold text-slate-800">{activeSchool.npsn || "-"}</span>
+                    </div>
+                    <div className="md:col-span-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Alamat</span>
+                      <span className="text-xs font-semibold text-slate-700">{activeSchool.alamat || "-"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Kepala Sekolah</span>
+                      <span className="text-xs font-semibold text-slate-700">{activeSchool.nama_kepala_sekolah || "-"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pengawas Pembina</span>
+                      <span className="text-xs font-semibold text-slate-700">{activeSchool.nama_pengawas || "-"}</span>
+                    </div>
+                  </div>
+                  <div className="border-t border-slate-200 pt-3 flex justify-between items-center text-[10px] text-slate-500 font-medium">
+                    <span>Sumber data: Master Data Sekolah</span>
+                    <button
+                      onClick={() => router.push('/dashboard?module=sekolah')}
+                      className="text-violet-600 hover:text-violet-700 font-bold transition cursor-pointer"
+                    >
+                      Kelola di Master Data &rarr;
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 text-center">
+                  <span className="text-2xl mb-2 block">⚠️</span>
+                  <h4 className="text-xs font-bold text-amber-800">Belum Ada Sekolah yang Dipilih</h4>
+                  <p className="text-[10px] text-amber-600 mt-1 max-w-md mx-auto">
+                    Anda belum membuat atau memilih sekolah aktif. Silakan tambahkan sekolah baru atau pilih sekolah Anda di menu Master Data.
+                  </p>
+                  <button
+                    onClick={() => router.push('/dashboard?module=sekolah')}
+                    className="mt-3 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+                  >
+                    Buka Master Data Sekolah
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Bank Info */}
@@ -576,23 +790,44 @@ function ProfileContent() {
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col justify-between">
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
               <div>
                 <span className="text-[10px] text-slate-400 font-bold block uppercase">Kode Referral Anda</span>
                 <span className="text-lg font-black text-indigo-600 font-mono tracking-wider block mt-1">{user?.referral_code || "BELUM ADA"}</span>
               </div>
-              <button
-                onClick={() => {
-                  if (typeof window !== "undefined") {
-                    const refLink = `${window.location.origin}/login?ref=${user?.referral_code}`;
-                    navigator.clipboard.writeText(refLink);
-                    showToast("success", "Link referral berhasil disalin ke clipboard!");
-                  }
-                }}
-                className="mt-3 w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold transition text-center cursor-pointer"
-              >
-                Salin Link Referral
-              </button>
+              <div className="flex flex-col gap-2 mt-3">
+                <button
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      // Prioritas: env var > window.origin (fallback)
+                      // Pastikan URL production di-set saat deploy!
+                      const envUrl = process.env.NEXT_PUBLIC_APP_URL;
+                      const isPlaceholder = !envUrl || envUrl.includes('your-') || envUrl === 'localhost';
+                      const baseUrl = (envUrl && !isPlaceholder) ? envUrl : window.location.origin;
+                      const refLink = `${baseUrl}/register?ref=${user?.referral_code}`;
+                      navigator.clipboard.writeText(refLink);
+                      showToast("success", "Link referral berhasil disalin! Bagikan ke teman untuk dapat bonus +10 Token.");
+                    }
+                  }}
+                  className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition text-center cursor-pointer"
+                >
+                  🔗 Salin Link Referral
+                </button>
+                <button
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      navigator.clipboard.writeText(user?.referral_code || "");
+                      showToast("success", "Kode referral berhasil disalin!");
+                    }
+                  }}
+                  className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold transition text-center cursor-pointer"
+                >
+                  📋 Salin Kode Saja
+                </button>
+              </div>
+              <p className="text-[9px] text-slate-400 mt-2 text-center">
+                Teman yang daftar via link Anda akan dapat +10 Token bonus!
+              </p>
             </div>
             <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col justify-between">
               <div>
@@ -701,24 +936,153 @@ function ProfileContent() {
         </div>
       )}
 
-      {/* TAB: Simulasi Peran */}
-      {activeTab === "role" && (
-        <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
-          <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">🔄 Simulasi Peran Aktif (Multi-Role)</h3>
-          <p className="text-sm text-slate-500">Mengubah pilihan di bawah akan menyimulasikan tampilan dasbor, navigasi, dan hak akses sesuai peran yang dipilih.</p>
-          <div className="bg-slate-50 border border-slate-200/60 rounded-3xl p-6">
-            <select
-              value={user?.role || "guru"}
-              onChange={(e) => handleRoleChange(e.target.value)}
-              className="px-4 py-3 border border-slate-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none bg-white font-bold text-slate-800 w-full sm:w-72"
-            >
-              <option value="guru">Guru (Default)</option>
-              <option value="kepala_sekolah">Kepala Sekolah / Wakasek</option>
-              <option value="pengawas">Pengawas Sekolah (Read-Only)</option>
-              <option value="operator">Operator Sekolah (Jadwal & Data)</option>
-              <option value="admin">Administrator Platform</option>
-            </select>
-            <p className="text-xs text-slate-400 mt-3">Halaman akan di-reload setelah perubahan peran.</p>
+      {/* TAB: Pengaturan */}
+      {activeTab === "pengaturan" && (
+        <div className="space-y-6">
+          {/* Pendaftaran Wajah */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            {/* Card Header */}
+            <div className="bg-gradient-to-r from-rose-500 to-pink-500 p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <span className="text-2xl">👤</span>
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Pendaftaran Wajah</h3>
+                  <p className="text-white/80 text-xs">Verifikasi presensi berbasis wajah</p>
+                </div>
+              </div>
+            </div>
+            {/* Card Body */}
+            <div className="p-5">
+              <p className="text-sm text-slate-500 mb-4">
+                Daftarkan wajah Anda untuk verifikasi presensi berbasis wajah di sekolah.
+              </p>
+              <FaceEnrollmentSection />
+            </div>
+          </div>
+
+          {/* Notifikasi */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            {/* Card Header */}
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <span className="text-2xl">🔔</span>
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Pengaturan Notifikasi</h3>
+                  <p className="text-white/80 text-xs">Kelola cara Anda menerima notifikasi</p>
+                </div>
+              </div>
+            </div>
+            {/* Card Body */}
+            <div className="p-5">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                      <span className="text-lg">📧</span>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-800">Email</p>
+                      <p className="text-xs text-slate-500">Notifikasi penting dikirim ke email</p>
+                    </div>
+                  </div>
+                  <Switch checked={notifications.email} onCheckedChange={() => handleNotificationToggle("email")} />
+                </div>
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-violet-100 rounded-lg flex items-center justify-center">
+                      <span className="text-lg">📱</span>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-800">Notifikasi Push</p>
+                      <p className="text-xs text-slate-500">Notifikasi langsung di perangkat</p>
+                    </div>
+                  </div>
+                  <Switch checked={notifications.push} onCheckedChange={() => handleNotificationToggle("push")} />
+                </div>
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                      <span className="text-lg">💬</span>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-800">SMS</p>
+                      <p className="text-xs text-slate-500">Notifikasi melalui pesan teks</p>
+                    </div>
+                  </div>
+                  <Switch checked={notifications.sms} onCheckedChange={() => handleNotificationToggle("sms")} />
+                </div>
+              </div>
+              <p className="text-xs text-amber-600 mt-4 bg-amber-50 p-3 rounded-lg">💡 Pengaturan notifikasi disimpan secara lokal di perangkat ini.</p>
+            </div>
+          </div>
+
+          {/* Preferensi */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            {/* Card Header */}
+            <div className="bg-gradient-to-r from-violet-500 to-purple-500 p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <span className="text-2xl">🎨</span>
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Preferensi Aplikasi</h3>
+                  <p className="text-white/80 text-xs">Atur tampilan dan bahasa aplikasi</p>
+                </div>
+              </div>
+            </div>
+            {/* Card Body */}
+            <div className="p-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">🌍</span>
+                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">Bahasa</label>
+                  </div>
+                  <select
+                    value={preferences.bahasa}
+                    onChange={(e) => handlePreferenceChange("bahasa", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-violet-500 focus:outline-none bg-white font-medium"
+                  >
+                    <option value="id">🇮🇩 Indonesia</option>
+                    <option value="en">🇬🇧 English</option>
+                  </select>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">🌓</span>
+                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">Tema</label>
+                  </div>
+                  <select
+                    value={preferences.tema}
+                    onChange={(e) => handlePreferenceChange("tema", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-violet-500 focus:outline-none bg-white font-medium"
+                  >
+                    <option value="light">☀️ Terang</option>
+                    <option value="dark">🌙 Gelap</option>
+                    <option value="system">💻 Sesuai Sistem</option>
+                  </select>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">🕐</span>
+                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">Zona Waktu</label>
+                  </div>
+                  <select
+                    value={preferences.zonaWaktu}
+                    onChange={(e) => handlePreferenceChange("zonaWaktu", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-violet-500 focus:outline-none bg-white font-medium"
+                  >
+                    <option value="Asia/Jakarta">🕌 WIB (Jakarta)</option>
+                    <option value="Asia/Makassar">🕌 WITA (Makassar)</option>
+                    <option value="Asia/Jayapura">🕌 WIT (Jayapura)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

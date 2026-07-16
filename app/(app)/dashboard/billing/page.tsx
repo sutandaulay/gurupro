@@ -81,6 +81,12 @@ export default function BillingPage() {
 
   useEffect(() => {
     fetchData();
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "token") {
+        setActiveTab("token");
+      }
+    }
   }, []);
 
   async function fetchData() {
@@ -210,6 +216,16 @@ export default function BillingPage() {
                   {getStatusBadge(tokenStatus?.subscription_status || "active")}
                 </div>
               </div>
+            </div>
+            
+            <div className="flex items-center shrink-0">
+              <button
+                onClick={() => setActiveTab("token")}
+                className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-sm shadow-green-500/10"
+              >
+                <Coins className="w-4 h-4" />
+                Beli Token Ekstra
+              </button>
             </div>
           </div>
 

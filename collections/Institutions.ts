@@ -93,6 +93,72 @@ const Institutions: CollectionConfig = {
         { label: "Trial", value: "trial" },
       ],
     },
+    {
+      name: "location",
+      type: "group",
+      fields: [
+        {
+          name: "latitude",
+          type: "number",
+          required: false,
+          label: "Latitude",
+        },
+        {
+          name: "longitude",
+          type: "number",
+          required: false,
+          label: "Longitude",
+        },
+      ],
+    },
+    {
+      name: "attendanceSettings",
+      type: "group",
+      label: "Pengaturan Presensi",
+      fields: [
+        {
+          name: "attendanceRadiusMeters",
+          type: "number",
+          required: false,
+          defaultValue: 100,
+          label: "Radius Presensi (meter)",
+        },
+        {
+          name: "classSessionRadiusMeters",
+          type: "number",
+          required: false,
+          defaultValue: 150,
+          label: "Radius Presensi Mengajar (meter)",
+        },
+        {
+          name: "lateToleranceMinutes",
+          type: "number",
+          required: false,
+          defaultValue: 10,
+          label: "Toleransi Keterlambatan (menit)",
+        },
+        {
+          name: "duplicateCheckMinutes",
+          type: "number",
+          required: false,
+          defaultValue: 5,
+          label: "Interval Cek Duplikat (menit)",
+        },
+        {
+          name: "qrCodeEnabled",
+          type: "checkbox",
+          required: false,
+          defaultValue: false,
+          label: "Aktifkan Verifikasi QR Code",
+        },
+        {
+          name: "qrCodeToken",
+          type: "text",
+          required: false,
+          label: "Token QR Code Harian",
+        },
+      ],
+    },
   ],
 };
 

@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useTeacherStore, useKurikulumStore, DIMENSI_8_OPTIONS } from '@/lib/stores';
 import { GenerateBahanAjarButton } from '@/app/components/bahan-ajar';
 import { useSession } from "next-auth/react";
 import dynamic from 'next/dynamic';
 import TokenHabisModal from '@/app/components/ui/TokenHabisModal';
 
-export default function AdministrasiPage() {
+function AdministrasiContent() {
   const { data: session } = useSession();
   const {
     activeSchoolId,
@@ -64,16 +65,21 @@ export default function AdministrasiPage() {
   // Modul Ajar export mode (ringkas vs lengkap)
   const [modulAjarExportMode, setModulAjarExportMode] = useState<'lengkap' | 'ringkas'>('lengkap');
 
+  const searchParams = useSearchParams();
+
   useEffect(() => {
     setMounted(true);
 
     // Read URL query params for document type
-    const params = new URLSearchParams(window.location.search);
-    const tipeParam = params.get('tipe');
-    if (tipeParam && ['modul', 'rpp', 'silabus', 'lkpd', 'bahan_ajar', 'prota', 'prosem'].includes(tipeParam)) {
-      setFormData(f => ({ ...f, tipe: tipeParam }));
+    const tipeParam = searchParams.get('tipe');
+    if (tipeParam) {
+      const validTypes = ['modul', 'modul_ajar', 'rpp', 'silabus', 'lkpd', 'bahan_ajar', 'prota', 'prosem'];
+      if (validTypes.includes(tipeParam)) {
+        const mappedTipe = tipeParam === 'modul_ajar' ? 'modul' : tipeParam;
+        setFormData(f => ({ ...f, tipe: mappedTipe }));
+      }
     }
-  }, []);
+  }, [searchParams]);
 
   const activeSchool = mounted ? getActiveSchool() : null;
   const kurikulumCtx = serializeForAPI();
@@ -936,5 +942,17 @@ export default function AdministrasiPage() {
         onUpgrade={() => window.location.href = '/profile?tab=billing'}
       />
     </div>
+  );
+}
+
+export default function AdministrasiPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <AdministrasiContent />
+    </Suspense>
   );
 }

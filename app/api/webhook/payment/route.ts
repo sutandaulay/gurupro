@@ -12,6 +12,7 @@
  * 3. Grants main tokens based on plan
  * 4. Preserves addon tokens if renewing during grace period
  * 5. Resets grace period status if applicable
+ * 6. Sends in-app notification to user's bell
  *
  * Security:
  * - Verifies webhook signatures
@@ -21,6 +22,7 @@
 
 import { query } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { sendInAppNotification } from "@/lib/institution-members";
 
 // ==========================================
 // XENDIT WEBHOOK HANDLER
@@ -181,6 +183,17 @@ async function processPaymentSuccess(transactionId: string) {
       const tokenAmount = pkgRes.rows[0].token_amount;
       await grantAddonTokensToUser(userId, tokenAmount);
       await query("UPDATE transactions SET status = 'ACTIVATED', updated_at = NOW() WHERE id = $1", [tx.id]);
+
+      // Send in-app notification for addon token purchase
+      await sendInAppNotification(
+        userId,
+        "💎 Token Tambahan Aktif!",
+        `Pembelian ${tokenAmount} token tambahan berhasil! Saldo token Anda telah diperbarui.`,
+        "payment_success",
+        "addon_purchase",
+        tx.id
+      );
+
       console.log(`[WEBHOOK] Granted ${tokenAmount} addon tokens to user ${userId} (tx ACTIVATED)`);
     }
     return;
@@ -223,7 +236,8 @@ async function processPaymentSuccess(transactionId: string) {
        subscription_end = $2,
        grace_period_ends_at = NULL,
        token_limit = COALESCE(token_limit, 0) + $3,
-       main_token_reset_date = $4
+       main_token_reset_date = $4,
+       last_expiry_warning_sent = NULL
      WHERE id = $5`,
     [
       planId || "free",
@@ -232,6 +246,22 @@ async function processPaymentSuccess(transactionId: string) {
       newSubscriptionEnd,
       userId,
     ]
+  );
+
+  // Send in-app notification for successful subscription activation
+  const formattedEndDate = newSubscriptionEnd.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  await sendInAppNotification(
+    userId,
+    "✅ Pembayaran Berhasil!",
+    `Paket langganan Anda telah aktif sampai ${formattedEndDate}. Total ${tokens} token telah ditambahkan ke akun Anda.`,
+    "payment_success",
+    "subscription_activated",
+    tx.id
   );
 
   console.log(
