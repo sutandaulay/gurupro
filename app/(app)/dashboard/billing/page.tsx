@@ -77,6 +77,7 @@ export default function BillingPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"subscription" | "token">("subscription");
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
+  const [preselectedPlan, setPreselectedPlan] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -85,6 +86,11 @@ export default function BillingPage() {
       const params = new URLSearchParams(window.location.search);
       if (params.get("tab") === "token") {
         setActiveTab("token");
+      }
+      const checkout = params.get("checkout");
+      if (checkout) {
+        setActiveTab("subscription");
+        setPreselectedPlan(checkout);
       }
     }
   }, []);
@@ -317,7 +323,7 @@ export default function BillingPage() {
                 key={plan.id}
                 className={`bg-white rounded-xl border-2 ${
                   plan.popular ? "border-blue-500 shadow-lg" : "border-gray-200"
-                } overflow-hidden transition-transform hover:scale-[1.02]`}
+                } ${preselectedPlan === plan.id ? "ring-4 ring-blue-300" : ""} overflow-hidden transition-transform hover:scale-[1.02]`}
               >
                 {plan.popular && (
                   <div className="bg-blue-500 text-white text-center py-1 text-sm font-medium">

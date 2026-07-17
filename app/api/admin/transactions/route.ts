@@ -1,7 +1,6 @@
 import { query } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { getPricingConfig } from "@/lib/settings";
 import { sendEventNotification } from "@/lib/notifications";
 import { activateTransaction } from "@/lib/payments";
 
@@ -203,8 +202,45 @@ export async function POST(req: Request) {
     const user = userRes.rows[0];
 
     if (action === "activate") {
-      if (transaction.status !== "PAID") {
-        return NextResponse.json({ error: "Hanya transaksi berstatus PAID yang dapat diaktifkan" }, { status: 400 });
+      if (transaction.status !== "PENDING" && transaction.status !== "PAID") {
+        return NextResponse.json({ error: "Hanya transaksi berstatus PENDING atau PAID yang dapat diaktifkan" }, { status: 400 });
+      }
+
+      // Untuk transaksi PENDING, verifikasi dulu ke gateway agar tidak salah aktif
+      if (transaction.status === "PENDING") {
+        const pgRes = await query("SELECT value FROM system_settings WHERE key = 'payment_gateway'");
+        const pgConfig = pgRes.rows[0]?.value || {};
+        const gateway = pgConfig.default_gateway || "mock";
+
+        if (gateway === "xendit" && pgConfig.xendit?.api_key && transaction.external_id) {
+          try {
+            const authHeader = Buffer.from(pgConfig.xendit.api_key + ":").toString("base64");
+            const invRes = await fetch(
+              `https://api.xendit.co/v2/invoices/${encodeURIComponent(transaction.external_id)}`,
+              { method: "GET", headers: { Authorization: `Basic ${authHeader}` } }
+            );
+            if (invRes.ok) {
+              const inv = await invRes.json();
+              if (inv.status !== "PAID" && inv.status !== "SETTLED") {
+                return NextResponse.json(
+                  { error: `Invoice Xendit belum dibayar (status: ${inv.status}). Tidak dapat diaktifkan.` },
+                  { status: 400 }
+                );
+              }
+            } else {
+              const invErr = await invRes.json().catch(() => ({}));
+              return NextResponse.json(
+                { error: `Gagal verifikasi Xendit: ${invErr.message || invRes.status}` },
+                { status: 502 }
+              );
+            }
+          } catch (e: any) {
+            return NextResponse.json({ error: `Error verifikasi Xendit: ${e.message}` }, { status: 500 });
+          }
+        }
+
+        // Tandai sebagai PAID sebelum aktivasi (webhook mungkin terlewat)
+        await query("UPDATE transactions SET status = 'PAID', updated_at = NOW() WHERE id = $1", [transactionId]);
       }
 
       const res = await activateTransaction(transactionId);
@@ -218,7 +254,7 @@ export async function POST(req: Request) {
         email: user.email,
         amount: transaction.amount,
         plan_name: transaction.plan_id,
-        payment_method: transaction.payment_method,
+        payment_method: transaction.payment_method || "Manual Activation",
         tokens_added: "5000"
       });
 
@@ -489,35 +525,74 @@ export async function POST(req: Request) {
 
       const userId = transaction.user_id;
       const planKey = transaction.plan_id || "three_month";
-      const pricingConfig = await getPricingConfig();
 
-      let planDetails = (pricingConfig as any)[planKey];
-      if (!planDetails) {
-        const amount = Number(transaction.amount);
-        if (amount >= 400000) {
-          planDetails = pricingConfig.one_year;
-        } else if (amount >= 220000) {
-          planDetails = pricingConfig.six_month;
-        } else {
-          planDetails = pricingConfig.three_month;
+      // Ambil detail paket dari CMS pricing_plans (single source of truth)
+      const planRes = await query(
+        `SELECT id, package_name, tokens, duration_days, price
+         FROM pricing_plans
+         WHERE (id = $1 OR LOWER(package_name) = LOWER($1)) AND is_active = true
+         LIMIT 1`,
+        [planKey]
+      );
+
+      let tokensToDeduct = 0;
+      if (planRes.rows.length > 0) {
+        tokensToDeduct = Number(planRes.rows[0].tokens || 0);
+      } else {
+        // Fallback by amount (masih dari pricing_plans)
+        const amountPlan = await query(
+          `SELECT tokens FROM pricing_plans WHERE is_active = true ORDER BY ABS(price - $1) ASC LIMIT 1`,
+          [Number(transaction.amount)]
+        );
+        if (amountPlan.rows.length > 0) {
+          tokensToDeduct = Number(amountPlan.rows[0].tokens || 0);
         }
       }
 
-      const tokensToDeduct = planDetails.tokens;
+      // Ambil data user saat ini untuk audit trail
+      const userBeforeRes = await query(
+        "SELECT token_limit, status_langganan, subscription_end FROM users WHERE id = $1",
+        [userId]
+      );
+      const userBefore = userBeforeRes.rows[0];
 
       // Update transaction status to REFUNDED
       await query("UPDATE transactions SET status = $1, updated_at = NOW() WHERE id = $2", ["REFUNDED", transactionId]);
 
-      // Deduct tokens from user and downgrade subscription status to free if it was activated
+      // Deduct tokens from user and downgrade subscription status to refunded if it was activated
       if (transaction.status === "ACTIVATED") {
         await query(
           `UPDATE users
            SET token_limit = GREATEST(0, COALESCE(token_limit, 0) - $1),
-               status_langganan = $2
-           WHERE id = $3`,
-          [tokensToDeduct, "free", userId]
+               status_langganan = 'free',
+               subscription_status = 'refunded',
+               subscription_end = NOW(),
+               grace_period_ends_at = NULL,
+               last_expiry_warning_sent = NULL
+           WHERE id = $2`,
+          [tokensToDeduct, userId]
         );
       }
+
+      // Audit trail untuk refund
+      await query(
+        `INSERT INTO audit_trails (user_id, aksi, deskripsi, ip_address)
+         VALUES ($1, $2, $3, $4)`,
+        [
+          userId,
+          "Refund Transaksi",
+          `Refund transaksi ${transactionId} (${planKey}) - Potong ${tokensToDeduct} token dari ${userBefore?.token_limit || 0} → ${Math.max(0, (userBefore?.token_limit || 0) - tokensToDeduct)}. Status: ${userBefore?.status_langganan || 'unknown'} → free. Admin: manual refund.`,
+          "admin_panel"
+        ]
+      );
+
+      // Kirim notifikasi refund ke user
+      await sendEventNotification("refund", user, {
+        refund_amount: Number(transaction.amount),
+        refund_tokens: tokensToDeduct,
+        plan_name: planKey,
+        reason: "Refund oleh admin"
+      }).catch(() => {}); // Non-blocking, jangan fail jika notifikasi gagal
 
       return NextResponse.json({ success: true, message: "Transaksi berhasil direfund." });
     }

@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import TopBar from "@/app/components/layout/TopBar";
 import Sidebar from "@/app/components/layout/Sidebar";
 import SessionSync from "@/app/components/SessionSync";
+import ReferralProcessor from "@/app/(app)/components/ReferralProcessor";
 
 
 
@@ -74,6 +75,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <SessionSync />
+      <ReferralProcessor />
       <TopBar onToggleSidebar={handleToggleSidebar} />
       <div className="flex-1 pt-16 flex flex-row">
         <Sidebar

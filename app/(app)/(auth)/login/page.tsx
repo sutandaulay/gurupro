@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
+import { signInWithGoogle } from '@/lib/oauth';
 import {
   IconMail,
   IconLock,
@@ -363,6 +364,7 @@ function LoginContent() {
           email: forgotEmail,
           otp: otpCode,
           password: newPassword,
+          purpose: 'password_reset',
         }),
       });
       const data = await res.json();
@@ -766,17 +768,7 @@ function LoginContent() {
                   <button
                     type="button"
                     onClick={() => {
-                      // Store invitation info if present
-                      if (invitationToken && invitationSchoolName) {
-                        localStorage.setItem("pending_invitation_token", invitationToken);
-                        localStorage.setItem("pending_invitation_school", invitationSchoolName);
-                      }
-                      // Store referral code if present
-                      const ref = searchParams.get('ref');
-                      if (ref) {
-                        localStorage.setItem("referral_code", ref.toUpperCase());
-                      }
-                      signIn('google', { callbackUrl: '/dashboard' });
+                      signInWithGoogle(searchParams, { invitationSchoolName });
                     }}
                     className="w-full flex items-center justify-center gap-2.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-sm font-semibold text-slate-700 rounded-button transition-colors duration-150 cursor-pointer"
                   >

@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+import { signInWithGoogle } from "@/lib/oauth";
 import {
   IconMail,
   IconLock,
@@ -260,6 +261,9 @@ function RegisterContent() {
   const [otpUserId, setOtpUserId] = useState("");
   const [otpCode, setOtpCode] = useState("");
 
+  // Checkout plan (diteruskan dari landing page langganan)
+  const [checkoutPlan, setCheckoutPlan] = useState("");
+
   // UI inputs
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -324,6 +328,10 @@ function RegisterContent() {
     if (ref) {
       const cleanRef = ref.toUpperCase();
       setReferralCode(cleanRef);
+    }
+    const checkout = searchParams.get("checkout");
+    if (checkout) {
+      setCheckoutPlan(checkout);
     }
   }, [searchParams]);
 
@@ -404,6 +412,7 @@ function RegisterContent() {
           invitation_token: invitationToken,
           account_type: invitationToken ? "institutional" : "individual",
           role: role,
+          checkout_plan: checkoutPlan,
         }),
       });
 
@@ -446,6 +455,7 @@ function RegisterContent() {
           userId: otpUserId,
           otp: otpCode,
           purpose: "account_verification",
+          checkout_plan: checkoutPlan,
         }),
       });
       const data = await res.json();
@@ -780,19 +790,8 @@ function RegisterContent() {
               </div>
               <button
                 type="button"
-                onClick={async () => {
-                  const token = searchParams.get("token");
-                  // Store invitation info if present
-                  if (token && invitationSchoolName) {
-                    localStorage.setItem("pending_invitation_token", token);
-                    localStorage.setItem("pending_invitation_school", invitationSchoolName);
-                  }
-                  // Store referral code if present
-                  const ref = searchParams.get("ref");
-                  if (ref) {
-                    localStorage.setItem("referral_code", ref.toUpperCase());
-                  }
-                  signIn("google", { callbackUrl: "/dashboard" });
+                onClick={() => {
+                  signInWithGoogle(searchParams, { invitationSchoolName });
                 }}
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-2.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-sm font-semibold text-slate-700 rounded-button transition-colors duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"

@@ -7,7 +7,6 @@ import {
   resolveWASenderConfig,
   resolveNotificationTemplates,
   resolveAIConfig,
-  resolvePricingConfig,
   resolveAppBrandingConfig,
   resolveFaqConfig,
   resolveReferralConfig,
@@ -15,6 +14,7 @@ import {
 } from "@/lib/settings";
 import { sendEmailNotification, sendWhatsAppNotification } from "@/lib/notifications";
 import { generateAIContent } from "@/lib/ai";
+import { getActivePricingPlans } from "@/lib/settings";
 
 async function verifyAdmin() {
   const cookieStore = await cookies();
@@ -40,7 +40,7 @@ export async function GET() {
     const waSender = resolveWASenderConfig(allSettings);
     const templates = resolveNotificationTemplates(allSettings);
     const aiConfig = resolveAIConfig(allSettings);
-    const pricingConfig = resolvePricingConfig(allSettings);
+    const pricingConfig = await getActivePricingPlans();
     const appBranding = resolveAppBrandingConfig(allSettings);
     const faqConfig = resolveFaqConfig(allSettings);
     const referralConfig = resolveReferralConfig(allSettings);
@@ -112,12 +112,6 @@ export async function POST(req: Request) {
       const success = await updateSystemSetting("ai_config", data);
       if (!success) throw new Error("Database update failed");
       return NextResponse.json({ success: true, message: "Pengaturan Vendor AI berhasil diperbarui!" });
-    }
-
-    if (action === "update_pricing_config") {
-      const success = await updateSystemSetting("pricing_config", data);
-      if (!success) throw new Error("Database update failed");
-      return NextResponse.json({ success: true, message: "Pengaturan Paket Berlangganan & Token berhasil diperbarui!" });
     }
 
     if (action === "update_app_branding") {

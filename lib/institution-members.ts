@@ -98,13 +98,55 @@ export async function sendInviteNotification(
   const title = 'Undangan Bergabung Institusi';
   const body = `Anda telah diundang untuk bergabung dengan institusi "${institutionName}". Silakan masuk ke akun GuruPRO Anda untuk menerima atau menolak undangan ini.`;
 
+  // Simpan notifikasi in-app
   await sendInAppNotification(appUserId, title, body, 'invitation', 'institution_invite', appUserId);
 
-  // TODO: Integrasi WhatsApp — placeholder
-  console.log(`[TODO] Kirim WA ke ${whatsapp} untuk user ${appUserId}: ${body}`);
+  // Kirim WhatsApp notification
+  if (whatsapp) {
+    const waMessage = `[GuruPRO] 🎓 Undangan Bergabung Institusi
 
-  // TODO: Integrasi Email — placeholder
-  console.log(`[TODO] Kirim Email ke ${email} untuk user ${appUserId}: ${body}`);
+Halo ${namaLengkap || 'Bapak/Ibu'},
+
+Anda mendapat undangan untuk bergabung dengan institusi "${institutionName}" di GuruPRO.
+
+Silakan masuk ke akun GuruPRO Anda untuk menerima atau menolak undangan ini.
+
+Terima kasih,
+Tim GuruPRO`;
+
+    try {
+      const { sendWhatsAppNotification } = await import('./notifications');
+      await sendWhatsAppNotification(whatsapp, waMessage);
+      console.log(`[Institution] WhatsApp invitation sent to ${whatsapp}`);
+    } catch (err) {
+      console.error('[Institution] Failed to send WhatsApp invitation:', err);
+    }
+  }
+
+  // Kirim Email notification
+  if (email) {
+    const emailSubject = 'Undangan Bergabung Institusi - GuruPRO';
+    const emailHtml = `
+      <div style="font-family: sans-serif; padding: 20px;">
+        <h2 style="color: #4f46e5;">Undangan Bergabung Institusi</h2>
+        <p>Halo ${namaLengkap || 'Bapak/Ibu'},</p>
+        <p>Anda mendapat undangan untuk bergabung dengan institusi:</p>
+        <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <strong style="font-size: 18px;">${institutionName}</strong>
+        </div>
+        <p>Silakan masuk ke akun GuruPRO Anda untuk menerima atau menolak undangan ini.</p>
+        <p>Terima kasih,<br>Tim GuruPRO</p>
+      </div>
+    `;
+
+    try {
+      const { sendEmailNotification } = await import('./notifications');
+      await sendEmailNotification(email, emailSubject, emailHtml);
+      console.log(`[Institution] Email invitation sent to ${email}`);
+    } catch (err) {
+      console.error('[Institution] Failed to send email invitation:', err);
+    }
+  }
 }
 
 export async function getUserActiveMemberships(appUserId: string): Promise<InstitutionMemberRow[]> {

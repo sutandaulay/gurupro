@@ -90,18 +90,18 @@ function AdminPageContent() {
   // Toast hook
   const { addToast } = useToast();
 
-  // Ref untuk tracking notifikasi baru
-  const previousPendingTxRef = useRef(0);
-  const previousPendingPayoutsRef = useRef(0);
+  // Ref untuk tracking notifikasi baru (berbasis ID unik, bukan selisih counter)
+  const lastNotifiedTxIdRef = useRef<string | null>(null);
+  const lastNotifiedPayoutIdRef = useRef<string | null>(null);
 
   // Format currency helper
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = useCallback((amount: number) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       maximumFractionDigits: 0,
     }).format(amount);
-  };
+  }, []);
 
   // Handle notification click
   const handleNotificationClick = useCallback((notification: any) => {
@@ -219,46 +219,35 @@ function AdminPageContent() {
           const newPendingTx = data.counts?.pendingTransactions || 0;
           const newPendingPayouts = data.counts?.pendingPayouts || 0;
 
-          // Deteksi pembayaran baru
-          if (newPendingTx > previousPendingTxRef.current) {
-            const newPayments = newPendingTx - previousPendingTxRef.current;
-            // Ambil detail transaksi terbaru untuk toast
-            if (data.notifications && data.notifications.length > 0) {
-              const latestTx = data.notifications.find((n: any) => n.status === "PAID" || n.status === "PENDING");
-              if (latestTx) {
-                addToast({
-                  type: "payment",
-                  title: "💳 Pembayaran Baru!",
-                  message: `${latestTx.nama_lengkap || "User"} - Rp ${formatCurrency(latestTx.amount)}`,
-                  duration: 6000,
-                  icon: latestTx.status === "PAID" ? "✅" : "⏳"
-                });
-              }
-            } else if (newPayments > 0) {
+          // Deteksi pembayaran baru berbasis ID unik (bukan selisih counter)
+          // agar tidak spam notifikasi tiap polling saat jumlah total tidak berubah.
+          if (data.notifications && data.notifications.length > 0) {
+            const latestTx = data.notifications.find((n: any) => n.status === "PAID" || n.status === "PENDING");
+            if (latestTx && latestTx.id !== lastNotifiedTxIdRef.current) {
+              lastNotifiedTxIdRef.current = latestTx.id;
               addToast({
                 type: "payment",
-                title: `📋 ${newPayments} Transaksi Baru`,
-                message: `Ada ${newPayments} pembayaran baru yang menunggu diproses`,
-                duration: 5000,
-                icon: "💳"
+                title: "💳 Pembayaran Baru!",
+                message: `${latestTx.nama_lengkap || "User"} - Rp ${formatCurrency(latestTx.amount)}`,
+                duration: 6000,
+                icon: latestTx.status === "PAID" ? "✅" : "⏳"
               });
             }
           }
 
-          // Deteksi payout request baru
-          if (newPendingPayouts > previousPendingPayoutsRef.current) {
-            const newPayouts = newPendingPayouts - previousPendingPayoutsRef.current;
+          // Deteksi payout request baru berbasis ID unik
+          const latestPayout = (data.notifications || []).find((n: any) => n.type === "payout" && n.status === "PENDING");
+          if (latestPayout && latestPayout.id !== lastNotifiedPayoutIdRef.current) {
+            lastNotifiedPayoutIdRef.current = latestPayout.id;
             addToast({
               type: "warning",
               title: "💸 Request Payout Baru!",
-              message: `Ada ${newPayouts} permintaan pencairan saldo baru`,
+              message: `Ada permintaan pencairan saldo baru dari ${latestPayout.nama_lengkap || "user"}`,
               duration: 6000,
               icon: "💸"
             });
           }
 
-          previousPendingTxRef.current = newPendingTx;
-          previousPendingPayoutsRef.current = newPendingPayouts;
           setAdminNotifications(data.counts || {
             pendingPayouts: newPendingPayouts,
             pendingTransactions: newPendingTx,

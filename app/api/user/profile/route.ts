@@ -1,7 +1,7 @@
 import { query } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { getPricingConfig, getActivePricingPlans } from "@/lib/settings";
+import { getActivePricingPlans } from "@/lib/settings";
 import { getUserAccountMode, getUserActiveMemberships } from "@/lib/institution-members";
 import { SessionData, getSession, setDefaultSessionCookie } from "@/lib/session";
 
@@ -69,7 +69,7 @@ export async function GET() {
 
       const user = userRes.rows[0];
       const [pricingConfig, pricingPlans] = await Promise.all([
-        getPricingConfig(),
+        getActivePricingPlans(),
         getActivePricingPlans(),
       ]);
 
@@ -146,7 +146,7 @@ export async function GET() {
 
     const user = userRes.rows[0];
     const [pricingConfig, pricingPlans] = await Promise.all([
-      getPricingConfig(),
+      getActivePricingPlans(),
       getActivePricingPlans(),
     ]);
 
@@ -367,7 +367,7 @@ export async function PUT(req: Request) {
     );
 
     const [pricingConfig, pricingPlans] = await Promise.all([
-      getPricingConfig(),
+      getActivePricingPlans(),
       getActivePricingPlans(),
     ]);
     return NextResponse.json({

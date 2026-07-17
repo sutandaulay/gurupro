@@ -5,7 +5,7 @@ import crypto from "crypto";
 
 export async function POST(req: Request) {
   try {
-    const { email, userId, otp, password, purpose = "password_reset" } = await req.json();
+    const { email, userId, otp, password, purpose = "password_reset", checkoutPlan = "" } = await req.json();
 
     if (!otp) {
       return NextResponse.json({ error: "Kode OTP wajib diisi!" }, { status: 400 });
@@ -218,9 +218,15 @@ export async function POST(req: Request) {
         activeContext: "individual",
       });
 
+      const redirectUrl = checkoutPlan
+        ? (activeCount >= 2 ? "/select-context?checkout=" : "/dashboard/billing?checkout=") + checkoutPlan
+        : activeCount >= 2
+          ? "/select-context"
+          : "/dashboard";
+
       const response = NextResponse.json({
         success: true,
-        redirectUrl: activeCount >= 2 ? "/select-context" : "/dashboard",
+        redirectUrl,
         needsSelection: activeCount >= 2,
         message: "Akun Anda berhasil diverifikasi!"
       });
@@ -229,6 +235,7 @@ export async function POST(req: Request) {
       response.cookies.set("gurupro_session", sessionData, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
+        sameSite: "lax", // CSRF protection
         maxAge: 60 * 60 * 24 * 7,
         path: "/",
       });

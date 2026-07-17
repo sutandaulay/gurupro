@@ -1,25 +1,60 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 
-// Inisialisasi pool koneksi database postgresql lokal Anda
-export const pool = new Pool({
-  user: 'postgres',          // sesuaikan dengan username pgAdmin Anda
+// Global singleton untuk database pool - persist across module reloads
+const globalForPool = globalThis as unknown as {
+  pool: Pool | undefined;
+};
+
+export const pool = globalForPool.pool ?? new Pool({
+  user: 'postgres',
   host: 'localhost',
-  database: 'gurupro_db',    // nama database lokal Anda
-  password: 'nus4nt4r4', // sesuaikan dengan password postgres Anda
+  database: 'gurupro_db',
+  password: 'nus4nt4r4',
   port: 5432,
-  options: '-c search_path=payload,public',
+  options: '-c search_path=public,payload',
 });
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPool.pool = pool;
+}
 
 // Export drizzle instance for use with schemas
 export const db = drizzle(pool);
+
+// Global singleton untuk init promise - prevent multiple initDb calls
+const globalForInit = globalThis as unknown as {
+  initPromise: Promise<void> | null;
+};
+
+let initPromise: Promise<void> | null = globalForInit.initPromise;
+
+// Timeout wrapper for queries
+export const queryWithTimeout = async (text: string, params?: any[], timeoutMs: number = 5000): Promise<any> => {
+  try {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(`Query timed out after ${timeoutMs}ms`)), timeoutMs);
+    });
+    return await Promise.race([pool.query(text, params), timeoutPromise]);
+  } catch (error: any) {
+    if (error.message.includes('timed out')) {
+      console.warn("[DB] Query timed out:", text.substring(0, 50) + "...");
+    } else {
+      console.error("[DB] Query error:", error.message);
+    }
+    throw error;
+  }
+};
 
 export const query = (text: string, params?: any[]) => {
   return pool.query(text, params);
 };
 
 // Skrip Migrasi Otomatis untuk Tabel Operasional Sekolah & Presensi
+// Hanya dijalankan sekali dan di-cache
 const initDb = async () => {
+  console.log("[DB] Starting database initialization...");
+  const startTime = Date.now();
   try {
     // Pastikan ekstensi pgcrypto terpasang jika dibutuhkan
     await pool.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
@@ -483,6 +518,13 @@ const initDb = async () => {
             email_subject: "Pembayaran Langganan GuruPRO Berhasil",
             email_body: "<div style=\"font-family: sans-serif; padding: 20px;\"><h2 style=\"color: #4f46e5;\">Pembayaran Berhasil!</h2><p>Halo Ibu/Bapak <strong>{nama_lengkap}</strong>,</p><p>Terima kasih atas pembayarannya! Pembayaran Anda sebesar <strong>Rp {amount}</strong> untuk paket <strong>{plan_name}</strong> telah berhasil kami terima via <strong>{payment_method}</strong>.</p><p>Kuota token Anda telah bertambah sebanyak <strong>+{tokens_added} Token</strong> dan status akun Anda sekarang aktif sebagai <strong>PRO</strong>.</p><p>Selamat berkarya!</p></div>",
             wa_message: "Halo Ibu/Bapak *{nama_lengkap}*,\n\nTerima kasih! Pembayaran sebesar *Rp {amount}* untuk paket *{plan_name}* telah diterima via *{payment_method}*.\n\nAkun Anda telah diaktifkan ke *PRO* dan kuota Anda telah bertambah *+{tokens_added} Token*! 🎉\n\nSelamat berkreasi dengan GuruPRO! ✨"
+          },
+          refund: {
+            email_enabled: true,
+            wa_enabled: true,
+            email_subject: "Refund Pembayaran GuruPRO",
+            email_body: "<div style=\"font-family: sans-serif; padding: 20px;\"><h2 style=\"color: #ef4444;\">Refund Pembayaran</h2><p>Halo Ibu/Bapak <strong>{nama_lengkap}</strong>,</p><p>Mohon maaf, pengajuan refund untuk pembayaran paket <strong>{plan_name}</strong> telah diproses oleh Admin.</p><p><strong>Detail Refund:</strong></p><ul style=\"background: #fee2e2; padding: 15px; border-radius: 8px; list-style: none;\"><li><strong>Jumlah Refund:</strong> Rp {refund_amount}</li><li><strong>Token Dipotong:</strong> {refund_tokens} Token</li><li><strong>Alasan:</strong> {reason}</li></ul><p>Token Anda telah dikurangi sesuai jumlah yang tertera di atas. Jika ada pertanyaan, silakan hubungi Admin.</p></div>",
+            wa_message: "Halo Ibu/Bapak *{nama_lengkap}*,\n\nInformasi penting. Refund untuk paket *{plan_name}* telah diproses oleh Admin.\n\n📋 *Detail Refund:*\n• Jumlah: *Rp {refund_amount}*\n• Token Dipotong: *{refund_tokens} Token*\n• Alasan: {reason}\n\nToken Anda telah dikurangi. Hubungi Admin jika ada pertanyaan. Terima kasih."
           }
         })]
       );
@@ -501,29 +543,6 @@ const initDb = async () => {
           deepseek: { api_key: "", model_name: "deepseek-chat" }
         })]
       );
-    }
-
-    // Inisialisasi pricing_config jika belum ada atau migrasi ke 4 paket
-    const checkPricing = await pool.query("SELECT value FROM system_settings WHERE key = 'pricing_config'");
-    const defaultPricing = {
-      free: { price: 0, tokens: 10, duration_days: 30 },
-      three_month: { price: 120000, tokens: 500, duration_days: 90 },
-      six_month: { price: 220000, tokens: 1100, duration_days: 180 },
-      one_year: { price: 400000, tokens: 2500, duration_days: 365 }
-    };
-    if (checkPricing.rows.length === 0) {
-      await pool.query(
-        "INSERT INTO system_settings (key, value) VALUES ($1, $2)",
-        ["pricing_config", JSON.stringify(defaultPricing)]
-      );
-    } else {
-      const val = checkPricing.rows[0].value;
-      if (!val.free || !val.three_month || !val.six_month || !val.one_year) {
-        await pool.query(
-          "UPDATE system_settings SET value = $1 WHERE key = $2",
-          [JSON.stringify(defaultPricing), "pricing_config"]
-        );
-      }
     }
 
     // Pre-populate cms_landing with default content if empty
@@ -1294,16 +1313,21 @@ export async function getUserById(userId: string): Promise<UserRecord | null> {
   }
 }
 
-let initPromise: Promise<void> | null = null;
-
+// Lazy initialization - hanya dipanggil ketika benar-benar dibutuhkan
+// BUKAN di module scope
 export function ensureDbInitialized(): Promise<void> {
   if (!initPromise) {
-    initPromise = initDb();
+    initPromise = initDb().catch((err) => {
+      console.error("[DB] Initialization failed:", err);
+      initPromise = null; // Reset agar bisa retry
+      throw err;
+    });
+    if (process.env.NODE_ENV !== 'production') {
+      globalForInit.initPromise = initPromise;
+    }
   }
   return initPromise;
 }
 
-// Run initDb at module scope but catch any errors gracefully
-ensureDbInitialized().catch((err) =>
-  console.error("Background DB initialization failed:", err)
-);
+// TIDAK ADA pemanggilan ensureDbInitialized() di module scope
+// Ini yang menyebabkan multiple initialization sebelumnya

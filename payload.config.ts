@@ -11,6 +11,7 @@ import Features from "./collections/Features";
 import WhyPoints from "./collections/WhyPoints";
 import FooterContent from "./collections/FooterContent";
 import ChatbotConfig from "./collections/ChatbotConfig";
+import PricingPlans from "./collections/PricingPlans";
 import Categories from "./collections/Categories";
 import Posts from "./collections/Posts";
 import AddonTokenPackages from "./collections/AddonTokenPackages";
@@ -66,6 +67,7 @@ export default buildConfig({
     Media,
     Features,
     WhyPoints,
+    PricingPlans,
     Categories,
     Posts,
     AddonTokenPackages,

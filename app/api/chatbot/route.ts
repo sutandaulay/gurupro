@@ -1,6 +1,6 @@
 import { generateAIContent } from "@/lib/ai";
 import { NextResponse } from "next/server";
-import { getPricingConfig } from "@/lib/settings";
+import { getActivePricingPlans } from "@/lib/settings";
 
 export async function POST(req: Request) {
   try {
@@ -11,8 +11,10 @@ export async function POST(req: Request) {
 
     let pricingStr = "";
     try {
-      const pricing = await getPricingConfig();
-      pricingStr = JSON.stringify(pricing);
+      const plans = await getActivePricingPlans();
+      pricingStr = plans
+        .map((p: any) => `${p.package_name} (Rp${Number(p.price).toLocaleString("id-ID")}, ${p.tokens} token, ${p.duration_days} hari)`)
+        .join(", ");
     } catch (e) {
       pricingStr = "Paket Pro 3 Bulan (Rp135.000), 6 Bulan (Rp240.000), 1 Tahun (Rp420.000).";
     }

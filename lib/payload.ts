@@ -6,24 +6,46 @@ import config from "@payload-config";
 
 let cached: Promise<BasePayload> | null = null;
 let cacheError: string | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_TTL = 60000; // 1 minute TTL
 
 export async function getPayload(): Promise<BasePayload> {
-  // Return cached promise if available
-  if (cached) {
+  const now = Date.now();
+
+  // Return cached promise if available and not expired
+  if (cached && (now - cacheTimestamp) < CACHE_TTL) {
     return cached;
   }
 
-  // If we already had an error, don't retry
-  if (cacheError) {
+  // If we already had an error and it's been less than 30 seconds, don't retry
+  if (cacheError && (now - cacheTimestamp) < 30000) {
     throw new Error(cacheError);
   }
 
   try {
     cached = getPayloadClient({ config });
+    cacheTimestamp = now;
     return cached;
   } catch (error: any) {
     cacheError = error.message || "Failed to initialize Payload CMS";
+    cacheTimestamp = now;
     throw error;
+  }
+}
+
+// Timeout wrapper for payload operations
+export async function getPayloadWithTimeout<T>(
+  operation: () => Promise<T>,
+  timeoutMs: number = 5000
+): Promise<T | null> {
+  try {
+    const timeoutPromise = new Promise<null>((_, reject) => {
+      setTimeout(() => reject(new Error("Operation timed out")), timeoutMs);
+    });
+    return await Promise.race([operation(), timeoutPromise]);
+  } catch (error) {
+    console.warn("[Payload] Operation failed or timed out:", error);
+    return null;
   }
 }
 

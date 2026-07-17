@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { IconBuilding, IconUser, IconLoader2, IconLogout, IconArrowRight } from "@tabler/icons-react";
 
 interface Institution {
@@ -9,8 +9,11 @@ interface Institution {
   name: string;
 }
 
-export default function SelectContextPage() {
+function SelectContextPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const checkoutPlan = searchParams.get("checkout");
+  const checkoutSuffix = checkoutPlan ? `?checkout=${checkoutPlan}` : "";
   const [loading, setLoading] = useState(true);
   const [switching, setSwitching] = useState<string | null>(null);
   const [institutions, setInstitutions] = useState<Institution[]>([]);
@@ -51,7 +54,7 @@ export default function SelectContextPage() {
       });
 
       if (res.ok) {
-        router.push("/dashboard");
+        router.push("/dashboard" + checkoutSuffix);
       }
     } catch (err) {
       console.error("Failed to set active context:", err);
@@ -177,5 +180,13 @@ export default function SelectContextPage() {
         GuruPRO AI — Platform Administrasi & Presensi Digital Terintegrasi.
       </div>
     </div>
+  );
+}
+
+export default function SelectContextPageWrapper() {
+  return (
+    <Suspense fallback={null}>
+      <SelectContextPage />
+    </Suspense>
   );
 }

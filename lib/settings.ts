@@ -104,6 +104,7 @@ export interface NotificationTemplates {
   payout_approved: NotificationTemplate;
   payout_rejected: NotificationTemplate;
   payment_success: NotificationTemplate;
+  refund: NotificationTemplate;
 }
 
 export async function getPaymentGatewayConfig(): Promise<PaymentGatewayConfig> {
@@ -214,13 +215,6 @@ export async function getAIConfig(): Promise<AIConfig> {
   return val ? { ...defaults, ...val } : defaults;
 }
 
-export interface PricingPlan {
-  price: number;
-  tokens: number;
-  duration_days: number;
-  features: string[];
-}
-
 export interface PricingPlanItem {
   id: string;
   package_name: string;
@@ -231,13 +225,6 @@ export interface PricingPlanItem {
   popular: boolean;
   is_active: boolean;
   sort_order: number;
-}
-
-export interface PricingConfig {
-  free: PricingPlan;
-  three_month: PricingPlan;
-  six_month: PricingPlan;
-  one_year: PricingPlan;
 }
 
 export async function getActivePricingPlans(): Promise<PricingPlanItem[]> {
@@ -261,60 +248,6 @@ export async function getActivePricingPlans(): Promise<PricingPlanItem[]> {
     console.error("getActivePricingPlans error:", e);
     return [];
   }
-}
-
-export async function getPricingConfig(): Promise<PricingConfig> {
-  const defaults: PricingConfig = {
-    free: {
-      price: 0, tokens: 10, duration_days: 30,
-      features: [
-        "10 Token Kuota Sekali",
-        "Masa Aktif 30 Hari",
-        "Generator Soal (LOTS C1-C3)",
-        "Dukungan Kurikulum Merdeka",
-      ],
-    },
-    three_month: {
-      price: 120000, tokens: 500, duration_days: 90,
-      features: [
-        "500 Token Kuota Utama",
-        "Masa Aktif 90 Hari",
-        "Generator Soal HOTS (C4-C6)",
-        "Cetak Lembar Jawaban Resmi",
-        "Server Prioritas & CS Terpadu",
-      ],
-    },
-    six_month: {
-      price: 220000, tokens: 1100, duration_days: 180,
-      features: [
-        "1100 Token Kuota Utama",
-        "Masa Aktif 180 Hari",
-        "Generator Soal HOTS (C4-C6)",
-        "Cetak Lembar Jawaban Resmi",
-        "Server Prioritas & CS Prioritas",
-      ],
-    },
-    one_year: {
-      price: 400000, tokens: 2500, duration_days: 365,
-      features: [
-        "2500 Token Kuota Utama",
-        "Masa Aktif 365 Hari",
-        "Generator Soal HOTS (C4-C6)",
-        "Cetak Lembar Jawaban Resmi",
-        "CS VIP 24/7 & Backup Riwayat",
-      ],
-    },
-  };
-  const val = await getSystemSetting<PricingConfig>("pricing_config");
-  if (val && val.free && val.three_month && val.six_month && val.one_year) {
-    return {
-      free: { ...defaults.free, ...val.free, features: val.free.features || defaults.free.features },
-      three_month: { ...defaults.three_month, ...val.three_month, features: val.three_month.features || defaults.three_month.features },
-      six_month: { ...defaults.six_month, ...val.six_month, features: val.six_month.features || defaults.six_month.features },
-      one_year: { ...defaults.one_year, ...val.one_year, features: val.one_year.features || defaults.one_year.features },
-    };
-  }
-  return defaults;
 }
 
 export interface AppBrandingConfig {
@@ -426,7 +359,8 @@ const defaultNotificationTemplates: NotificationTemplates = {
   forgot_password: { email_enabled: true, wa_enabled: true, email_subject: "Kode OTP Masuk GuruPRO", email_body: "", wa_message: "" },
   payout_approved: { email_enabled: true, wa_enabled: true, email_subject: "Pencairan Cashback GuruPRO Berhasil!", email_body: "", wa_message: "" },
   payout_rejected: { email_enabled: true, wa_enabled: true, email_subject: "Pencairan Cashback GuruPRO Ditolak", email_body: "", wa_message: "" },
-  payment_success: { email_enabled: true, wa_enabled: true, email_subject: "Pembayaran Langganan GuruPRO Berhasil", email_body: "", wa_message: "" }
+  payment_success: { email_enabled: true, wa_enabled: true, email_subject: "Pembayaran Langganan GuruPRO Berhasil", email_body: "", wa_message: "" },
+  refund: { email_enabled: true, wa_enabled: true, email_subject: "Refund Pembayaran GuruPRO", email_body: "", wa_message: "" }
 };
 
 const defaultAIConfig: AIConfig = {
@@ -435,13 +369,6 @@ const defaultAIConfig: AIConfig = {
   openai: { api_key: "", model_name: "gpt-4o-mini" },
   claude: { api_key: "", model_name: "claude-3-5-sonnet-20241022" },
   deepseek: { api_key: "", model_name: "deepseek-chat" }
-};
-
-const defaultPricingConfig: PricingConfig = {
-  free: { price: 0, tokens: 10, duration_days: 30, features: ["10 Token Kuota Sekali", "Masa Aktif 30 Hari", "Generator Soal (LOTS C1-C3)", "Dukungan Kurikulum Merdeka"] },
-  three_month: { price: 120000, tokens: 500, duration_days: 90, features: ["500 Token Kuota Utama", "Masa Aktif 90 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Terpadu"] },
-  six_month: { price: 220000, tokens: 1100, duration_days: 180, features: ["1100 Token Kuota Utama", "Masa Aktif 180 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Prioritas"] },
-  one_year: { price: 400000, tokens: 2500, duration_days: 365, features: ["2500 Token Kuota Utama", "Masa Aktif 365 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "CS VIP 24/7 & Backup Riwayat"] },
 };
 
 const defaultBranding: AppBrandingConfig = {
@@ -498,25 +425,6 @@ export function resolveNotificationTemplates(cache: Record<string, any>): Notifi
 
 export function resolveAIConfig(cache: Record<string, any>): AIConfig {
   return readSetting(cache, "ai_config", defaultAIConfig);
-}
-
-export function resolvePricingConfig(cache: Record<string, any>): PricingConfig {
-  const raw = cache["pricing_config"];
-  if (!raw) return defaultPricingConfig;
-  try {
-    const val = typeof raw === "string" ? JSON.parse(raw) : raw;
-    if (val && val.free && val.three_month && val.six_month && val.one_year) {
-      return {
-        free: { ...defaultPricingConfig.free, ...val.free, features: val.free.features || defaultPricingConfig.free.features },
-        three_month: { ...defaultPricingConfig.three_month, ...val.three_month, features: val.three_month.features || defaultPricingConfig.three_month.features },
-        six_month: { ...defaultPricingConfig.six_month, ...val.six_month, features: val.six_month.features || defaultPricingConfig.six_month.features },
-        one_year: { ...defaultPricingConfig.one_year, ...val.one_year, features: val.one_year.features || defaultPricingConfig.one_year.features },
-      };
-    }
-    return defaultPricingConfig;
-  } catch {
-    return defaultPricingConfig;
-  }
 }
 
 export function resolveAppBrandingConfig(cache: Record<string, any>): AppBrandingConfig {

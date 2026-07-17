@@ -923,6 +923,33 @@ function DashboardContent() {
     }
   }, [searchParams]);
 
+  // Verifikasi pembayaran setelah redirect dari payment gateway (fallback webhook)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get("payment");
+    const txId = params.get("tx");
+    if (paymentStatus === "success" && txId) {
+      fetch("/api/checkout/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactionId: txId }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.verified || data.alreadyActivated) {
+            window.location.reload();
+          }
+        })
+        .catch((e) => console.error("[page.tsx] verify payment failed:", e))
+        .finally(() => {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("payment");
+          url.searchParams.delete("tx");
+          window.history.replaceState({}, "", url.pathname + url.search);
+        });
+    }
+  }, []);
+
   // Fetch related data when user is loaded
   useEffect(() => {
     if (currentUser) {

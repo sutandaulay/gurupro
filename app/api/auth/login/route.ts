@@ -170,11 +170,11 @@ export async function POST(request: NextRequest) {
     // If multi-school, redirect to switcher selection page
     let targetUrl = '/dashboard';
     if (activeMembershipsCount >= 2) {
-      targetUrl = '/select-context';
+      targetUrl = checkoutPlan ? `/select-context?checkout=${checkoutPlan}` : '/select-context';
     } else if (user.role === 'admin') {
       targetUrl = '/admin';
     } else if (checkoutPlan) {
-      targetUrl = `/dashboard?checkout=${checkoutPlan}`;
+      targetUrl = `/dashboard/billing?checkout=${checkoutPlan}`;
     }
 
     // Create session using consistent helper

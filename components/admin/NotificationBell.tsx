@@ -49,7 +49,6 @@ export default function NotificationBell({ onNotificationClick, onBadgeClick }: 
   const [lastTimestamp, setLastTimestamp] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const previousCountsRef = useRef<NotificationCounts | null>(null);
 
   // Initialize audio
   useEffect(() => {
@@ -80,18 +79,14 @@ export default function NotificationBell({ onNotificationClick, onBadgeClick }: 
       if (res.ok) {
         const data = await res.json();
 
-        // Check for new notifications
-        if (isPolling && previousCountsRef.current) {
-          const newPendingTx = data.counts.pendingTransactions - previousCountsRef.current.pendingTransactions;
-          const newPendingPayouts = data.counts.pendingPayouts - previousCountsRef.current.pendingPayouts;
-
-          if (newPendingTx > 0 || newPendingPayouts > 0) {
-            setHasNewNotifications(true);
-            playNotificationSound();
-          }
+        // Deteksi notifikasi baru berdasarkan flag hasNew dari API
+        // (dihitung dari updated_at > since), BUKAN selisih counter
+        // agar suara tidak berbunyi terus menerus.
+        if (isPolling && data.hasNew) {
+          setHasNewNotifications(true);
+          playNotificationSound();
         }
 
-        previousCountsRef.current = counts;
         setCounts(data.counts);
         setLastTimestamp(data.timestamp);
 
@@ -102,7 +97,7 @@ export default function NotificationBell({ onNotificationClick, onBadgeClick }: 
     } catch (error) {
       console.error("Failed to fetch notifications:", error);
     }
-  }, [lastTimestamp, counts, notifications.length, playNotificationSound]);
+  }, [lastTimestamp, notifications.length, playNotificationSound]);
 
   // Initial fetch and polling
   useEffect(() => {

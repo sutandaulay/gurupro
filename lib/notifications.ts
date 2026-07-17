@@ -148,7 +148,7 @@ function interpolate(template: string, variables: Record<string, any>): string {
  * General purpose notification dispatcher for predefined system events
  */
 export async function sendEventNotification(
-  event: "register" | "forgot_password" | "payout_approved" | "payout_rejected" | "payment_success",
+  event: "register" | "forgot_password" | "payout_approved" | "payout_rejected" | "payment_success" | "refund",
   user: { email: string; whatsapp: string; nama_lengkap: string },
   variables: Record<string, any>
 ) {

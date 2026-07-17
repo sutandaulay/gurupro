@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
   let referralCode = '';
   let invitationToken = '';
   let accountType: 'individual' | 'institutional' = 'individual';
+  let checkoutPlan = '';
 
   if (request.headers.get('Content-Type')?.includes('application/json')) {
     const body = await request.json();
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
     referralCode = body.referralCode || body.referral_code || '';
     invitationToken = body.invitationToken || body.invitation_token || '';
     accountType = body.accountType || body.account_type || 'individual';
+    checkoutPlan = body.checkoutPlan || body.checkout_plan || '';
   } else {
     const formData = await request.formData();
     email = formData.get('email')?.toString() || '';
@@ -49,6 +51,7 @@ export async function POST(request: NextRequest) {
     referralCode = formData.get('referral_code')?.toString() || '';
     invitationToken = formData.get('invitation_token')?.toString() || '';
     accountType = (formData.get('account_type')?.toString() as 'individual' | 'institutional') || 'individual';
+    checkoutPlan = formData.get('checkout_plan')?.toString() || '';
   }
 
   // 1. Validate PDP Consent
@@ -135,6 +138,7 @@ export async function POST(request: NextRequest) {
           success: true,
           requiresOtp: true,
           userId: user.id,
+          checkoutPlan: checkoutPlan,
           message: 'Akun terdaftar ditemukan. Kode OTP verifikasi telah dikirim ke WhatsApp/Email Anda.'
         });
       } else {
@@ -237,6 +241,7 @@ export async function POST(request: NextRequest) {
       success: true,
       requiresOtp: true,
       userId: user.id,
+      checkoutPlan: checkoutPlan,
       message: 'Registrasi berhasil! Kode verifikasi OTP telah dikirimkan ke WhatsApp/Email Anda.'
     });
   } catch (err: any) {

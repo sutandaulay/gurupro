@@ -59,6 +59,7 @@ export async function getSession(): Promise<SessionData | null> {
           cookieStore.set('gurupro_session', JSON.stringify(sessionData), {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax', // CSRF protection
             maxAge: 60 * 60 * 24 * 7,
             path: '/',
           });
@@ -100,6 +101,7 @@ export async function setActiveContext(context: ActiveContext): Promise<void> {
   cookieStore.set('gurupro_session', JSON.stringify(session), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax', // CSRF protection
     maxAge: 60 * 60 * 24 * 7,
     path: '/',
   });
@@ -116,6 +118,7 @@ export async function setDefaultSessionCookie(
   (await cookies()).set('gurupro_session', JSON.stringify(data), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax', // CSRF protection
     maxAge: 60 * 60 * 24 * 7,
     path: '/',
   });

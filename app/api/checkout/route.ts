@@ -79,54 +79,33 @@ export async function POST(req: Request) {
       tokens = typeof dbPlan.tokens === "string" ? parseInt(dbPlan.tokens) || 0 : dbPlan.tokens || 0;
       isFree = amount === 0;
     } else {
-      // Legacy: Support old plan keys for backward compatibility
-      const pricingConfigRes = await query("SELECT value FROM system_settings WHERE key = 'pricing_config'");
-      let cfg: any = {};
-      if (pricingConfigRes.rows.length > 0) {
-        const raw = pricingConfigRes.rows[0].value;
-        cfg = typeof raw === "string" ? JSON.parse(raw) : raw;
-      }
-
-      if (plan === "free") {
-        isFree = true;
-        const planCfg = isUUID(plan) ? null : (cfg.free || cfg[0]);
-        if (planCfg) {
-          amount = parsePrice(planCfg.price);
-          planLabel = "GuruPRO Free";
-          planKey = "free";
-          durationDays = planCfg.duration_days || 30;
-          tokens = planCfg.tokens || 10;
-        } else {
-          amount = 0;
-          planLabel = "GuruPRO Free";
-          planKey = "free";
-          durationDays = 30;
-          tokens = 10;
-        }
-      } else if (plan === "three_month" || plan === "pro_monthly") {
-        const planCfg = cfg.three_month || cfg[1];
-        amount = parsePrice(planCfg?.price || 120000);
-        planLabel = "GuruPRO Premium 3 Bulan";
-        planKey = "three_month";
-        durationDays = planCfg?.duration_days || 90;
-        tokens = planCfg?.tokens || 500;
-      } else if (plan === "six_month") {
-        const planCfg = cfg.six_month || cfg[2];
-        amount = parsePrice(planCfg?.price || 220000);
-        planLabel = "GuruPRO Premium 6 Bulan";
-        planKey = "six_month";
-        durationDays = planCfg?.duration_days || 180;
-        tokens = planCfg?.tokens || 1100;
-      } else if (plan === "one_year" || plan === "pro_yearly") {
-        const planCfg = cfg.one_year || cfg[3];
-        amount = parsePrice(planCfg?.price || 400000);
-        planLabel = "GuruPRO Premium 1 Tahun";
-        planKey = "one_year";
-        durationDays = planCfg?.duration_days || 365;
-        tokens = planCfg?.tokens || 2500;
-      } else {
+      // Legacy: dukung plan key lama, tapi TETAP ambil dari CMS pricing_plans by package_name
+      const legacyNameMap: Record<string, string> = {
+        free: "Gratis",
+        three_month: "3 Bulan",
+        pro_monthly: "3 Bulan",
+        six_month: "6 Bulan",
+        one_year: "1 Tahun",
+        pro_yearly: "1 Tahun",
+      };
+      const lookupName = legacyNameMap[plan];
+      if (!lookupName) {
         return NextResponse.json({ error: "Paket tidak valid!" }, { status: 400 });
       }
+      const planRes = await query(
+        "SELECT * FROM pricing_plans WHERE LOWER(package_name) = LOWER($1) AND is_active = true LIMIT 1",
+        [lookupName]
+      );
+      if (planRes.rows.length === 0) {
+        return NextResponse.json({ error: "Paket tidak ditemukan di CMS pricing_plans!" }, { status: 400 });
+      }
+      const dbPlan = planRes.rows[0];
+      amount = parsePrice(dbPlan.price);
+      planLabel = dbPlan.package_name;
+      planKey = dbPlan.id;
+      durationDays = dbPlan.duration_days;
+      tokens = Number(dbPlan.tokens || 0);
+      if (lookupName === "Gratis") isFree = amount === 0;
     }
 
     if (isAddonPackage) {
@@ -143,7 +122,10 @@ export async function POST(req: Request) {
         try {
           const xenditApiKey = pgConfig.xendit.api_key;
           const authHeader = Buffer.from(xenditApiKey + ":").toString("base64");
-          const xenditResponse = await fetch("https://api.xendit.co/v2/invoices", {
+          const xenditBaseUrl = pgConfig.xendit.is_sandbox
+            ? "https://api.xendit.co/v2/invoices"
+            : "https://api.xendit.co/v2/invoices";
+          const xenditResponse = await fetch(xenditBaseUrl, {
             method: "POST",
             headers: {
               "Authorization": `Basic ${authHeader}`,
@@ -157,19 +139,23 @@ export async function POST(req: Request) {
               invoice_duration: 86400,
               success_redirect_url: `${appUrl}/dashboard?payment=success&tx=${transactionId}`,
               failure_redirect_url: `${appUrl}/dashboard?payment=failed`,
+              callback_url: `${appUrl}/api/webhook/xendit`,
             }),
           });
 
           if (!xenditResponse.ok) {
-            const xenditErr = await xenditResponse.json();
-            throw new Error(xenditErr.message || "Xendit returned error status");
+            const xenditErr = await xenditResponse.json().catch(() => ({}));
+            throw new Error(xenditErr.message || `Xendit error (${xenditResponse.status})`);
           }
           const invoice = await xenditResponse.json();
           checkoutUrl = invoice.invoice_url;
-          processedGateway = "XENDIT";
+          processedGateway = `XENDIT${pgConfig.xendit.is_sandbox ? "_SANDBOX" : ""}`;
         } catch (err: any) {
-          console.error("Xendit addon invoice failed, falling back to mock:", err.message);
+          console.error("Xendit addon invoice failed:", err.message);
+          return NextResponse.json({ error: `Pembayaran Xendit gagal: ${err.message}` }, { status: 502 });
         }
+      } else if (gateway === "xendit") {
+        return NextResponse.json({ error: "Konfigurasi Xendit tidak lengkap (api_key kosong)." }, { status: 500 });
       }
 
       if (!checkoutUrl) {
@@ -247,35 +233,39 @@ export async function POST(req: Request) {
       try {
         const xenditApiKey = pgConfig.xendit.api_key;
         const authHeader = Buffer.from(xenditApiKey + ":").toString("base64");
-
         const xenditResponse = await fetch("https://api.xendit.co/v2/invoices", {
           method: "POST",
           headers: {
             "Authorization": `Basic ${authHeader}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            external_id: externalId,
-            amount: amount,
-            payer_email: user.email,
-            description: planLabel,
-            invoice_duration: 86400,
-            success_redirect_url: `${appUrl}/dashboard?payment=success&tx=${transactionId}`,
-            failure_redirect_url: `${appUrl}/dashboard?payment=failed`,
-          }),
+            body: JSON.stringify({
+              external_id: externalId,
+              amount: amount,
+              payer_email: user.email,
+              description: planLabel,
+              invoice_duration: 86400,
+              success_redirect_url: `${appUrl}/dashboard?payment=success&tx=${transactionId}`,
+              failure_redirect_url: `${appUrl}/dashboard?payment=failed`,
+              callback_url: `${appUrl}/api/webhook/xendit`,
+            }),
         });
 
         if (!xenditResponse.ok) {
-          const xenditErr = await xenditResponse.json();
-          throw new Error(xenditErr.message || "Xendit returned error status");
+          const xenditErr = await xenditResponse.json().catch(() => ({}));
+          throw new Error(xenditErr.message || `Xendit error (${xenditResponse.status})`);
         }
 
         const invoice = await xenditResponse.json();
         checkoutUrl = invoice.invoice_url;
-        processedGateway = "XENDIT";
+        processedGateway = `XENDIT${pgConfig.xendit.is_sandbox ? "_SANDBOX" : ""}`;
       } catch (err: any) {
-        console.error("Xendit Invoice Generation failed, falling back to mock:", err.message);
+        console.error("Xendit Invoice Generation failed:", err.message);
+        return NextResponse.json({ error: `Pembayaran Xendit gagal: ${err.message}` }, { status: 502 });
       }
+    }
+    else if (gateway === "xendit") {
+      return NextResponse.json({ error: "Konfigurasi Xendit tidak lengkap (api_key kosong)." }, { status: 500 });
     }
     else if (gateway === "midtrans" && pgConfig.midtrans.server_key) {
       try {
@@ -321,15 +311,19 @@ export async function POST(req: Request) {
 
         if (!midtransResponse.ok) {
           const midtransErr = await midtransResponse.json().catch(() => ({}));
-          throw new Error(midtransErr.error_messages?.[0] || "Midtrans returned error status");
+          throw new Error(midtransErr.error_messages?.[0] || `Midtrans error (${midtransResponse.status})`);
         }
 
         const snapData = await midtransResponse.json();
         checkoutUrl = snapData.redirect_url;
-        processedGateway = "MIDTRANS";
+        processedGateway = `MIDTRANS${is_sandbox ? "_SANDBOX" : ""}`;
       } catch (err: any) {
-        console.error("Midtrans Snap Generation failed, falling back to mock:", err.message);
+        console.error("Midtrans Snap Generation failed:", err.message);
+        return NextResponse.json({ error: `Pembayaran Midtrans gagal: ${err.message}` }, { status: 502 });
       }
+    }
+    else if (gateway === "midtrans") {
+      return NextResponse.json({ error: "Konfigurasi Midtrans tidak lengkap (server_key kosong)." }, { status: 500 });
     }
     else if (gateway === "duitku" && pgConfig.duitku.merchant_code && pgConfig.duitku.api_key) {
       try {
@@ -365,20 +359,24 @@ export async function POST(req: Request) {
 
         if (!duitkuResponse.ok) {
           const duitkuErr = await duitkuResponse.json().catch(() => ({}));
-          throw new Error(duitkuErr.message || "Duitku returned error status");
+          throw new Error(duitkuErr.message || `Duitku error (${duitkuResponse.status})`);
         }
 
         const duitkuData = await duitkuResponse.json();
 
         if (duitkuData.paymentUrl) {
           checkoutUrl = duitkuData.paymentUrl;
-          processedGateway = "DUITKU";
+          processedGateway = `DUITKU${is_sandbox ? "_SANDBOX" : ""}`;
         } else {
           throw new Error(duitkuData.message || "Duitku returned no paymentUrl");
         }
       } catch (err: any) {
-        console.error("Duitku Inquiry failed, falling back to mock:", err.message);
+        console.error("Duitku Inquiry failed:", err.message);
+        return NextResponse.json({ error: `Pembayaran Duitku gagal: ${err.message}` }, { status: 502 });
       }
+    }
+    else if (gateway === "duitku") {
+      return NextResponse.json({ error: "Konfigurasi Duitku tidak lengkap (merchant_code/api_key kosong)." }, { status: 500 });
     }
 
     if (!checkoutUrl) {

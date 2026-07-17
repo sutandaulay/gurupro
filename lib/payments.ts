@@ -35,11 +35,11 @@ export async function activateTransaction(transactionId: string): Promise<{ succ
 
   const userId = transaction.user_id;
   const planKey = transaction.plan_id || "three_month";
-  
-  // Lookup plan from pricing_plans table (Admin Dashboard source of truth)
+
+  // Lookup plan from pricing_plans table (CMS Landing Page - Paket = single source of truth)
   let plan = await getPlanDetails(planKey);
 
-  // Fallback: try to find by amount if planKey not matched
+  // Fallback: try to find by amount if planKey not matched (still from pricing_plans only)
   if (!plan) {
     const amount = Number(transaction.amount);
     const amountPlan = await query(
@@ -55,15 +55,12 @@ export async function activateTransaction(transactionId: string): Promise<{ succ
     }
   }
 
-  // Final fallback: hardcoded defaults (shouldn't happen if pricing_plans has data)
+  // Semua paket HARUS berasal dari CMS pricing_plans. Tidak ada fallback hardcoded.
   if (!plan) {
-    if (Number(transaction.amount) >= 400000) {
-      plan = { id: "one_year", package_name: "1 Tahun", tokens: 2500, duration_days: 365, price: 400000 };
-    } else if (Number(transaction.amount) >= 220000) {
-      plan = { id: "six_month", package_name: "6 Bulan", tokens: 1100, duration_days: 180, price: 220000 };
-    } else {
-      plan = { id: "three_month", package_name: "3 Bulan", tokens: 500, duration_days: 90, price: 120000 };
-    }
+    throw new Error(
+      `Paket dengan id/name "${planKey}" tidak ditemukan di CMS pricing_plans. ` +
+      `Pastikan paket dibuat di CMS Landing Page - Paket dan status aktif.`
+    );
   }
 
   const tokensToAdd = Number(plan.tokens || 0);

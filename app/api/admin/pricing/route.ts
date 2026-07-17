@@ -2,7 +2,6 @@ import { query } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { updateSystemSetting } from "@/lib/settings";
 
 function parsePlanRow(row: any) {
   return {
@@ -11,29 +10,6 @@ function parsePlanRow(row: any) {
     tokens: typeof row.tokens === "string" ? parseInt(row.tokens) || 0 : row.tokens || 0,
     features: typeof row.features === "string" ? JSON.parse(row.features) : row.features || [],
   };
-}
-
-async function syncPricingConfig() {
-  try {
-    const plans = await query(
-      "SELECT * FROM pricing_plans WHERE is_active = true ORDER BY sort_order ASC"
-    );
-    if (plans.rows.length === 0) return;
-    const config = plans.rows.map((plan: any) => ({
-      id: plan.id,
-      package_name: plan.package_name,
-      price: typeof plan.price === "string" ? parseFloat(plan.price) : Number(plan.price),
-      tokens: typeof plan.tokens === "string" ? parseInt(plan.tokens) || 0 : plan.tokens || 0,
-      duration_days: plan.duration_days,
-      features: typeof plan.features === "string" ? JSON.parse(plan.features) : plan.features || [],
-      popular: plan.popular || false,
-      sort_order: plan.sort_order || 0,
-      is_active: plan.is_active !== false,
-    }));
-    await updateSystemSetting("pricing_config", config);
-  } catch (e) {
-    console.error("syncPricingConfig error:", e);
-  }
 }
 
 async function verifyAdmin() {
@@ -104,7 +80,6 @@ export async function POST(request: Request) {
       ]
     );
 
-    await syncPricingConfig();
     return NextResponse.json({ success: true, data: parsePlanRow(result.rows[0]) });
   } catch (error: any) {
     console.error("POST /api/admin/pricing error:", error);
@@ -155,7 +130,6 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Paket tidak ditemukan" }, { status: 404 });
     }
 
-    await syncPricingConfig();
     return NextResponse.json({ success: true, data: parsePlanRow(result.rows[0]) });
   } catch (error: any) {
     console.error("PUT /api/admin/pricing error:", error);
@@ -175,7 +149,6 @@ export async function PATCH(request: Request) {
     }
 
     await query("UPDATE pricing_plans SET sort_order = $1, updated_at = NOW() WHERE id = $2", [sort_order, id]);
-    await syncPricingConfig();
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -196,7 +169,6 @@ export async function DELETE(request: Request) {
     }
 
     await query("DELETE FROM pricing_plans WHERE id = $1", [id]);
-    await syncPricingConfig();
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
