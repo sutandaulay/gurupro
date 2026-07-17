@@ -188,115 +188,171 @@ export default function CmsLandingEditor() {
   const [showAddonModal, setShowAddonModal] = useState(false);
   const [editAddon, setEditAddon] = useState<any>(null);
 
-  // Helper with timeout
-  const fetchWithTimeout = async (url: string, timeout = 5000) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-    try {
-      const res = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
-      return res;
-    } catch {
-      clearTimeout(timeoutId);
-      return null;
+  // Helper with timeout and retry - for slow database connections
+  const fetchWithRetry = async (
+    url: string,
+    retries = 3,
+    timeout = 60000 // 60 seconds timeout
+  ): Promise<Response | null> => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      try {
+        console.log(`[CMS] Fetching ${url} (attempt ${attempt + 1}/${retries + 1})`);
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        return res;
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') {
+          console.warn(`[CMS] Timeout for ${url} on attempt ${attempt + 1}`);
+          if (attempt < retries) {
+            console.log(`[CMS] Retrying ${url} in 2 seconds...`);
+            await new Promise(r => setTimeout(r, 2000));
+            continue;
+          }
+        }
+        console.error(`[CMS] Fetch failed for ${url}:`, err);
+        return null;
+      }
     }
+    return null;
   };
 
   useEffect(() => {
+    const abortController = new AbortController();
+
     const loadData = async () => {
       setLoading(true);
+      console.log("[CMS Landing] Starting to load data...");
 
-      // Load hero
-      const heroRes = await fetchWithTimeout("/api/admin/landing/hero");
-      if (heroRes?.ok) {
-        const heroData = await heroRes.json();
-        setHero({
-          heroBadgeText: heroData.badge || heroData.heroBadgeText || "",
-          heroHeadline: heroData.headline || heroData.heroHeadline || "",
-          heroSubheadline: heroData.subheadline || heroData.heroSubheadline || "",
-          heroStats: (heroData.stats || heroData.heroStats || []).map((s: any) => ({
-            number: s.value || s.number || "",
-            label: s.label || "",
-          })),
-          heroCTAPrimary: heroData.heroCTAPrimary || { label: "Mulai Gratis Sekarang", url: "/register" },
-          heroCTASecondary: heroData.heroCTASecondary || { label: "Lihat Demo", url: "#demo" },
-          seoTitle: heroData.seoTitle || "",
-          seoDescription: heroData.seoDescription || "",
-          ogImage: heroData.ogImage ?? null,
-        });
-      }
+      try {
+        // Load hero
+        const heroRes = await fetchWithRetry("/api/admin/landing/hero");
+        if (heroRes?.ok) {
+          const heroData = await heroRes.json();
+          setHero({
+            heroBadgeText: heroData.badge || heroData.heroBadgeText || "",
+            heroHeadline: heroData.headline || heroData.heroHeadline || "",
+            heroSubheadline: heroData.subheadline || heroData.heroSubheadline || "",
+            heroStats: (heroData.stats || heroData.heroStats || []).map((s: any) => ({
+              number: s.value || s.number || "",
+              label: s.label || "",
+            })),
+            heroCTAPrimary: heroData.heroCTAPrimary || { label: "Mulai Gratis Sekarang", url: "/register" },
+            heroCTASecondary: heroData.heroCTASecondary || { label: "Lihat Demo", url: "#demo" },
+            seoTitle: heroData.seoTitle || "",
+            seoDescription: heroData.seoDescription || "",
+            ogImage: heroData.ogImage ?? null,
+          });
+          console.log("[CMS Landing] Hero loaded:", heroData);
+        } else {
+          console.warn("[CMS Landing] Failed to load hero:", heroRes?.status);
+        }
 
-      // Load features
-      const featuresRes = await fetchWithTimeout("/api/admin/landing/features");
-      if (featuresRes?.ok) {
-        const featuresData = await featuresRes.json();
-        setFeatures(featuresData.docs || []);
-      }
+        // Load features
+        const featuresRes = await fetchWithRetry("/api/admin/landing/features");
+        if (featuresRes?.ok) {
+          const featuresData = await featuresRes.json();
+          setFeatures(featuresData.docs || []);
+          console.log("[CMS Landing] Features loaded:", featuresData.docs?.length || 0);
+        } else {
+          console.warn("[CMS Landing] Failed to load features:", featuresRes?.status);
+        }
 
-      // Load why points
-      const whyRes = await fetchWithTimeout("/api/admin/landing/why");
-      if (whyRes?.ok) {
-        const whyData = await whyRes.json();
-        setWhyPoints(whyData.docs || []);
-      }
+        // Load why points
+        const whyRes = await fetchWithRetry("/api/admin/landing/why");
+        if (whyRes?.ok) {
+          const whyData = await whyRes.json();
+          setWhyPoints(whyData.docs || []);
+          console.log("[CMS Landing] Why points loaded:", whyData.docs?.length || 0);
+        } else {
+          console.warn("[CMS Landing] Failed to load why points:", whyRes?.status);
+        }
 
-      // Load footer
-      const footerRes = await fetchWithTimeout("/api/admin/landing/footer");
-      if (footerRes?.ok) {
-        const footerData = await footerRes.json();
-        setFooter(footerData || {});
-      }
+        // Load footer
+        const footerRes = await fetchWithRetry("/api/admin/landing/footer");
+        if (footerRes?.ok) {
+          const footerData = await footerRes.json();
+          setFooter(footerData || {});
+          console.log("[CMS Landing] Footer loaded");
+        } else {
+          console.warn("[CMS Landing] Failed to load footer:", footerRes?.status);
+        }
 
-      // Load chatbot
-      const chatbotRes = await fetchWithTimeout("/api/admin/landing/chatbot");
-      if (chatbotRes?.ok) {
-        const chatbotData = await chatbotRes.json();
-        setChatbot(chatbotData || {});
-      }
+        // Load chatbot
+        const chatbotRes = await fetchWithRetry("/api/admin/landing/chatbot");
+        if (chatbotRes?.ok) {
+          const chatbotData = await chatbotRes.json();
+          setChatbot(chatbotData || {});
+          console.log("[CMS Landing] Chatbot loaded");
+        } else {
+          console.warn("[CMS Landing] Failed to load chatbot:", chatbotRes?.status);
+        }
 
-      // Load pricing
-      const pricingRes = await fetchWithTimeout("/api/admin/pricing");
-      if (pricingRes?.ok) {
-        const pricingData = await pricingRes.json();
-        setPricingPlans(pricingData.plans || pricingData.docs || []);
-      }
+        // Load pricing
+        const pricingRes = await fetchWithRetry("/api/admin/pricing");
+        if (pricingRes?.ok) {
+          const pricingData = await pricingRes.json();
+          setPricingPlans(pricingData.plans || pricingData.docs || []);
+          console.log("[CMS Landing] Pricing loaded:", pricingData.plans?.length || pricingData.docs?.length || 0);
+        } else {
+          console.warn("[CMS Landing] Failed to load pricing:", pricingRes?.status);
+        }
 
-      // Load token packages (addons)
-      const addonsRes = await fetchWithTimeout("/api/admin/token-packages");
-      if (addonsRes?.ok) {
-        const addonsData = await addonsRes.json();
-        setAddonPackages(addonsData.docs || []);
-      }
+        // Load token packages (addons)
+        const addonsRes = await fetchWithRetry("/api/admin/token-packages");
+        if (addonsRes?.ok) {
+          const addonsData = await addonsRes.json();
+          setAddonPackages(addonsData.docs || []);
+          console.log("[CMS Landing] Addons loaded:", addonsData.docs?.length || 0);
+        } else {
+          console.warn("[CMS Landing] Failed to load addons:", addonsRes?.status);
+        }
 
-      // Load blog data
-      // eslint-disable-next-line react-hooks/immutability
-      await fetchBlogData();
+        // Load blog data
+        // eslint-disable-next-line react-hooks/immutability
+        await fetchBlogData();
 
-      // Load FAQ & Referral & Legal from settings
-      const settingsRes = await fetchWithTimeout("/api/admin/settings");
-      if (settingsRes?.ok) {
-        const settingsData = await settingsRes.json();
-        if (settingsData.faqConfig) setFaqItems(settingsData.faqConfig);
-        if (settingsData.referralConfig) setReferral(settingsData.referralConfig);
-        setLegalPages({
-          privacy_policy: settingsData.privacy_policy || { title: "Kebijakan Privasi", content: "", last_updated: "" },
-          terms_conditions: settingsData.terms_conditions || { title: "Syarat & Ketentuan", content: "", last_updated: "" },
-          refund_policy: settingsData.refund_policy || { title: "Kebijakan Refund", content: "", last_updated: "" },
-        });
+        // Load FAQ & Referral & Legal from settings
+        const settingsRes = await fetchWithRetry("/api/admin/settings");
+        if (settingsRes?.ok) {
+          const settingsData = await settingsRes.json();
+          if (settingsData.faqConfig) setFaqItems(settingsData.faqConfig);
+          if (settingsData.referralConfig) setReferral(settingsData.referralConfig);
+          setLegalPages({
+            privacy_policy: settingsData.privacy_policy || { title: "Kebijakan Privasi", content: "", last_updated: "" },
+            terms_conditions: settingsData.terms_conditions || { title: "Syarat & Ketentuan", content: "", last_updated: "" },
+            refund_policy: settingsData.refund_policy || { title: "Kebijakan Refund", content: "", last_updated: "" },
+          });
+          console.log("[CMS Landing] Settings loaded");
+        } else {
+          console.warn("[CMS Landing] Failed to load settings:", settingsRes?.status);
+        }
+
+        console.log("[CMS Landing] Data loading complete!");
+      } catch (err) {
+        console.error("[CMS Landing] Error loading data:", err);
       }
 
       setLoading(false);
     };
 
     loadData();
+
+    return () => {
+      // Abort any in-flight requests when component unmounts
+      abortController.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchBlogData = async () => {
     setBlogLoading(true);
     try {
-      const postsRes = await fetchWithTimeout("/api/admin/posts?limit=50");
-      const catsRes = await fetchWithTimeout("/api/admin/categories?limit=50");
+      const postsRes = await fetchWithRetry("/api/admin/posts?limit=50");
+      const catsRes = await fetchWithRetry("/api/admin/categories?limit=50");
 
       if (postsRes?.ok) {
         const postsData = await postsRes.json();

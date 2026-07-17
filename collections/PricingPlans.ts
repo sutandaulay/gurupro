@@ -16,7 +16,7 @@ const PricingPlans: CollectionConfig = {
   admin: {
     useAsTitle: "packageName",
     group: "CMS Landing",
-    defaultColumns: ["packageName", "price", "tokens", "durationDays", "isActive", "sortOrder"],
+    defaultColumns: ["packageName", "price", "poin", "durationDays", "isActive", "sortOrder"],
     description: "Kelola paket langganan yang ditampilkan di landing page dan halaman billing",
   },
   hooks: {
@@ -70,12 +70,12 @@ const PricingPlans: CollectionConfig = {
       },
     },
     {
-      name: "tokens",
+      name: "poin",
       type: "number",
       required: true,
-      label: "Jumlah Token",
+      label: "Jumlah Poin",
       admin: {
-        description: "Jumlah token yang diberikan per paket",
+        description: "Jumlah Poin yang diberikan per paket. 1 Poin = 2000 token AI.",
       },
     },
     {

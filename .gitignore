@@ -49,3 +49,5 @@ payload-types.ts
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+nul
