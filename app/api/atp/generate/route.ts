@@ -1,6 +1,7 @@
 import { generateAIContent } from "@/lib/ai";
 import { query } from "@/lib/db";
-import { consumeUserToken, getUserTokenAccess } from "@/lib/token-system";
+import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
+import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { jsonrepair as repair } from "jsonrepair";
@@ -72,16 +73,16 @@ export async function POST(req: Request) {
     const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
-    const tokenState = await getUserTokenAccess(userId);
-    if (!tokenState.user) {
+    const poinState = await getUserPoinAccess(userId);
+    if (!poinState.user) {
       return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
     }
-    const user = tokenState.user;
+    const user = poinState.user;
 
-    if (!tokenState.access.allowed) {
-      const message = tokenState.access.reason === "subscription_expired"
+    if (!poinState.access.allowed) {
+      const message = poinState.access.reason === "subscription_expired"
         ? "Masa aktif langganan akun Anda telah habis. Silakan perpanjang paket terlebih dahulu."
-        : "Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.";
+        : "Poin GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.";
       return NextResponse.json({ error: message }, { status: 403 });
     }
 
@@ -183,9 +184,17 @@ Hasilkan seluruh dokumen ATP LENGKAP tersebut langsung dalam format Markdown yan
 `;
 
     let parsed: any;
+    let rawUsage = null;
     try {
-      const text = await generateAIContent(prompt, undefined, false);
+      const aiResult = await generateAIContent(prompt, undefined, false);
+      const text = aiResult.data as string || aiResult.response?.text?.() || "";
       const cleanMarkdown = text.trim();
+      rawUsage = aiResult.rawUsage;
+
+      if (!text || text.trim() === "") {
+        throw new Error("AI mengembalikan respons kosong");
+      }
+
       const docTitle = `ATP - ${resolvedMapel} ${jenjang} Fase ${fase} ${semester === 'ganjil' ? 'Ganjil' : 'Genap'} ${tahun_ajaran || ''}`;
 
       parsed = {
@@ -214,6 +223,10 @@ Hasilkan seluruh dokumen ATP LENGKAP tersebut langsung dalam format Markdown yan
 
     } catch (aiError: any) {
       console.error("ATP AI generation failed:", aiError);
+
+      // Log failed usage
+      await logFailedPoinUsage(userId, 0, "generate-atp", aiError.message);
+
       return NextResponse.json({ error: `Gagal generate ATP: ${aiError.message}` }, { status: 502 });
     }
 
@@ -250,9 +263,24 @@ Hasilkan seluruh dokumen ATP LENGKAP tersebut langsung dalam format Markdown yan
       console.error("Failed to save ATP:", dbErr);
     }
 
-    // Deduct token
+    // Deduct Poin based on actual usage
     if (user.role !== "admin") {
-      await consumeUserToken(userId, 1);
+      try {
+        const poinCalc = calculatePoinFromTokens(
+          rawUsage?.promptTokenCount || 0,
+          rawUsage?.candidatesTokenCount || 0,
+          rawUsage?.cachedContentTokenCount || 0
+        );
+
+        await consumeUserPoin(userId, poinCalc.rawTokens, "generate-atp", {
+          model: "gemini-2.5-flash-lite",
+          provider: "gemini",
+        });
+
+        console.log(`[ATP Generate] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+      } catch (poinError: any) {
+        console.error("[ATP Generate] Poin deduction failed:", poinError);
+      }
     }
 
     return NextResponse.json(parsed);

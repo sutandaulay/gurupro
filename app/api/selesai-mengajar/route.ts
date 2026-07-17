@@ -14,6 +14,7 @@ import { saveAbsensiSummary } from '@/lib/selesai-mengajar/save-absensi';
 import { updateProgressATP } from '@/lib/selesai-mengajar/update-atp';
 import { updateLessonMemory } from '@/lib/selesai-mengajar/update-memory';
 import { generateNextMateri } from '@/lib/selesai-mengajar/generate-next-materi';
+import { getUserTokenAccess, consumeUserToken, logAIUsage } from '@/lib/token-system';
 import type { SelesaiMengajarInput, ProgressEvent, SelesaiMengajarResult } from '@/lib/selesai-mengajar/types';
 
 const prisma = new PrismaClient();
@@ -88,6 +89,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'expired' }, { status: 403 });
     }
 
+    // Token check (hanya untuk non-admin) - cek sebelum stream dibuka
+    if (userDb?.role !== 'admin') {
+      const tokenAccess = await getUserTokenAccess(user.id);
+      if (!tokenAccess.access.allowed) {
+        const message =
+          tokenAccess.access.reason === 'subscription_expired'
+            ? 'Masa aktif langganan akun Anda telah habis! Silakan lakukan perpanjangan langganan terlebih dahulu.'
+            : 'Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan di Landing Page.';
+        return NextResponse.json({ error: message }, { status: 403 });
+      }
+    }
+
     const guruId = user.id;
     const body: SelesaiMengajarInput = await request.json();
 
@@ -118,6 +131,16 @@ export async function POST(request: NextRequest) {
             status: 'done',
             message: 'Memulai proses administrasi...',
           });
+
+          // Konsumsi 1 token untuk seluruh pipeline selesai-mengajar (non-admin)
+          if (userDb?.role !== 'admin') {
+            try {
+              await consumeUserToken(guruId, 1);
+              await logAIUsage({ userId: guruId, feature: "selesai-mengajar", tokensCharged: 1, success: true });
+            } catch (tokenErr) {
+              console.error('[Selesai Mengajar] Token deduction failed:', tokenErr);
+            }
+          }
 
           // Prepare input with school_id
           const inputData: SelesaiMengajarInput = {

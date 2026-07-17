@@ -1,6 +1,6 @@
 import { generateAIContent } from "@/lib/ai";
 import { query } from "@/lib/db";
-import { consumeUserToken, getUserTokenAccess } from "@/lib/token-system";
+import { consumeUserToken, getUserTokenAccess, logAIUsage } from "@/lib/token-system";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -71,6 +71,7 @@ Harap berikan respons dalam JSON dengan skema berikut:
     // 3. Deduct token on success
     if (user.role !== "admin") {
       await consumeUserToken(userId, 1);
+      await logAIUsage({ userId, feature: "journals-ai", tokensCharged: 1, success: true });
     }
 
     return NextResponse.json(parsed);

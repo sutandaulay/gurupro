@@ -1,6 +1,7 @@
 import { generateAIContent } from "@/lib/ai";
 import { query } from "@/lib/db";
-import { consumeUserToken, getUserTokenAccess } from "@/lib/token-system";
+import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
+import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -12,7 +13,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "mapel, kelas, dan materi_capaian wajib diisi" }, { status: 400 });
     }
 
-    // 1. SaaS Token Validation
+    // 1. SaaS Poin Validation
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("gurupro_session")?.value;
     if (!sessionCookie) {
@@ -21,16 +22,16 @@ export async function POST(req: Request) {
     const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
-    const tokenState = await getUserTokenAccess(userId);
-    if (!tokenState.user) {
+    const poinState = await getUserPoinAccess(userId);
+    if (!poinState.user) {
       return NextResponse.json({ error: "Pengguna tidak ditemukan." }, { status: 404 });
     }
-    const user = tokenState.user;
+    const user = poinState.user;
 
-    if (!tokenState.access.allowed) {
-      const message = tokenState.access.reason === "subscription_expired"
+    if (!poinState.access.allowed) {
+      const message = poinState.access.reason === "subscription_expired"
         ? "Masa aktif langganan akun Anda telah habis. Silakan perpanjang paket terlebih dahulu."
-        : "Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.";
+        : "Poin GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.";
       return NextResponse.json({ error: message }, { status: 403 });
     }
 
@@ -72,19 +73,46 @@ Harap berikan respons dalam JSON dengan format persis seperti ini:
 }
 `;
 
-    // 2. Call universal AI service and parse response before token deduction
+    // 2. Call universal AI service and parse response
     let parsed: any;
+    let rawUsage = null;
     try {
-      const text = await generateAIContent(prompt);
-      parsed = JSON.parse(text);
+      const aiResult = await generateAIContent(prompt);
+      parsed = aiResult.data;
+      rawUsage = aiResult.rawUsage;
+
+      if (!aiResult.success || !parsed) {
+        throw new Error(aiResult.error || "AI generation failed");
+      }
     } catch (aiError: any) {
       console.error("Assessment AI generation failed:", aiError);
+
+      // Log failed usage
+      await logFailedPoinUsage(userId, 0, "assessments-ai", aiError.message);
+
       return NextResponse.json({ error: `Gagal memproses AI: ${aiError.message || aiError}` }, { status: 502 });
     }
 
-    // 3. Deduct token on success
+    // 3. Deduct Poin based on actual usage
     if (user.role !== "admin") {
-      await consumeUserToken(userId, 1);
+      try {
+        const poinCalc = calculatePoinFromTokens(
+          rawUsage?.promptTokenCount || 0,
+          rawUsage?.candidatesTokenCount || 0,
+          rawUsage?.cachedContentTokenCount || 0
+        );
+
+        await consumeUserPoin(userId, poinCalc.rawTokens, "assessments-ai", {
+          model: "gemini-2.5-flash-lite",
+          provider: "gemini",
+          mapel: mapel,
+          jenjang: kurikulum,
+        });
+
+        console.log(`[Assessments AI] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+      } catch (poinError: any) {
+        console.error("[Assessments AI] Poin deduction failed:", poinError);
+      }
     }
 
     return NextResponse.json(parsed);

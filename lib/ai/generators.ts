@@ -8,19 +8,33 @@
 
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import { truncateText } from './validation-utils';
+import { getAIConfig } from '@/lib/settings';
 
-// Initialize Gemini AI
-const googleAIKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || '';
-const genAI = googleAIKey ? new GoogleGenerativeAI(googleAIKey) : null;
+// Inisialisasi Gemini AI dari config admin panel (dengan fallback ke env agar kompatibel)
+async function getGenAI() {
+  const config = await getAIConfig();
+  const apiKey = config.gemini.api_key || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || '';
+  if (!apiKey) return null;
+  return { genAI: new GoogleGenerativeAI(apiKey), modelName: config.gemini.model_name || 'gemini-2.5-flash' };
+}
+
+// Timeout untuk mencegah generate menggantung (terutama selesai-mengajar yang memanggil AI berkali-kali)
+const AI_REQUEST_TIMEOUT_MS = 120000;
 
 // Get Gemini model
-function getModel(apiVersion?: string) {
+async function getModel(apiVersion?: string) {
+  const { genAI, modelName } = (await getGenAI()) as { genAI: GoogleGenerativeAI; modelName: string };
   if (!genAI) {
     throw new Error('Google AI API key not configured');
   }
   return genAI.getGenerativeModel(
     {
-      model: 'gemini-2.5-flash',
+      model: modelName,
+      systemInstruction: undefined,
+      generationConfig: {
+        maxOutputTokens: 32768,
+        temperature: 0.7,
+      },
       safetySettings: [
         {
           category: HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -52,6 +66,14 @@ export interface GenerationResult<T = any> {
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;
+    cachedTokens?: number; // For context caching
+  };
+  // Raw usage metadata for Poin calculation
+  rawUsage?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+    cachedContentTokenCount?: number;
   };
 }
 
@@ -67,26 +89,38 @@ export async function generateAIContent<T>(
   }
 ): Promise<GenerationResult<T>> {
   try {
-    const model = getModel('v1');
+    const model = await getModel('v1');
 
     const generationConfig = {
       temperature: options?.temperature ?? 0.7,
-      maxOutputTokens: options?.maxOutputTokens ?? 2048,
+      maxOutputTokens: options?.maxOutputTokens ?? 32768,
     };
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig,
-    });
+    const result = await model.generateContent(
+      {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig,
+      },
+      { signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS) }
+    );
 
     const response = result.response;
     const text = response.text();
 
-    // Get usage metadata
+    // Get usage metadata for Poin calculation
     const usage = {
       inputTokens: response.usageMetadata?.promptTokenCount || 0,
       outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
       totalTokens: response.usageMetadata?.totalTokenCount || 0,
+      cachedTokens: response.usageMetadata?.cachedContentTokenCount || 0,
+    };
+
+    // Raw usage metadata for accurate Poin calculation
+    const rawUsage = {
+      promptTokenCount: response.usageMetadata?.promptTokenCount || 0,
+      candidatesTokenCount: response.usageMetadata?.candidatesTokenCount || 0,
+      totalTokenCount: response.usageMetadata?.totalTokenCount || 0,
+      cachedContentTokenCount: response.usageMetadata?.cachedContentTokenCount || 0,
     };
 
     // Parse JSON response
@@ -112,6 +146,7 @@ export async function generateAIContent<T>(
       success: true,
       data,
       usage,
+      rawUsage,
     };
   } catch (error: any) {
     console.error('AI Generation Error:', error);
@@ -458,17 +493,20 @@ User: ${params.userMessage}
 `;
 
   try {
-    const model = getModel('v1');
+    const model = await getModel('v1');
 
     const generationConfig = {
       temperature: 0.8,
-      maxOutputTokens: 2048,
+      maxOutputTokens: 32768,
     };
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-      generationConfig,
-    });
+    const result = await model.generateContent(
+      {
+        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+        generationConfig,
+      },
+      { signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS) }
+    );
 
     const response = result.response;
     const text = response.text();
@@ -477,6 +515,14 @@ User: ${params.userMessage}
       inputTokens: response.usageMetadata?.promptTokenCount || 0,
       outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
       totalTokens: response.usageMetadata?.totalTokenCount || 0,
+      cachedTokens: response.usageMetadata?.cachedContentTokenCount || 0,
+    };
+
+    const rawUsage = {
+      promptTokenCount: response.usageMetadata?.promptTokenCount || 0,
+      candidatesTokenCount: response.usageMetadata?.candidatesTokenCount || 0,
+      totalTokenCount: response.usageMetadata?.totalTokenCount || 0,
+      cachedContentTokenCount: response.usageMetadata?.cachedContentTokenCount || 0,
     };
 
     return {
@@ -486,6 +532,7 @@ User: ${params.userMessage}
         suggestions: [],
       },
       usage,
+      rawUsage,
     };
   } catch (error: any) {
     console.error('AI Chat Generation Error:', error);

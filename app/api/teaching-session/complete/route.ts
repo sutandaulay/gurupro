@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
 import { generateJournal, generateReflection, estimateCost } from '@/lib/ai/generators';
+import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/services/poin-service';
+import { calculatePoinFromTokens } from '@/src/lib/ai-usage';
 
 const prisma = new PrismaClient();
 
@@ -38,6 +40,24 @@ export async function POST(request: NextRequest) {
 
     const userId = user.id;
     const body = await request.json();
+
+    // Poin check (non-admin) sebelum generate AI
+    const userDb = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (userDb?.role !== 'admin') {
+      const poinAccess = await getUserPoinAccess(userId);
+      if (!poinAccess.access.allowed) {
+        return NextResponse.json({
+          error: poinAccess.access.reason === 'subscription_expired'
+            ? 'Masa aktif langganan akun Anda telah habis! Silakan lakukan perpanjangan langganan terlebih dahulu.'
+            : 'Poin GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan di Landing Page.',
+          reason: poinAccess.access.reason,
+          remainingPoin: 0,
+        }, { status: 403 });
+      }
+    }
 
     const {
       session_id,
@@ -259,6 +279,27 @@ export async function POST(request: NextRequest) {
           last_date: today,
         },
       });
+    }
+
+    // Deduct Poin after successful AI generation (non-admin)
+    if (userDb?.role !== 'admin' && (results.journal || results.reflection)) {
+      try {
+        const rawUsage = results.journal?.rawUsage || results.reflection?.rawUsage || {};
+        const poinCalc = calculatePoinFromTokens(
+          rawUsage?.promptTokenCount || 0,
+          rawUsage?.candidatesTokenCount || 0,
+          rawUsage?.cachedContentTokenCount || 0
+        );
+
+        await consumeUserPoin(userId, poinCalc.rawTokens, 'teaching-session-complete', {
+          model: 'gemini-2.5-flash-lite',
+          provider: 'gemini',
+        });
+
+        console.log(`[Teaching Session] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+      } catch (poinError) {
+        console.error('[Teaching Session] Poin deduction failed:', poinError);
+      }
     }
 
     return NextResponse.json({

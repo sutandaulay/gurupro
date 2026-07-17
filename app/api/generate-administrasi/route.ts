@@ -1,7 +1,8 @@
 import { generateAIContent } from "@/lib/ai";
 import { jsonrepair as repair } from "jsonrepair";
 import { query } from "@/lib/db";
-import { consumeUserToken, getUserTokenAccess } from "@/lib/token-system";
+import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
+import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { uploadToR2 } from "@/lib/r2";
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Parameter tipe, mapel, kelas, dan topik wajib diisi" }, { status: 400 });
     }
 
-    // 1. SaaS Token Validation
+    // 1. SaaS Poin Validation
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("gurupro_session")?.value;
     if (!sessionCookie) {
@@ -83,16 +84,16 @@ export async function POST(req: Request) {
     const userId = session.id;
 
     // Ambil data user
-    const tokenState = await getUserTokenAccess(userId);
-    if (!tokenState.user) {
+    const poinState = await getUserPoinAccess(userId);
+    if (!poinState.user) {
       return NextResponse.json({ error: "Pengguna tidak ditemukan." }, { status: 404 });
     }
-    const user = tokenState.user;
+    const user = poinState.user;
 
-    if (!tokenState.access.allowed) {
-      const message = tokenState.access.reason === "subscription_expired"
+    if (!poinState.access.allowed) {
+      const message = poinState.access.reason === "subscription_expired"
         ? "Masa aktif langganan akun Anda telah habis! Silakan lakukan perpanjangan langganan terlebih dahulu."
-        : "Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan di Landing Page.";
+        : "Poin GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan di Landing Page.";
       return NextResponse.json({ error: message }, { status: 403 });
     }
 
@@ -809,9 +810,24 @@ Hasilkan seluruh dokumen Laporan Evaluasi Pelaksanaan LKPD tersebut langsung dal
       console.error("Failed to save admin document:", dbError);
     }
 
-    // 4. Deduct token on success
+    // 4. Deduct Poin based on actual usage
     if (user.role !== "admin") {
-      await consumeUserToken(userId, 1);
+      try {
+        const poinCalc = calculatePoinFromTokens(
+          aiResult?.rawUsage?.promptTokenCount || 0,
+          aiResult?.rawUsage?.candidatesTokenCount || 0,
+          aiResult?.rawUsage?.cachedContentTokenCount || 0
+        );
+
+        await consumeUserPoin(userId, poinCalc.rawTokens, "generate-administrasi", {
+          model: "gemini-2.5-flash-lite",
+          provider: "gemini",
+        });
+
+        console.log(`[Generate Administrasi] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+      } catch (poinError) {
+        console.error("[Generate Administrasi] Poin deduction failed:", poinError);
+      }
     }
 
     return NextResponse.json(parsed);

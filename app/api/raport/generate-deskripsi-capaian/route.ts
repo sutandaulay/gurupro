@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getUserTokenAccess, consumeUserToken } from '@/lib/token-system';
+import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/services/poin-service';
+import { calculatePoinFromTokens } from '@/src/lib/ai-usage';
 import { cookies } from 'next/headers';
 import { truncateText } from '@/lib/ai/validation-utils';
 
@@ -76,7 +77,7 @@ async function validateGuruRole(memberId: string): Promise<boolean> {
 async function generateAIDeskripsi(
   prompt: string,
   modeNaratif: boolean
-): Promise<{ deskripsi: string; saran: string }> {
+): Promise<{ deskripsi: string; saran: string; rawUsage?: any }> {
   const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = await import('@google/generative-ai');
 
   const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || '';
@@ -111,6 +112,14 @@ async function generateAIDeskripsi(
 
   const rawText = result.response.text();
 
+  // Get raw usage metadata
+  const rawUsage = {
+    promptTokenCount: result.response.usageMetadata?.promptTokenCount || 0,
+    candidatesTokenCount: result.response.usageMetadata?.candidatesTokenCount || 0,
+    totalTokenCount: result.response.usageMetadata?.totalTokenCount || 0,
+    cachedContentTokenCount: result.response.usageMetadata?.cachedContentTokenCount || 0,
+  };
+
   // Parse JSON dengan cleanup dan enforce limits
   let cleanText = rawText.trim()
     .replace(/```json\s*|```\s*/gi, '')
@@ -118,13 +127,14 @@ async function generateAIDeskripsi(
 
   try {
     const parsed = JSON.parse(cleanText);
-    return enforceOutputLimits(parsed);
+    return { ...enforceOutputLimits(parsed), rawUsage };
   } catch {
     // Fallback jika JSON parse gagal - truncate raw text
     console.warn('[Deskripsi Capaian] JSON parse failed, using truncated fallback');
     return {
       deskripsi: truncateText(rawText, 500) || 'Ananda menunjukkan pemahaman terhadap materi pembelajaran.',
-      saran: ''
+      saran: '',
+      rawUsage,
     };
   }
 }
@@ -230,16 +240,16 @@ export async function POST(req: Request) {
     const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
-    const tokenState = await getUserTokenAccess(userId);
-    if (!tokenState.user) {
+    const poinState = await getUserPoinAccess(userId);
+    if (!poinState.user) {
       return NextResponse.json({ error: 'Pengguna tidak ditemukan.' }, { status: 404 });
     }
-    const user = tokenState.user;
+    const user = poinState.user;
 
-    if (!tokenState.access.allowed) {
-      const message = tokenState.access.reason === 'subscription_expired'
+    if (!poinState.access.allowed) {
+      const message = poinState.access.reason === 'subscription_expired'
         ? 'Masa aktif langganan akun Anda telah habis. Silakan perpanjang paket terlebih dahulu.'
-        : 'Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.';
+        : 'Poin GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.';
       return NextResponse.json({ error: message }, { status: 403 });
     }
 
@@ -253,17 +263,39 @@ export async function POST(req: Request) {
     const prompt = buildPrompt(params);
 
     let result: { deskripsi: string; saran: string };
+    let rawUsage = null;
     try {
-      result = await generateAIDeskripsi(prompt, params.modeNaratif);
+      const aiResult = await generateAIDeskripsi(prompt, params.modeNaratif);
+      result = aiResult;
+      rawUsage = aiResult.rawUsage;
     } catch (aiError: any) {
       console.error('AI generation failed:', aiError);
+
+      // Log failed usage
+      await logFailedPoinUsage(userId, 0, 'generate-deskripsi-capaian', aiError.message);
+
       return NextResponse.json({
         error: `Gagal memproses AI: ${aiError.message || aiError}`,
       }, { status: 502 });
     }
 
     if (user.role !== 'admin') {
-      await consumeUserToken(userId, 1);
+      try {
+        const poinCalc = calculatePoinFromTokens(
+          rawUsage?.promptTokenCount || 0,
+          rawUsage?.candidatesTokenCount || 0,
+          rawUsage?.cachedContentTokenCount || 0
+        );
+
+        await consumeUserPoin(userId, poinCalc.rawTokens, 'generate-deskripsi-capaian', {
+          model: 'gemini-2.5-flash-lite',
+          provider: 'gemini',
+        });
+
+        console.log(`[Generate Deskripsi Capaian] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+      } catch (poinError: any) {
+        console.error('[Generate Deskripsi Capaian] Poin deduction failed:', poinError);
+      }
     }
 
     return NextResponse.json({

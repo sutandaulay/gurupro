@@ -1,6 +1,7 @@
 import { generateAIContent } from "@/lib/ai";
 import { query } from "@/lib/db";
-import { consumeUserToken, getUserTokenAccess } from "@/lib/token-system";
+import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
+import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { uploadToR2 } from "@/lib/r2";
@@ -136,16 +137,16 @@ export async function POST(req: Request) {
     const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
-    const tokenState = await getUserTokenAccess(userId);
-    if (!tokenState.user) {
+    const poinState = await getUserPoinAccess(userId);
+    if (!poinState.user) {
       return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
     }
-    const user = tokenState.user;
+    const user = poinState.user;
 
-    if (!tokenState.access.allowed) {
-      const message = tokenState.access.reason === "subscription_expired"
+    if (!poinState.access.allowed) {
+      const message = poinState.access.reason === "subscription_expired"
         ? "Masa aktif langganan akun Anda telah habis. Silakan perpanjang paket terlebih dahulu."
-        : "Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.";
+        : "Poin GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.";
       return NextResponse.json({ error: message }, { status: 403 });
     }
 
@@ -306,10 +307,19 @@ Keluarkan HANYA JSON valid tanpa markdown fence atau teks pembuka.
 `;
 
     let parsed: z.infer<typeof laporanEvaluasiLkpdOutputSchema>;
+    let rawUsage = null;
     try {
-      const text = await generateAIContent(prompt, systemPromptCache, true);
-      console.log("[Generate Laporan Evaluasi LKPD] Raw AI response length:", text?.length);
+      const aiResult = await generateAIContent(prompt, systemPromptCache, true);
+      console.log("[Generate Laporan Evaluasi LKPD] Raw AI response length:", aiResult?.data?.length);
 
+      if (!aiResult.success) {
+        throw new Error(aiResult.error || "AI generation failed");
+      }
+
+      // Store raw usage metadata
+      rawUsage = aiResult.rawUsage;
+
+      const text = aiResult.data as string;
       if (!text || text.trim() === "") {
         throw new Error("AI mengembalikan respons kosong");
       }
@@ -321,6 +331,10 @@ Keluarkan HANYA JSON valid tanpa markdown fence atau teks pembuka.
         parsed.capaianPerKKTP.length, "KKTP evaluated");
     } catch (aiError: any) {
       console.error("Laporan Evaluasi LKPD AI generation failed:", aiError);
+
+      // Log failed usage
+      await logFailedPoinUsage(userId, 0, "generate-laporan-evaluasi-lkpd", aiError.message);
+
       return NextResponse.json(
         { error: `Gagal memproses AI: ${aiError.message || aiError}` },
         { status: 502 }
@@ -379,9 +393,24 @@ Keluarkan HANYA JSON valid tanpa markdown fence atau teks pembuka.
       console.error("Failed to save Laporan Evaluasi LKPD:", dbErr);
     }
 
-    // Deduct token
+    // Deduct Poin based on actual usage
     if (user.role !== "admin") {
-      await consumeUserToken(userId, 1);
+      try {
+        const poinCalc = calculatePoinFromTokens(
+          rawUsage?.promptTokenCount || 0,
+          rawUsage?.candidatesTokenCount || 0,
+          rawUsage?.cachedContentTokenCount || 0
+        );
+
+        await consumeUserPoin(userId, poinCalc.rawTokens, "generate-laporan-evaluasi-lkpd", {
+          model: "gemini-2.5-flash-lite",
+          provider: "gemini",
+        });
+
+        console.log(`[Generate Laporan Evaluasi LKPD] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+      } catch (poinError: any) {
+        console.error("[Generate Laporan Evaluasi LKPD] Poin deduction failed:", poinError);
+      }
     }
 
     return NextResponse.json({

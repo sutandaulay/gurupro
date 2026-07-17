@@ -447,15 +447,25 @@ model TokenUsage {
   id             String   @id @default(uuid())
   user_id        String
   request_id     String   @unique
-  input_tokens   Int
-  output_tokens  Int
+  feature        String   @default("unknown")
+  model          String   @default("unknown")
+  provider       String   @default("unknown")
+  input_tokens   Int      @default(0)
+  output_tokens  Int      @default(0)
   cached_tokens  Int      @default(0)
   image_tokens   Int      @default(0)
-  total_cost_idr Float
-  mapel          String
-  jenjang        String
-  jumlah_soal    Int
+  total_cost_idr Float    @default(0)
+  tokens_charged Int      @default(0)
+  success        Boolean  @default(true)
+  error_message  String?
+  duration_ms    Int      @default(0)
+  mapel          String   @default("-")
+  jenjang        String   @default("-")
+  jumlah_soal    Int      @default(0)
   created_at     DateTime @default(now())
+
+  @@index([user_id])
+  @@index([feature])
 }
 
 model teaching_sessions {

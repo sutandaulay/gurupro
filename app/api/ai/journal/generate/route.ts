@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
 import { generateJournal, estimateCost } from '@/lib/ai/generators';
+import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/services/poin-service';
+import { calculatePoinFromTokens } from '@/src/lib/ai-usage';
 
 const prisma = new PrismaClient();
 
@@ -37,6 +39,25 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = user.id;
+
+    // Token check (non-admin)
+    const userDb = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (userDb?.role !== 'admin') {
+      const poinAccess = await getUserPoinAccess(userId);
+      if (!poinAccess.access.allowed) {
+        return NextResponse.json({
+          error: poinAccess.access.reason === 'subscription_expired'
+            ? 'Masa aktif langganan akun Anda telah habis! Silakan lakukan perpanjangan langganan terlebih dahulu.'
+            : 'Poin GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan di Landing Page.',
+          reason: poinAccess.access.reason,
+          remainingPoin: 0,
+        }, { status: 403 });
+      }
+    }
+
     const body = await request.json();
 
     const {
@@ -128,12 +149,52 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Consume Poin after successful generation (non-admin)
+      if (userDb?.role !== 'admin') {
+        try {
+          const rawUsage = result.rawUsage;
+          const poinCalc = calculatePoinFromTokens(
+            rawUsage?.promptTokenCount || 0,
+            rawUsage?.candidatesTokenCount || 0,
+            rawUsage?.cachedContentTokenCount || 0
+          );
+
+          await consumeUserPoin(userId, poinCalc.rawTokens, 'ai-journal-generate', {
+            model: 'gemini-2.5-flash-lite',
+            provider: 'gemini',
+          });
+
+          console.log(`[AI Journal] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+        } catch (poinErr) {
+          console.error('[AI Journal] Poin deduction failed:', poinErr);
+        }
+      }
+
       return NextResponse.json({
         success: true,
         journal,
         generated: result.data,
         cost,
       });
+    }
+
+    // Consume Poin after successful generation (non-admin, mode save=false)
+    if (userDb?.role !== 'admin') {
+      try {
+        const rawUsage = result.rawUsage;
+        const poinCalc = calculatePoinFromTokens(
+          rawUsage?.promptTokenCount || 0,
+          rawUsage?.candidatesTokenCount || 0,
+          rawUsage?.cachedContentTokenCount || 0
+        );
+
+        await consumeUserPoin(userId, poinCalc.rawTokens, 'ai-journal-generate', {
+          model: 'gemini-2.5-flash-lite',
+          provider: 'gemini',
+        });
+      } catch (poinErr) {
+        console.error('[AI Journal] Poin deduction failed:', poinErr);
+      }
     }
 
     return NextResponse.json({

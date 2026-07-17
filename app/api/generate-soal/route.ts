@@ -1,7 +1,8 @@
 import { generateAIContent } from "@/lib/ai";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { consumeUserToken, getUserTokenAccess } from "@/lib/token-system";
+import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
+import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
 import { cookies } from "next/headers";
 import { truncateText } from "@/lib/ai/validation-utils";
 
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // SaaS Token Validation
+    // SaaS Poin Validation
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("gurupro_session")?.value;
     if (!sessionCookie) {
@@ -42,16 +43,16 @@ export async function POST(req: Request) {
     const userId = session.id;
 
     // Ambil data user
-    const tokenState = await getUserTokenAccess(userId);
-    if (!tokenState.user) {
+    const poinState = await getUserPoinAccess(userId);
+    if (!poinState.user) {
       return NextResponse.json({ error: "Pengguna tidak ditemukan." }, { status: 404 });
     }
-    const user = tokenState.user;
+    const user = poinState.user;
 
-    if (!tokenState.access.allowed) {
-      const message = tokenState.access.reason === "subscription_expired"
+    if (!poinState.access.allowed) {
+      const message = poinState.access.reason === "subscription_expired"
         ? "Masa aktif langganan akun Anda telah habis! Silakan lakukan perpanjangan langganan terlebih dahulu."
-        : "Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan di Landing Page.";
+        : "Poin GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan di Landing Page.";
       return NextResponse.json({ error: message }, { status: 403 });
     }
 
@@ -190,16 +191,24 @@ JSON SCHEMA:
 
 CATATAN: AI TIDAK SELALU PATUH BATASAN KARAKTER. LAKUKAN TRUNCATE DI LAYER VALIDASI.`;
 
-    // Call universal AI service and parse response before token deduction
+    // Call universal AI service and parse response
     let parsed: any;
+    let rawUsage = null;
     try {
-      const text = await generateAIContent(prompt);
-      console.log("[Generate Soal] Raw AI response length:", text?.length);
-      console.log("[Generate Soal] Raw AI response preview:", text?.substring(0, 500));
+      const result = await generateAIContent(prompt);
+      console.log("[Generate Soal] Raw AI response length:", result?.data?.length);
 
+      if (!result.success) {
+        throw new Error(result.error || "AI generation failed");
+      }
+
+      const text = result.data as string;
       if (!text || text.trim() === "") {
         throw new Error("AI mengembalikan respons kosong");
       }
+
+      // Store raw usage metadata for Poin calculation
+      rawUsage = result.rawUsage;
 
       const cleanText = text.replace(/```json|```/g, "").trim();
       parsed = JSON.parse(cleanText);
@@ -216,12 +225,37 @@ CATATAN: AI TIDAK SELALU PATUH BATASAN KARAKTER. LAKUKAN TRUNCATE DI LAYER VALID
       console.log("[Generate Soal] Successfully generated and validated", parsed.soal.length, "questions");
     } catch (aiError: any) {
       console.error("Generate Soal AI generation failed:", aiError);
+      // Log failed usage
+      await logFailedPoinUsage(userId, 0, "generate-soal", aiError.message, {
+        mapel: body.mapel,
+        jenjang: body.jenjang,
+      });
       return NextResponse.json({ error: `Gagal memproses AI: ${aiError.message || aiError}` }, { status: 502 });
     }
 
-    // Deduct token on success
+    // Deduct Poin based on actual usage (non-admin)
     if (user.role !== "admin") {
-      await consumeUserToken(userId, 1);
+      try {
+        // Calculate Poin from raw tokens
+        const poinCalc = calculatePoinFromTokens(
+          rawUsage?.promptTokenCount || 0,
+          rawUsage?.candidatesTokenCount || 0,
+          rawUsage?.cachedContentTokenCount || 0
+        );
+
+        await consumeUserPoin(userId, poinCalc.rawTokens, "generate-soal", {
+          model: "gemini-2.5-flash-lite",
+          provider: "gemini",
+          mapel: body.mapel,
+          jenjang: body.jenjang,
+          jumlahSoal: parsed.soal?.length || 0,
+        });
+
+        console.log(`[Generate Soal] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+      } catch (poinError: any) {
+        console.error("[Generate Soal] Poin deduction failed:", poinError);
+        // Jangan fail request jika Poin deduction gagal - generation sudah sukses
+      }
     }
 
     return NextResponse.json(parsed);

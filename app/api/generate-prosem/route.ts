@@ -1,6 +1,7 @@
 import { generateAIContent } from "@/lib/ai";
 import { query } from "@/lib/db";
-import { consumeUserToken, getUserTokenAccess } from "@/lib/token-system";
+import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
+import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { jsonrepair as repair } from "jsonrepair";
@@ -48,16 +49,16 @@ export async function POST(req: Request) {
     const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
-    const tokenState = await getUserTokenAccess(userId);
-    if (!tokenState.user) {
+    const poinState = await getUserPoinAccess(userId);
+    if (!poinState.user) {
       return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
     }
-    const user = tokenState.user;
+    const user = poinState.user;
 
-    if (!tokenState.access.allowed) {
-      const message = tokenState.access.reason === "subscription_expired"
+    if (!poinState.access.allowed) {
+      const message = poinState.access.reason === "subscription_expired"
         ? "Masa aktif langganan akun Anda telah habis. Silakan perpanjang paket terlebih dahulu."
-        : "Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.";
+        : "Poin GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.";
       return NextResponse.json({ error: message }, { status: 403 });
     }
 
@@ -215,9 +216,24 @@ Hasilkan seluruh dokumen PROSEM tersebut langsung dalam format Markdown dengan t
       console.error("Failed to save prosem:", dbErr);
     }
 
-    // Deduct token
+    // Deduct Poin based on actual usage
     if (user.role !== "admin") {
-      await consumeUserToken(userId, 1);
+      try {
+        const poinCalc = calculatePoinFromTokens(
+          aiResult?.rawUsage?.promptTokenCount || 0,
+          aiResult?.rawUsage?.candidatesTokenCount || 0,
+          aiResult?.rawUsage?.cachedContentTokenCount || 0
+        );
+
+        await consumeUserPoin(userId, poinCalc.rawTokens, "generate-prosem", {
+          model: "gemini-2.5-flash-lite",
+          provider: "gemini",
+        });
+
+        console.log(`[Generate Prosem] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+      } catch (poinError) {
+        console.error("[Generate Prosem] Poin deduction failed:", poinError);
+      }
     }
 
     return NextResponse.json(parsed);

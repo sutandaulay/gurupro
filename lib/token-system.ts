@@ -151,3 +151,54 @@ export async function grantAddonTokens(userId: string, amount: number) {
   );
   return Number(res.rows[0]?.addon_token_balance || 0);
 }
+
+/**
+ * Catat penggunaan AI ke tabel TokenUsage (audit terpusat).
+ * Dipanggil dari semua endpoint AI setelah generate (sukses maupun gagal).
+ */
+export async function logAIUsage(args: {
+  userId: string;
+  feature: string;
+  model?: string;
+  provider?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  imageTokens?: number;
+  totalCostIdr?: number;
+  tokensCharged?: number;
+  success?: boolean;
+  errorMessage?: string | null;
+  durationMs?: number;
+  mapel?: string;
+  jenjang?: string;
+  jumlahSoal?: number;
+}): Promise<void> {
+  const requestId = `tu_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  try {
+    await query(
+      `INSERT INTO "TokenUsage"
+        (id, user_id, request_id, feature, model, provider, input_tokens, output_tokens, image_tokens, total_cost_idr, tokens_charged, success, error_message, duration_ms, mapel, jenjang, jumlah_soal)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+      [
+        args.userId,
+        requestId,
+        args.feature || "unknown",
+        args.model || "unknown",
+        args.provider || "unknown",
+        args.inputTokens || 0,
+        args.outputTokens || 0,
+        args.imageTokens || 0,
+        args.totalCostIdr || 0,
+        args.tokensCharged || 0,
+        args.success !== false,
+        args.errorMessage || null,
+        args.durationMs || 0,
+        args.mapel || "-",
+        args.jenjang || "-",
+        args.jumlahSoal || 0,
+      ]
+    );
+  } catch (err) {
+    console.error("[TokenSystem] Failed to write TokenUsage log:", err);
+  }
+}

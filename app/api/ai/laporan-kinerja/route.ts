@@ -6,7 +6,8 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai'
-import { getUserTokenAccess, consumeUserToken } from '@/lib/token-system'
+import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/services/poin-service'
+import { calculatePoinFromTokens } from '@/src/lib/ai-usage'
 
 const genAI = process.env.GOOGLE_AI_API_KEY
   ? new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY)
@@ -25,13 +26,13 @@ export async function POST(req: Request) {
   const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
   const guruId = sessionData.id
 
-  // Token check
-  const tokenAccess = await getUserTokenAccess(guruId)
-  if (!tokenAccess.access.allowed) {
+  // Poin check
+  const poinAccess = await getUserPoinAccess(guruId)
+  if (!poinAccess.access.allowed) {
     return NextResponse.json({
-      error: 'Token habis atau langganan expired',
-      reason: tokenAccess.access.reason,
-      remainingTokens: 0,
+      error: 'Poin habis atau langganan expired',
+      reason: poinAccess.access.reason,
+      remainingPoin: 0,
     }, { status: 403 })
   }
 
@@ -176,14 +177,32 @@ export async function POST(req: Request) {
           ]
         )
 
-        // Consume token after successful generation
-        await consumeUserToken(guruId, 1)
+        // Deduct Poin based on actual usage
+        try {
+          // Estimate based on prompt length
+          const estimatedInputTokens = Math.ceil(prompt.length / 4)
+          const estimatedOutputTokens = Math.ceil(fullText.length / 4)
+          const poinCalc = calculatePoinFromTokens(estimatedInputTokens, estimatedOutputTokens, 0)
+
+          await consumeUserPoin(guruId, poinCalc.rawTokens, 'ai-laporan-kinerja', {
+            model: 'gemini-2.5-flash-lite',
+            provider: 'gemini',
+          })
+
+          console.log(`[AI Laporan Kinerja] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`)
+        } catch (poinError: any) {
+          console.error('[AI Laporan Kinerja] Poin deduction failed:', poinError)
+        }
 
         send({ step: 'complete', laporan_id: insertResult.rows[0].id })
         controller.close()
 
       } catch (err: any) {
         console.error('Laporan Kinerja generation error:', err)
+
+        // Log failed usage
+        await logFailedPoinUsage(guruId, 0, 'ai-laporan-kinerja', err.message)
+
         send({ step: 'error', message: err.message || 'Gagal generate laporan' })
         controller.close()
       }

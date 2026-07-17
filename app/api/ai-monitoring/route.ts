@@ -1,41 +1,74 @@
 import { NextResponse } from 'next/server';
-import {
-  getAISummary,
-  getRecentTruncations,
-  getFrequentTruncations,
-  exportEvents,
-  clearEvents,
-} from '@/lib/ai/monitoring';
+import { query } from '@/lib/db';
 
 /**
  * GET /api/ai-monitoring
- * Get AI generation monitoring statistics
+ * Get AI generation monitoring statistics from the persistent TokenUsage table.
  *
  * Query params:
  *   - feature: Filter by feature name
- *   - limit: Limit recent truncations (default: 50)
- *   - minRate: Minimum truncation rate for frequent issues (default: 0.1)
+ *   - limit: Limit recent failures (default: 50)
  */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const feature = searchParams.get('feature') || undefined;
     const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const minRate = parseFloat(searchParams.get('minRate') || '0.1', 10);
 
-    // Get summary
-    const summary = getAISummary(feature);
+    const featureFilter = feature ? 'WHERE feature = $1' : '';
+    const params: any[] = feature ? [feature] : [];
 
-    // Get recent truncations
-    const recentTruncations = getRecentTruncations(limit);
+    // Summary per feature
+    const summaryRes = await query(
+      `SELECT
+         feature,
+         COUNT(*) AS total,
+         SUM(CASE WHEN success THEN 1 ELSE 0 END) AS success_count,
+         SUM(CASE WHEN NOT success THEN 1 ELSE 0 END) AS error_count,
+         SUM(tokens_charged) AS tokens_charged,
+         SUM(total_cost_idr) AS total_cost_idr
+       FROM "TokenUsage"
+       ${featureFilter}
+       GROUP BY feature
+       ORDER BY total DESC`,
+      params
+    );
 
-    // Get frequent truncation issues
-    const frequentIssues = getFrequentTruncations(minRate);
+    // Recent failures
+    const failParams: any[] = feature ? [feature, limit] : [limit];
+    const failFilter = feature ? 'WHERE feature = $1' : '';
+    const recentFailures = await query(
+      `SELECT id, user_id, feature, model, provider, error_message, duration_ms, created_at
+       FROM "TokenUsage"
+       ${failFilter} AND success = false
+       ORDER BY created_at DESC
+       LIMIT $${feature ? 2 : 1}`,
+      failParams
+    );
+
+    const summary = (summaryRes.rows || []).map((r: any) => {
+      const total = Number(r.total) || 0;
+      const errorCount = Number(r.error_count) || 0;
+      return {
+        feature: r.feature,
+        total,
+        successCount: Number(r.success_count) || 0,
+        errorCount,
+        errorRate: total > 0 ? errorCount / total : 0,
+        tokensCharged: Number(r.tokens_charged) || 0,
+        totalCostIdr: Number(r.total_cost_idr) || 0,
+      };
+    });
+
+    const totalEvents = summary.reduce((a, b) => a + b.total, 0);
+    const totalErrors = summary.reduce((a, b) => a + b.errorCount, 0);
 
     return NextResponse.json({
       summary,
-      recentTruncations,
-      frequentIssues,
+      totalEvents,
+      totalErrors,
+      errorRate: totalEvents > 0 ? totalErrors / totalEvents : 0,
+      recentFailures: recentFailures.rows || [],
       generatedAt: new Date().toISOString(),
     });
   } catch (error: any) {
@@ -49,14 +82,13 @@ export async function GET(req: Request) {
 
 /**
  * DELETE /api/ai-monitoring
- * Clear all monitoring events (for testing/admin)
+ * Clear monitoring data (admin only, via secret)
  */
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const secret = searchParams.get('secret');
 
-    // Simple secret check (in production, use proper auth)
     if (secret !== process.env.ADMIN_SECRET) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -64,11 +96,11 @@ export async function DELETE(req: Request) {
       );
     }
 
-    clearEvents();
+    await query(`DELETE FROM "TokenUsage" WHERE success = true`);
 
     return NextResponse.json({
       success: true,
-      message: 'All monitoring events cleared',
+      message: 'All successful usage logs cleared',
     });
   } catch (error: any) {
     console.error('[AI Monitoring] DELETE error:', error);

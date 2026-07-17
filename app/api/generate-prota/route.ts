@@ -1,6 +1,7 @@
 import { generateAIContent } from "@/lib/ai";
 import { query } from "@/lib/db";
-import { consumeUserToken, getUserTokenAccess } from "@/lib/token-system";
+import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
+import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { jsonrepair as repair } from "jsonrepair";
@@ -46,16 +47,16 @@ export async function POST(req: Request) {
     const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
-    const tokenState = await getUserTokenAccess(userId);
-    if (!tokenState.user) {
+    const poinState = await getUserPoinAccess(userId);
+    if (!poinState.user) {
       return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
     }
-    const user = tokenState.user;
+    const user = poinState.user;
 
-    if (!tokenState.access.allowed) {
-      const message = tokenState.access.reason === "subscription_expired"
+    if (!poinState.access.allowed) {
+      const message = poinState.access.reason === "subscription_expired"
         ? "Masa aktif langganan akun Anda telah habis. Silakan perpanjang paket terlebih dahulu."
-        : "Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.";
+        : "Poin GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.";
       return NextResponse.json({ error: message }, { status: 403 });
     }
 
@@ -128,9 +129,17 @@ Hasilkan seluruh dokumen PROTA tersebut langsung dalam format Markdown dengan ta
 `;
 
     let parsed: any;
+    let rawUsage = null;
     try {
-      const text = await generateAIContent(prompt, undefined, false);
+      const aiResult = await generateAIContent(prompt, undefined, false);
+      const text = aiResult.data as string || "";
       const cleanMarkdown = text.trim();
+      rawUsage = aiResult.rawUsage;
+
+      if (!text || text.trim() === "") {
+        throw new Error("AI mengembalikan respons kosong");
+      }
+
       const docTitle = `Program Tahunan (Prota) - ${subjectList} ${jenjang || ''} ${tahun_ajaran || ''}`;
 
       parsed = {
@@ -159,6 +168,10 @@ Hasilkan seluruh dokumen PROTA tersebut langsung dalam format Markdown dengan ta
 
     } catch (aiError: any) {
       console.error("Prota AI generation failed:", aiError);
+
+      // Log failed usage
+      await logFailedPoinUsage(userId, 0, "generate-prota", aiError.message);
+
       return NextResponse.json({ error: `Gagal generate Prota: ${aiError.message}` }, { status: 502 });
     }
 
@@ -173,8 +186,8 @@ Hasilkan seluruh dokumen PROTA tersebut langsung dalam format Markdown dengan ta
         userId,
         'prota',
         parsed.judul || `Program Tahunan - ${subjectList}`,
-        JSON.stringify({ 
-          markdown: parsed.konten, 
+        JSON.stringify({
+          markdown: parsed.konten,
           pptx_url: null,
           pdf_url: parsed.pdf_url || null,
           docx_url: parsed.docx_url || null
@@ -188,9 +201,24 @@ Hasilkan seluruh dokumen PROTA tersebut langsung dalam format Markdown dengan ta
       console.error("Failed to save prota:", dbErr);
     }
 
-    // Deduct token
+    // Deduct Poin based on actual usage
     if (user.role !== "admin") {
-      await consumeUserToken(userId, 1);
+      try {
+        const poinCalc = calculatePoinFromTokens(
+          rawUsage?.promptTokenCount || 0,
+          rawUsage?.candidatesTokenCount || 0,
+          rawUsage?.cachedContentTokenCount || 0
+        );
+
+        await consumeUserPoin(userId, poinCalc.rawTokens, "generate-prota", {
+          model: "gemini-2.5-flash-lite",
+          provider: "gemini",
+        });
+
+        console.log(`[Generate Prota] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+      } catch (poinError: any) {
+        console.error("[Generate Prota] Poin deduction failed:", poinError);
+      }
     }
 
     return NextResponse.json(parsed);

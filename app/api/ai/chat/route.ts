@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
 import { generateChatResponse, estimateCost } from '@/lib/ai/generators';
-import { getUserTokenAccess, consumeUserToken } from '@/lib/token-system';
+import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/services/poin-service';
+import { calculatePoinFromTokens } from '@/src/lib/ai-usage';
 
 const prisma = new PrismaClient();
 
@@ -40,13 +41,13 @@ export async function POST(request: NextRequest) {
     const userId = user.id;
     const body = await request.json();
 
-    // Token check
-    const tokenAccess = await getUserTokenAccess(userId);
-    if (!tokenAccess.access.allowed) {
+    // Poin check
+    const poinAccess = await getUserPoinAccess(userId);
+    if (!poinAccess.access.allowed) {
       return NextResponse.json({
-        error: 'Token habis atau langganan expired',
-        reason: tokenAccess.access.reason,
-        remainingTokens: 0,
+        error: 'Poin habis atau langganan expired',
+        reason: poinAccess.access.reason,
+        remainingPoin: 0,
       }, { status: 403 });
     }
 
@@ -152,8 +153,24 @@ export async function POST(request: NextRequest) {
     // Calculate cost
     const cost = result.usage ? estimateCost(result.usage) : { totalCost: 0 };
 
-    // Consume token
-    await consumeUserToken(userId, 1);
+    // Deduct Poin based on actual usage
+    try {
+      const rawUsage = result.rawUsage;
+      const poinCalc = calculatePoinFromTokens(
+        rawUsage?.promptTokenCount || 0,
+        rawUsage?.candidatesTokenCount || 0,
+        rawUsage?.cachedContentTokenCount || 0
+      );
+
+      await consumeUserPoin(userId, poinCalc.rawTokens, 'ai-chat', {
+        model: 'gemini-2.5-flash-lite',
+        provider: 'gemini',
+      });
+
+      console.log(`[AI Chat] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+    } catch (poinError: any) {
+      console.error('[AI Chat] Poin deduction failed:', poinError);
+    }
 
     return NextResponse.json({
       success: true,

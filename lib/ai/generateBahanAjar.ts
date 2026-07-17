@@ -7,7 +7,7 @@
  */
 
 import { generateAIContent } from "./generators";
-import { getUserTokenAccess, consumeUserToken } from "../token-system";
+import { getUserTokenAccess, consumeUserToken, grantUserTokens, logAIUsage } from "../token-system";
 import {
   buildSlidePrompt,
   buildLkpdPrompt,
@@ -321,6 +321,13 @@ async function deductAndTrack(
       context,
       timestamp: new Date().toISOString(),
     });
+    await logAIUsage({
+      userId,
+      feature: "bahan-ajar",
+      tokensCharged: actualTokens,
+      success: true,
+      jumlahSoal: 0,
+    });
   } catch (error) {
     // Log error tapi jangan throw - generation sudah sukses
     console.error("[BahanAjar] Token deduction failed:", error, {
@@ -332,18 +339,28 @@ async function deductAndTrack(
 }
 
 /**
- * Refund tokens jika generation gagal di tengah jalan
+ * Refund tokens jika generation gagal di tengah jalan.
+ * Mengembalikan token yang sudah dipotong agar guru tidak dirugikan.
  */
 async function refundTokens(
   userId: string,
   tokensToRefund: number,
   reason: string
 ): Promise<void> {
-  // Token system tidak ada refund function, jadi kita log sebagai credit
-  // Untuk implementasi lengkap, bisa add grantUserTokens sebagai "refund"
-  console.warn(`[BahanAjar] Refund needed: ${tokensToRefund} tokens for ${userId}. Reason: ${reason}`);
-  // TODO: Implementasi refund function jika diperlukan
-  // await grantUserTokens(userId, tokensToRefund);
+  if (!tokensToRefund || tokensToRefund <= 0) return;
+  try {
+    await grantUserTokens(userId, tokensToRefund);
+    console.log(`[BahanAjar] Refund ${tokensToRefund} tokens for ${userId}. Reason: ${reason}`);
+    await logAIUsage({
+      userId,
+      feature: "bahan-ajar-refund",
+      tokensCharged: -tokensToRefund,
+      success: false,
+      errorMessage: reason,
+    });
+  } catch (err) {
+    console.error('[BahanAjar] Refund failed:', err);
+  }
 }
 
 // ============================================
