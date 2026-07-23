@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { 
+import {
   getAllSystemSettings,
   resolvePaymentGatewayConfig,
   resolveEmailSenderConfig,
@@ -10,11 +10,13 @@ import {
   resolveAppBrandingConfig,
   resolveFaqConfig,
   resolveReferralConfig,
-  updateSystemSetting
+  updateSystemSetting,
+  getSystemSetting
 } from "@/lib/settings";
 import { sendEmailNotification, sendWhatsAppNotification } from "@/lib/notifications";
 import { generateAIContent } from "@/lib/ai";
 import { getActivePricingPlans } from "@/lib/settings";
+import { updateTokensPerPoinRatio, getTokensPerPoin } from "@/src/config/ratio-cache";
 
 async function verifyAdmin() {
   const cookieStore = await cookies();
@@ -48,6 +50,9 @@ export async function GET() {
     const terms_conditions = allSettings["terms_conditions"] ? (typeof allSettings["terms_conditions"] === "string" ? JSON.parse(allSettings["terms_conditions"]) : allSettings["terms_conditions"]) : null;
     const refund_policy = allSettings["refund_policy"] ? (typeof allSettings["refund_policy"] === "string" ? JSON.parse(allSettings["refund_policy"]) : allSettings["refund_policy"]) : null;
 
+    // Ambil rasio Poin saat ini (dari cache/DB)
+    const tokensPerPoin = await getTokensPerPoin();
+
     return NextResponse.json({
       paymentGateway,
       emailSender,
@@ -61,6 +66,7 @@ export async function GET() {
       privacy_policy,
       terms_conditions,
       refund_policy,
+      tokensPerPoin,
     });
   } catch (error: any) {
     console.error("GET Admin Settings error:", error);
@@ -76,7 +82,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    await verifyAdmin();
+    const session = await verifyAdmin();
+    const adminUserId = session.id;
     const body = await req.json();
     const { action, data } = body;
 
@@ -84,6 +91,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Action is required" }, { status: 400 });
     }
 
+    // ── Rasio Token per Poin (items 2 & 3) ──────────────────────────────
+    if (action === "update_tokens_per_poin") {
+      const newRatio = Number(data?.ratio);
+      if (!Number.isFinite(newRatio) || newRatio <= 0) {
+        return NextResponse.json({ error: "Rasio harus angka positif lebih dari 0" }, { status: 400 });
+      }
+      try {
+        const result = await updateTokensPerPoinRatio(adminUserId, newRatio, data?.note);
+        return NextResponse.json({
+          success: true,
+          message: `Rasio berhasil diubah dari ${result.oldRatio} ke ${result.newRatio}`,
+          oldRatio: result.oldRatio,
+          newRatio: result.newRatio,
+        });
+      } catch (updateErr: any) {
+        console.error("[Admin Settings] update_tokens_per_poin failed:", updateErr);
+        return NextResponse.json({ error: updateErr.message || "Gagal update rasio" }, { status: 500 });
+      }
+    }
+
+    // ── Existing actions ───────────────────────────────────────────────
     if (action === "update_payment_gateway") {
       const success = await updateSystemSetting("payment_gateway", data);
       if (!success) throw new Error("Database update failed");

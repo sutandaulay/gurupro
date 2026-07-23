@@ -263,17 +263,16 @@ function mapPenilaianSikapRowToResponse(row: PenilaianSikapRow): PenilaianSikapR
 export async function createEkstrakurikuler(
   input: EkstrakurikulerCreate
 ): Promise<EkstrakurikulerResponse> {
-  // Validate kelas exists
   const kelasCheck = await query('SELECT id FROM classes WHERE id = $1', [input.kelasId]);
   if (!kelasCheck.rows.length) {
     throw new Error('Kelas tidak ditemukan');
   }
 
   const result = await query(
-    `INSERT INTO ekstrakurikuler (nama_ekskul, kelas_id, pembina_member_id)
-     VALUES ($1, $2, $3)
+    `INSERT INTO ekstrakurikuler (nama_ekskul, kelas_id, pembina_member_id, pembina_user_id)
+     VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [input.namaEkskul, input.kelasId, input.pembinaMemberId]
+    [input.namaEkskul, input.kelasId, input.pembinaMemberId || null, input.pembinaUserId || null]
   );
 
   return mapEkstrakurikulerRowToResponse(result.rows[0]);
@@ -298,9 +297,13 @@ export async function updateEkstrakurikuler(
     updates.push(`nama_ekskul = $${idx++}`);
     params.push(input.namaEkskul);
   }
-  if (input.pembinaMemberId) {
+  if (input.pembinaMemberId !== undefined) {
     updates.push(`pembina_member_id = $${idx++}`);
     params.push(input.pembinaMemberId);
+  }
+  if (input.pembinaUserId !== undefined) {
+    updates.push(`pembina_user_id = $${idx++}`);
+    params.push(input.pembinaUserId);
   }
 
   if (updates.length === 0) {
@@ -365,6 +368,7 @@ function mapEkstrakurikulerRowToResponse(row: EkstrakurikulerRow): Ekstrakurikul
     namaEkskul: row.nama_ekskul,
     kelasId: row.kelas_id,
     pembinaMemberId: row.pembina_member_id,
+    pembinaUserId: row.pembina_user_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

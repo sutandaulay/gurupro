@@ -64,6 +64,8 @@ export async function activateTransaction(transactionId: string): Promise<{ succ
   }
 
   const tokensToAdd = Number(plan.tokens || 0);
+  // Konversi token legacy -> Poin (pakai rasio default awal 2000, ceil min 1)
+  const poinToAdd = Math.max(1, Math.ceil((Number(plan.poin) || tokensToAdd) / 2000));
   const durationDays = Number(plan.duration_days || 30);
   const planName = plan.package_name || plan.id;
   const newPlanKey = plan.id; // Use the actual pricing_plans ID as the status_langganan
@@ -79,10 +81,10 @@ export async function activateTransaction(transactionId: string): Promise<{ succ
   }
   newEnd.setDate(newEnd.getDate() + durationDays);
 
-  // Update user's token limit, status, and subscription dates
+  // Update user's Poin (bukan token_limit legacy), status, and subscription dates
   await query(
     `UPDATE users 
-     SET token_limit = COALESCE(token_limit, 0) + $1, 
+     SET quota_poin_total = GREATEST(0, COALESCE(quota_poin_total,0)) + $1, 
          status_langganan = $2,
          subscription_status = 'active',
          subscription_start = COALESCE($3, NOW()),
@@ -90,7 +92,7 @@ export async function activateTransaction(transactionId: string): Promise<{ succ
          grace_period_ends_at = NULL,
          last_expiry_warning_sent = NULL
      WHERE id = $5`,
-    [tokensToAdd, newPlanKey, currentStart, newEnd, userId]
+    [poinToAdd, newPlanKey, currentStart, newEnd, userId]
   );
 
   // Update transaction status to ACTIVATED
@@ -100,7 +102,7 @@ export async function activateTransaction(transactionId: string): Promise<{ succ
   await query(
     `INSERT INTO audit_trails (user_id, aksi, deskripsi, ip_address)
      VALUES ($1, $2, $3, $4)`,
-    [userId, "Aktivasi Paket", `Aktivasi paket ${planName} (+${tokensToAdd} Token) secara otomatis`, "127.0.0.1"]
+    [userId, "Aktivasi Paket", `Aktivasi paket ${planName} (+${tokensToAdd} Poin) secara otomatis`, "127.0.0.1"]
   );
 
   // Send notification

@@ -15,10 +15,11 @@ import { subMinutes } from 'date-fns';
 
 // Schema untuk validasi input
 const StartTeachingSchema = z.object({
-  sessionId: z.string().min(1, 'Session ID diperlukan'), // Accept any non-empty string
-  institutionId: z.string(),
+  sessionId: z.string().min(1, 'Session ID diperlukan'),
+  institutionId: z.string().optional(),
+  schoolId: z.string().uuid().optional(),
   subjectId: z.string().min(1, 'Subject ID diperlukan'),
-  classSessionId: z.string().optional(), // Optional - can be same as sessionId
+  classSessionId: z.string().optional(),
   subjectName: z.string().optional(),
   faceEmbedding: z.string().optional(),
   faceMatchScore: z.number().min(0).max(1).optional(),
@@ -51,45 +52,78 @@ export async function POST(req: Request) {
                      req.headers.get('cf-connecting-ip') ||
                      'unknown';
 
-    // Validasi tambahan: pastikan assignment aktif dan sesuai institusi
-    const parsedInstId = /^\d+$/.test(validatedData.institutionId) ? parseInt(validatedData.institutionId, 10) : 0;
-    const [assignment] = await db.select()
-      .from(teacherInstitutionAssignments)
-      .where(and(
-        eq(teacherInstitutionAssignments.teacherId, userId),
-        eq(teacherInstitutionAssignments.institutionId, parsedInstId),
-        eq(teacherInstitutionAssignments.status, 'aktif')
-      ));
+    // Validasi tambahan: pastikan assignment aktif dan sesuai institusi atau sekolah
+    const parsedInstId = validatedData.institutionId && /^\d+$/.test(validatedData.institutionId) 
+      ? parseInt(validatedData.institutionId, 10) 
+      : 0;
     
-    if (!assignment) {
-      return NextResponse.json({ error: 'Assignment tidak ditemukan atau tidak aktif' }, { status: 404 });
+    let institutionIdNum = parsedInstId;
+    let schoolId = validatedData.schoolId;
+    let institutionLocation: { latitude: number; longitude: number } = { latitude: -6.2088, longitude: 106.8456 };
+    let attendanceSettings: any = { classSessionRadiusMeters: 150 };
+
+    if (schoolId) {
+      // Mode sekolah mandiri
+      const schoolResult = await query(`
+        SELECT id, nama_sekolah, location_latitude, location_longitude, attendance_radius_meters
+        FROM schools
+        WHERE id = $1 AND user_id = $2
+      `, [schoolId, userId]);
+
+      if (schoolResult.rows.length === 0) {
+        return NextResponse.json({ error: 'Sekolah tidak ditemukan atau bukan milik Anda' }, { status: 404 });
+      }
+
+      const school = schoolResult.rows[0];
+      institutionLocation = {
+        latitude: school.location_latitude ? parseFloat(school.location_latitude) : -6.2088,
+        longitude: school.location_longitude ? parseFloat(school.location_longitude) : 106.8456,
+      };
+      attendanceSettings = {
+        classSessionRadiusMeters: school.attendance_radius_meters || 150,
+      };
+      institutionIdNum = parseInt(school.id, 10);
+    } else if (parsedInstId > 0) {
+      // Mode institusi terinstansi
+      const [assignment] = await db.select()
+        .from(teacherInstitutionAssignments)
+        .where(and(
+          eq(teacherInstitutionAssignments.teacherId, userId),
+          eq(teacherInstitutionAssignments.institutionId, parsedInstId),
+          eq(teacherInstitutionAssignments.status, 'aktif')
+        ));
+      
+      if (!assignment) {
+        return NextResponse.json({ error: 'Assignment tidak ditemukan atau tidak aktif' }, { status: 404 });
+      }
+
+      // Dapatkan setting institusi
+      const instResult = await query(`
+        SELECT 
+          id,
+          name,
+          location_latitude as "locationLatitude",
+          location_longitude as "locationLongitude",
+          attendance_settings_class_session_radius_meters as "classSessionRadiusMeters"
+        FROM payload.institutions
+        WHERE id = $1
+      `, [parsedInstId]);
+
+      if (instResult.rows.length === 0) {
+        return NextResponse.json({ error: 'Institusi tidak ditemukan' }, { status: 404 });
+      }
+
+      const rawInstitution = instResult.rows[0];
+      institutionLocation = {
+        latitude: rawInstitution.locationLatitude ? parseFloat(rawInstitution.locationLatitude) : -6.2088,
+        longitude: rawInstitution.locationLongitude ? parseFloat(rawInstitution.locationLongitude) : 106.8456,
+      };
+      attendanceSettings = {
+        classSessionRadiusMeters: rawInstitution.classSessionRadiusMeters || 150,
+      };
+    } else {
+      return NextResponse.json({ error: 'institutionId atau schoolId wajib diisi' }, { status: 400 });
     }
-
-    // Dapatkan setting institusi
-    const instResult = await query(`
-      SELECT 
-        id,
-        name,
-        location_latitude as "locationLatitude",
-        location_longitude as "locationLongitude",
-        attendance_settings_attendance_radius_meters as "attendanceRadiusMeters",
-        attendance_settings_class_session_radius_meters as "classSessionRadiusMeters",
-        attendance_settings_late_tolerance_minutes as "lateToleranceMinutes",
-        attendance_settings_duplicate_check_minutes as "duplicateCheckMinutes",
-        attendance_settings_qr_code_enabled as "qrCodeEnabled",
-        attendance_settings_qr_code_token as "qrCodeToken"
-      FROM payload.institutions
-      WHERE id = $1
-    `, [parsedInstId]);
-
-    if (instResult.rows.length === 0) {
-      return NextResponse.json({ error: 'Institusi tidak ditemukan' }, { status: 404 });
-    }
-
-    const rawInstitution = instResult.rows[0];
-    const institution = formatInstitution(rawInstitution)!;
-    const institutionLocation = institution.location;
-    const attendanceSettings = institution.attendanceSettings;
     
     const distance = calculateDistance(
       validatedData.latitude,
@@ -153,7 +187,7 @@ export async function POST(req: Request) {
     const [attendanceLog] = await db.insert(attendanceLogs).values({
       id: sessionUuid,
       teacherId: userId,
-      institutionId: validatedData.institutionId,
+      institutionId: parseInt(validatedData.institutionId, 10),
       assignmentId: assignment.id,
       type: 'mengajar_mulai',
       classSessionId: validatedData.classSessionId || validatedData.sessionId, // ID sesi kelas
@@ -176,7 +210,7 @@ export async function POST(req: Request) {
     // Update atau buat summary harian
     await updateDailyAttendanceSummary(
       userId, 
-      validatedData.institutionId, 
+      parseInt(validatedData.institutionId, 10), 
       validatedData.subjectId
     );
 
@@ -196,7 +230,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { 
           error: 'Validasi input gagal', 
-          details: error.errors 
+          details: error.issues 
         }, 
         { status: 400 }
       );
@@ -271,7 +305,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 // Fungsi untuk update summary harian
-async function updateDailyAttendanceSummary(teacherId: string, institutionId: string, subjectId: string) {
+async function updateDailyAttendanceSummary(teacherId: string, institutionId: number, subjectId: string) {
   const today = new Date();
   today.setHours(0, 0, 0, 0); // Set ke awal hari
   
@@ -292,7 +326,7 @@ async function updateDailyAttendanceSummary(teacherId: string, institutionId: st
     
     await db.update(attendanceSummary)
       .set({
-        teachingSessionsCompleted: existingSummary.teachingSessionsCompleted + 1,
+        teachingSessionsCompleted: (existingSummary.teachingSessionsCompleted || 0) + 1,
         teachingMinutesBySubject: JSON.stringify(updatedTeachingMinutesBySubject),
         updatedAt: new Date(),
       })

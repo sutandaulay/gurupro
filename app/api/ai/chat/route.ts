@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
 import { generateChatResponse, estimateCost } from '@/lib/ai/generators';
-import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/services/poin-service';
-import { calculatePoinFromTokens } from '@/src/lib/ai-usage';
+import { getUserPoinAccess, logFailedPoinUsage } from '@/src/services/poin-service';
+import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
 
 const prisma = new PrismaClient();
 
@@ -155,19 +155,14 @@ export async function POST(request: NextRequest) {
 
     // Deduct Poin based on actual usage
     try {
-      const rawUsage = result.rawUsage;
-      const poinCalc = calculatePoinFromTokens(
-        rawUsage?.promptTokenCount || 0,
-        rawUsage?.candidatesTokenCount || 0,
-        rawUsage?.cachedContentTokenCount || 0
+      await deductPoinFromAIResult(
+        { success: true, usage: (result.usage as any) || null },
+        userId,
+        'ai-chat',
+        {}
       );
 
-      await consumeUserPoin(userId, poinCalc.rawTokens, 'ai-chat', {
-        model: 'gemini-2.5-flash-lite',
-        provider: 'gemini',
-      });
-
-      console.log(`[AI Chat] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+      console.log(`[AI Chat] Poin deducted`);
     } catch (poinError: any) {
       console.error('[AI Chat] Poin deduction failed:', poinError);
     }

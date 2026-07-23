@@ -7,7 +7,7 @@ export async function GET() {
     return NextResponse.json({ packages: result.rows.map((row: any) => ({
       id: row.id,
       name: row.name,
-      token_amount: Number(row.token_amount || 0),
+      poin_amount: Number(row.poin_amount || 0),
       price: Number(row.price || 0),
       description: row.description || "",
     })) });

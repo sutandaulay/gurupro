@@ -145,6 +145,35 @@ function interpolate(template: string, variables: Record<string, any>): string {
 }
 
 /**
+ * Sprint 1.1 — Personalisasi tone notifikasi.
+ * Murni memodifikasi teks (awalan sapaan) sesuai preferensi guru,
+ * TIDAK mengubah logika pengiriman notifikasi.
+ * tone: 'hangat' | 'formal' | 'santai'
+ */
+function applyTone(tone: string | undefined, text: string): string {
+  const clean = (text || "").trim();
+  if (!clean) return clean;
+
+  const t = tone === "formal" || tone === "santai" ? tone : "hangat";
+  const nama = "";
+
+  // Jangan double-prefix jika sudah ada sapaan
+  const sudahAdaSapaan = /^(yth\.?|halo|hai|dear|selamat|hi\b|hello\b)/i.test(clean);
+
+  if (sudahAdaSapaan) return clean;
+
+  switch (t) {
+    case "formal":
+      return `Yth. Bapak/Ibu ${nama}${nama ? " " : ""}${clean.charAt(0).toLowerCase() + clean.slice(1)}`;
+    case "santai":
+      return `Hai ${nama}${nama ? " " : ""}${clean.charAt(0).toLowerCase() + clean.slice(1)}`;
+    case "hangat":
+    default:
+      return `Halo ${nama}${nama ? " " : ""}${clean.charAt(0).toLowerCase() + clean.slice(1)}`;
+  }
+}
+
+/**
  * General purpose notification dispatcher for predefined system events
  */
 export async function sendEventNotification(
@@ -167,17 +196,20 @@ export async function sendEventNotification(
       ...variables
     };
 
+    // Sprint 1.1 — baca preferensi tone (opsional, default hangat)
+    const tone = (variables.tone as string | undefined) || "hangat";
+
     const jobs: Promise<any>[] = [];
 
     if (template.email_enabled && user.email) {
       const subject = interpolate(template.email_subject, mergeVars);
       const htmlBody = interpolate(template.email_body, mergeVars);
-      jobs.push(sendEmailNotification(user.email, subject, htmlBody));
+      jobs.push(sendEmailNotification(user.email, applyTone(tone, subject), htmlBody));
     }
 
     if (template.wa_enabled && user.whatsapp) {
       const waMsg = interpolate(template.wa_message, mergeVars);
-      jobs.push(sendWhatsAppNotification(user.whatsapp, waMsg));
+      jobs.push(sendWhatsAppNotification(user.whatsapp, applyTone(tone, waMsg)));
     }
 
     const results = await Promise.allSettled(jobs);

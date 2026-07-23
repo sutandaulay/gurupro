@@ -115,8 +115,8 @@ export async function consumeUserToken(userId: string, amount = 1) {
       try {
         await sendInAppNotification(
           userId,
-          "⚠️ Kuota Token Menipis!",
-          `Sisa token Anda tinggal ${newTotal}. Pertimbangkan untuk melakukan top-up agar tidak terganggu aktivitas.`,
+          "⚠️ Kuota Poin Menipis!",
+          `Sisa poin Anda tinggal ${newTotal}. Pertimbangkan untuk melakukan top-up agar tidak terganggu aktivitas.`,
           "token_low",
           "token_balance",
           null

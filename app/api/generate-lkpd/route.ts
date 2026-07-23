@@ -1,7 +1,7 @@
-import { generateAIContent } from "@/lib/ai";
+import { generateAIContentWithUsage } from "@/lib/ai";
 import { query } from "@/lib/db";
-import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
-import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
+import { getUserPoinAccess, logFailedPoinUsage } from "@/src/services/poin-service";
+import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { uploadToR2 } from "@/lib/r2";
@@ -219,19 +219,12 @@ Keluarkan HANYA JSON valid tanpa markdown fence atau teks pembuka.
 `;
 
     let parsed: z.infer<typeof lkpdOutputSchema>;
-    let rawUsage = null;
+    let aiResult: Awaited<ReturnType<typeof generateAIContentWithUsage>> | null = null;
     try {
-      const aiResult = await generateAIContent(prompt, lkpdSystemPrompt, true);
-      console.log("[Generate LKPD] Raw AI response length:", aiResult?.data?.length);
+      aiResult = await generateAIContentWithUsage(prompt, lkpdSystemPrompt, true);
+      console.log("[Generate LKPD] Raw AI response length:", aiResult?.text?.length);
 
-      if (!aiResult.success) {
-        throw new Error(aiResult.error || "AI generation failed");
-      }
-
-      // Store raw usage metadata
-      rawUsage = aiResult.rawUsage;
-
-      const text = aiResult.data as string;
+      const text = aiResult.text;
       if (!text || text.trim() === "") {
         throw new Error("AI mengembalikan respons kosong");
       }
@@ -302,19 +295,15 @@ Keluarkan HANYA JSON valid tanpa markdown fence atau teks pembuka.
     // Deduct Poin based on actual usage
     if (user.role !== "admin") {
       try {
-        const poinCalc = calculatePoinFromTokens(
-          rawUsage?.promptTokenCount || 0,
-          rawUsage?.candidatesTokenCount || 0,
-          rawUsage?.cachedContentTokenCount || 0
+        await deductPoinFromAIResult(
+          { success: true, usage: aiResult?.usage || null },
+          userId,
+          "generate-lkpd",
+          {}
         );
 
-        await consumeUserPoin(userId, poinCalc.rawTokens, "generate-lkpd", {
-          model: "gemini-2.5-flash-lite",
-          provider: "gemini",
-        });
-
-        console.log(`[Generate LKPD] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
-      } catch (poinError: any) {
+          console.log(`[Generate LKPD] Poin deducted`);
+        } catch (poinError: any) {
         console.error("[Generate LKPD] Poin deduction failed:", poinError);
       }
     }

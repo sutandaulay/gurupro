@@ -15,6 +15,10 @@ import {
   type PoinDeductionResult,
   type PoinTransaction,
 } from '@/src/config/billing';
+export type { PoinDeductionResult, PoinTransaction } from '@/src/config/billing';
+import { getTokensPerPoin, invalidateTokensPerPoinCache } from '@/src/config/ratio-cache';
+import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
+import type { AIUsageResult } from '@/src/lib/ai-usage-result';
 
 // ============================================
 // POIN ACCESS CHECK
@@ -163,7 +167,10 @@ export async function consumeUserPoin(
     jumlahSoal?: number;
   }
 ): Promise<PoinDeductionResult> {
-  const poinNeeded = convertTokensToPoin(rawTokens);
+  // Rasio diambil dari cache setting admin (bukan hardcoded)
+  const tokensPerPoin = await getTokensPerPoin();
+  const poinNeeded = convertTokensToPoin(rawTokens, tokensPerPoin);
+  const ratioUsed = tokensPerPoin; // disimpan per-transaksi (audit integrity)
 
   const client = await pool.connect();
   try {
@@ -247,8 +254,9 @@ export async function consumeUserPoin(
     await client.query(
       `INSERT INTO poin_transactions (
          id, user_id, feature, raw_tokens, poin_deducted, source,
-         model, provider, mapel, jenjang, jumlah_soal, success
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+         model, provider, mapel, jenjang, jumlah_soal, success,
+         ratio_used_at_transaction, cached_tokens
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
       [
         transactionId,
         userId,
@@ -262,6 +270,8 @@ export async function consumeUserPoin(
         options?.jenjang || '-',
         options?.jumlahSoal || 0,
         true,
+        ratioUsed,
+        0, // cachedTokens - hanya dihitung di consumeUserPoinFromUsage
       ]
     );
 
@@ -294,6 +304,52 @@ export async function consumeUserPoin(
 }
 
 /**
+ * Konsumsi Poin dari AIUsageResult terstandar (provider-agnostic).
+ *
+ * Total token = inputTokens + outputTokens.
+ * cachedTokens dihitung dangan bobot lebih ringan (lihat CACHED_TOKEN_RATIO
+ * di billing.ts via calculateEffectiveTokens) — sesuai kebijakan masing-masing
+ * provider. Downstream CUKUP memanggil ini; TIDAK perlu membaca
+ * struktur response provider tertentu.
+ *
+ * @returns Result + ratio_used_at_transaction yang disimpan ke ledger
+ */
+export async function consumeUserPoinFromUsage(
+  userId: string,
+  usage: AIUsageResult | null,
+  feature: string,
+  options?: {
+    mapel?: string;
+    jenjang?: string;
+    jumlahSoal?: number;
+  }
+): Promise<PoinDeductionResult & { ratioUsed: number }> {
+  const inputTokens = usage?.inputTokens || 0;
+  const outputTokens = usage?.outputTokens || 0;
+  const cachedTokens = usage?.cachedTokens || 0;
+  const model = usage?.model || 'gemini-2.5-flash-lite';
+  const provider = usage?.provider || 'gemini';
+
+  // Total token efektif (cached di-discount)
+  const effectiveTokens = calculateEffectiveTokens({
+    promptTokenCount: inputTokens,
+    candidatesTokenCount: outputTokens,
+    cachedContentTokenCount: cachedTokens,
+  });
+
+  const result = await consumeUserPoin(userId, effectiveTokens, feature, {
+    model,
+    provider,
+    mapel: options?.mapel,
+    jenjang: options?.jenjang,
+    jumlahSoal: options?.jumlahSoal,
+  });
+
+  const ratioUsed = await getTokensPerPoin();
+  return { ...result, ratioUsed };
+}
+
+/**
  * Log gagal penggunaan Poin (untuk audit trail)
  */
 export async function logFailedPoinUsage(
@@ -311,12 +367,14 @@ export async function logFailedPoinUsage(
   try {
     const poinNeeded = convertTokensToPoin(rawTokens);
     const transactionId = `ptx_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const ratioUsed = await getTokensPerPoin();
 
     await query(
       `INSERT INTO poin_transactions (
          id, user_id, feature, raw_tokens, poin_deducted, source,
-         model, provider, mapel, jenjang, success, error_message
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+         model, provider, mapel, jenjang, success, error_message,
+         ratio_used_at_transaction, cached_tokens
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
       [
         transactionId,
         userId,
@@ -330,6 +388,8 @@ export async function logFailedPoinUsage(
         options?.jenjang || '-',
         false,
         errorMessage,
+        ratioUsed,
+        0,
       ]
     );
   } catch (err) {
@@ -421,7 +481,7 @@ async function sendLowPoinWarning(userId: string, remainingPoin: number): Promis
     `Sisa Poin Anda tinggal ${remainingPoin}. Pertimbangkan untuk melakukan top-up agar tidak terganggu aktivitas.`,
     'poin_low',
     'poin_balance',
-    null
+    undefined
   );
 }
 

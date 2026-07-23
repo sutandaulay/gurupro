@@ -6,7 +6,7 @@ import { useTeacherStore, useKurikulumStore, DIMENSI_8_OPTIONS } from '@/lib/sto
 import { GenerateBahanAjarButton } from '@/app/components/bahan-ajar';
 import { useSession } from "next-auth/react";
 import dynamic from 'next/dynamic';
-import TokenHabisModal from '@/app/components/ui/TokenHabisModal';
+import PoinHabisModal from '@/app/components/ui/PoinHabisModal';
 
 function AdministrasiContent() {
   const { data: session } = useSession();
@@ -214,7 +214,7 @@ function AdministrasiContent() {
         if (err.reason === "token_habis" || err.reason === "subscription_expired") {
           setShowTokenModal(true);
           setTokenShortfall(1);
-          setError("Token habis. Silakan top-up atau upgrade paket.");
+          setError("Poin habis. Silakan top-up atau upgrade paket.");
         } else {
           setError(err.error || 'Gagal generate dokumen');
         }
@@ -933,8 +933,8 @@ function AdministrasiContent() {
         }
       `}} />
 
-      {/* Token Habis Modal */}
-      <TokenHabisModal
+      {/* Poin Habis Modal */}
+      <PoinHabisModal
         open={showTokenModal}
         shortfall={tokenShortfall}
         onClose={() => setShowTokenModal(false)}

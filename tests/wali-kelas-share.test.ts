@@ -1,9 +1,34 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { query } from '@/lib/db';
 import { getWaliKelasForKelas } from '@/lib/wali-kelas';
 import { sendInAppNotification } from '@/lib/raport/notifications';
 
-// Mock data untuk testing
+vi.mock('@/lib/payload');
+vi.mock('@/lib/db');
+vi.mock('@/lib/wali-kelas');
+vi.mock('@/lib/raport/notifications');
+
+const mockQuery = query as ReturnType<typeof vi.fn>;
+const mockGetWaliKelasForKelas = getWaliKelasForKelas as ReturnType<typeof vi.fn>;
+const mockSendInAppNotification = sendInAppNotification as ReturnType<typeof vi.fn>;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+const BASE_URL = 'http://localhost:3000';
+
+async function apiFetch(path: string, options: RequestInit = {}) {
+  return fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+  });
+}
+
 const mockSiswaId = 'test_siswa_id';
 const mockKelasId = 'test_kelas_id';
 const mockGuruMapelMemberId = 'test_guru_member_id';
@@ -15,7 +40,7 @@ describe('Fitur Share Nilai ke Wali Kelas', () => {
   describe('Bagian A - Share ke Wali Kelas via Kontak Eksternal', () => {
     it('Harus bisa generate excel dengan contentType ekskul', async () => {
       // Mock request ke endpoint generate-excel
-      const response = await fetch('/api/raport/eksternal/generate-excel', {
+      const response = await apiFetch('/api/raport/eksternal/generate-excel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -33,7 +58,7 @@ describe('Fitur Share Nilai ke Wali Kelas', () => {
 
     it('Harus bisa generate pdf dengan contentType raport', async () => {
       // Mock request ke endpoint generate-pdf
-      const response = await fetch('/api/raport/eksternal/generate-pdf', {
+      const response = await apiFetch('/api/raport/eksternal/generate-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -51,7 +76,7 @@ describe('Fitur Share Nilai ke Wali Kelas', () => {
 
     it('Harus bisa membuat kontak eksternal dengan role wali_kelas', async () => {
       // Mock request ke endpoint kontak-eksternal
-      const response = await fetch('/api/raport/kontak-eksternal', {
+      const response = await apiFetch('/api/raport/kontak-eksternal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -75,7 +100,7 @@ describe('Fitur Share Nilai ke Wali Kelas', () => {
   describe('Bagian B - Kirim ke Wali Kelas Internal', () => {
     it('Harus bisa kirim notifikasi internal ke wali kelas', async () => {
       // Mock request ke endpoint internal notifikasi
-      const response = await fetch('/api/internal-notifications/nilai-to-wali-kelas', {
+      const response = await apiFetch('/api/internal-notifications/nilai-to-wali-kelas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -97,7 +122,7 @@ describe('Fitur Share Nilai ke Wali Kelas', () => {
 
     it('Harus gagal jika user tidak memiliki izin', async () => {
       // Mock request dengan dataId yang bukan milik user
-      const response = await fetch('/api/internal-notifications/nilai-to-wali-kelas', {
+      const response = await apiFetch('/api/internal-notifications/nilai-to-wali-kelas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -116,7 +141,7 @@ describe('Fitur Share Nilai ke Wali Kelas', () => {
 
     it('Harus gagal jika wali kelas tidak ditemukan', async () => {
       // Mock request ke kelas tanpa wali kelas
-      const response = await fetch('/api/internal-notifications/nilai-to-wali-kelas', {
+      const response = await apiFetch('/api/internal-notifications/nilai-to-wali-kelas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -137,7 +162,7 @@ describe('Fitur Share Nilai ke Wali Kelas', () => {
   describe('Validasi RBAC dan Security', () => {
     it('Harus menerapkan financial data exclusion', async () => {
       // Endpoint generate excel/pdf tidak boleh mengembalikan data keuangan
-      const response = await fetch('/api/raport/eksternal/generate-excel', {
+      const response = await apiFetch('/api/raport/eksternal/generate-excel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -164,7 +189,7 @@ describe('Fitur Share Nilai ke Wali Kelas', () => {
 
     it('Harus memvalidasi OTP sebelum memberikan akses data', async () => {
       // Request tanpa OTP terverifikasi harus ditolak
-      const response = await fetch('/api/raport/eksternal/generate-excel', {
+      const response = await apiFetch('/api/raport/eksternal/generate-excel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/services/poin-service';
-import { calculatePoinFromTokens } from '@/src/lib/ai-usage';
+import { getUserPoinAccess, logFailedPoinUsage } from '@/src/services/poin-service';
+import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
+import { generateAIContentWithUsage } from '@/lib/ai';
 import { cookies } from 'next/headers';
 import { truncateText } from '@/lib/ai/validation-utils';
 
@@ -74,70 +75,6 @@ async function validateGuruRole(memberId: string): Promise<boolean> {
   return res.rows[0]?.is_valid === true;
 }
 
-async function generateAIDeskripsi(
-  prompt: string,
-  modeNaratif: boolean
-): Promise<{ deskripsi: string; saran: string; rawUsage?: any }> {
-  const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = await import('@google/generative-ai');
-
-  const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || '';
-  if (!apiKey) {
-    throw new Error('Google AI API key not configured');
-  }
-
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel(
-    {
-      model: 'gemini-2.5-flash-lite',
-      systemInstruction: SYSTEM_PROMPT_DESKRIPSI_CAPAIAN,
-      safetySettings: [
-        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-      ],
-    },
-    { apiVersion: 'v1' }
-  );
-
-  const generationConfig = {
-    temperature: 0.7,
-    maxOutputTokens: 512,
-  };
-
-  const result = await model.generateContent({
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig,
-  });
-
-  const rawText = result.response.text();
-
-  // Get raw usage metadata
-  const rawUsage = {
-    promptTokenCount: result.response.usageMetadata?.promptTokenCount || 0,
-    candidatesTokenCount: result.response.usageMetadata?.candidatesTokenCount || 0,
-    totalTokenCount: result.response.usageMetadata?.totalTokenCount || 0,
-    cachedContentTokenCount: result.response.usageMetadata?.cachedContentTokenCount || 0,
-  };
-
-  // Parse JSON dengan cleanup dan enforce limits
-  let cleanText = rawText.trim()
-    .replace(/```json\s*|```\s*/gi, '')
-    .trim();
-
-  try {
-    const parsed = JSON.parse(cleanText);
-    return { ...enforceOutputLimits(parsed), rawUsage };
-  } catch {
-    // Fallback jika JSON parse gagal - truncate raw text
-    console.warn('[Deskripsi Capaian] JSON parse failed, using truncated fallback');
-    return {
-      deskripsi: truncateText(rawText, 500) || 'Ananda menunjukkan pemahaman terhadap materi pembelajaran.',
-      saran: '',
-      rawUsage,
-    };
-  }
-}
 
 /**
  * Enforce output limits - truncate sesuai batas karakter
@@ -263,11 +200,31 @@ export async function POST(req: Request) {
     const prompt = buildPrompt(params);
 
     let result: { deskripsi: string; saran: string };
-    let rawUsage = null;
+    let aiResult: Awaited<ReturnType<typeof generateAIContentWithUsage>> | null = null;
     try {
-      const aiResult = await generateAIDeskripsi(prompt, params.modeNaratif);
-      result = aiResult;
-      rawUsage = aiResult.rawUsage;
+      // Call via wrapper (gets usage metadata for Poin)
+      aiResult = await generateAIContentWithUsage(
+        prompt,
+        SYSTEM_PROMPT_DESKRIPSI_CAPAIAN,
+        true // isJson
+      );
+
+      // Parse JSON response
+      let cleanText = aiResult.text.trim()
+        .replace(/```json\s*|```\s*/gi, '')
+        .trim();
+
+      try {
+        const parsed = JSON.parse(cleanText);
+        result = enforceOutputLimits(parsed);
+      } catch {
+        // Fallback jika JSON parse gagal
+        console.warn('[Deskripsi Capaian] JSON parse failed, using truncated fallback');
+        result = {
+          deskripsi: truncateText(aiResult.text, 500) || 'Ananda menunjukkan pemahaman terhadap materi pembelajaran.',
+          saran: '',
+        };
+      }
     } catch (aiError: any) {
       console.error('AI generation failed:', aiError);
 
@@ -279,20 +236,15 @@ export async function POST(req: Request) {
       }, { status: 502 });
     }
 
+    // Deduct Poin using wrapper result
     if (user.role !== 'admin') {
       try {
-        const poinCalc = calculatePoinFromTokens(
-          rawUsage?.promptTokenCount || 0,
-          rawUsage?.candidatesTokenCount || 0,
-          rawUsage?.cachedContentTokenCount || 0
+        await deductPoinFromAIResult(
+          { success: true, usage: aiResult?.usage || null },
+          userId,
+          'generate-deskripsi-capaian',
+          {}
         );
-
-        await consumeUserPoin(userId, poinCalc.rawTokens, 'generate-deskripsi-capaian', {
-          model: 'gemini-2.5-flash-lite',
-          provider: 'gemini',
-        });
-
-        console.log(`[Generate Deskripsi Capaian] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
       } catch (poinError: any) {
         console.error('[Generate Deskripsi Capaian] Poin deduction failed:', poinError);
       }

@@ -9,7 +9,7 @@ import {
   institutions as institutionsTable,
   formatInstitution
 } from '@/lib/schemas/attendance';
-import { eq, and, desc, lt } from 'drizzle-orm';
+import { eq, and, desc, lt, gt } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { subMinutes } from 'date-fns';
 
@@ -21,10 +21,13 @@ const CheckInSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   accuracy: z.number().min(0),
-  institutionId: z.string(),
-  assignmentId: z.string().uuid(),
+  institutionId: z.string().optional(),
+  schoolId: z.string().optional(),
+  assignmentId: z.string().uuid().optional(),
   qrCodeVerified: z.boolean().optional(),
   browserFingerprint: z.string().optional(),
+  teacherId: z.string(),
+  type: z.string(),
 });
 
 export async function POST(req: Request) {
@@ -51,78 +54,147 @@ export async function POST(req: Request) {
                      req.headers.get('cf-connecting-ip') ||
                      'unknown';
 
-    // Validasi tambahan: pastikan assignment aktif dan sesuai institusi
-    // Dalam implementasi nyata, Anda akan memeriksa assignment di database
+    const { institutionId, schoolId, latitude, longitude } = validatedData;
+    let institutionIdNum: number | null = null;
+    let institutionLocation: { latitude: number; longitude: number } | null = null;
+    let attendanceSettings: any = null;
+    let distance = 0;
+    let refId = validatedData.assignmentId || `school-${schoolId}`;
 
-    // Hitung jarak dari institusi (haversine formula)
-    const { institutionId, latitude, longitude } = validatedData;
-    
-    // Dapatkan setting institusi
-    const parsedInstId = /^\d+$/.test(institutionId) ? parseInt(institutionId, 10) : 0;
-    const instResult = await query(`
-      SELECT 
-        id,
-        name,
-        location_latitude as "locationLatitude",
-        location_longitude as "locationLongitude",
-        attendance_settings_attendance_radius_meters as "attendanceRadiusMeters",
-        attendance_settings_class_session_radius_meters as "classSessionRadiusMeters",
-        attendance_settings_late_tolerance_minutes as "lateToleranceMinutes",
-        attendance_settings_duplicate_check_minutes as "duplicateCheckMinutes",
-        attendance_settings_qr_code_enabled as "qrCodeEnabled",
-        attendance_settings_qr_code_token as "qrCodeToken"
-      FROM payload.institutions
-      WHERE id = $1
-    `, [parsedInstId]);
+    // ==========================================
+    // Handle sekolah mandiri (schoolId)
+    // ==========================================
+    if (schoolId) {
+      const schoolResult = await query(`
+        SELECT id, nama_sekolah, location_latitude, location_longitude, attendance_radius_meters
+        FROM schools
+        WHERE id = $1 AND user_id = $2
+      `, [schoolId, session.id]);
 
-    if (instResult.rows.length === 0) {
-      return NextResponse.json({ error: 'Institusi tidak ditemukan' }, { status: 404 });
+      if (schoolResult.rows.length === 0) {
+        return NextResponse.json({ error: 'Sekolah tidak ditemukan atau bukan milik Anda' }, { status: 404 });
+      }
+
+      const school = schoolResult.rows[0];
+      const currentLat = typeof latitude === 'number' ? latitude : parseFloat(String(latitude));
+      const currentLng = typeof longitude === 'number' ? longitude : parseFloat(String(longitude));
+
+      // Jika sekolah belum punya koordinat, simpan GPS saat ini sebagai referensi
+      if (!school.location_latitude || !school.location_longitude) {
+        await query(
+          `UPDATE schools 
+           SET location_latitude = $1, location_longitude = $2, attendance_radius_meters = COALESCE(attendance_radius_meters, 100) 
+           WHERE id = $3`,
+          [currentLat, currentLng, schoolId]
+        );
+
+        institutionLocation = { latitude: currentLat, longitude: currentLng };
+        attendanceSettings = {
+          attendanceRadiusMeters: school.attendance_radius_meters || 100,
+          duplicateCheckMinutes: 5,
+          qrCodeEnabled: false,
+        };
+        distance = 0;
+        refId = validatedData.assignmentId || schoolId;
+      } else {
+        institutionLocation = {
+          latitude: parseFloat(school.location_latitude),
+          longitude: parseFloat(school.location_longitude),
+        };
+        attendanceSettings = {
+          attendanceRadiusMeters: school.attendance_radius_meters || 100,
+          duplicateCheckMinutes: 5,
+          qrCodeEnabled: false,
+        };
+        distance = calculateDistance(latitude, longitude, institutionLocation.latitude, institutionLocation.longitude);
+        refId = validatedData.assignmentId || schoolId;
+      }
+
+      institutionIdNum = parseInt(school.id, 10);
+    } 
+    // ==========================================
+    // Handle institusi terinstansi (institutionId)
+    // ==========================================
+    else if (institutionId) {
+      institutionIdNum = parseInt(institutionId, 10);
+
+      const instResult = await query(`
+        SELECT 
+          id,
+          name,
+          location_latitude as "locationLatitude",
+          location_longitude as "locationLongitude",
+          attendance_settings_attendance_radius_meters as "attendanceRadiusMeters",
+          attendance_settings_class_session_radius_meters as "classSessionRadiusMeters",
+          attendance_settings_late_tolerance_minutes as "lateToleranceMinutes",
+          attendance_settings_duplicate_check_minutes as "duplicateCheckMinutes",
+          attendance_settings_qr_code_enabled as "qrCodeEnabled",
+          attendance_settings_qr_code_token as "qrCodeToken"
+        FROM payload.institutions
+        WHERE id = $1
+      `, [institutionIdNum]);
+
+      if (instResult.rows.length === 0) {
+        return NextResponse.json({ error: 'Institusi tidak ditemukan' }, { status: 404 });
+      }
+
+      const rawInstitution = instResult.rows[0];
+      const institution = formatInstitution(rawInstitution)!;
+      institutionLocation = institution.location;
+      attendanceSettings = institution.attendanceSettings;
+
+      distance = calculateDistance(
+        latitude,
+        longitude,
+        institutionLocation.latitude,
+        institutionLocation.longitude
+      );
+      refId = validatedData.assignmentId || institutionId;
+    } else {
+      return NextResponse.json({ error: 'institutionId atau schoolId wajib diisi' }, { status: 400 });
     }
 
-    const rawInstitution = instResult.rows[0];
-    const institution = formatInstitution(rawInstitution)!;
-    const institutionLocation = institution.location;
-    const attendanceSettings = institution.attendanceSettings;
-    
-    const distance = calculateDistance(
-      latitude,
-      longitude,
-      institutionLocation.latitude,
-      institutionLocation.longitude
-    );
+    if (!institutionLocation || !institutionIdNum) {
+      return NextResponse.json({ error: 'Lokasi institusi tidak ditemukan' }, { status: 400 });
+    }
 
-    // Validasi rate limiting - cek apakah sudah ada presensi dalam rentang waktu duplicateCheckMinutes
+    // ==========================================
+    // Validasi rate limiting & anti-fraud
+    // ==========================================
+    if (!institutionLocation) {
+      return NextResponse.json({ error: 'Lokasi institusi tidak ditemukan' }, { status: 400 });
+    }
+
     const duplicateCheckMinutes = attendanceSettings.duplicateCheckMinutes || 5;
     const minTime = subMinutes(new Date(), duplicateCheckMinutes);
-    
+
     const recentLogs = await db.select()
       .from(attendanceLogs)
       .where(and(
         eq(attendanceLogs.teacherId, validatedData.teacherId),
-        eq(attendanceLogs.institutionId, validatedData.institutionId),
+        eq(attendanceLogs.institutionId, institutionIdNum as number),
         eq(attendanceLogs.type, 'masuk'),
         lt(attendanceLogs.timestamp, new Date()),
-        lt(minTime, attendanceLogs.timestamp)
+        gt(attendanceLogs.timestamp, minTime)
       ));
-    
+
     if (recentLogs.length > 0) {
       return NextResponse.json({
         error: 'Presensi terlalu cepat, tunggu sebentar sebelum mencoba lagi',
       }, { status: 429 });
     }
 
-    // Jalankan semua validasi anti-fraud
     const { trustScore, flagReasons } = await performAntiFraudChecks(
       validatedData,
       ipAddress,
-      institutionId,
+      String(institutionIdNum),
       distance,
       attendanceSettings
     );
 
     // Tentukan status berdasarkan skor kepercayaan
     let status: 'valid' | 'flagged' | 'rejected' = 'valid';
-    const trustThreshold = 0.6; // Konfigurabel
+    const trustThreshold = 0.6;
     if (trustScore < trustThreshold) {
       status = 'flagged';
     }
@@ -131,8 +203,8 @@ export async function POST(req: Request) {
     const attendanceLog = await db.insert(attendanceLogs).values({
       id: uuidv4(),
       teacherId: validatedData.teacherId,
-      institutionId: validatedData.institutionId,
-      assignmentId: validatedData.assignmentId,
+      institutionId: institutionIdNum as number,
+      assignmentId: validatedData.assignmentId || '',
       type: validatedData.type,
       timestamp: new Date(),
       latitude: validatedData.latitude,
@@ -150,11 +222,12 @@ export async function POST(req: Request) {
     }).returning();
 
     // Update atau buat summary harian
-    await updateDailyAttendanceSummary(validatedData.teacherId, validatedData.institutionId);
+    await updateDailyAttendanceSummary(validatedData.teacherId, institutionIdNum);
 
     return NextResponse.json({
       success: true,
-      message: 'Presensi masuk berhasil dicatat',
+      message: schoolId ? 'Presensi sekolah berhasil dicatat' : 'Presensi masuk berhasil dicatat',
+      refId: refId,
       distanceFromInstitution: distance,
       faceMatchScore: validatedData.faceMatchScore,
       trustScore: trustScore,
@@ -168,7 +241,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { 
           error: 'Validasi input gagal', 
-          details: error.errors 
+          details: error.issues 
         }, 
         { status: 400 }
       );
@@ -207,7 +280,7 @@ async function getIPLocation(ipAddress: string) {
 
 
 // Fungsi untuk update summary harian
-async function updateDailyAttendanceSummary(teacherId: string, institutionId: string) {
+async function updateDailyAttendanceSummary(teacherId: string, institutionId: number) {
   const today = new Date();
   today.setHours(0, 0, 0, 0); // Set ke awal hari
 

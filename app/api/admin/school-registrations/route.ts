@@ -1,9 +1,7 @@
-import { PrismaClient } from '@prisma/client';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-
-const prisma = new PrismaClient();
+import { approveSchoolRegistration } from '@/lib/school-registration-approval';
 
 // Helper: Pastikan user adalah admin
 async function requireAdmin() {
@@ -27,11 +25,13 @@ export async function GET() {
   try {
     await requireAdmin();
 
-    const registrations = await prisma.school_registrations.findMany({
-      orderBy: { created_at: 'desc' },
-    });
+    const registrations = await query(`
+      SELECT id, nama_lembaga, npsn, jenjang, naungan, alamat, nama_kepala_sekolah, email_kontak, whatsapp, status, catatan_admin, created_at, updated_at
+      FROM school_registrations
+      ORDER BY created_at DESC
+    `);
 
-    return NextResponse.json(registrations);
+    return NextResponse.json(registrations.rows);
   } catch (error: any) {
     const status = error.message === 'Unauthorized' ? 401 : error.message === 'Forbidden' ? 403 : 500;
     return NextResponse.json({ error: error.message }, { status });
@@ -55,174 +55,36 @@ export async function PUT(req: Request) {
     }
 
     // Ambil data pendaftaran saat ini
-    const currentRegistration = await prisma.school_registrations.findUnique({
-      where: { id },
-    });
+    const currentRegistration = await query(
+      'SELECT * FROM school_registrations WHERE id = $1 LIMIT 1',
+      [id]
+    );
 
-    if (!currentRegistration) {
+    if (currentRegistration.rows.length === 0) {
       return NextResponse.json({ error: 'Data pendaftaran tidak ditemukan' }, { status: 404 });
     }
 
+    const registration = currentRegistration.rows[0];
+
     // Update status pendaftaran
-    const updated = await prisma.school_registrations.update({
-      where: { id },
-      data: {
-        status,
-        catatan_admin: catatan_admin || null,
-      },
-    });
+    await query(
+      `UPDATE school_registrations
+       SET status = $1, catatan_admin = $2, updated_at = NOW()
+       WHERE id = $3`,
+      [status, catatan_admin || null, id]
+    );
 
     // Jika status diubah menjadi approved, buat lembaga (institution) baru secara otomatis
     if (status === 'approved') {
-      const npsn = currentRegistration.npsn ? currentRegistration.npsn.trim() : null;
-
-      // Cek apakah institusi dengan NPSN yang sama sudah ada
-      let existingInstitution = null;
-      if (npsn) {
-        existingInstitution = await prisma.institutions.findFirst({
-          where: { npsn },
-        });
-      }
-
-      if (!existingInstitution) {
-        // Pemetaan jenjang ke enum enum_institutions_jenjang
-        let mappedJenjang: any = 'Lainnya';
-        const jenjangLower = currentRegistration.jenjang.toLowerCase();
-        if (jenjangLower.includes('sd')) {
-          mappedJenjang = 'SD';
-        } else if (jenjangLower.includes('mi')) {
-          mappedJenjang = 'MI';
-        } else if (jenjangLower.includes('smp')) {
-          mappedJenjang = 'SMP';
-        } else if (jenjangLower.includes('mts')) {
-          mappedJenjang = 'MTs';
-        } else if (jenjangLower.includes('sma')) {
-          mappedJenjang = 'SMA';
-        } else if (jenjangLower.includes('ma')) {
-          mappedJenjang = 'MA';
-        } else if (jenjangLower.includes('smk')) {
-          mappedJenjang = 'SMK';
-        } else if (jenjangLower.includes('pesantren')) {
-          mappedJenjang = 'Pesantren';
-        }
-
-        // Pemetaan naungan ke enum enum_institutions_naungan
-        let mappedNaungan: any = 'Swasta_Lainnya';
-        const naunganLower = currentRegistration.naungan.toLowerCase();
-        if (naunganLower.includes('kemenag')) {
-          mappedNaungan = 'Kemenag';
-        } else if (naunganLower.includes('kemendikbud')) {
-          mappedNaungan = 'Kemendikbud';
-        }
-
-        // Ambil tahun ajaran aktif dari database secara dinamis
-        const activeTahunAjaran = await prisma.tahun_ajaran.findFirst({
-          where: { is_active: true },
-          select: { nama: true },
-        });
-        const activeYear = activeTahunAjaran?.nama || '2025/2026';
-
-        // Buat institusi baru
-        const newInstitution = await prisma.institutions.create({
-          data: {
-            name: currentRegistration.nama_lembaga,
-            npsn: npsn || null,
-            jenjang: mappedJenjang,
-            naungan: mappedNaungan,
-            subscription_tier: 'trial',
-            academic_year_active: activeYear,
-            approval_layer_config: 'single',
-            status: 'active',
-          },
-        });
-
-        // Buat sekolah baru di tabel schools utama (jika belum ada berdasarkan NPSN)
-        let school = null;
-        if (npsn) {
-          school = await prisma.schools.findFirst({ where: { npsn } });
-
-          if (!school) {
-            school = await prisma.schools.create({
-              data: {
-                user_id: userId,
-                nama_sekolah: currentRegistration.nama_lembaga,
-                npsn: npsn,
-                alamat: currentRegistration.alamat || null,
-                nama_kepala_sekolah: currentRegistration.nama_kepala_sekolah || null,
-              },
-            });
-          }
-        } else {
-          school = await prisma.schools.create({
-            data: {
-              user_id: userId,
-              nama_sekolah: currentRegistration.nama_lembaga,
-              alamat: currentRegistration.alamat || null,
-              nama_kepala_sekolah: currentRegistration.nama_kepala_sekolah || null,
-            },
-          });
-        }
-
-        // Hubungkan admin yang approve sebagai anggota institusi
-        try {
-          const adminUser = await prisma.users.findUnique({ where: { id: userId } });
-          if (adminUser) {
-            let cmsUser = await prisma.cms_users.findFirst({ where: { email: adminUser.email } });
-            if (!cmsUser) {
-              cmsUser = await prisma.cms_users.create({
-                data: {
-                  name: adminUser.nama_lengkap || 'Admin',
-                  email: adminUser.email || '',
-                  password: '',
-                  role: 'admin',
-                  salt: '',
-                  hash: '',
-                },
-              });
-            }
-
-            const existingMembership = await prisma.institution_members.findFirst({
-              where: { user_id: cmsUser.id, institution_id: newInstitution.id },
-            });
-
-            if (!existingMembership) {
-              const membership = await prisma.institution_members.create({
-                data: {
-                  user_id: cmsUser.id,
-                  app_user_id: userId,
-                  institution_id: newInstitution.id,
-                  status: 'active',
-                  joined_at: new Date(),
-                },
-              });
-
-              await prisma.institution_members_role.create({
-                data: { order: 1, parent_id: membership.id, value: 'admin_sekolah' },
-              });
-            }
-
-            if (school) {
-              const existingAssign = await prisma.user_school_assignments.findFirst({
-                where: { userid: userId, schoolid: school.id },
-              });
-
-              if (!existingAssign) {
-                await prisma.user_school_assignments.create({
-                  data: { userid: userId, schoolid: school.id },
-                });
-              }
-
-              await prisma.users.update({
-                where: { id: userId },
-                data: { nama_sekolah: currentRegistration.nama_lembaga },
-              });
-            }
-          }
-        } catch { /* non-critical */ }
+      try {
+        await approveSchoolRegistration(registration);
+      } catch (e) {
+        console.error('Error approving registration:', e);
+        return NextResponse.json({ error: 'Gagal menyetujui pendaftaran' }, { status: 500 });
       }
     }
 
-    return NextResponse.json(updated);
+    return NextResponse.json({ success: true, status });
   } catch (error: any) {
     console.error('Update registration status error:', error);
     const status = error.message === 'Unauthorized' ? 401 : error.message === 'Forbidden' ? 403 : 500;
@@ -241,9 +103,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'ID wajib diisi' }, { status: 400 });
     }
 
-    await prisma.school_registrations.delete({
-      where: { id },
-    });
+    await query('DELETE FROM school_registrations WHERE id = $1', [id]);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

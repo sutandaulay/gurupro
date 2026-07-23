@@ -10,7 +10,7 @@ import {
   institutions as institutionsTable,
   formatInstitution
 } from '@/lib/schemas/attendance';
-import { eq, and, desc, lt } from 'drizzle-orm';
+import { eq, and, desc, lt, gt } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { subMinutes } from 'date-fns';
 
@@ -26,6 +26,8 @@ const CheckOutSchema = z.object({
   assignmentId: z.string().uuid(),
   qrCodeVerified: z.boolean().optional(),
   browserFingerprint: z.string().optional(),
+  teacherId: z.string(),
+  type: z.string(),
 });
 
 export async function POST(req: Request) {
@@ -57,9 +59,9 @@ export async function POST(req: Request) {
 
     // Hitung jarak dari institusi (haversine formula)
     const { institutionId, latitude, longitude } = validatedData;
+    const institutionIdNum = parseInt(institutionId, 10);
     
     // Dapatkan setting institusi
-    const parsedInstId = /^\d+$/.test(institutionId) ? parseInt(institutionId, 10) : 0;
     const instResult = await query(`
       SELECT 
         id,
@@ -74,7 +76,7 @@ export async function POST(req: Request) {
         attendance_settings_qr_code_token as "qrCodeToken"
       FROM payload.institutions
       WHERE id = $1
-    `, [parsedInstId]);
+    `, [institutionIdNum]);
 
     if (instResult.rows.length === 0) {
       return NextResponse.json({ error: 'Institusi tidak ditemukan' }, { status: 404 });
@@ -100,10 +102,10 @@ export async function POST(req: Request) {
       .from(attendanceLogs)
       .where(and(
         eq(attendanceLogs.teacherId, validatedData.teacherId),
-        eq(attendanceLogs.institutionId, validatedData.institutionId),
+        eq(attendanceLogs.institutionId, institutionIdNum),
         eq(attendanceLogs.type, 'pulang'),
         lt(attendanceLogs.timestamp, new Date()),
-        lt(minTime, attendanceLogs.timestamp)
+        gt(attendanceLogs.timestamp, minTime)
       ));
     
     if (recentLogs.length > 0) {
@@ -132,7 +134,7 @@ export async function POST(req: Request) {
     const attendanceLog = await db.insert(attendanceLogs).values({
       id: uuidv4(),
       teacherId: validatedData.teacherId,
-      institutionId: validatedData.institutionId,
+      institutionId: institutionIdNum,
       assignmentId: validatedData.assignmentId,
       type: validatedData.type,
       timestamp: new Date(),
@@ -151,7 +153,7 @@ export async function POST(req: Request) {
     }).returning();
 
     // Update summary harian dengan waktu check-out
-    await updateDailyAttendanceSummary(validatedData.teacherId, validatedData.institutionId);
+    await updateDailyAttendanceSummary(validatedData.teacherId, institutionIdNum);
 
     return NextResponse.json({
       success: true,
@@ -169,7 +171,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { 
           error: 'Validasi input gagal', 
-          details: error.errors 
+          details: error.issues 
         }, 
         { status: 400 }
       );
@@ -538,7 +540,7 @@ function distanceBetweenCoordinates(lat1: number, lng1: number, lat2: number, ln
 }
 
 // Fungsi untuk update summary harian
-async function updateDailyAttendanceSummary(teacherId: string, institutionId: string) {
+async function updateDailyAttendanceSummary(teacherId: string, institutionId: number) {
   const today = new Date();
   today.setHours(0, 0, 0, 0); // Set ke awal hari
   

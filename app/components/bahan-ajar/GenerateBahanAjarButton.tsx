@@ -318,7 +318,7 @@ function GenerateConfirmationModal({
       if (!res.ok) {
         if (res.status === 402) {
           setError(
-            `Token tidak cukup. ${data.error}. Sisa token: ${quotaInfo?.remaining || 0}`
+            `Poin tidak cukup. ${data.error}. Sisa poin: ${quotaInfo?.remaining || 0}`
           );
           return;
         }
@@ -684,14 +684,14 @@ function GenerateConfirmationModal({
                 </div>
               )}
 
-              {/* Token Info */}
+              {/* Poin Info */}
               <div className="bg-slate-50 rounded-xl p-4 mb-5">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-gray-600">
-                    Estimasi Token:
+                    Estimasi Poin:
                   </span>
                   <span className="text-sm font-bold text-violet-600">
-                    ~{quotaInfo?.estimatedCost.toLocaleString() || 0} token
+                    ~{quotaInfo?.estimatedCost.toLocaleString() || 0} poin
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -701,7 +701,7 @@ function GenerateConfirmationModal({
                       hasEnoughQuota ? "text-green-600" : "text-red-500"
                     }`}
                   >
-                    {quotaInfo?.remaining.toLocaleString() || 0} token
+                    {quotaInfo?.remaining.toLocaleString() || 0} poin
                   </span>
                 </div>
               </div>
@@ -713,7 +713,7 @@ function GenerateConfirmationModal({
                     <span className="text-xl">⚠️</span>
                     <div>
                       <p className="text-sm font-semibold text-amber-800 mb-1">
-                        Token Tidak Cukup
+                        Poin Tidak Cukup
                       </p>
                       <p className="text-xs text-amber-700 mb-3">
                         Anda membutuhkan{" "}
@@ -722,7 +722,7 @@ function GenerateConfirmationModal({
                           (quotaInfo?.estimatedCost || 0) -
                             (quotaInfo?.remaining || 0)
                         ).toLocaleString()}{" "}
-                        token lagi untuk melanjutkan.
+                         poin lagi untuk melanjutkan.
                       </p>
                       <button
                         onClick={() => {
@@ -732,7 +732,7 @@ function GenerateConfirmationModal({
                         }}
                         className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition-colors"
                       >
-                        Beli Token Ekstra
+                        Beli Poin Ekstra
                       </button>
                     </div>
                   </div>

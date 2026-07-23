@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { grantAddonTokens } from "@/lib/token-system";
+import { grantAddonPoin } from "@/src/services/poin-service";
 import { processSuccessPayment } from "@/lib/payments";
 
 export async function POST(req: Request) {
@@ -22,10 +22,10 @@ export async function POST(req: Request) {
       if (tx.plan_id && tx.plan_id.startsWith("addon:")) {
         await query("UPDATE transactions SET status = $1, updated_at = NOW() WHERE id = $2", ["PAID", tx.id]);
         const addonId = tx.plan_id.split(":")[1];
-        const pkgRes = await query("SELECT token_amount FROM addon_token_packages WHERE id = $1", [addonId]);
+        const pkgRes = await query("SELECT poin_amount FROM addon_token_packages WHERE id = $1", [addonId]);
         if (pkgRes.rows.length) {
-          const tokens = Number(pkgRes.rows[0].token_amount || 0);
-          await grantAddonTokens(tx.user_id, tokens);
+          const poinAmount = Number(pkgRes.rows[0].poin_amount || 0);
+          await grantAddonPoin(tx.user_id, poinAmount);
         }
       } else {
         await processSuccessPayment(orderId, "MIDTRANS", Number(tx.amount), false);

@@ -1,7 +1,7 @@
-import { generateAIContent } from "@/lib/ai";
+import { generateAIContentWithUsage } from "@/lib/ai";
 import { query } from "@/lib/db";
-import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
-import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
+import { getUserPoinAccess, logFailedPoinUsage } from "@/src/services/poin-service";
+import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -75,14 +75,22 @@ Harap berikan respons dalam JSON dengan format persis seperti ini:
 
     // 2. Call universal AI service and parse response
     let parsed: any;
-    let rawUsage = null;
+    let aiResult: Awaited<ReturnType<typeof generateAIContentWithUsage>> | null = null;
     try {
-      const aiResult = await generateAIContent(prompt);
-      parsed = aiResult.data;
-      rawUsage = aiResult.rawUsage;
+      aiResult = await generateAIContentWithUsage(prompt);
+      const cleanText = (aiResult.text || '').trim();
+      if (!cleanText) {
+        throw new Error("AI generation returned empty response");
+      }
 
-      if (!aiResult.success || !parsed) {
-        throw new Error(aiResult.error || "AI generation failed");
+      try {
+        parsed = JSON.parse(cleanText);
+      } catch {
+        parsed = { raw: cleanText };
+      }
+
+      if (!parsed) {
+        throw new Error("AI generation failed");
       }
     } catch (aiError: any) {
       console.error("Assessment AI generation failed:", aiError);
@@ -96,21 +104,15 @@ Harap berikan respons dalam JSON dengan format persis seperti ini:
     // 3. Deduct Poin based on actual usage
     if (user.role !== "admin") {
       try {
-        const poinCalc = calculatePoinFromTokens(
-          rawUsage?.promptTokenCount || 0,
-          rawUsage?.candidatesTokenCount || 0,
-          rawUsage?.cachedContentTokenCount || 0
+        await deductPoinFromAIResult(
+          { success: true, usage: aiResult?.usage || null },
+          userId,
+          "assessments-ai",
+          { mapel, jenjang: kurikulum }
         );
 
-        await consumeUserPoin(userId, poinCalc.rawTokens, "assessments-ai", {
-          model: "gemini-2.5-flash-lite",
-          provider: "gemini",
-          mapel: mapel,
-          jenjang: kurikulum,
-        });
-
-        console.log(`[Assessments AI] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
-      } catch (poinError: any) {
+          console.log(`[Assessments AI] Poin deducted`);
+        } catch (poinError: any) {
         console.error("[Assessments AI] Poin deduction failed:", poinError);
       }
     }

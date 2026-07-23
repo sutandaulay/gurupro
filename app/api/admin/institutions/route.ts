@@ -1,9 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-
-const prisma = new PrismaClient();
 
 // Helper: Pastikan user adalah admin
 async function requireAdmin() {
@@ -30,25 +27,23 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || '';
 
-    // Mengambil institusi dan menghitung jumlah member
-    const institutions = await prisma.institutions.findMany({
-      where: search
-        ? {
-            OR: [
-              { name: { contains: search, mode: 'insensitive' } },
-              { npsn: { contains: search, mode: 'insensitive' } },
-            ],
-          }
-        : undefined,
-      include: {
-        _count: {
-          select: { institution_members: true },
-        },
-      },
-      orderBy: { created_at: 'desc' },
-    });
+    let institutionsQuery = `
+      SELECT i.*,
+        (SELECT COUNT(*) FROM payload.institution_members im WHERE im.institution_id = i.id AND im.status = 'active') as member_count
+      FROM payload.institutions i
+    `;
+    const params: any[] = [];
 
-    return NextResponse.json(institutions);
+    if (search) {
+      institutionsQuery += ` WHERE LOWER(i.name) LIKE $1 OR LOWER(i.npsn) LIKE $1`;
+      params.push(`%${search.toLowerCase()}%`);
+    }
+
+    institutionsQuery += ` ORDER BY i.created_at DESC`;
+
+    const institutions = await query(institutionsQuery, params);
+
+    return NextResponse.json(institutions.rows);
   } catch (error: any) {
     const status = error.message === 'Unauthorized' ? 401 : error.message === 'Forbidden' ? 403 : 500;
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status });
@@ -67,52 +62,41 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Nama, jenjang, dan naungan wajib diisi' }, { status: 400 });
     }
 
-    const newInstitution = await prisma.institutions.create({
-      data: {
-        name,
-        npsn: npsn || null,
-        jenjang,
-        naungan,
-        subscription_tier: subscription_tier || 'trial',
-        academic_year_active: academic_year_active || null,
-        approval_layer_config: approval_layer_config || 'single',
-        status: status || 'trial',
-      },
-    });
+    const cleanNpsn = npsn ? npsn.trim() : null;
+
+    const newInstitution = await query(
+      `INSERT INTO payload.institutions (name, npsn, jenjang, naungan, subscription_tier, academic_year_active, approval_layer_config, status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+       RETURNING *`,
+      [name, cleanNpsn, jenjang, naungan, subscription_tier || 'trial', academic_year_active || null, approval_layer_config || 'single', status || 'trial']
+    );
 
     // Buat sekolah baru di tabel schools utama (jika belum ada berdasarkan NPSN)
-    const cleanNpsn = npsn ? npsn.trim() : null;
     if (cleanNpsn) {
-      const existingSchool = await prisma.schools.findFirst({
-        where: { npsn: cleanNpsn },
-      });
+      const existingSchool = await query(
+        'SELECT id FROM schools WHERE npsn = $1 LIMIT 1',
+        [cleanNpsn]
+      );
 
-      if (!existingSchool) {
-        await prisma.schools.create({
-          data: {
-            user_id: userId,
-            nama_sekolah: name,
-            npsn: cleanNpsn,
-          },
-        });
+      if (existingSchool.rows.length === 0) {
+        await query(
+          'INSERT INTO schools (user_id, nama_sekolah, npsn) VALUES ($1, $2, $3)',
+          [userId, name, cleanNpsn]
+        );
       }
     } else {
-      // Jika NPSN kosong, buat sekolah baru berdasarkan nama
-      await prisma.schools.create({
-        data: {
-          user_id: userId,
-          nama_sekolah: name,
-        },
-      });
+      await query(
+        'INSERT INTO schools (user_id, nama_sekolah) VALUES ($1, $2)',
+        [userId, name]
+      );
     }
 
-    return NextResponse.json(newInstitution, { status: 201 });
+    return NextResponse.json(newInstitution.rows[0], { status: 201 });
   } catch (error: any) {
     console.error('Create institution error:', error);
     const status = error.message === 'Unauthorized' ? 401 : error.message === 'Forbidden' ? 403 : 500;
-    
-    // Cek unique constraint error (P2002) untuk NPSN
-    if (error.code === 'P2002') {
+
+    if (error.code === 'P2002' || error.message?.includes('unique constraint')) {
       return NextResponse.json({ error: 'NPSN sudah digunakan oleh lembaga lain' }, { status: 409 });
     }
 
@@ -132,26 +116,24 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'ID, nama, jenjang, dan naungan wajib diisi' }, { status: 400 });
     }
 
-    const updated = await prisma.institutions.update({
-      where: { id: Number(id) },
-      data: {
-        name,
-        npsn: npsn || null,
-        jenjang,
-        naungan,
-        subscription_tier,
-        academic_year_active,
-        approval_layer_config,
-        status,
-      },
-    });
+    const updated = await query(
+      `UPDATE payload.institutions
+       SET name = $1, npsn = $2, jenjang = $3, naungan = $4, subscription_tier = $5, academic_year_active = $6, approval_layer_config = $7, status = $8, updated_at = NOW()
+       WHERE id = $9
+       RETURNING *`,
+      [name, npsn || null, jenjang, naungan, subscription_tier, academic_year_active, approval_layer_config, status, Number(id)]
+    );
 
-    return NextResponse.json(updated);
+    if (updated.rows.length === 0) {
+      return NextResponse.json({ error: 'Lembaga tidak ditemukan' }, { status: 404 });
+    }
+
+    return NextResponse.json(updated.rows[0]);
   } catch (error: any) {
     console.error('Update institution error:', error);
     const status = error.message === 'Unauthorized' ? 401 : error.message === 'Forbidden' ? 403 : 500;
 
-    if (error.code === 'P2002') {
+    if (error.code === 'P2002' || error.message?.includes('unique constraint')) {
       return NextResponse.json({ error: 'NPSN sudah digunakan oleh lembaga lain' }, { status: 409 });
     }
 
@@ -170,9 +152,14 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'ID wajib diisi' }, { status: 400 });
     }
 
-    await prisma.institutions.delete({
-      where: { id: Number(id) },
-    });
+    const result = await query(
+      'DELETE FROM payload.institutions WHERE id = $1 RETURNING id',
+      [Number(id)]
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: 'Lembaga tidak ditemukan' }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

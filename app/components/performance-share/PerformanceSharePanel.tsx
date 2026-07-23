@@ -335,9 +335,9 @@ export default function PerformanceSharePanel({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Bagikan Kinerja ke Pimpinan</h2>
+          <h2 className="text-lg font-bold text-gray-900">Bagikan Progres Kerja ke Pimpinan</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Tambahkan kontak pimpinan untuk membagikan ringkasan kinerja mengajar
+            Tambahkan kontak pimpinan untuk berbagi ringkasan kerja keras Anda selama mengajar
           </p>
         </div>
         <button
@@ -386,7 +386,7 @@ export default function PerformanceSharePanel({
           </div>
           <h3 className="font-medium text-gray-900">Belum Ada Kontak</h3>
           <p className="text-sm text-gray-500 mt-1">
-            Tambahkan kontak pimpinan untuk mulai membagikan kinerja Anda
+            Tambahkan kontak pimpinan untuk mulai berbagi progres kerja keras Anda
           </p>
         </div>
       )}

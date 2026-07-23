@@ -299,8 +299,8 @@ describe("Phase 0 - Regression Tests", () => {
       const op = opRes.rows[0];
 
       const cmsOpRes = await query(
-        `INSERT INTO payload.cms_users (name, email, role, salt, hash)
-         VALUES ($1, $2, 'editor', '', '') RETURNING id`,
+        `INSERT INTO payload.cms_users (name, email, role, salt, hash, pdp_consent_given, pdp_consent_version, pdp_consent_consented_at)
+         VALUES ($1, $2, 'editor', '', '', true, '1.0', NOW()) RETURNING id`,
         ["Operator Inst A", "test-regression-op@example.com"]
       );
       const cmsOp = cmsOpRes.rows[0];
@@ -476,8 +476,8 @@ describe("Phase 0 - Regression Tests", () => {
       const opId = opRes.rows[0].id;
 
       const cmsOpRes = await query(
-        `INSERT INTO payload.cms_users (name, email, role, salt, hash)
-         VALUES ('Operator B', 'test-regression-op2@example.com', 'editor', '', '') RETURNING id`
+        `INSERT INTO payload.cms_users (name, email, role, salt, hash, pdp_consent_given, pdp_consent_version, pdp_consent_consented_at)
+         VALUES ('Operator B', 'test-regression-op2@example.com', 'editor', '', '', true, '1.0', NOW()) RETURNING id`
       );
       const cmsOpId = cmsOpRes.rows[0].id;
 
@@ -577,8 +577,8 @@ describe("Phase 0 - Regression Tests", () => {
       const opAId = opARes.rows[0].id;
 
       const cmsOpARes = await query(
-        `INSERT INTO payload.cms_users (name, email, role, salt, hash)
-         VALUES ('Operator A', 'test-regression-op-a@example.com', 'editor', '', '') RETURNING id`
+        `INSERT INTO payload.cms_users (name, email, role, salt, hash, pdp_consent_given, pdp_consent_version, pdp_consent_consented_at)
+         VALUES ('Operator A', 'test-regression-op-a@example.com', 'editor', '', '', true, '1.0', NOW()) RETURNING id`
       );
       const cmsOpAId = cmsOpARes.rows[0].id;
 
@@ -605,8 +605,8 @@ describe("Phase 0 - Regression Tests", () => {
       const guruBId = guruBRes.rows[0].id;
 
       const cmsGuruBRes = await query(
-        `INSERT INTO payload.cms_users (name, email, role, salt, hash)
-         VALUES ('Guru B', 'test-regression-guru-b@example.com', 'editor', '', '') RETURNING id`
+        `INSERT INTO payload.cms_users (name, email, role, salt, hash, pdp_consent_given, pdp_consent_version, pdp_consent_consented_at)
+         VALUES ('Guru B', 'test-regression-guru-b@example.com', 'editor', '', '', true, '1.0', NOW()) RETURNING id`
       );
       const cmsGuruBId = cmsGuruBRes.rows[0].id;
 
@@ -674,8 +674,8 @@ describe("Phase 0 - Regression Tests", () => {
       const bendaharaId = bendaharaRes.rows[0].id;
 
       const cmsBendaharaRes = await query(
-        `INSERT INTO payload.cms_users (name, email, role, salt, hash)
-         VALUES ('Bendahara C', 'test-regression-bendahara@example.com', 'editor', '', '') RETURNING id`
+        `INSERT INTO payload.cms_users (name, email, role, salt, hash, pdp_consent_given, pdp_consent_version, pdp_consent_consented_at)
+         VALUES ('Bendahara C', 'test-regression-bendahara@example.com', 'editor', '', '', true, '1.0', NOW()) RETURNING id`
       );
       const cmsBendaharaId = cmsBendaharaRes.rows[0].id;
 

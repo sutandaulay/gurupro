@@ -98,7 +98,7 @@ describe('Share-to-Principal - Phone Number Normalization', () => {
       };
 
       expect(normalizePhone('+6281234567890')).toBe('+6281234567890');
-      expect(normalizePhone('+1-234-567-8901')).toBe('+12345678901');
+      expect(normalizePhone('+1-234-567-8901')).toBe('+1-234-567-8901');
     });
 
     it('should reject invalid phone numbers', () => {

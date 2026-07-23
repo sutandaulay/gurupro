@@ -33,7 +33,7 @@ const AddonTokenPackages: CollectionConfig = {
       name: "poin_amount",
       type: "number",
       required: true,
-      label: "Poin Amount",
+      label: "Jumlah Poin",
       admin: {
         description: "Jumlah Poin dalam paket ini",
       },

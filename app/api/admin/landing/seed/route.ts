@@ -101,8 +101,8 @@ const defaultFooter = {
 // Default FAQ
 const defaultFaq = [
   {
-    question: "Bagaimana cara kerja perhitungan Token kuota?",
-    answer: "Setiap kali Anda menekan tombol generate paket butir soal baru, sistem akan memotong 1 Token dari sisa batas limit token Anda. Token ini akan otomatis diperbarui setiap masa tagihan bulanan berjalan.",
+    question: "Bagaimana cara kerja perhitungan Poin kuota?",
+    answer: "Setiap kali Anda menekan tombol generate paket butir soal baru, sistem akan memotong 1 Poin dari sisa batas limit poin Anda. Poin ini akan otomatis diperbarui setiap masa tagihan bulanan berjalan.",
   },
   {
     question: "Apakah metode pembayaran mendukung e-Wallet lokal?",
@@ -113,11 +113,11 @@ const defaultFaq = [
 // Default Referral
 const defaultReferral = {
   badge: "🎁 Program Kemitraan Guru",
-  title: "Bagikan GuruPro, Dapatkan Cashback & Token!",
-  description: "Dapatkan cashback senilai Rp10.000 tunai dan +20 Token kuota untuk setiap guru yang mendaftar dan berlangganan menggunakan kode referral unik Anda! Teman Anda juga akan mendapatkan bonus +10 Token saat mendaftar.",
+  title: "Bagikan GuruPro, Dapatkan Cashback & Poin!",
+  description: "Dapatkan cashback senilai Rp10.000 tunai dan +20 Poin kuota untuk setiap guru yang mendaftar dan berlangganan menggunakan kode referral unik Anda! Teman Anda juga akan mendapatkan bonus +10 Poin saat mendaftar.",
   benefits: [
     { icon: "💰", title: "Cashback Saldo Dompet", description: "Saldo cashback sebesar Rp10.000 ditambahkan ke dompet akun Anda setiap kali teman Anda meng-upgrade status akun menjadi PRO. Saldo ini dapat dicairkan langsung ke rekening bank." },
-    { icon: "⚡", title: "Token Kuota Tambahan", description: "Dapatkan +20 Token kuota ekstra gratis untuk generator soal Anda, sementara teman Anda mendapatkan +10 Token kuota tambahan saat mendaftar!" },
+    { icon: "⚡", title: "Poin Kuota Tambahan", description: "Dapatkan +20 Poin kuota ekstra gratis untuk generator soal Anda, sementara teman Anda mendapatkan +10 Poin kuota tambahan saat mendaftar!" },
   ],
   ctaText: "Mulai Undang Teman",
   ctaLink: "",

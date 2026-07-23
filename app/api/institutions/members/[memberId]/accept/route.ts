@@ -40,7 +40,7 @@ export async function POST(
       );
     }
 
-    if (member.rows[0].status !== 'invited') {
+    if (member.rows[0].status !== 'invited' && member.rows[0].status !== 'pending') {
       return NextResponse.json(
         { error: `Undangan sudah dalam status ${member.rows[0].status}, tidak bisa di-accept` },
         { status: 409 }
@@ -48,13 +48,31 @@ export async function POST(
     }
 
     // Accept: set status to 'active' and set joinedAt
-    const result = await query(
-      `UPDATE institution_members
-       SET status = 'active', joined_at = NOW(), updated_at = NOW()
-       WHERE id = $1
-       RETURNING *`,
-      [memberIdNum]
-    );
+    let result;
+    if (member.rows[0].status === 'pending') {
+      result = await query(
+        `UPDATE institution_members
+         SET status = 'active', joined_at = NOW(), updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [memberIdNum]
+      );
+
+      await query(
+        `UPDATE connection_requests
+         SET status = 'approved', updated_at = NOW()
+         WHERE user_id = $1 AND institution_id = $2 AND status = 'pending'`,
+        [userId, member.rows[0].institution_id]
+      );
+    } else {
+      result = await query(
+        `UPDATE institution_members
+         SET status = 'active', joined_at = NOW(), updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [memberIdNum]
+      );
+    }
 
     // Send in-app notification confirming acceptance
     try {

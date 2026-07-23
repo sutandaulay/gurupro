@@ -105,56 +105,54 @@ export async function POST(
     }
 
     // 2. Cek atau Buat user di cms_users (Payload CMS layer)
-    let cmsUser = await prisma.cms_users.findFirst({ where: { email } });
-    if (!cmsUser) {
-      cmsUser = await prisma.cms_users.create({
-        data: {
-          name,
-          email,
-          password: '', // payload password dikosongkan karena auth utama lewat users table
-          role: 'editor',
-          salt: '',
-          hash: '',
-        },
-      });
+    let cmsUser = await query(
+      `SELECT id, name, email FROM payload.cms_users WHERE email = $1 LIMIT 1`,
+      [email.toLowerCase().trim()]
+    );
+    if (cmsUser.rows.length === 0) {
+      const newCmsUser = await query(
+        `INSERT INTO payload.cms_users (name, email, role, salt, hash, pdp_consent_given, pdp_consent_version, pdp_consent_consented_at, created_at, updated_at)
+         VALUES ($1, $2, 'admin', '', '', true, '1.0', NOW(), NOW(), NOW())
+         RETURNING id`,
+        [name, email.toLowerCase().trim()]
+      );
+      cmsUser = { rows: [{ id: newCmsUser.rows[0].id }] } as any;
     }
+    const cmsUserId = cmsUser.rows[0].id;
 
     // 3. Cek apakah sudah terdaftar sebagai anggota di lembaga ini
-    const existingMembership = await prisma.institution_members.findFirst({
-      where: {
-        user_id: cmsUser.id,
-        institution_id: instId,
-      },
-    });
+    const existingMembership = await query(
+      `SELECT id FROM payload.institution_members WHERE user_id = $1 AND institution_id = $2 LIMIT 1`,
+      [cmsUserId, instId]
+    );
 
-    if (existingMembership) {
+    if (existingMembership.rows.length > 0) {
       return NextResponse.json({ error: 'Pengguna ini sudah terdaftar sebagai anggota di lembaga ini' }, { status: 409 });
     }
 
     // 4. Buat keanggotaan (institution_members) dengan status active
-    const membership = await prisma.institution_members.create({
-      data: {
-        user_id: cmsUser.id,
-        app_user_id: appUser.id,
-        institution_id: instId,
-        status: 'active',
-        joined_at: new Date(),
-      },
-    });
+    const membershipRes = await query(
+      `INSERT INTO payload.institution_members (user_id, app_user_id, institution_id, status, joined_at, created_at, updated_at)
+       VALUES ($1, $2, $3, 'active', NOW(), NOW(), NOW())
+       RETURNING id`,
+      [cmsUserId, appUser.id, instId]
+    );
+    const membershipId = membershipRes.rows[0].id;
 
     // 5. Tambahkan role keanggotaan (institution_members_role)
-    await prisma.institution_members_role.create({
-      data: {
-        order: 1,
-        parent_id: membership.id,
-        value: role,
-      },
-    });
+    await query(
+      `INSERT INTO payload.institution_members_role ("order", parent_id, value)
+       VALUES ($1, $2, $3)
+       ON CONFLICT DO NOTHING`,
+      [1, membershipId, role]
+    );
 
     // 6. Sinkronkan sekolah dan buat user_school_assignments otomatis
-    const institution = await prisma.institutions.findUnique({
-      where: { id: instId },
-    });
+    const institutionRes = await query(
+      `SELECT id, name, npsn FROM payload.institutions WHERE id = $1 LIMIT 1`,
+      [instId]
+    );
+    const institution = institutionRes.rows[0];
 
     if (institution) {
       // Perbarui nama_sekolah di tabel users utama milik user tersebut
@@ -166,22 +164,24 @@ export async function POST(
       // Cari sekolah di tabel schools utama berdasarkan NPSN atau Nama
       let school = null;
       if (institution.npsn) {
-        school = await prisma.schools.findFirst({
+        const schoolByNpsn = await prisma.schools.findFirst({
           where: { npsn: institution.npsn },
         });
+        if (schoolByNpsn) school = schoolByNpsn;
       }
 
       if (!school) {
-        school = await prisma.schools.findFirst({
+        const schoolByName = await prisma.schools.findFirst({
           where: { nama_sekolah: institution.name },
         });
+        if (schoolByName) school = schoolByName;
       }
 
       // Jika sekolah tidak ditemukan, buat entri sekolah baru otomatis
       if (!school) {
         school = await prisma.schools.create({
           data: {
-            user_id: appUser.id, // Set pembuat pertama kali ke user ini
+            user_id: appUser.id,
             nama_sekolah: institution.name,
             npsn: institution.npsn || null,
           },
@@ -192,16 +192,16 @@ export async function POST(
       if (school) {
         const existingAssignment = await prisma.user_school_assignments.findFirst({
           where: {
-            userid: appUser.id,
-            schoolid: school.id,
+            userId: appUser.id,
+            schoolId: school.id,
           },
         });
 
         if (!existingAssignment) {
           await prisma.user_school_assignments.create({
             data: {
-              userid: appUser.id,
-              schoolid: school.id,
+              userId: appUser.id,
+              schoolId: school.id,
             },
           });
         }

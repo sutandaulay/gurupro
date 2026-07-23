@@ -7,7 +7,7 @@ function parsePackageRow(row: any) {
   return {
     ...row,
     price: typeof row.price === "string" ? parseFloat(row.price) : Number(row.price || 0),
-    token_amount: typeof row.token_amount === "string" ? parseInt(row.token_amount, 10) || 0 : Number(row.token_amount || 0),
+    poin_amount: typeof row.poin_amount === "string" ? parseInt(row.poin_amount, 10) || 0 : Number(row.poin_amount || 0),
   };
 }
 
@@ -22,7 +22,7 @@ async function verifyAdmin() {
 const packageSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1).max(100),
-  token_amount: z.preprocess((v) => (v === "" || v === undefined || v === null ? 0 : Number(v)), z.number().int().min(0)),
+  poin_amount: z.preprocess((v) => (v === "" || v === undefined || v === null ? 0 : Number(v)), z.number().int().min(0)),
   price: z.preprocess((v) => (v === "" || v === undefined || v === null ? 0 : Number(v)), z.number().min(0)),
   description: z.string().max(500).optional().nullable(),
   is_active: z.boolean().optional(),
@@ -56,10 +56,10 @@ export async function POST(request: Request) {
     const sortOrder = data.sort_order ?? maxOrder.rows[0].next_order;
 
     const result = await query(
-      `INSERT INTO addon_token_packages (name, token_amount, price, description, is_active, sort_order)
+      `INSERT INTO addon_token_packages (name, poin_amount, price, description, is_active, sort_order)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [data.name, data.token_amount || 0, data.price || 0, data.description || null, data.is_active ?? true, sortOrder]
+      [data.name, data.poin_amount || 0, data.price || 0, data.description || null, data.is_active ?? true, sortOrder]
     );
 
     return NextResponse.json({ success: true, data: parsePackageRow(result.rows[0]) });
@@ -84,14 +84,14 @@ export async function PUT(request: Request) {
     const result = await query(
       `UPDATE addon_token_packages SET
         name = COALESCE($1, name),
-        token_amount = COALESCE($2, token_amount),
+        poin_amount = COALESCE($2, poin_amount),
         price = COALESCE($3, price),
         description = COALESCE($4, description),
         is_active = COALESCE($5, is_active),
         sort_order = COALESCE($6, sort_order)
        WHERE id = $7
        RETURNING *`,
-      [data.name, data.token_amount, data.price, data.description ?? null, data.is_active, data.sort_order, data.id]
+      [data.name, data.poin_amount, data.price, data.description ?? null, data.is_active, data.sort_order, data.id]
     );
 
     if (result.rows.length === 0) {

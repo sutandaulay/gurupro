@@ -1,7 +1,7 @@
-import { generateAIContent } from '@/lib/ai';
+import { generateAIContentWithUsage } from '@/lib/ai';
 import { query } from '@/lib/db';
-import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/services/poin-service';
-import { calculatePoinFromTokens } from '@/src/lib/ai-usage';
+import { getUserPoinAccess, logFailedPoinUsage } from '@/src/services/poin-service';
+import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { uploadToR2 } from '@/lib/r2';
@@ -115,18 +115,11 @@ export async function POST(req: Request) {
 
     // Generate with AI
     let silabusData;
-    let rawUsage = null;
+    let aiResult: Awaited<ReturnType<typeof generateAIContentWithUsage>> | null = null;
     try {
-      const aiResult = await generateAIContent(prompt, SILABUS_SYSTEM_PROMPT, true);
+      aiResult = await generateAIContentWithUsage(prompt, SILABUS_SYSTEM_PROMPT, true);
 
-      if (!aiResult.success) {
-        throw new Error(aiResult.error || 'AI generation failed');
-      }
-
-      // Store raw usage metadata
-      rawUsage = aiResult.rawUsage;
-
-      silabusData = parseSilabusFromAIResponse(aiResult.data as string);
+      silabusData = parseSilabusFromAIResponse(aiResult.text);
     } catch (aiError: any) {
       console.error('Silabus AI generation failed:', aiError);
 
@@ -205,19 +198,10 @@ export async function POST(req: Request) {
     // Deduct Poin based on actual usage (skip for admins)
     if (currentUser.role !== 'admin') {
       try {
-        const poinCalc = calculatePoinFromTokens(
-          rawUsage?.promptTokenCount || 0,
-          rawUsage?.candidatesTokenCount || 0,
-          rawUsage?.cachedContentTokenCount || 0
-        );
+          await deductPoinFromAIResult({ success: true, usage: aiResult?.usage || null }, userId, 'generate-silabus', {});
 
-        await consumeUserPoin(userId, poinCalc.rawTokens, 'generate-silabus', {
-          model: 'gemini-2.5-flash-lite',
-          provider: 'gemini',
-        });
-
-        console.log(`[Silabus] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
-      } catch (poinError: any) {
+          console.log(`[Generate Silabus] Poin deducted`);
+        } catch (poinError: any) {
         console.error('[Silabus] Poin deduction failed:', poinError);
       }
     }

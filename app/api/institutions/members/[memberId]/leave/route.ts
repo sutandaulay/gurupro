@@ -92,6 +92,41 @@ export async function POST(
       );
     } catch { /* notification is non-critical */ }
 
+    // Notify institution admins
+    try {
+      const adminsResult = await query(
+        `SELECT im.app_user_id FROM institution_members im
+         JOIN institution_members_role imr ON imr.parent_id = im.id
+         WHERE im.institution_id = $1
+           AND im.status = 'active'
+           AND imr.value IN ('operator', 'admin_sekolah', 'kepala_sekolah')
+           AND im.app_user_id IS NOT NULL`,
+        [membership.institution_id]
+      );
+
+      for (const admin of adminsResult.rows) {
+        const appUserId = admin.app_user_id;
+        const appUserResult = await query(
+          `SELECT nama_lengkap FROM users WHERE id = $1 LIMIT 1`,
+          [appUserId]
+        );
+        const appUserName = appUserResult.rows[0]?.nama_lengkap || 'Admin';
+
+        await query(
+          `INSERT INTO in_app_notifications (user_id, title, body, type, reference_type, reference_id, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+          [
+            appUserId,
+            'Anggota Keluar dari Institusi',
+            `${appUserName}, "${membership.institution_name}" telah keluar atau dinonaktifkan dari institusi.`,
+            'info',
+            'institution_member_leave',
+            String(memberIdNum),
+          ]
+        );
+      }
+    } catch { /* notification is non-critical */ }
+
     return NextResponse.json({
       message: 'Keanggotaan berhasil diakhiri. Dokumen tetap tersimpan dengan akses read-only.',
     });

@@ -34,11 +34,14 @@ interface ClassSession {
   institutionId: string;
   subjectId: string;
   className: string;
+  classId?: string;
   startTime: string; // Format HH:MM
   endTime: string;
   dayOfWeek: number; // 0 = Minggu, 1 = Senin, dst
   subject?: Subject;
   institution?: Institution;
+  schoolId?: string;
+  schoolName?: string;
 }
 
 interface TeachingSession {
@@ -93,11 +96,12 @@ export default function TeachingAttendancePage() {
 
         // Proses data dan tambahkan status
         const today = new Date();
-        const dayOfWeek = today.getDay(); // 0 = Minggu, 1 = Senin, dst
-        
+        const now = new Date();
+        const currentHour = now.getHours().toString().padStart(2, '0');
+        const currentMin = now.getMinutes().toString().padStart(2, '0');
+        const currentTimeStr = `${currentHour}:${currentMin}`;
+
         const processedSchedules: ScheduleSlot[] = scheduleData.map((slot: any) => {
-          // Konversi waktu ke objek Date untuk perbandingan
-          const now = new Date();
           const startTime = new Date();
           const [startHour, startMinute] = slot.startTime.split(':').map(Number);
           startTime.setHours(startHour, startMinute, 0, 0);
@@ -111,11 +115,9 @@ export default function TeachingAttendancePage() {
             status = 'ongoing';
           } else if (now >= endTime) {
             status = 'missed';
-          } else if (now < startTime) {
-            status = 'upcoming';
           }
           
-          // Tambahkan informasi institusi dan mata pelajaran
+          // Tambahkan informasi institusi atau sekolah
           const institution = institutionData.find((inst: Institution) => inst.id === slot.institutionId);
           const subject = subjectData.find((subj: Subject) => subj.id === slot.subjectId);
           
@@ -177,14 +179,21 @@ export default function TeachingAttendancePage() {
 
   const handleStartTeaching = async (sessionId: string, institutionId: string) => {
     try {
+      const schedule = schedules.find(s => s.id === sessionId);
+      if (!schedule) {
+        throw new Error('Jadwal tidak ditemukan');
+      }
+
+      const isSchoolBased = !!schedule.schoolId;
+      const targetId = isSchoolBased ? (schedule.schoolId || institutionId) : institutionId;
+
       // Cek apakah ada sesi aktif sebelumnya
-      const activeSession = schedules.find(s => s.teachingSession?.status === 'active');
+      const activeSession = schedules.find(s => s.teachingSession?.status === 'active' && s.id !== sessionId);
       
-      if (activeSession && activeSession.institutionId !== institutionId) {
-        // Jika institusi berbeda, minta konfirmasi
+      if (activeSession && activeSession.institutionId !== targetId) {
         setConfirmingSwitch({
           from: activeSession.institutionId,
-          to: institutionId
+          to: targetId
         });
         return;
       }
@@ -192,57 +201,105 @@ export default function TeachingAttendancePage() {
       // Dapatkan lokasi terbaru
       const location = await getLocation();
       
-      // Validasi lokasi terhadap institusi yang sesuai
-      const institution = institutions.find(inst => inst.id === institutionId);
-      if (!institution) {
-        throw new Error('Institusi tidak ditemukan');
+      if (isSchoolBased) {
+        // Untuk sekolah mandiri, gunakan API teaching session khusus
+        const startResponse = await fetch('/api/attendance/teaching/school', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            schoolId: schedule.schoolId,
+            subjectId: schedule.subjectId,
+            classId: schedule.classId,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy: location.accuracy,
+            faceMatchScore: 0.9,
+            livenessPassed: true,
+          }),
+        });
+
+        if (!startResponse.ok) {
+          const err = await startResponse.json();
+          throw new Error(err.error || 'Gagal memulai sesi mengajar');
+        }
+
+        const startResult = await startResponse.json();
+        
+        // Update status lokal
+        setSchedules(prev => 
+          prev.map(s => {
+            if (s.id === sessionId) {
+              return {
+                ...s,
+                status: 'ongoing',
+                teachingSession: {
+                  id: startResult.session.id,
+                  sessionId,
+                  teacherId: session?.user?.id || '',
+                  institutionId: targetId || s.institutionId,
+                  subjectId: schedule.subjectId,
+                  startTime: new Date().toISOString(),
+                  status: 'active',
+                  isSchool: true,
+                  schoolId: schedule.schoolId,
+                }
+              } as ScheduleSlot;
+            }
+            return s;
+          })
+        );
+
+        toast.success('Sesi mengajar dimulai (Sekolah Mandiri)');
+      } else {
+        // Validasi lokasi terhadap institusi yang sesuai
+        const institution = institutions.find(inst => inst.id === institutionId);
+        if (!institution) {
+          throw new Error('Institusi tidak ditemukan');
+        }
+
+        const response = await fetch('/api/attendance/teaching/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId,
+            institutionId,
+            subjectId: schedule.subjectId,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy: location.accuracy,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Gagal memulai sesi mengajar');
+        }
+
+        // Update status lokal
+        setSchedules(prev => 
+          prev.map(s => {
+            if (s.id === sessionId) {
+              return {
+                ...s,
+                status: 'ongoing',
+                teachingSession: {
+                  id: result.sessionId,
+                  sessionId,
+                  teacherId: session?.user?.id || '',
+                  institutionId,
+                  subjectId: schedule.subjectId,
+                  startTime: new Date().toISOString(),
+                  status: 'active'
+                }
+              };
+            }
+            return s;
+          })
+        );
+
+        toast.success('Sesi mengajar dimulai');
       }
-
-      // Kirim permintaan ke API
-      const response = await fetch('/api/attendance/teaching/start', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sessionId,
-          institutionId,
-          subjectId: schedules.find(s => s.id === sessionId)?.subjectId,
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: location.accuracy,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Gagal memulai sesi mengajar');
-      }
-
-      // Update status lokal
-      setSchedules(prev => 
-        prev.map(schedule => {
-          if (schedule.id === sessionId) {
-            return {
-              ...schedule,
-              status: 'ongoing',
-              teachingSession: {
-                id: result.sessionId,
-                sessionId,
-                teacherId: session?.user?.id || '',
-                institutionId,
-                subjectId: schedule.subjectId,
-                startTime: new Date().toISOString(),
-                status: 'active'
-              }
-            };
-          }
-          return schedule;
-        })
-      );
-
-      toast.success('Sesi mengajar dimulai');
     } catch (err: any) {
       console.error('Error starting teaching session:', err);
       toast.error(err.message || 'Gagal memulai sesi mengajar');
@@ -256,35 +313,61 @@ export default function TeachingAttendancePage() {
         throw new Error('Jadwal tidak ditemukan');
       }
 
-      // Dapatkan lokasi terbaru
+      const isSchoolBased = !!schedule.schoolId;
       const location = await getLocation();
 
-      // Kirim permintaan ke API
-      const response = await fetch('/api/attendance/teaching/end', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sessionId,
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: location.accuracy,
-        }),
-      });
+      if (isSchoolBased) {
+        // Untuk sekolah mandiri, gunakan API teaching session end
+        const endResponse = await fetch('/api/attendance/teaching/school/end', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: schedule.teachingSession?.id || sessionId,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy: location.accuracy,
+            faceMatchScore: 0.9,
+            livenessPassed: true,
+          }),
+        });
 
-      const result = await response.json();
+        if (!endResponse.ok) {
+          const err = await endResponse.json();
+          throw new Error(err.error || 'Gagal mengakhiri sesi mengajar');
+        }
 
-      if (!response.ok) {
-        throw new Error(result.message || 'Gagal mengakhiri sesi mengajar');
+        const endResult = await endResponse.json();
+        console.log('Sesi mengajar selesai, durasi:', endResult.durationMinutes, 'menit');
+        toast.success(`Sesi mengajar selesai (${endResult.durationMinutes} menit)`);
+      } else {
+        const response = await fetch('/api/attendance/teaching/end', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: schedule.teachingSession?.id || sessionId,
+            classSessionId: sessionId,
+            subjectId: schedule.subjectId,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy: location.accuracy,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Gagal mengakhiri sesi mengajar');
+        }
+
+        toast.success('Sesi mengajar selesai');
       }
 
       // Update status lokal
       setSchedules(prev => 
-        prev.map(schedule => {
-          if (schedule.id === sessionId) {
+        prev.map(s => {
+          if (s.id === sessionId) {
             return {
-              ...schedule,
+              ...s,
               status: 'completed',
               teachingSession: schedule.teachingSession ? {
                 ...schedule.teachingSession,
@@ -293,11 +376,9 @@ export default function TeachingAttendancePage() {
               } : undefined
             };
           }
-          return schedule;
+          return s;
         })
       );
-
-      toast.success('Sesi mengajar selesai');
     } catch (err: any) {
       console.error('Error ending teaching session:', err);
       toast.error(err.message || 'Gagal mengakhiri sesi mengajar');
@@ -307,8 +388,9 @@ export default function TeachingAttendancePage() {
   const confirmInstitutionSwitch = () => {
     if (!confirmingSwitch) return;
     
-    // Lanjutkan dengan memulai sesi di institusi baru
-    const nextSchedule = schedules.find(s => s.institutionId === confirmingSwitch.to);
+    const nextSchedule = schedules.find(s => 
+      s.institutionId === confirmingSwitch.to || s.schoolId === confirmingSwitch.to
+    );
     if (nextSchedule) {
       handleStartTeaching(nextSchedule.id, nextSchedule.institutionId);
     }
@@ -399,18 +481,22 @@ export default function TeachingAttendancePage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {schedules.map((schedule) => {
-                  const institution = institutions.find(inst => inst.id === schedule.institutionId);
-                  const subject = subjects.find(subj => subj.id === schedule.subjectId);
-                  
-                  return (
-                    <Card key={schedule.id} className="p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <School className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">{institution?.name}</span>
-                          </div>
+                 {schedules.map((schedule) => {
+                   const institution = schedule.schoolId 
+                     ? null 
+                     : institutions.find(inst => inst.id === schedule.institutionId);
+                   const subject = subjects.find(subj => subj.id === schedule.subjectId);
+                   
+                   return (
+                     <Card key={schedule.id} className="p-4">
+                       <div className="flex flex-wrap items-center justify-between gap-4">
+                         <div className="space-y-1">
+                           <div className="flex items-center gap-2">
+                             <School className="h-4 w-4 text-muted-foreground" />
+                             <span className="font-medium">
+                               {schedule.schoolId ? schedule.schoolName : institution?.name || 'Institusi'}
+                             </span>
+                           </div>
                           
                           <div className="flex items-center gap-2">
                             <BookOpen className="h-4 w-4 text-muted-foreground" />

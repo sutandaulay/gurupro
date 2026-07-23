@@ -186,15 +186,14 @@ export default function LeaveRequestPage() {
                         {formData.startDate ? format(formData.startDate, "PPP", { locale: id }) : <span>Pilih tanggal</span>}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.startDate}
-                        onSelect={(date) => date && handleInputChange('startDate', date)}
-                        initialFocus
-                        locale={id}
-                      />
-                    </PopoverContent>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={formData.startDate}
+                          onSelect={(date) => date && handleInputChange('startDate', date)}
+                          locale={id}
+                        />
+                      </PopoverContent>
                   </Popover>
                 </div>
 
@@ -210,15 +209,14 @@ export default function LeaveRequestPage() {
                         {formData.endDate ? format(formData.endDate, "PPP", { locale: id }) : <span>Pilih tanggal</span>}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.endDate}
-                        onSelect={(date) => date && handleInputChange('endDate', date)}
-                        initialFocus
-                        locale={id}
-                      />
-                    </PopoverContent>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={formData.endDate}
+                          onSelect={(date) => date && handleInputChange('endDate', date)}
+                          locale={id}
+                        />
+                      </PopoverContent>
                   </Popover>
                 </div>
               </div>

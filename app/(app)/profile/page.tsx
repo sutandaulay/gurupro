@@ -8,6 +8,9 @@ import { useProfileStore } from "@/lib/stores";
 import FaceEnrollmentSection from "@/components/settings/FaceEnrollmentSection";
 import { Switch } from "@/components/ui/switch";
 import { toast as sonnerToast } from "sonner";
+import AppIcon from "@/app/components/ui/AppIcon";
+import { User, CreditCard, Gift, Settings } from "lucide-react";
+import { resolveCategory } from "@/lib/menuConfig";
 
 type TabType = "profil" | "billing" | "referral" | "pengaturan";
 
@@ -64,6 +67,23 @@ function ProfileContent() {
   const [preferences, setPreferences] = useState<UserPreferences>(PREF_DEFAULTS);
   const preferencesRef = useRef(preferences);
 
+  // Preferensi tone notifikasi (Sprint 1.1)
+  const TONE_OPTIONS = [
+    { value: "hangat", label: "Hangat & Semangat", desc: "Bahasa akrab, seperti teman menyemangati", emoji: "🔥" },
+    { value: "formal", label: "Formal & Jelas", desc: "Bahasa resmi, rapi, dan to the point", emoji: "📋" },
+    { value: "santai", label: "Santai & Ringan", desc: "Bahasa cair, tidak kaku, enak dibaca", emoji: "😌" },
+  ];
+  const [notificationTone, setNotificationTone] = useState<string>("hangat");
+  const [isSavingTone, setIsSavingTone] = useState(false);
+
+  // Preferensi morning briefing (Sprint 2.2)
+  const [morningBriefing, setMorningBriefing] = useState<boolean>(true);
+  const [isSavingBriefing, setIsSavingBriefing] = useState(false);
+
+  // Preferensi weekly recap (Sprint 2.1)
+  const [weeklyRecap, setWeeklyRecap] = useState<boolean>(true);
+  const [isSavingRecap, setIsSavingRecap] = useState(false);
+
   // Load from localStorage after hydration (avoid SSR mismatch)
   useEffect(() => {
     const savedNotif = localStorage.getItem("gurupro_notification_settings");
@@ -98,6 +118,9 @@ function ProfileContent() {
         setProfBankName(data.bank_name || "");
         setProfBankAccountNumber(data.bank_account_number || "");
         setProfBankAccountName(data.bank_account_name || "");
+        setNotificationTone(data.notification_tone || "hangat");
+        setMorningBriefing(data.morning_briefing_enabled !== false);
+        setWeeklyRecap(data.weekly_recap_enabled !== false);
         useProfileStore.getState().setProfile(data);
       } else {
         // Session invalid - show error message
@@ -338,11 +361,11 @@ function ProfileContent() {
     return badges[status] || badges.free;
   };
 
-  const tabs: { id: TabType; label: string; icon: string }[] = [
-    { id: "profil", label: "Profil Saya", icon: "👤" },
-    { id: "billing", label: "Billing & Langganan", icon: "💳" },
-    { id: "referral", label: "Referral & Cashback", icon: "🎁" },
-    { id: "pengaturan", label: "Pengaturan", icon: "⚙️" },
+  const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
+    { id: "profil", label: "Profil Saya", icon: <User size={18} /> },
+    { id: "billing", label: "Billing & Langganan", icon: <CreditCard size={18} /> },
+    { id: "referral", label: "Referral & Cashback", icon: <Gift size={18} /> },
+    { id: "pengaturan", label: "Pengaturan", icon: <Settings size={18} /> },
   ];
 
   if (isLoading) {
@@ -397,13 +420,14 @@ function ProfileContent() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition cursor-pointer ${
               activeTab === tab.id
                 ? "bg-violet-600 text-white shadow-sm"
                 : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
             }`}
           >
-            {tab.icon} {tab.label}
+            <AppIcon label={tab.label} size={36} iconSize={18} category={resolveCategory(tab.label)} active={activeTab === tab.id} icon={tab.icon} />
+            <span>{tab.label}</span>
           </button>
         ))}
       </div>
@@ -670,9 +694,9 @@ function ProfileContent() {
             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">📦 Langganan & Kuota</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-gradient-to-br from-violet-50 to-violet-100/50 rounded-xl border border-violet-100">
-                <p className="text-[10px] text-violet-600 font-bold uppercase tracking-wide">Kuota Token</p>
+                <p className="text-[10px] text-violet-600 font-bold uppercase tracking-wide">Kuota Poin</p>
                 <p className="text-2xl font-black text-violet-700 mt-1">{user?.token_limit?.toLocaleString("id-ID") || 0}</p>
-                <p className="text-[10px] text-violet-500 mt-1">Token tersedia</p>
+                <p className="text-[10px] text-violet-500 mt-1">Poin tersedia</p>
               </div>
               <div className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-xl border border-emerald-100">
                 <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wide">Masa Berlangganan</p>
@@ -762,7 +786,7 @@ function ProfileContent() {
                           <p className="font-bold text-gray-800">{plan.package_name}</p>
                           <p className="text-2xl font-black text-violet-600 mt-1">Rp {plan.price.toLocaleString("id-ID")}</p>
                           <p className="text-xs text-gray-500 mt-1">{plan.duration_days} Hari</p>
-                          <p className="text-[10px] text-gray-400 mt-2">{plan.tokens.toLocaleString("id-ID")} token</p>
+                          <p className="text-[10px] text-gray-400 mt-2">{plan.tokens.toLocaleString("id-ID")} poin</p>
                         </div>
                         <button
                           onClick={() => handleCheckout(plan.id)}
@@ -786,7 +810,7 @@ function ProfileContent() {
         <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
           <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">🎁 Program Referral &amp; Cashback</h3>
           <p className="text-sm text-slate-500 leading-relaxed">
-            Undang rekan guru untuk menggunakan GuruPro Premium dan nikmati reward instan! Setiap pendaftaran sukses akan menambahkan <strong>+20 Token kuota</strong> dan saldo cashback <strong>Rp10.000</strong> ke akun Anda. Teman yang diundang juga akan langsung mendapatkan bonus <strong>+10 Token</strong>.
+            Undang rekan guru untuk menggunakan GuruPro Premium dan nikmati reward instan! Setiap pendaftaran sukses akan menambahkan <strong>+20 Poin kuota</strong> dan saldo cashback <strong>Rp10.000</strong> ke akun Anda. Teman yang diundang juga akan langsung mendapatkan bonus <strong>+10 Poin</strong>.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -806,7 +830,7 @@ function ProfileContent() {
                       const baseUrl = (envUrl && !isPlaceholder) ? envUrl : window.location.origin;
                       const refLink = `${baseUrl}/register?ref=${user?.referral_code}`;
                       navigator.clipboard.writeText(refLink);
-                      showToast("success", "Link referral berhasil disalin! Bagikan ke teman untuk dapat bonus +10 Token.");
+                      showToast("success", "Link referral berhasil disalin! Bagikan ke teman untuk dapat bonus +10 Poin.");
                     }
                   }}
                   className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition text-center cursor-pointer"
@@ -826,7 +850,7 @@ function ProfileContent() {
                 </button>
               </div>
               <p className="text-[9px] text-slate-400 mt-2 text-center">
-                Teman yang daftar via link Anda akan dapat +10 Token bonus!
+                Teman yang daftar via link Anda akan dapat +10 Poin bonus!
               </p>
             </div>
             <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col justify-between">
@@ -854,10 +878,10 @@ function ProfileContent() {
           <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-[10px] text-slate-400 font-bold block uppercase">Tukar Saldo dengan Token</span>
-                <p className="text-[9px] text-slate-400 font-medium mt-0.5">Nilai Tukar: Rp 1.000 = 1 Token kuota</p>
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">Tukar Saldo dengan Poin</span>
+                <p className="text-[9px] text-slate-400 font-medium mt-0.5">Nilai Tukar: Rp 1.000 = 1 Poin kuota</p>
               </div>
-              <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">Hasil: {Math.floor(exchangeAmount / 1000)} Token</span>
+              <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">Hasil: {Math.floor(exchangeAmount / 1000)} Poin</span>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -925,7 +949,7 @@ function ProfileContent() {
                       <p className="text-slate-400 mt-0.5">{ref.referee_email}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-black text-indigo-600">+{ref.reward_tokens} Token</p>
+                      <p className="font-black text-indigo-600">+{ref.reward_tokens} Poin</p>
                       <p className="font-black text-emerald-600 mt-0.5">+Rp {(ref.cashback_amount || 0).toLocaleString("id-ID")}</p>
                     </div>
                   </div>
@@ -1017,6 +1041,193 @@ function ProfileContent() {
                 </div>
               </div>
               <p className="text-xs text-amber-600 mt-4 bg-amber-50 p-3 rounded-lg">💡 Pengaturan notifikasi disimpan secara lokal di perangkat ini.</p>
+            </div>
+          </div>
+
+          {/* Preferensi */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <span className="text-2xl">💬</span>
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Gaya Bahasa Notifikasi</h3>
+                  <p className="text-white/80 text-xs">Pilih tone yang paling nyaman untuk Anda</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {TONE_OPTIONS.map((opt) => {
+                  const active = notificationTone === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setNotificationTone(opt.value)}
+                      className={`text-left p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                        active
+                          ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
+                          : "border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-2xl">{opt.emoji}</span>
+                        <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] ${
+                          active ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 text-transparent"
+                        }`}>✓</span>
+                      </div>
+                      <p className={`text-sm font-bold ${active ? "text-emerald-700" : "text-slate-700"}`}>{opt.label}</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">{opt.desc}</p>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={async () => {
+                    setIsSavingTone(true);
+                    try {
+                      const res = await fetch("/api/user/profile", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ notification_tone: notificationTone }),
+                      });
+                      if (!res.ok) throw new Error("Gagal menyimpan");
+                      showToast("success", "Gaya bahasa notifikasi tersimpan!");
+                    } catch {
+                      showToast("error", "Gagal menyimpan gaya bahasa");
+                    } finally {
+                      setIsSavingTone(false);
+                    }
+                  }}
+                  disabled={isSavingTone}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-md shadow-emerald-100 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingTone ? "Menyimpan..." : "Simpan Gaya Bahasa"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Preferensi Morning Briefing (Sprint 2.2) */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-sky-500 to-indigo-500 p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <span className="text-2xl">☀️</span>
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Briefing Pagi</h3>
+                  <p className="text-white/80 text-xs">Ringkasan jadwal & hal penting tiap pagi</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-5">
+              <p className="text-sm text-slate-600 mb-4">
+                Setiap pagi, GuruPRO mengirimkan ringkasan singkat: jadwal mengajar, materi yang bisa dilanjutkan,
+                tugas yang belum dikoreksi, dan siswa yang butuh perhatian. Anda bisa mematikan kapan saja.
+              </p>
+              <div className="flex items-center justify-between gap-3 p-4 rounded-xl border-2 border-slate-200">
+                <div>
+                  <p className="text-sm font-bold text-slate-700">Aktifkan Briefing Pagi</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {morningBriefing ? "Anda akan menerima briefing setiap pagi." : "Briefing tidak akan dikirim."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsSavingBriefing(true);
+                    const next = !morningBriefing;
+                    try {
+                      const res = await fetch("/api/user/profile", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ morning_briefing_enabled: next }),
+                      });
+                      if (!res.ok) throw new Error("Gagal menyimpan");
+                      setMorningBriefing(next);
+                      showToast("success", next ? "Briefing pagi diaktifkan!" : "Briefing pagi dimatikan.");
+                    } catch {
+                      showToast("error", "Gagal menyimpan pengaturan briefing");
+                    } finally {
+                      setIsSavingBriefing(false);
+                    }
+                  }}
+                  disabled={isSavingBriefing}
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 ${
+                    morningBriefing ? "bg-indigo-600" : "bg-slate-300"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                      morningBriefing ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Preferensi Weekly Recap (Sprint 2.1) */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <span className="text-2xl">🌟</span>
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Rekap Mingguan</h3>
+                  <p className="text-white/80 text-xs">Ringkasan kerja keras tiap akhir pekan</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-5">
+              <p className="text-sm text-slate-600 mb-4">
+                Tiap Minggu malam, GuruPRO mengirimkan rekap hangat: sesi mengajar, siswa yang selesai remedial,
+                dan progress kurikulum Anda. Bukan untuk dinilai, murni mengingatkan betapa produktifnya Anda.
+              </p>
+              <div className="flex items-center justify-between gap-3 p-4 rounded-xl border-2 border-slate-200">
+                <div>
+                  <p className="text-sm font-bold text-slate-700">Aktifkan Rekap Mingguan</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {weeklyRecap ? "Anda akan menerima recap tiap Minggu malam." : "Recap tidak akan dikirim."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsSavingRecap(true);
+                    const next = !weeklyRecap;
+                    try {
+                      const res = await fetch("/api/user/profile", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ weekly_recap_enabled: next }),
+                      });
+                      if (!res.ok) throw new Error("Gagal menyimpan");
+                      setWeeklyRecap(next);
+                      showToast("success", next ? "Rekap mingguan diaktifkan!" : "Rekap mingguan dimatikan.");
+                    } catch {
+                      showToast("error", "Gagal menyimpan pengaturan recap");
+                    } finally {
+                      setIsSavingRecap(false);
+                    }
+                  }}
+                  disabled={isSavingRecap}
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 ${
+                    weeklyRecap ? "bg-orange-600" : "bg-slate-300"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                      weeklyRecap ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
           </div>
 

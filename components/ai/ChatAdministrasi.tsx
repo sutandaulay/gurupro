@@ -14,11 +14,12 @@ import {
   IconChartBar,
   IconUsers,
   IconPhone,
+  IconWallet,
 } from "@tabler/icons-react";
 import dynamic from "next/dynamic";
 import { useTokenError, parseTokenError } from "@/app/hooks/useTokenError";
 
-const TokenHabisModal = dynamic(() => import("@/app/components/ui/TokenHabisModal"), { ssr: false });
+  const PoinHabisModal = dynamic(() => import("@/app/components/ui/PoinHabisModal"), { ssr: false });
 
 interface ChatAdministrasiProps {
   onBack?: () => void;
@@ -79,6 +80,12 @@ const quickActions: QuickAction[] = [
     prompt: "Beri rekomendasi pembelajaran untuk",
     color: "bg-rose-500",
   },
+  {
+    icon: <IconWallet size={16} />,
+    label: "Catat Transaksi",
+    prompt: "Catat transaksi: ",
+    color: "bg-amber-600",
+  },
 ];
 
 export default function ChatAdministrasi({ onBack }: ChatAdministrasiProps) {
@@ -98,6 +105,7 @@ Saya adalah asisten AI GuruPRO yang siap membantu Anda dalam administrasi sekola
 - 📊 Menganalisis nilai siswa
 - 📱 Membuat pesan untuk komunikasi dengan orang tua
 - 📄 Membuat deskripsi rapor
+- 💰 Catat transaksi keuangan (pemasukan/pengeluaran)
 
 Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
       timestamp: new Date(),
@@ -107,6 +115,8 @@ Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [financeEditingId, setFinanceEditingId] = useState<string | null>(null);
+  const [financeDraft, setFinanceDraft] = useState<{ text: string }>({ text: '' });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -180,6 +190,92 @@ Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
   const handleQuickAction = (prompt: string) => {
     setInputMessage(prompt);
     inputRef.current?.focus();
+  };
+
+  const handleFinanceSave = async (msgId: string, rawText: string) => {
+    try {
+      const res = await fetch('/api/administrasi/parse-keuangan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: rawText }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal memproses transaksi');
+
+      const financeRes = await fetch('/api/administrasi?tipe=keuangan');
+      let docId = '';
+      let existingTransactions: any[] = [];
+      if (financeRes.ok) {
+        const financeData = await financeRes.json();
+        if (Array.isArray(financeData) && financeData.length > 0) {
+          docId = financeData[0].id;
+          const konten = financeData[0].konten;
+          existingTransactions = Array.isArray(konten?.transactions) ? konten.transactions : [];
+        }
+      }
+
+      const newTx = {
+        id: `tx-${Date.now()}`,
+        keterangan: data.data.keterangan,
+        jumlah: data.data.jumlah,
+        tipe: data.data.tipe,
+        kategori: data.data.kategori,
+        tanggal: data.data.tanggal,
+      };
+
+      const updatedTransactions = [...existingTransactions, newTx];
+
+      const saveRes = await fetch('/api/administrasi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: docId || undefined,
+          judul_dokumen: 'Catatan Keuangan',
+          tipe_dokumen: 'keuangan',
+          konten: {
+            transactions: updatedTransactions,
+            savings: [],
+            investments: [],
+          },
+          tanggal_kegiatan: data.data.tanggal,
+        }),
+      });
+
+      if (!saveRes.ok) {
+        const saveData = await saveRes.json();
+        throw new Error(saveData.error || 'Gagal menyimpan transaksi');
+      }
+
+      const savedText = `Tercatat: ${data.data.tipe === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'} ${data.data.keterangan} sebesar ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(data.data.jumlah)} pada ${new Date(data.data.tanggal + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
+
+      setMessages((prev) => prev.map((m) => {
+        if (m.id === msgId) {
+          return {
+            ...m,
+            content: savedText,
+            action: undefined,
+          };
+        }
+        return m;
+      }));
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleFinanceEdit = (msgId: string) => {
+    setFinanceEditingId(msgId);
+    const msg = messages.find((m) => m.id === msgId);
+    if (msg?.action?.data?.text) {
+      setFinanceDraft({ text: msg.action.data.text });
+    }
+  };
+
+  const handleFinanceEditSave = async (msgId: string) => {
+    if (!financeDraft.text.trim()) return;
+    await handleFinanceSave(msgId, financeDraft.text.trim());
+    setFinanceEditingId(null);
+    setFinanceDraft({ text: '' });
   };
 
   const handleClearChat = () => {
@@ -286,6 +382,41 @@ Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
                 >
                   {message.content}
                 </div>
+
+                {message.action?.type === 'finance_parse' && (
+                  <div className="mt-3 bg-indigo-50 border border-indigo-100 rounded-xl p-3 space-y-2">
+                    <p className="text-xs font-semibold text-indigo-700">Konfirmasi Catat Transaksi</p>
+                    <p className="text-xs text-slate-700">Teks: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">{message.action.data.text}</span></p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleFinanceSave(message.id, message.action!.data.text)}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition cursor-pointer"
+                      >
+                        Simpan
+                      </button>
+                      <button
+                        onClick={() => handleFinanceEdit(message.id)}
+                        className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                      >
+                        Edit
+                      </button>
+                  </div>
+                  {financeEditingId === message.id && (
+                    <div className="mt-2 bg-white border border-slate-200 rounded-lg p-2 space-y-2">
+                      <textarea
+                        value={financeDraft.text}
+                        onChange={(e) => setFinanceDraft({ text: e.target.value })}
+                        className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:border-indigo-400 outline-none"
+                        rows={2}
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={() => handleFinanceEditSave(message.id)} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition cursor-pointer">Simpan Perubahan</button>
+                        <button onClick={() => { setFinanceEditingId(null); setFinanceDraft({ text: '' }); }} className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[11px] font-bold transition cursor-pointer">Batal</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               </div>
               <div
                 className={`px-3 pb-2 text-[10px] ${
@@ -376,7 +507,7 @@ Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
     </div>
 
     {/* Token Habis Modal */}
-    <TokenHabisModal
+    <PoinHabisModal
       open={showTokenModal}
       shortfall={shortfall}
       onClose={closeModal}

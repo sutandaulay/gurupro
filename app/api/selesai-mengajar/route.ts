@@ -14,7 +14,7 @@ import { saveAbsensiSummary } from '@/lib/selesai-mengajar/save-absensi';
 import { updateProgressATP } from '@/lib/selesai-mengajar/update-atp';
 import { updateLessonMemory } from '@/lib/selesai-mengajar/update-memory';
 import { generateNextMateri } from '@/lib/selesai-mengajar/generate-next-materi';
-import { getUserTokenAccess, consumeUserToken, logAIUsage } from '@/lib/token-system';
+import { getUserPoinAccess, consumeUserPoinFromUsage, logFailedPoinUsage } from '@/src/services/poin-service';
 import type { SelesaiMengajarInput, ProgressEvent, SelesaiMengajarResult } from '@/lib/selesai-mengajar/types';
 
 const prisma = new PrismaClient();
@@ -23,18 +23,15 @@ const prisma = new PrismaClient();
  * Helper to get school ID for a user
  */
 async function getSchoolIdForUser(userId: string): Promise<string | null> {
-  // Try to find school by user_id
   const school = await prisma.schools.findFirst({
-    where: { user_id: userId },
+    where: { userId },
   });
   if (school) return school.id;
 
-  // If not found, check if user has created any school through classes/subjects
   const userClass = await prisma.classes.findFirst({
-    where: { schools: { user_id: userId } },
+    where: { schools: { userId } },
   });
-  if (userClass) return userClass.school_id;
-
+  if (userClass) return userClass.schoolId;
   return null;
 }
 
@@ -79,24 +76,24 @@ export async function POST(request: NextRequest) {
 
     const userDb = await prisma.users.findUnique({
       where: { id: user.id },
-      select: { role: true, status_langganan: true, subscription_end: true },
+      select: { role: true, statusLangganan: true, subscriptionEnd: true },
     });
 
-    const isPro = userDb?.status_langganan && userDb.status_langganan !== 'free';
-    const isExpired = isPro && userDb.subscription_end && new Date(userDb.subscription_end).getTime() < Date.now();
+    const isPro = userDb?.statusLangganan && userDb.statusLangganan !== 'free';
+    const isExpired = isPro && userDb.subscriptionEnd && new Date(userDb.subscriptionEnd).getTime() < Date.now();
 
-    if (isExpired && userDb.role !== 'admin') {
+    if (isExpired && userDb?.role !== 'admin') {
       return NextResponse.json({ error: 'expired' }, { status: 403 });
     }
 
-    // Token check (hanya untuk non-admin) - cek sebelum stream dibuka
+    // Poin check (hanya untuk non-admin) - cek sebelum stream dibuka
     if (userDb?.role !== 'admin') {
-      const tokenAccess = await getUserTokenAccess(user.id);
-      if (!tokenAccess.access.allowed) {
+      const poinAccess = await getUserPoinAccess(user.id);
+      if (!poinAccess.access.allowed) {
         const message =
-          tokenAccess.access.reason === 'subscription_expired'
+          poinAccess.access.reason === 'subscription_expired'
             ? 'Masa aktif langganan akun Anda telah habis! Silakan lakukan perpanjangan langganan terlebih dahulu.'
-            : 'Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan di Landing Page.';
+            : 'Poin GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan di Landing Page.';
         return NextResponse.json({ error: message }, { status: 403 });
       }
     }
@@ -132,13 +129,16 @@ export async function POST(request: NextRequest) {
             message: 'Memulai proses administrasi...',
           });
 
-          // Konsumsi 1 token untuk seluruh pipeline selesai-mengajar (non-admin)
+          // Konsumsi Poin untuk seluruh pipeline selesai-mengajar (non-admin)
+          // usage=null -> fallback estimasi (min 1 Poin per pipeline)
           if (userDb?.role !== 'admin') {
             try {
-              await consumeUserToken(guruId, 1);
-              await logAIUsage({ userId: guruId, feature: "selesai-mengajar", tokensCharged: 1, success: true });
-            } catch (tokenErr) {
-              console.error('[Selesai Mengajar] Token deduction failed:', tokenErr);
+              await consumeUserPoinFromUsage(guruId, null, "selesai-mengajar", {
+                mapel: body.mapel || '-',
+                jenjang: body.jenjang || '-',
+              });
+            } catch (poinErr) {
+              console.error('[Selesai Mengajar] Poin deduction failed:', poinErr);
             }
           }
 
@@ -347,113 +347,159 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/selesai-mengajar
- * Get today's teaching sessions and schedules
- */
-export async function GET() {
-  try {
-    const user = await getCurrentUser();
+  * Get today's teaching sessions and schedules
+  */
+  export async function GET() {
+    try {
+      let user: any = null;
+      try {
+        user = await getCurrentUser();
+      } catch (e) {
+        console.error('[selesai-mengajar] getCurrentUser failed:', e);
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
 
-    if (!user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+      if (!user?.id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
 
-    const userDb = await prisma.users.findUnique({
-      where: { id: user.id },
-      select: { role: true, status_langganan: true, subscription_end: true },
-    });
+      let userDb: { role: string; statusLangganan?: string | null; subscriptionEnd?: Date | null } | null = null;
+      try {
+        userDb = await prisma.users.findUnique({
+          where: { id: user.id },
+          select: { role: true, statusLangganan: true, subscriptionEnd: true },
+        });
+      } catch (userError) {
+        console.error('[selesai-mengajar] Error fetching user:', userError);
+        return NextResponse.json({ schedules: [], allSchedules: [] });
+      }
 
-    const isPro = userDb?.status_langganan && userDb.status_langganan !== 'free';
-    const isExpired = isPro && userDb.subscription_end && new Date(userDb.subscription_end).getTime() < Date.now();
+      const isPro = userDb?.statusLangganan && userDb.statusLangganan !== 'free';
+      const isExpired = isPro && userDb?.subscriptionEnd && new Date(userDb.subscriptionEnd).getTime() < Date.now();
 
-    if (isExpired && userDb.role !== 'admin') {
-      return NextResponse.json({ error: 'expired' }, { status: 403 });
-    }
+      if (isExpired && userDb?.role !== 'admin') {
+        return NextResponse.json({ error: 'expired' }, { status: 403 });
+      }
 
-    // Find all schools for this user
-    const userSchools = await prisma.schools.findMany({
-      where: { user_id: user.id },
-      select: { id: true, nama_sekolah: true },
-    });
+      let schedules: any[] = [];
+      let allSchedules: any[] = [];
 
-    // If no schools found via user_id, try looking through classes
-    let allSchoolIds: string[] = userSchools.map((s) => s.id);
-    if (allSchoolIds.length === 0) {
-      const userClasses = await prisma.classes.findMany({
-        where: { schools: { user_id: user.id } },
-        select: { school_id: true },
-        distinct: ['school_id'],
+      try {
+        let userSchools: { id: string; namaSekolah: string | null }[] = [];
+        try {
+          userSchools = await prisma.schools.findMany({
+            where: { userId: user.id },
+            select: { id: true, namaSekolah: true },
+          });
+        } catch (schoolError) {
+          console.error('[selesai-mengajar] Error fetching schools:', schoolError);
+        }
+
+        let allSchoolIds: string[] = userSchools.map((s) => s.id);
+        if (allSchoolIds.length === 0) {
+          try {
+            const userClasses = await prisma.classes.findMany({
+              where: { schools: { userId: user.id } },
+              select: { schoolId: true },
+            });
+            const uniqueSchoolIds = Array.from(new Set(userClasses.map((c) => c.schoolId).filter(Boolean)));
+            allSchoolIds = uniqueSchoolIds;
+          } catch (classError) {
+            console.error('[selesai-mengajar] Error fetching classes:', classError);
+          }
+        }
+
+        if (allSchoolIds.length === 0) {
+          return NextResponse.json({ schedules: [], allSchedules: [] });
+        }
+
+        const schoolMap = new Map(userSchools.map((s) => [s.id, s.namaSekolah]));
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        const hariIni = dayNames[today.getDay()];
+
+        let todaySchedules: any[] = [];
+        try {
+          todaySchedules = await prisma.schedules.findMany({
+            where: {
+              schoolId: { in: allSchoolIds },
+              hari: hariIni,
+            },
+            include: {
+              classes: { select: { namaKelas: true } },
+              subjects: { select: { namaMapel: true } },
+              schools: { select: { namaSekolah: true } },
+            },
+            orderBy: [{ schoolId: 'asc' }, { jamMulai: 'asc' }],
+          });
+        } catch (scheduleError) {
+          console.error('[selesai-mengajar] Error fetching schedules:', scheduleError);
+          return NextResponse.json({ schedules: [], allSchedules: [] });
+        }
+
+        let completedSessions: { scheduleId: string; journalGenerated: boolean }[] = [];
+        try {
+          completedSessions = await prisma.teachingSessions.findMany({
+            where: {
+              userId: user.id,
+              sessionDate: today,
+              status: 'completed',
+            },
+            select: { scheduleId: true, journalGenerated: true },
+          });
+        } catch (sessionError) {
+          console.error('[selesai-mengajar] Error fetching teaching sessions:', sessionError);
+        }
+
+        const completedMap = new Map(
+          completedSessions.map((s) => [s.scheduleId, s.journalGenerated])
+        );
+
+        const safeString = (val: string | null | undefined, fallback = '') => (val && String(val).trim()) ? String(val).trim() : fallback;
+
+        schedules = todaySchedules
+          .filter((s) => !completedMap.get(s.id))
+          .map((s) => ({
+            id: s.id,
+            class_id: s.classId,
+            subject_id: s.subjectId,
+            school_id: s.schoolId,
+            school_name: safeString(s.schools?.namaSekolah || schoolMap.get(s.schoolId)),
+            class_name: safeString(s.classes?.namaKelas),
+            subject_name: safeString(s.subjects?.namaMapel),
+            jam_mulai: s.jamMulai,
+            jam_selesai: s.jamSelesai,
+          }));
+
+        allSchedules = todaySchedules.map((s) => ({
+          id: s.id,
+          class_id: s.classId,
+          subject_id: s.subjectId,
+          school_id: s.schoolId,
+          school_name: safeString(s.schools?.namaSekolah || schoolMap.get(s.schoolId)),
+          class_name: safeString(s.classes?.namaKelas),
+          subject_name: safeString(s.subjects?.namaMapel),
+          jam_mulai: s.jamMulai,
+          jam_selesai: s.jamSelesai,
+          isCompleted: completedMap.get(s.id) || false,
+        }));
+      } catch (processingError) {
+        console.error('[selesai-mengajar] Error processing schedule data:', processingError);
+        return NextResponse.json({ schedules: [], allSchedules: [] });
+      }
+
+      return NextResponse.json({
+        schedules,
+        allSchedules,
       });
-      allSchoolIds = [...new Set(userClasses.map((c) => c.school_id))];
+    } catch (error: any) {
+      console.error('[selesai-mengajar] GET handler fatal error:', error);
+      return NextResponse.json(
+        { error: 'Internal server error' },
+        { status: 500 }
+      );
     }
-
-    const schoolMap = new Map(userSchools.map((s) => [s.id, s.nama_sekolah]));
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-    const hariIni = dayNames[today.getDay()];
-
-    const todaySchedules = await prisma.schedules.findMany({
-      where: {
-        school_id: allSchoolIds.length > 0 ? { in: allSchoolIds } : undefined,
-        hari: hariIni,
-      },
-      include: {
-        classes: { select: { nama_kelas: true } },
-        subjects: { select: { nama_mapel: true } },
-        schools: { select: { nama_sekolah: true } },
-      },
-      orderBy: [{ school_id: 'asc' }, { jam_mulai: 'asc' }],
-    });
-
-    const completedSessions = await prisma.teaching_sessions.findMany({
-      where: {
-        user_id: user.id,
-        session_date: today,
-        status: 'completed',
-      },
-      select: { schedule_id: true, journal_generated: true },
-    });
-
-    const completedMap = new Map(
-      completedSessions.map((s) => [s.schedule_id, s.journal_generated])
-    );
-
-    const availableSchedules = todaySchedules
-      .filter((s) => !completedMap.get(s.id))
-      .map((s) => ({
-        id: s.id,
-        class_id: s.class_id,
-        subject_id: s.subject_id,
-        school_id: s.school_id,
-        school_name: s.schools?.nama_sekolah || schoolMap.get(s.school_id) || '',
-        class_name: s.classes.nama_kelas,
-        subject_name: s.subjects.nama_mapel,
-        jam_mulai: s.jam_mulai,
-        jam_selesai: s.jam_selesai,
-      }));
-
-    return NextResponse.json({
-      schedules: availableSchedules,
-      allSchedules: todaySchedules.map((s) => ({
-        id: s.id,
-        class_id: s.class_id,
-        subject_id: s.subject_id,
-        school_id: s.school_id,
-        school_name: s.schools?.nama_sekolah || schoolMap.get(s.school_id) || '',
-        class_name: s.classes.nama_kelas,
-        subject_name: s.subjects.nama_mapel,
-        jam_mulai: s.jam_mulai,
-        jam_selesai: s.jam_selesai,
-        isCompleted: completedMap.get(s.id) || false,
-      })),
-    });
-  } catch (error: any) {
-    console.error('GET Error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
   }
-}

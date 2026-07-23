@@ -101,14 +101,14 @@ export default function TransactionDetailModal({
 
     if (transaction.status === "PAID") {
       buttons.push(
-        { action: "activate", label: "✅ Aktifkan Paket", color: "bg-emerald-600 hover:bg-emerald-700", confirmMsg: "Aktifkan paket untuk customer ini? Kuota token akan ditambahkan." },
-        { action: "refund", label: "↩️ Refund", color: "bg-rose-600 hover:bg-rose-700", confirmMsg: "Refund transaksi ini? Token customer akan dipotong." }
+        { action: "activate", label: "✅ Aktifkan Paket", color: "bg-emerald-600 hover:bg-emerald-700", confirmMsg: "Aktifkan paket untuk customer ini? Kuota poin akan ditambahkan." },
+        { action: "refund", label: "↩️ Refund", color: "bg-rose-600 hover:bg-rose-700", confirmMsg: "Refund transaksi ini? Poin customer akan dipotong." }
       );
     }
 
     if (transaction.status === "ACTIVATED") {
       buttons.push(
-        { action: "refund", label: "↩️ Refund", color: "bg-rose-600 hover:bg-rose-700", confirmMsg: "Refund transaksi ini? Token customer akan dipotong dan status langganan dikembalikan ke free." }
+        { action: "refund", label: "↩️ Refund", color: "bg-rose-600 hover:bg-rose-700", confirmMsg: "Refund transaksi ini? Poin customer akan dipotong dan status langganan dikembalikan ke free." }
       );
     }
 
@@ -243,8 +243,8 @@ export default function TransactionDetailModal({
                       Batal
                     </button>
                     <button
-                      onClick={() => handleAction(showConfirm === "Aktifkan paket untuk customer ini? Kuota token akan ditambahkan." ? "activate" :
-                        showConfirm === "Refund transaksi ini? Token customer akan dipotong." ? "refund" :
+                      onClick={() => handleAction(showConfirm === "Aktifkan paket untuk customer ini? Kuota poin akan ditambahkan." ? "activate" :
+                        showConfirm === "Refund transaksi ini? Poin customer akan dipotong." ? "refund" :
                         showConfirm === "Kirim ulang invoice ke email customer?" ? "resend_invoice" :
                         showConfirm === "Kirim pesan pengingat ke customer?" ? "follow_up" :
                         showConfirm === "Tandai transaksi ini sebagai kadaluarsa?" ? "expire" :

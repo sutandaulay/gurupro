@@ -81,10 +81,41 @@ export async function GET(req: NextRequest) {
     }
 
     // ==========================================
+    // 1b. Get independent teacher's own schools (if no institution assignments)
+    // ==========================================
+    let schoolAssignments: any[] = [];
+    if (assignments.length === 0) {
+      const schoolsResult = await query(`
+        SELECT 
+          id,
+          nama_sekolah as "schoolName",
+          location_latitude as "locationLatitude",
+          location_longitude as "locationLongitude",
+          attendance_radius_meters as "attendanceRadiusMeters"
+        FROM schools
+        WHERE user_id = $1
+      `, [teacherId]);
+
+      schoolAssignments = (schoolsResult.rows || []).map((row: any) => ({
+        id: row.id,
+        institutionId: row.id,
+        institutionName: row.schoolName,
+        locationLatitude: row.locationLatitude,
+        locationLongitude: row.locationLongitude,
+        attendanceRadiusMeters: row.attendanceRadiusMeters || 100,
+        qrCodeEnabled: false,
+        isSchool: true,
+      }));
+    }
+
+    // Merge assignments
+    const allAssignments = [...assignments, ...schoolAssignments];
+
+    // ==========================================
     // 2. Get subjects for each institution
     // ==========================================
     const assignmentsWithSubjects = await Promise.all(
-      assignments.map(async (assignment) => {
+      allAssignments.map(async (assignment) => {
         let subjects: any[] = [];
 
         // Get subjects from database
@@ -209,22 +240,32 @@ export async function GET(req: NextRequest) {
     });
 
     // ==========================================
-    // 5. Get attendance summary for today
+    // 5. Get duty assignments for today
     // ==========================================
-    const todaySummary = await db
-      .select()
-      .from(attendanceSummary)
-      .where(
-        and(
-          eq(attendanceSummary.teacherId, teacherId),
-          eq(attendanceSummary.date, startOfDay)
-        )
-      );
+    const dutyAssignmentsToday = await query(`
+      SELECT 
+        id,
+        teacher_id,
+        school_id,
+        institution_id,
+        date,
+        purpose,
+        location_latitude as "locationLatitude",
+        location_longitude as "locationLongitude",
+        radius_meters,
+        status,
+        approved_by,
+        created_at
+      FROM duty_assignments
+      WHERE teacher_id = $1 
+        AND date = $2 
+        AND status = 'approved'
+    `, [teacherId, startOfDay.toISOString().split('T')[0]]);
 
     // ==========================================
     // 6. Build response
     // ==========================================
-    const enrichedAssignments = assignmentsWithSubjects.map((assignment) => {
+    const enrichedAssignments = assignmentsWithSubjects.map((assignment: any) => {
       const institutionAttendance = attendanceByInstitution[assignment.institutionId] || [];
       const checkIn = institutionAttendance.find((log) => log.type === 'masuk');
       const checkOut = institutionAttendance.find((log) => log.type === 'pulang');
@@ -272,6 +313,8 @@ export async function GET(req: NextRequest) {
         date: today.toISOString(),
         dayName: todayKey,
         assignments: enrichedAssignments,
+        schoolAssignments: allAssignments.filter((a: any) => a.isSchoolAssignment),
+        dutyAssignmentsToday: dutyAssignmentsToday.rows || [],
         attendanceByInstitution,
         todaySummary,
         workingHours: {

@@ -1,8 +1,7 @@
-import { generateAIContent } from "@/lib/ai";
+import { generateAIContentWithUsage } from "@/lib/ai";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
-import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
+import { getUserPoinAccess, consumeUserPoinFromUsage, logFailedPoinUsage } from "@/src/services/poin-service";
 import { cookies } from "next/headers";
 import { truncateText } from "@/lib/ai/validation-utils";
 
@@ -26,6 +25,7 @@ function enforceSoalLimits(soal: any[]): any[] {
     tp: truncateText(item.tp, 200) || null,
     skor: item.skor || 1,
     gambar: item.gambar ? truncateText(item.gambar, 200) : null,
+    estimasi_kesulitan: [1, 2, 3, 4, 5].includes(Number(item.estimasi_kesulitan)) ? Number(item.estimasi_kesulitan) : 3,
   }));
 }
 
@@ -148,9 +148,17 @@ Buatlah kumpulan soal ujian berkualitas tinggi berdasarkan spesifikasi berikut i
    - **tabel**: Pertanyaan melengkapi tabel data. Sediakan field 'kunci' berupa string penjelasan pengisian.
    - **sebab-akibat**: Pertanyaan yang memiliki Pernyataan dan Alasan. Pilihan jawaban wajib A-E standar sebab-akibat (A: Pernyataan benar, alasan benar, berhubungan; B: Benar, benar, tidak berhubungan; C: Pernyataan benar, alasan salah; D: Pernyataan salah, alasan benar; E: Keduanya salah).
 
-${visualInstructions}
+ ${visualInstructions}
 
-Output harus berupa JSON murni dengan format schema berikut:
+  7. **Kalibrasi Kualitas AKM (Sprint 4.2)**:
+     - Jika pendekatan soal adalah "literasi AKM" atau "numerasi AKM", soal wajib memuat konteks kehidupan nyata siswa, mengukur penalaran (bukan hafalan), dan menggunakan stimulus singkat yang relevan.
+     - Hindari soal yang murni menguji ingatan faktual. Prioritaskan penalaran, analisis, dan pemecahan masalah.
+     - Untuk "literasi AKM", selaraskan soal dengan kompetensi membaca (memperoleh informasi, menafsirkan, mengevaluasi), menyela, menalar, dan merefleksi.
+     - Untuk "numerasi AKM", selaraskan soal dengan kompetensi memodelkan situasi matematika, menggunakan alat matematika (representasi, operasi), menafsirkan, menalar, dan memeriksa kembali hasil secara kontekstual.
+     - Sebar estimasi_kesulitan secara proporsional mengikuti distribusi tingkat kesulitan di atas (mudah≈1-2, sedang≈3, sulit≈4-5) agar soal memiliki gradasi yang sepadan dengan AKM (tidak semua soal mudah/sulit).
+     - Berikan setiap soal nilai "estimasi_kesulitan" berupa angka 1-5 (1 sangat mudah, 5 sangat sulit) berdasarkan kedalaman berpikir yang dibutuhkan, selaras dengan tingkat kesulitan (mudah≈1-2, sedang≈3, sulit≈4-5).
+
+ Output harus berupa JSON murni dengan format schema berikut:
 
 BATASAN PANJANG PER-FIELD (WAJIB DIIKUTI):
 - pertanyaan (per soal): MAKSIMAL 500 KARAKTER
@@ -184,7 +192,8 @@ JSON SCHEMA:
       "cp": "string (maks 200 karakter) | null",
       "tp": "string (maks 200 karakter) | null",
       "skor": 1 | 2 | 3 | 5,
-      "gambar": "deskripsi visual (maks 200 karakter) | null"
+      "gambar": "deskripsi visual (maks 200 karakter) | null",
+      "estimasi_kesulitan": 1 | 2 | 3 | 4 | 5
     }
   ]
 }
@@ -193,22 +202,15 @@ CATATAN: AI TIDAK SELALU PATUH BATASAN KARAKTER. LAKUKAN TRUNCATE DI LAYER VALID
 
     // Call universal AI service and parse response
     let parsed: any;
-    let rawUsage = null;
+    let aiResult: Awaited<ReturnType<typeof generateAIContentWithUsage>>;
     try {
-      const result = await generateAIContent(prompt);
-      console.log("[Generate Soal] Raw AI response length:", result?.data?.length);
+      aiResult = await generateAIContentWithUsage(prompt);
+      console.log("[Generate Soal] Raw AI response length:", aiResult?.text?.length);
 
-      if (!result.success) {
-        throw new Error(result.error || "AI generation failed");
-      }
-
-      const text = result.data as string;
+      const text = aiResult.text;
       if (!text || text.trim() === "") {
         throw new Error("AI mengembalikan respons kosong");
       }
-
-      // Store raw usage metadata for Poin calculation
-      rawUsage = result.rawUsage;
 
       const cleanText = text.replace(/```json|```/g, "").trim();
       parsed = JSON.parse(cleanText);
@@ -236,22 +238,11 @@ CATATAN: AI TIDAK SELALU PATUH BATASAN KARAKTER. LAKUKAN TRUNCATE DI LAYER VALID
     // Deduct Poin based on actual usage (non-admin)
     if (user.role !== "admin") {
       try {
-        // Calculate Poin from raw tokens
-        const poinCalc = calculatePoinFromTokens(
-          rawUsage?.promptTokenCount || 0,
-          rawUsage?.candidatesTokenCount || 0,
-          rawUsage?.cachedContentTokenCount || 0
-        );
-
-        await consumeUserPoin(userId, poinCalc.rawTokens, "generate-soal", {
-          model: "gemini-2.5-flash-lite",
-          provider: "gemini",
+        await consumeUserPoinFromUsage(userId, aiResult.usage, "generate-soal", {
           mapel: body.mapel,
           jenjang: body.jenjang,
           jumlahSoal: parsed.soal?.length || 0,
         });
-
-        console.log(`[Generate Soal] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
       } catch (poinError: any) {
         console.error("[Generate Soal] Poin deduction failed:", poinError);
         // Jangan fail request jika Poin deduction gagal - generation sudah sukses

@@ -270,7 +270,7 @@ Perpanjang di: ${appUrl}/dashboard/billing`;
               <h2 style="color: #4f46e5; margin-bottom: 16px;">Masa Langganan Segera Berakhir</h2>
               <p>Yth. Guru <strong>${user.nama_lengkap}</strong>,</p>
               <p>Kami ingin menginformasikan bahwa masa aktif paket berlangganan GuruPRO Anda akan berakhir dalam <strong>${daysLeftText}</strong> (pada <strong>${formattedEndDate}</strong>).</p>
-              <p>Untuk tetap dapat menikmati akses tanpa batas ke semua generator AI (Modul Ajar, Silabus, LKPD, Soal, dll.) serta menghindari reset kuota token utama Anda, silakan lakukan perpanjangan paket sekarang.</p>
+              <p>Untuk tetap dapat menikmati akses tanpa batas ke semua generator AI (Modul Ajar, Silabus, LKPD, Soal, dll.) serta menghindari reset kuota poin utama Anda, silakan lakukan perpanjangan paket sekarang.</p>
               <div style="text-align: center; margin: 30px 0;">
                 <a href="${appUrl}/dashboard/billing" style="display: inline-block; padding: 12px 24px; background: #4f46e5; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
                   Perpanjang Langganan Sekarang

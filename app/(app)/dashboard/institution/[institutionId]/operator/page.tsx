@@ -121,6 +121,9 @@ export default function OperatorDashboardPage() {
         onImportExcel={() => setShowImportModal(true)}
       />
 
+      {/* Sprint 4.1 — Ekspor ke Dapodik */}
+      <DapodikExportCard institutionId={instId} academicYear={institution?.academic_year_active || "2025/2026"} />
+
       {loading ? (
         <div className="flex justify-center py-20">
           <Spinner size="lg" />
@@ -816,5 +819,75 @@ function Modal({
         <div className="px-6 py-4">{children}</div>
       </div>
     </div>
+  )
+}
+
+// Sprint 4.1 — Kartu ekspor file Dapodik (Excel, import manual ke Dapodik)
+function DapodikExportCard({ institutionId, academicYear }: { institutionId: number; academicYear: string }) {
+  const [semester, setSemester] = useState<"ganjil" | "genap">("ganjil");
+  const [version, setVersion] = useState<string>("2025");
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const qs = new URLSearchParams({
+        institutionId: String(institutionId),
+        semester,
+        tahunAjaran: academicYear,
+        version,
+      });
+      const res = await fetch(`/api/export/dapodik?${qs.toString()}`);
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || "Gagal mengekspor file");
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `dapodik_${institutionId}_${academicYear.replace("/", "-")}_${semester}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      alert("Terjadi kesalahan saat mengekspor");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <Card className="p-5 mb-6">
+      <div className="flex items-center gap-3 mb-3">
+        <span className="text-2xl">📤</span>
+        <div>
+          <h3 className="font-bold text-gray-900">Ekspor ke Dapodik</h3>
+          <p className="text-xs text-gray-500">Generate file Excel lalu import manual ke aplikasi Dapodik.</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+        <div>
+          <Label>Semester</Label>
+          <Select value={semester} onChange={(e: any) => setSemester(e.target.value)}>
+            <option value="ganjil">Ganjil</option>
+            <option value="genap">Genap</option>
+          </Select>
+        </div>
+        <div>
+          <Label>Versi Dapodik</Label>
+          <Select value={version} onChange={(e: any) => setVersion(e.target.value)}>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+          </Select>
+        </div>
+      </div>
+      <Button variant="primary" size="md" onClick={handleExport} disabled={exporting}>
+        {exporting ? "Membuat file..." : "Ekspor Sekarang"}
+      </Button>
+      <p className="text-[11px] text-gray-400 mt-2">
+        File berisi Data PTK, Rekap TPG, dan Presensi. Import melalui menu Impor pada Dapodik.
+      </p>
+    </Card>
   )
 }

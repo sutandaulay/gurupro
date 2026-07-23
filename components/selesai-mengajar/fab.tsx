@@ -54,6 +54,14 @@ export default function SelesaiMengajarFAB({ className = '' }: SelesaiMengajarFA
 
         // Handle non-OK responses
         if (!response.ok) {
+          let errorMessage = `HTTP ${response.status}`;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch {
+            // Keep default error message if JSON parsing fails
+          }
+
           if (response.status === 401) {
             // User not authenticated - hide the FAB
             setSchedules([]);
@@ -66,8 +74,11 @@ export default function SelesaiMengajarFAB({ className = '' }: SelesaiMengajarFA
             setIsVisible(false);
             return;
           }
-          // Other errors - try again later
-          console.error(`API error: ${response.status}`);
+
+          // Server errors - log full details and hide FAB to avoid broken UI
+          console.error(`[SelesaiMengajarFAB] API error ${response.status}:`, errorMessage);
+          setSchedules([]);
+          setIsVisible(false);
           return;
         }
 
@@ -88,7 +99,9 @@ export default function SelesaiMengajarFAB({ className = '' }: SelesaiMengajarFA
         );
         setCurrentSchedule(current || null);
       } catch (err) {
-        console.error('Failed to fetch schedules:', err);
+        console.error('[SelesaiMengajarFAB] Failed to fetch schedules:', err);
+        setSchedules([]);
+        setIsVisible(false);
       }
     };
 

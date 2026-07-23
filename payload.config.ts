@@ -103,7 +103,12 @@ export default buildConfig({
         process.env.DATABASE_URL ||
         "postgresql://postgres:nus4nt4r4@localhost:5432/gurupro_db",
     },
-    push: true,
+    // Disable automatic schema push at runtime. Auto-push triggers an
+    // interactive prompt when schema drift is detected, which hangs `next dev`
+    // (no TTY) and blocks every page from loading. Run schema migration
+    // manually with `npx payload migrate` / `npx payload generate:types`
+    // when collections change.
+    push: false,
     schemaName: "payload",
   }),
 

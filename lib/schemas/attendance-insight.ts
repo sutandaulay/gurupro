@@ -10,7 +10,7 @@ export const attendanceInsights = pgTable(
     teacherId: uuid('teacher_id')
       .notNull()
       .references(() => users.id),
-    institutionId: uuid('institution_id')
+    institutionId: integer('institution_id')
       .notNull()
       .references(() => institutions.id),
     periodType: varchar('period_type', { length: 10 }).notNull(), // 'weekly', 'monthly'

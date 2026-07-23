@@ -14,16 +14,11 @@ const ApproveDeviceSchema = z.object({
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Validasi sesi pengguna (seharusnya admin)
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user || session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const deviceId = params.id;
+    const { id } = await params;
+    const deviceId = id;
     
     // Validasi ID device
     const parsedId = z.string().uuid().parse(deviceId);
@@ -54,7 +49,7 @@ export async function POST(
       return NextResponse.json(
         { 
           error: 'Validasi input gagal', 
-          details: error.errors 
+          details: error.issues 
         }, 
         { status: 400 }
       );

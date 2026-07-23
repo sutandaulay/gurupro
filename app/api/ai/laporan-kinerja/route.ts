@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai'
 import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/services/poin-service'
-import { calculatePoinFromTokens } from '@/src/lib/ai-usage'
+import { deductPoinFromAIResult } from '@/src/lib/ai-usage'
 
 const genAI = process.env.GOOGLE_AI_API_KEY
   ? new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY)
@@ -180,16 +180,9 @@ export async function POST(req: Request) {
         // Deduct Poin based on actual usage
         try {
           // Estimate based on prompt length
-          const estimatedInputTokens = Math.ceil(prompt.length / 4)
-          const estimatedOutputTokens = Math.ceil(fullText.length / 4)
-          const poinCalc = calculatePoinFromTokens(estimatedInputTokens, estimatedOutputTokens, 0)
+          await deductPoinFromAIResult(null, guruId, 'ai-laporan-kinerja', {})
 
-          await consumeUserPoin(guruId, poinCalc.rawTokens, 'ai-laporan-kinerja', {
-            model: 'gemini-2.5-flash-lite',
-            provider: 'gemini',
-          })
-
-          console.log(`[AI Laporan Kinerja] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`)
+          console.log(`[AI Laporan Kinerja] Poin deducted (estimasi fallback)`)
         } catch (poinError: any) {
           console.error('[AI Laporan Kinerja] Poin deduction failed:', poinError)
         }

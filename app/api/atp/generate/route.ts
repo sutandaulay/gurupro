@@ -1,7 +1,7 @@
-import { generateAIContent } from "@/lib/ai";
+import { generateAIContentWithUsage } from "@/lib/ai";
 import { query } from "@/lib/db";
-import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
-import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
+import { getUserPoinAccess, logFailedPoinUsage } from "@/src/services/poin-service";
+import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { jsonrepair as repair } from "jsonrepair";
@@ -184,14 +184,12 @@ Hasilkan seluruh dokumen ATP LENGKAP tersebut langsung dalam format Markdown yan
 `;
 
     let parsed: any;
-    let rawUsage = null;
+    let aiResult: Awaited<ReturnType<typeof generateAIContentWithUsage>> | null = null;
     try {
-      const aiResult = await generateAIContent(prompt, undefined, false);
-      const text = aiResult.data as string || aiResult.response?.text?.() || "";
-      const cleanMarkdown = text.trim();
-      rawUsage = aiResult.rawUsage;
+      aiResult = await generateAIContentWithUsage(prompt, undefined, false); // isJson=false
+      const cleanMarkdown = (aiResult.text || '').trim();
 
-      if (!text || text.trim() === "") {
+      if (!cleanMarkdown) {
         throw new Error("AI mengembalikan respons kosong");
       }
 
@@ -266,19 +264,15 @@ Hasilkan seluruh dokumen ATP LENGKAP tersebut langsung dalam format Markdown yan
     // Deduct Poin based on actual usage
     if (user.role !== "admin") {
       try {
-        const poinCalc = calculatePoinFromTokens(
-          rawUsage?.promptTokenCount || 0,
-          rawUsage?.candidatesTokenCount || 0,
-          rawUsage?.cachedContentTokenCount || 0
+        await deductPoinFromAIResult(
+          { success: true, usage: aiResult?.usage || null },
+          userId,
+          "generate-atp",
+          {}
         );
 
-        await consumeUserPoin(userId, poinCalc.rawTokens, "generate-atp", {
-          model: "gemini-2.5-flash-lite",
-          provider: "gemini",
-        });
-
-        console.log(`[ATP Generate] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
-      } catch (poinError: any) {
+          console.log(`[Generate ATP] Poin deducted`);
+        } catch (poinError: any) {
         console.error("[ATP Generate] Poin deduction failed:", poinError);
       }
     }

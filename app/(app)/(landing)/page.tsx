@@ -52,12 +52,14 @@ export default async function LandingPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  // Initialize database schema (singleton, hanya jalan sekali)
-  await ensureDbInitialized().catch(err => {
+  const sp = await searchParams;
+
+  // Initialize database schema (singleton) concurrently so it doesn't block
+  // content fetching. Tables are already created on first run, so this is
+  // effectively a no-op fast path on warm servers.
+  const initPromise = ensureDbInitialized().catch(err => {
     console.warn("[Landing] DB init failed, continuing with fallback:", err.message);
   });
-
-  const sp = await searchParams;
   const refCode = typeof sp.ref === "string" ? sp.ref.toUpperCase() : null;
 
   let isLoggedIn = false;
@@ -83,6 +85,10 @@ export default async function LandingPage({
 
   // Pricing plans - always load from DB
   let pricingPlans: any[] = [];
+
+  // Ensure schema is ready before querying the cache (resolves the fast
+  // singleton promise started above)
+  await initPromise;
 
   // Try to get content from database cache (with timeout)
   try {
@@ -220,28 +226,28 @@ export default async function LandingPage({
 
   // Final fallback: hardcoded defaults
   const defaultPricingPlans = [
-    { id: "free", package_name: "Gratis", price: 0, tokens: 10, duration_days: 30, popular: false, features: ["10 Token Kuota Sekali", "Masa Aktif 30 Hari", "Generator Soal (LOTS C1-C3)", "Dukungan Kurikulum Merdeka"] },
-    { id: "three_month", package_name: "3 Bulan", price: 120000, tokens: 500, duration_days: 90, popular: true, features: ["500 Token Kuota Utama", "Masa Aktif 90 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Terpadu"] },
-    { id: "six_month", package_name: "6 Bulan", price: 220000, tokens: 1100, duration_days: 180, popular: false, features: ["1100 Token Kuota Utama", "Masa Aktif 180 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Prioritas"] },
-    { id: "one_year", package_name: "1 Tahun", price: 400000, tokens: 2500, duration_days: 365, popular: false, features: ["2500 Token Kuota Utama", "Masa Aktif 365 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "CS VIP 24/7 & Backup Riwayat"] },
+    { id: "free", package_name: "Gratis", price: 0, tokens: 10, duration_days: 30, popular: false, features: ["10 Poin Kuota Sekali", "Masa Aktif 30 Hari", "Generator Soal (LOTS C1-C3)", "Dukungan Kurikulum Merdeka"] },
+    { id: "three_month", package_name: "3 Bulan", price: 120000, tokens: 500, duration_days: 90, popular: true, features: ["500 Poin Kuota Utama", "Masa Aktif 90 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Terpadu"] },
+    { id: "six_month", package_name: "6 Bulan", price: 220000, tokens: 1100, duration_days: 180, popular: false, features: ["1100 Poin Kuota Utama", "Masa Aktif 180 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Prioritas"] },
+    { id: "one_year", package_name: "1 Tahun", price: 400000, tokens: 2500, duration_days: 365, popular: false, features: ["2500 Poin Kuota Utama", "Masa Aktif 365 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "CS VIP 24/7 & Backup Riwayat"] },
   ];
 
   const defaultFaq = [
     {
-      question: "Bagaimana cara kerja Token Kuota di GuruPRO?",
-      answer: "Setiap paket langganan GuruPRO dilengkapi dengan Kuota Token bulanan. Token ini dipakai setiap kali Anda menggunakan fitur AI seperti Generator Soal, RPP, atau fitur cerdas lainnya. Kuota utama akan reset otomatis setiap siklus bulanan (dihitung dari tanggal mulai langganan). Sisa token utama tidak diakumulasi ke bulan berikutnya.",
+      question: "Bagaimana cara kerja Poin Kuota di GuruPRO?",
+      answer: "Setiap paket langganan GuruPRO dilengkapi dengan Kuota Poin bulanan. Poin ini dipakai setiap kali Anda menggunakan fitur AI seperti Generator Soal, RPP, atau fitur cerdas lainnya. Kuota utama akan reset otomatis setiap siklus bulanan (dihitung dari tanggal mulai langganan). Sisa poin utama tidak diakumulasi ke bulan berikutnya.",
     },
     {
-      question: "Apa bedanya Kuota Utama dan Token Ekstra?",
-      answer: "Kuota Utama adalah token yang diberikan setiap awal siklus langganan. Token Ekstra adalah token tambahan yang bisa Anda beli kapan saja saat kuota utama habis sebelum reset berikutnya. Token ekstra tidak hangus saat reset bulanan dan berlaku selama langganan aktif.",
+      question: "Apa bedanya Kuota Utama dan Poin Ekstra?",
+      answer: "Kuota Utama adalah poin yang diberikan setiap awal siklus langganan. Poin Ekstra adalah poin tambahan yang bisa Anda beli kapan saja saat kuota utama habis sebelum reset berikutnya. Poin ekstra tidak hangus saat reset bulanan dan berlaku selama langganan aktif.",
     },
     {
-      question: "Apakah Token Ekstra bisa hangus?",
-      answer: "Token Ekstra akan tetap tersimpan selama masa langganan aktif. Jika langganan berakhir dan tidak diperpanjang dalam masa tenggang (grace period) 14 hari, maka token ekstra akan hangus. Pastikan memperpanjang langganan sebelum grace period berakhir.",
+      question: "Apakah Poin Ekstra bisa hangus?",
+      answer: "Poin Ekstra akan tetap tersimpan selama masa langganan aktif. Jika langganan berakhir dan tidak diperpanjang dalam masa tenggang (grace period) 14 hari, maka poin ekstra akan hangus. Pastikan memperpanjang langganan sebelum grace period berakhir.",
     },
     {
-      question: "Berapa harga Token Ekstra?",
-      answer: "Token Ekstra dijual dalam paket nominal tetap (50, 100, atau 250 token) dengan harga flat yang sama untuk semua tier. Pembelian token ekstra bisa dilakukan kapan saja langsung dari dashboard.",
+      question: "Berapa harga Poin Ekstra?",
+      answer: "Poin Ekstra dijual dalam paket nominal tetap (50, 100, atau 250 poin) dengan harga flat yang sama untuk semua tier. Pembelian poin ekstra bisa dilakukan kapan saja langsung dari dashboard.",
     },
     {
       question: "Apakah metode pembayaran mendukung e-Wallet lokal?",
@@ -251,11 +257,11 @@ export default async function LandingPage({
 
   const defaultReferral = {
     badge: "🎁 Program Kemitraan Guru",
-    title: "Bagikan GuruProAI, Dapatkan Cashback & Token!",
-    description: "Dapatkan cashback senilai Rp10.000 tunai atau tukarkan dengan +15 Token kuota untuk setiap guru yang mendaftar dan berlangganan menggunakan kode referral unik Anda! Teman Anda juga akan mendapatkan bonus +10 Token saat mendaftar.",
+    title: "Bagikan GuruProAI, Dapatkan Cashback & Poin!",
+    description: "Dapatkan cashback senilai Rp10.000 tunai atau tukarkan dengan +15 Poin kuota untuk setiap guru yang mendaftar dan berlangganan menggunakan kode referral unik Anda! Teman Anda juga akan mendapatkan bonus +10 Poin saat mendaftar.",
     benefits: [
       { icon: "💰", title: "Cashback Saldo Dompet", description: "Saldo cashback sebesar Rp10.000 ditambahkan ke dompet akun Anda setiap kali teman Anda meng-upgrade status akun menjadi PRO. Saldo ini dapat dicairkan langsung ke rekening bank." },
-      { icon: "⚡", title: "Token Kuota Tambahan", description: "Dapatkan +15 Token kuota untuk generator pekerjaan Anda, sementara teman Anda mendapatkan +10 Token kuota tambahan saat mendaftar!" },
+      { icon: "⚡", title: "Poin Kuota Tambahan", description: "Dapatkan +15 Poin kuota untuk generator pekerjaan Anda, sementara teman Anda mendapatkan +10 Poin kuota tambahan saat mendaftar!" },
     ],
     ctaText: "Mulai Undang Teman",
     ctaLink: "",

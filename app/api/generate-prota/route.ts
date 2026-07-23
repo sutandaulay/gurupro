@@ -1,7 +1,7 @@
-import { generateAIContent } from "@/lib/ai";
+import { generateAIContentWithUsage } from "@/lib/ai";
 import { query } from "@/lib/db";
-import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
-import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
+import { getUserPoinAccess, logFailedPoinUsage } from "@/src/services/poin-service";
+import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { jsonrepair as repair } from "jsonrepair";
@@ -129,12 +129,11 @@ Hasilkan seluruh dokumen PROTA tersebut langsung dalam format Markdown dengan ta
 `;
 
     let parsed: any;
-    let rawUsage = null;
+    let aiResult: Awaited<ReturnType<typeof generateAIContentWithUsage>> | null = null;
     try {
-      const aiResult = await generateAIContent(prompt, undefined, false);
-      const text = aiResult.data as string || "";
+      aiResult = await generateAIContentWithUsage(prompt, undefined, false);
+      const text = aiResult.text as string || "";
       const cleanMarkdown = text.trim();
-      rawUsage = aiResult.rawUsage;
 
       if (!text || text.trim() === "") {
         throw new Error("AI mengembalikan respons kosong");
@@ -204,19 +203,10 @@ Hasilkan seluruh dokumen PROTA tersebut langsung dalam format Markdown dengan ta
     // Deduct Poin based on actual usage
     if (user.role !== "admin") {
       try {
-        const poinCalc = calculatePoinFromTokens(
-          rawUsage?.promptTokenCount || 0,
-          rawUsage?.candidatesTokenCount || 0,
-          rawUsage?.cachedContentTokenCount || 0
-        );
+          await deductPoinFromAIResult({ success: true, usage: aiResult?.usage || null }, userId, "generate-prota", {});
 
-        await consumeUserPoin(userId, poinCalc.rawTokens, "generate-prota", {
-          model: "gemini-2.5-flash-lite",
-          provider: "gemini",
-        });
-
-        console.log(`[Generate Prota] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
-      } catch (poinError: any) {
+          console.log(`[Generate PROTA] Poin deducted`);
+        } catch (poinError: any) {
         console.error("[Generate Prota] Poin deduction failed:", poinError);
       }
     }

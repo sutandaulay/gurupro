@@ -222,7 +222,7 @@ export async function POST(
     } catch (error: any) {
       console.error("[BahanAjar] Regenerate error:", error);
 
-      if (error.message?.includes("Token tidak cukup")) {
+      if (error.message?.includes("Poin tidak cukup")) {
         return NextResponse.json(
           { error: error.message },
           { status: 402 }

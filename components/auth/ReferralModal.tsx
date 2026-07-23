@@ -135,7 +135,7 @@ export default function ReferralModal({ onProcessed }: ReferralModalProps) {
                 <div className="bg-emerald-50 rounded-xl p-4 mb-4">
                   <div className="flex items-center justify-center gap-2 text-emerald-700">
                     <IconCoin size={20} />
-                    <span className="font-bold text-lg">+10 Token</span>
+                    <span className="font-bold text-lg">+10 Poin</span>
                   </div>
                   <p className="text-xs text-emerald-600 mt-1">
                     Bonus untuk pendaftar baru via referral
@@ -196,7 +196,7 @@ export default function ReferralModal({ onProcessed }: ReferralModalProps) {
                 </div>
 
                 <p className="text-center text-xs text-slate-400 mt-4">
-                  Klaim sekarang dan dapatkan +10 token bonus
+                  Klaim sekarang dan dapatkan +10 poin bonus
                 </p>
               </>
             )}

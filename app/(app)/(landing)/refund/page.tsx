@@ -23,7 +23,7 @@ export default async function RefundPage() {
 
 <h2>Refund Tidak Dapat Dilakukan Apabila</h2>
 <ul>
-  <li>Token kuota sudah digunakan sebagian atau seluruhnya</li>
+  <li>Poin kuota sudah digunakan sebagian atau seluruhnya</li>
   <li>Melebihi batas waktu 7x24 jam sejak transaksi</li>
   <li>Pembatalan sepihak tanpa alasan teknis yang jelas</li>
 </ul>

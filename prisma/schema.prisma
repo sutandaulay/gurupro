@@ -56,6 +56,25 @@ model audit_trails {
   users      users?    @relation(fields: [user_id], references: [id], onUpdate: NoAction)
 }
 
+model duty_assignments {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teacher_id            String    @db.Uuid
+  school_id             String?   @db.Uuid
+  institution_id        String?   @db.Uuid
+  date                  DateTime  @db.Date
+  purpose               String?   @db.VarChar(255)
+  location_latitude     Decimal?  @db.Decimal(10, 7)
+  location_longitude    Decimal?  @db.Decimal(10, 7)
+  radius_meters         Int?      @default(50)
+  status                String    @default("pending") @db.VarChar(50)
+  approved_by           String?   @db.Uuid
+  created_at            DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([teacher_id])
+  @@index([date])
+  @@index([status])
+}
+
 model classes {
   id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   school_id        String             @db.Uuid
@@ -173,6 +192,9 @@ model schools {
   show_ttd_kepala     Boolean?             @default(true)
   show_ttd_pengawas   Boolean?             @default(true)
   show_ttd_wali       Boolean?             @default(true)
+  location_latitude   Decimal?             @db.Decimal(10, 7)
+  location_longitude  Decimal?             @db.Decimal(10, 7)
+  attendance_radius_meters Int?            @default(100)
   academic_calendars  academic_calendars[]
   assessments         assessments[]
   classes             classes[]
@@ -181,6 +203,7 @@ model schools {
   subjects            subjects[]
   teacher_attendance  teacher_attendance[]
   teacher_journals    teacher_journals[]
+  schoolTeachingSessions school_teaching_sessions[]
 }
 
 model student_attendance {
@@ -251,45 +274,40 @@ model addon_token_packages {
 }
 
 model teacher_attendance {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id    String    @db.Uuid
-  school_id  String    @db.Uuid
-  tanggal    DateTime  @db.Date
-  status     String    @db.VarChar(50)
-  catatan    String?
-  created_at DateTime? @default(now()) @db.Timestamp(6)
-  schools    schools   @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id             String    @db.Uuid
+  school_id           String    @db.Uuid
+  tanggal             DateTime  @db.Date
+  status              String    @db.VarChar(50)
+  catatan             String?
+  face_match_score    Decimal?  @db.Decimal(4, 3)
+  latitude            Decimal?  @db.Decimal(10, 7)
+  longitude           Decimal?  @db.Decimal(10, 7)
+  accuracy            Decimal?  @db.Decimal(10, 2)
+  liveness_passed     Boolean?  @default(false)
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  schools             schools   @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model teacher_journals {
-  id                                          String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  teacher_id                                  String                 @db.Uuid
-  school_id                                   String                 @db.Uuid
-  schedule_id                                 String?                @db.Uuid
-  class_id                                    String                 @db.Uuid
-  subject_id                                  String                 @db.Uuid
-  tanggal                                     DateTime               @default(dbgenerated("CURRENT_DATE")) @db.Date
-  materi_pembelajaran                         String                 @db.VarChar(255)
-  tujuan_pembelajaran                         String
-  aktivitas_pembelajaran                      String
-  media_pembelajaran                          String?
-  asesmen_pembelajaran                        String?
-  refleksi_guru                               String?
-  tindak_lanjut                               String?
-  evidensi                                    Json?                  @default("[]")
-  custom_values                               Json?                  @default("{}")
-  status                                      String                 @default("Draft") @db.VarChar(50)
-  supervisor_id                               String?                @db.Uuid
-  created_at                                  DateTime?              @default(now()) @db.Timestamp(6)
-  auto_generated                              Boolean?               @default(false)
-  source_schedule_id                          String?                @db.Uuid
-  journal_supervisions                        journal_supervisions[]
-  classes                                     classes                @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  schedules                                   schedules?             @relation(fields: [schedule_id], references: [id], onUpdate: NoAction)
-  schools                                     schools                @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  subjects                                    subjects               @relation(fields: [subject_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users_teacher_journals_supervisor_idTousers users?                 @relation("teacher_journals_supervisor_idTousers", fields: [supervisor_id], references: [id], onUpdate: NoAction)
-  users_teacher_journals_teacher_idTousers    users                  @relation("teacher_journals_teacher_idTousers", fields: [teacher_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id             String    @db.Uuid
+  school_id           String    @db.Uuid
+  supervisor_id       String?   @db.Uuid
+  tanggal             DateTime  @db.Date
+  kelas               String?   @db.VarChar(255)
+  mapel               String?   @db.VarChar(255)
+  tujuan_pembelajaran String?
+  kegiatan_pembelajaran String?
+  catatan             String?
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  schools             schools   @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  journal_supervisions journal_supervisions[]
+  classes             classes[]
+  schedules           schedules[]
+  subjects            subjects[]
+  supervisor           users?    @relation("teacher_journals_supervisor_idTousers", fields: [supervisor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  teacher              users?    @relation("teacher_journals_teacher_idTousers", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model transactions {
@@ -491,6 +509,25 @@ model teaching_sessions {
 
   @@index([user_id, status], map: "idx_teaching_sessions_status")
   @@index([user_id, session_date], map: "idx_teaching_sessions_user_date")
+}
+
+model school_teaching_sessions {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id             String    @db.Uuid
+  school_id           String    @db.Uuid
+  subject_id          String?   @db.VarChar(255)
+  class_id            String?   @db.VarChar(255)
+  started_at          DateTime? @db.Timestamp(6)
+  ended_at            DateTime? @db.Timestamp(6)
+  duration_minutes    Int?
+  latitude            Decimal?  @db.Decimal(10, 7)
+  longitude           Decimal?  @db.Decimal(10, 7)
+  accuracy            Decimal?  @db.Decimal(10, 2)
+  face_match_score    Decimal?  @db.Decimal(4, 3)
+  liveness_passed     Boolean?  @default(false)
+  status              String    @default("active") @db.VarChar(50)
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  schools             schools   @relation(fields: [school_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model lesson_memories {

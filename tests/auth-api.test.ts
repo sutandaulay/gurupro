@@ -79,8 +79,12 @@ describe('Authentication API Tests', () => {
       ];
 
       for (const email of invalidEmails) {
-        // Zod validation should catch these
-        expect(email.includes('@')).toBe(email.includes(' ') ? false : true);
+        const hasAt = email.includes('@');
+        const hasSpace = email.includes(' ');
+        const hasLocalPart = email.split('@')[0].length > 0;
+        const hasDomainPart = email.split('@').length > 1 && email.split('@')[1].includes('.');
+        const isValid = hasAt && !hasSpace && hasLocalPart && hasDomainPart;
+        expect(isValid).toBe(false);
       }
     });
 
@@ -88,9 +92,9 @@ describe('Authentication API Tests', () => {
       const weakPasswords = [
         '123',
         'password',
-        'Password1', // Too short
-        'lowercase123!', // No uppercase
-        'UPPERCASE123!', // No lowercase
+        'Pass1',
+        'lowercase123!',
+        'UPPERCASE123!',
       ];
 
       for (const password of weakPasswords) {

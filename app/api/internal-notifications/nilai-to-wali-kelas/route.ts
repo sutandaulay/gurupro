@@ -118,18 +118,18 @@ export async function POST(request: NextRequest) {
 
     switch (contentType) {
       case 'raport':
-        title = 'Nilai Raport Baru Dikirim';
-        notifBody = `Nilai raport untuk siswa ${studentName} telah dikirimkan untuk ditinjau oleh Wali Kelas.`;
+        title = 'Nilai Raport Baru Siap Dibagikan';
+        notifBody = `Nilai raport siswa ${studentName} sudah kami rangkum dan siap Anda lihat bersama orang tua. Terima kasih sudah mendampingi murid-murid Anda.`;
         referenceType = 'nilai_raport';
         break;
       case 'ekskul':
-        title = 'Nilai Ekstrakurikuler Baru Dikirim';
-        notifBody = `Nilai ekstrakurikuler untuk siswa ${studentName} telah dikirimkan untuk ditinjau oleh Wali Kelas.`;
+        title = 'Nilai Ekstrakurikuler Baru Siap Dibagikan';
+        notifBody = `Nilai ekstrakurikuler siswa ${studentName} sudah kami rangkum dan siap Anda lihat bersama orang tua. Terima kasih sudah mendampingi murid-murid Anda.`;
         referenceType = 'nilai_ekskul';
         break;
       case 'project':
-        title = 'Nilai Project Baru Dikirim';
-        notifBody = `Nilai project untuk siswa ${studentName} telah dikirimkan untuk ditinjau oleh Wali Kelas.`;
+        title = 'Nilai Project Baru Siap Dibagikan';
+        notifBody = `Nilai project siswa ${studentName} sudah kami rangkum dan siap Anda lihat bersama orang tua. Terima kasih sudah mendampingi murid-murid Anda.`;
         referenceType = 'nilai_project';
         break;
       default:

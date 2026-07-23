@@ -124,13 +124,15 @@ export type PenilaianSikapResponse = z.infer<typeof PenilaianSikapResponseSchema
 export const EkstrakurikulerCreateSchema = z.object({
   namaEkskul: z.string().min(1).max(255),
   kelasId: z.string().uuid(),
-  pembinaMemberId: z.string().uuid(),
+  pembinaMemberId: z.string().uuid().optional(),
+  pembinaUserId: z.string().uuid().nullable().optional(),
 });
 
 export const EkstrakurikulerUpdateSchema = z.object({
   id: z.string().uuid(),
   namaEkskul: z.string().min(1).max(255).optional(),
-  pembinaMemberId: z.string().uuid().optional(),
+  pembinaMemberId: z.string().uuid().nullable().optional(),
+  pembinaUserId: z.string().uuid().nullable().optional(),
 });
 
 export const EkstrakurikulerRowSchema = z.object({
@@ -138,6 +140,8 @@ export const EkstrakurikulerRowSchema = z.object({
   nama_ekskul: z.string(),
   kelas_id: z.string().uuid(),
   pembina_member_id: z.string().uuid(),
+  pembina_user_id: z.string().uuid().nullable(),
+  owner_id: z.string().uuid().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -147,6 +151,7 @@ export const EkstrakurikulerResponseSchema = z.object({
   namaEkskul: z.string(),
   kelasId: z.string().uuid(),
   pembinaMemberId: z.string().uuid(),
+  pembinaUserId: z.string().uuid().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

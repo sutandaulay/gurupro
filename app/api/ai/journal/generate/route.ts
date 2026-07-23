@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
 import { generateJournal, estimateCost } from '@/lib/ai/generators';
-import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/services/poin-service';
-import { calculatePoinFromTokens } from '@/src/lib/ai-usage';
+import { getUserPoinAccess, logFailedPoinUsage } from '@/src/services/poin-service';
+import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
 
 const prisma = new PrismaClient();
 
@@ -152,19 +152,14 @@ export async function POST(request: NextRequest) {
       // Consume Poin after successful generation (non-admin)
       if (userDb?.role !== 'admin') {
         try {
-          const rawUsage = result.rawUsage;
-          const poinCalc = calculatePoinFromTokens(
-            rawUsage?.promptTokenCount || 0,
-            rawUsage?.candidatesTokenCount || 0,
-            rawUsage?.cachedContentTokenCount || 0
+          await deductPoinFromAIResult(
+            { success: true, usage: (result.usage as any) || null },
+            userId,
+            'ai-journal-generate',
+            {}
           );
 
-          await consumeUserPoin(userId, poinCalc.rawTokens, 'ai-journal-generate', {
-            model: 'gemini-2.5-flash-lite',
-            provider: 'gemini',
-          });
-
-          console.log(`[AI Journal] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+          console.log(`[AI Journal] Poin deducted`);
         } catch (poinErr) {
           console.error('[AI Journal] Poin deduction failed:', poinErr);
         }
@@ -181,17 +176,12 @@ export async function POST(request: NextRequest) {
     // Consume Poin after successful generation (non-admin, mode save=false)
     if (userDb?.role !== 'admin') {
       try {
-        const rawUsage = result.rawUsage;
-        const poinCalc = calculatePoinFromTokens(
-          rawUsage?.promptTokenCount || 0,
-          rawUsage?.candidatesTokenCount || 0,
-          rawUsage?.cachedContentTokenCount || 0
+        await deductPoinFromAIResult(
+          { success: true, usage: (result.usage as any) || null },
+          userId,
+          'ai-journal-generate',
+          {}
         );
-
-        await consumeUserPoin(userId, poinCalc.rawTokens, 'ai-journal-generate', {
-          model: 'gemini-2.5-flash-lite',
-          provider: 'gemini',
-        });
       } catch (poinErr) {
         console.error('[AI Journal] Poin deduction failed:', poinErr);
       }

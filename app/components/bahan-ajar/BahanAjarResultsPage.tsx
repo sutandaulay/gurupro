@@ -22,7 +22,7 @@ import ComplianceBadge from "./ComplianceBadge";
 import SlidePreview from "./SlidePreview";
 import LKPDPreview from "./LKPDPreview";
 import HandoutPreview from "./HandoutPreview";
-import TokenHabisModal from "@/app/components/ui/TokenHabisModal";
+import PoinHabisModal from "@/app/components/ui/PoinHabisModal";
 
 interface BahanAjarData {
   id: string;
@@ -218,11 +218,11 @@ export default function BahanAjarResultsPage() {
             />
           </div>
 
-          {/* Token Cost */}
-          {data?.tokenCost !== undefined && data.tokenCost > 0 && (
-            <div className="flex items-center gap-1.5 mt-3 text-xs text-gray-400">
-              <IconCoins size={14} />
-              <span>Token terpakai: {data.tokenCost.toLocaleString()}</span>
+           {/* Poin Cost */}
+           {data?.tokenCost !== undefined && data.tokenCost > 0 && (
+
+             <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+               <span>Poin terpakai: {data.tokenCost.toLocaleString()}</span>
             </div>
           )}
 
@@ -292,8 +292,8 @@ export default function BahanAjarResultsPage() {
         </div>
       </div>
 
-      {/* Token Habis Modal */}
-      <TokenHabisModal
+      {/* Poin Habis Modal */}
+      <PoinHabisModal
         open={showTokenModal}
         shortfall={tokenShortfall}
         onClose={() => setShowTokenModal(false)}

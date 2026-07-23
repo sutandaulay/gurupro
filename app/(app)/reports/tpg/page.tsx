@@ -53,6 +53,28 @@ export default function TPGReportPage() {
   const [error, setError] = useState<string | null>(null);
   const [generatingInsight, setGeneratingInsight] = useState(false);
 
+  // Sprint 3.2 — Toggle & data agregasi lintas institusi
+  const [showCrossInstitution, setShowCrossInstitution] = useState(false);
+  const [crossData, setCrossData] = useState<any>(null);
+  const [crossLoading, setCrossLoading] = useState(false);
+  const [crossError, setCrossError] = useState<string | null>(null);
+
+  const fetchCrossInstitution = async () => {
+    setCrossLoading(true);
+    setCrossError(null);
+    try {
+      const res = await fetch("/api/attendance/tpg-reports-cross-institution", { cache: "no-store" });
+      if (!res.ok) throw new Error("Gagal memuat agregat lintas institusi");
+      const data = await res.json();
+      setCrossData(data);
+      setShowCrossInstitution(true);
+    } catch (e: any) {
+      setCrossError(e.message || "Gagal memuat data lintas institusi");
+    } finally {
+      setCrossLoading(false);
+    }
+  };
+
   // Simulasi pengambilan data dari API
   useEffect(() => {
     const fetchTPGReports = async () => {
@@ -255,6 +277,85 @@ export default function TPGReportPage() {
               Minggu Berikutnya &rarr;
             </Button>
           </div>
+
+          {/* Sprint 3.2 — Toggle agregasi lintas institusi */}
+          <div className="flex items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl mb-6">
+            <div>
+              <p className="text-sm font-semibold text-slate-700">Lihat Rekap Lintas Institusi</p>
+              <p className="text-[11px] text-slate-500">Gabungan jam mengajar dari semua sekolah tempat Anda bertugas</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchCrossInstitution}
+              disabled={crossLoading}
+            >
+              {crossLoading ? "Memuat..." : showCrossInstitution ? "Segarkan" : "Semua Institusi"}
+            </Button>
+          </div>
+
+          {crossError && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{crossError}</AlertDescription>
+            </Alert>
+          )}
+
+          {showCrossInstitution && crossData && (
+            <Card className="mb-6 border-indigo-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-indigo-700">
+                  <TrendingUp className="h-5 w-5" />
+                  Rekap Lintas Institusi {crossData.cached ? "(cache)" : ""}
+                </CardTitle>
+                <CardDescription>
+                  Total jam mengajar dari {crossData.institutions?.length || 0} institusi
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                  <Card>
+                    <CardContent className="p-4 text-center">
+                      <div className="text-3xl font-bold text-primary">
+                        {Math.floor((crossData.total?.minutes || 0) / 60)}:{((crossData.total?.minutes || 0) % 60).toString().padStart(2, "0")}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Total Jam</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4 text-center">
+                      <div className="text-3xl font-bold text-blue-600">{crossData.total?.sessions || 0}</div>
+                      <div className="text-sm text-muted-foreground">Sesi Selesai</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4 text-center">
+                      <div className="text-3xl font-bold text-green-600">{crossData.total?.attendanceDays || 0}</div>
+                      <div className="text-sm text-muted-foreground">Hari Hadir</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4 text-center">
+                      <div className={`text-3xl font-bold ${crossData.isRequirementMet ? "text-green-600" : "text-red-600"}`}>
+                        {crossData.isRequirementMet ? "✓" : "✗"}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Cukup TPG?</div>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="space-y-2">
+                  {(crossData.institutions || []).map((inst: any) => (
+                    <div key={inst.institutionId} className="flex items-center justify-between text-sm border-b border-slate-100 pb-2">
+                      <span className="font-medium text-slate-700">{inst.institutionName}</span>
+                      <span className="text-slate-500">
+                        {Math.floor(inst.minutes / 60)}j {inst.minutes % 60}m • {inst.sessions} sesi
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Ringkasan Mingguan */}
           {currentReport && (

@@ -23,6 +23,7 @@
 import { query } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { sendInAppNotification } from "@/lib/institution-members";
+import { grantAddonPoin } from "@/src/services/poin-service";
 
 // ==========================================
 // XENDIT WEBHOOK HANDLER
@@ -172,29 +173,28 @@ async function processPaymentSuccess(transactionId: string) {
     return;
   }
 
-  // Check if this is an addon token purchase
+  // Check if this is an addon poin purchase
   if (planId?.startsWith("addon:")) {
     const addonId = planId.replace("addon:", "");
     const pkgRes = await query(
-      "SELECT token_amount FROM addon_token_packages WHERE id = $1",
+      "SELECT poin_amount FROM addon_token_packages WHERE id = $1",
       [addonId]
     );
     if (pkgRes.rows.length > 0) {
-      const tokenAmount = pkgRes.rows[0].token_amount;
-      await grantAddonTokensToUser(userId, tokenAmount);
+      const poinAmount = pkgRes.rows[0].poin_amount;
+      await grantAddonPoinToUser(userId, poinAmount);
       await query("UPDATE transactions SET status = 'ACTIVATED', updated_at = NOW() WHERE id = $1", [tx.id]);
 
-      // Send in-app notification for addon token purchase
       await sendInAppNotification(
         userId,
-        "💎 Token Tambahan Aktif!",
-        `Pembelian ${tokenAmount} token tambahan berhasil! Saldo token Anda telah diperbarui.`,
+        "💎 Poin Tambahan Aktif!",
+        `Pembelian ${poinAmount} poin tambahan berhasil! Saldo poin Anda telah diperbarui.`,
         "payment_success",
         "addon_purchase",
         tx.id
       );
 
-      console.log(`[WEBHOOK] Granted ${tokenAmount} addon tokens to user ${userId} (tx ACTIVATED)`);
+      console.log(`[WEBHOOK] Granted ${poinAmount} addon poin to user ${userId} (tx ACTIVATED)`);
     }
     return;
   }
@@ -258,7 +258,7 @@ async function processPaymentSuccess(transactionId: string) {
   await sendInAppNotification(
     userId,
     "✅ Pembayaran Berhasil!",
-    `Paket langganan Anda telah aktif sampai ${formattedEndDate}. Total ${tokens} token telah ditambahkan ke akun Anda.`,
+    `Paket langganan Anda telah aktif sampai ${formattedEndDate}. Total ${tokens} poin telah ditambahkan ke akun Anda.`,
     "payment_success",
     "subscription_activated",
     tx.id
@@ -270,13 +270,10 @@ async function processPaymentSuccess(transactionId: string) {
 }
 
 /**
- * Grant addon tokens to user
+ * Grant addon poin to user
  */
-async function grantAddonTokensToUser(userId: string, amount: number) {
-  await query(
-    `UPDATE users SET addon_token_balance = COALESCE(addon_token_balance, 0) + $1 WHERE id = $2`,
-    [amount, userId]
-  );
+async function grantAddonPoinToUser(userId: string, poinAmount: number) {
+  await grantAddonPoin(userId, poinAmount);
 }
 
 /**

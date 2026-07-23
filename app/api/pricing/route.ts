@@ -81,10 +81,10 @@ export async function GET() {
   // ============================================
   return NextResponse.json({
     plans: [
-      { id: "free", name: "Gratis", package_name: "Gratis", price: 0, duration_days: 30, tokens: 10, popular: false, sort_order: 0, features: ["10 Token Kuota Sekali", "Masa Aktif 30 Hari", "Generator Soal (LOTS C1-C3)", "Dukungan Kurikulum Merdeka"] },
-      { id: "three_month", name: "3 Bulan", package_name: "3 Bulan", price: 120000, duration_days: 90, tokens: 500, popular: true, sort_order: 1, features: ["500 Token Kuota Utama", "Masa Aktif 90 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Terpadu"] },
-      { id: "six_month", name: "6 Bulan", package_name: "6 Bulan", price: 220000, duration_days: 180, tokens: 1100, popular: false, sort_order: 2, features: ["1100 Token Kuota Utama", "Masa Aktif 180 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Prioritas"] },
-      { id: "one_year", name: "1 Tahun", package_name: "1 Tahun", price: 400000, duration_days: 365, tokens: 2500, popular: false, sort_order: 3, features: ["2500 Token Kuota Utama", "Masa Aktif 365 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "CS VIP 24/7 & Backup Riwayat"] },
+      { id: "free", name: "Gratis", package_name: "Gratis", price: 0, duration_days: 30, tokens: 10, popular: false, sort_order: 0, features: ["10 Poin Kuota Sekali", "Masa Aktif 30 Hari", "Generator Soal (LOTS C1-C3)", "Dukungan Kurikulum Merdeka"] },
+      { id: "three_month", name: "3 Bulan", package_name: "3 Bulan", price: 120000, duration_days: 90, tokens: 500, popular: true, sort_order: 1, features: ["500 Poin Kuota Utama", "Masa Aktif 90 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Terpadu"] },
+      { id: "six_month", name: "6 Bulan", package_name: "6 Bulan", price: 220000, duration_days: 180, tokens: 1100, popular: false, sort_order: 2, features: ["1100 Poin Kuota Utama", "Masa Aktif 180 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Prioritas"] },
+      { id: "one_year", name: "1 Tahun", package_name: "1 Tahun", price: 400000, duration_days: 365, tokens: 2500, popular: false, sort_order: 3, features: ["2500 Poin Kuota Utama", "Masa Aktif 365 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "CS VIP 24/7 & Backup Riwayat"] },
     ],
   });
 }

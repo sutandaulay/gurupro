@@ -1,6 +1,6 @@
-import { generateAIContent } from "@/lib/ai";
+import { generateAIContentWithUsage } from "@/lib/ai";
 import { query } from "@/lib/db";
-import { consumeUserToken, getUserTokenAccess, logAIUsage } from "@/lib/token-system";
+import { consumeUserPoinFromUsage, logFailedPoinUsage } from "@/src/services/poin-service";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "materi, aktivitas, dan tujuan wajib diisi" }, { status: 400 });
     }
 
-    // 1. SaaS Token Validation
+    // 1. SaaS Poin Validation
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("gurupro_session")?.value;
     if (!sessionCookie) {
@@ -20,19 +20,6 @@ export async function POST(req: Request) {
     }
     const session = JSON.parse(sessionCookie);
     const userId = session.id;
-
-    const tokenState = await getUserTokenAccess(userId);
-    if (!tokenState.user) {
-      return NextResponse.json({ error: "Pengguna tidak ditemukan." }, { status: 404 });
-    }
-    const user = tokenState.user;
-
-    if (!tokenState.access.allowed) {
-      const message = tokenState.access.reason === "subscription_expired"
-        ? "Masa aktif langganan akun Anda telah habis. Silakan perpanjang paket terlebih dahulu."
-        : "Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan di Landing Page.";
-      return NextResponse.json({ error: message }, { status: 403 });
-    }
 
     const kurikulumLabel = kurikulum === "merdeka" ? "Kurikulum Merdeka"
       : kurikulum === "k13" ? "Kurikulum 2013 (K13)"
@@ -58,20 +45,30 @@ Harap berikan respons dalam JSON dengan skema berikut:
 }
 `;
 
-    // 2. Call universal AI service and parse response before token deduction
+    // 2. Call universal AI service and parse response
     let parsed: any;
+    let result: Awaited<ReturnType<typeof generateAIContentWithUsage>> | null = null;
     try {
-      const text = await generateAIContent(prompt);
-      parsed = JSON.parse(text);
+      result = await generateAIContentWithUsage(prompt);
+      if (!result.text) {
+        throw new Error("AI generation returned empty response");
+      }
+      parsed = JSON.parse(result.text);
+
+      // 3. Deduct Poin from actual usage (fallback estimasi bila usage null)
+      if (session.role !== "admin") {
+        await consumeUserPoinFromUsage(userId, result.usage, "journals-ai", {
+          mapel: mapel || "-",
+          jenjang: "-",
+        });
+      }
     } catch (aiError: any) {
       console.error("Journal AI generation failed:", aiError);
+      await logFailedPoinUsage(userId, 0, "journals-ai", aiError.message, {
+        mapel: mapel || "-",
+        jenjang: "-",
+      });
       return NextResponse.json({ error: `Gagal memproses AI: ${aiError.message || aiError}` }, { status: 502 });
-    }
-
-    // 3. Deduct token on success
-    if (user.role !== "admin") {
-      await consumeUserToken(userId, 1);
-      await logAIUsage({ userId, feature: "journals-ai", tokensCharged: 1, success: true });
     }
 
     return NextResponse.json(parsed);

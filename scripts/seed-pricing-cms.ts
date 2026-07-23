@@ -20,7 +20,7 @@ const PRICING_PLANS = [
     gracePeriodDays: 0,
     description: "Uji coba awal fitur GuruPRO",
     features: [
-      "10 Token Kuota Sekali",
+      "10 Poin Kuota Sekali",
       "Masa Aktif 30 Hari",
       "Generator Soal (LOTS C1-C3)",
       "Dukungan Kurikulum Merdeka"
@@ -38,7 +38,7 @@ const PRICING_PLANS = [
     gracePeriodDays: 7,
     description: "Pendamping mengajar 1 triwulan",
     features: [
-      "500 Token Kuota Utama",
+      "500 Poin Kuota Utama",
       "Masa Aktif 90 Hari",
       "Generator Soal HOTS (C4-C6)",
       "Cetak Lembar Jawaban Resmi",
@@ -57,7 +57,7 @@ const PRICING_PLANS = [
     gracePeriodDays: 14,
     description: "Persiapan matang untuk 2 semester",
     features: [
-      "1100 Token Kuota Utama",
+      "1100 Poin Kuota Utama",
       "Masa Aktif 180 Hari",
       "Generator Soal HOTS (C4-C6)",
       "Cetak Lembar Jawaban Resmi",
@@ -76,7 +76,7 @@ const PRICING_PLANS = [
     gracePeriodDays: 14,
     description: "Efisiensi maksimal jangka panjang",
     features: [
-      "2500 Token Kuota Utama",
+      "2500 Poin Kuota Utama",
       "Masa Aktif 365 Hari",
       "Generator Soal HOTS (C4-C6)",
       "Cetak Lembar Jawaban Resmi",

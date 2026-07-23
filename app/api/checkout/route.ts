@@ -63,7 +63,7 @@ export async function POST(req: Request) {
       planLabel = addonPackage.name;
       planKey = `addon:${addonPackage.id}`;
       durationDays = 0;
-      tokens = Number(addonPackage.token_amount || 0);
+      tokens = Number(addonPackage.poin_amount || 0);
       isFree = amount === 0;
     } else if (isUUID(plan)) {
       // New: Look up plan by UUID from pricing_plans table
@@ -326,14 +326,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Konfigurasi Midtrans tidak lengkap (server_key kosong)." }, { status: 500 });
     }
     else if (gateway === "duitku" && pgConfig.duitku.merchant_code && pgConfig.duitku.api_key) {
+      const { merchant_code, api_key, is_sandbox } = pgConfig.duitku;
       try {
-        const { merchant_code, api_key, is_sandbox } = pgConfig.duitku;
         const duitkuUrl = is_sandbox
           ? "https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry"
           : "https://passport.duitku.com/webapi/api/merchant/v2/inquiry";
 
         const orderId = externalId;
-        const signature = crypto.createHash("md5")
+        const signature = crypto.createHash("sha256")
           .update(merchant_code + orderId + amount + api_key)
           .digest("hex");
 
@@ -345,11 +345,43 @@ export async function POST(req: Request) {
           body: JSON.stringify({
             merchantCode: merchant_code,
             paymentAmount: amount,
+            paymentMethod: "SP",
             merchantOrderId: orderId,
             productDetails: planLabel,
             email: user.email,
             phoneNumber: user.whatsapp,
             customerVaName: user.nama_lengkap,
+            itemDetails: [
+              {
+                name: planLabel,
+                price: amount,
+                quantity: 1,
+              },
+            ],
+            customerDetail: {
+              firstName: user.nama_lengkap?.split(" ")[0] || "Customer",
+              lastName: user.nama_lengkap?.split(" ").slice(1).join(" ") || "",
+              email: user.email,
+              phoneNumber: user.whatsapp || "",
+              billingAddress: {
+                firstName: user.nama_lengkap?.split(" ")[0] || "Customer",
+                lastName: user.nama_lengkap?.split(" ").slice(1).join(" ") || "",
+                address: "",
+                city: "",
+                postalCode: "",
+                phone: user.whatsapp || "",
+                countryCode: "ID",
+              },
+              shippingAddress: {
+                firstName: user.nama_lengkap?.split(" ")[0] || "Customer",
+                lastName: user.nama_lengkap?.split(" ").slice(1).join(" ") || "",
+                address: "",
+                city: "",
+                postalCode: "",
+                phone: user.whatsapp || "",
+                countryCode: "ID",
+              },
+            },
             callbackUrl: `${appUrl}/api/webhook/duitku`,
             returnUrl: `${appUrl}/dashboard?payment=success&tx=${transactionId}`,
             signature: signature,
@@ -372,7 +404,12 @@ export async function POST(req: Request) {
         }
       } catch (err: any) {
         console.error("Duitku Inquiry failed:", err.message);
-        return NextResponse.json({ error: `Pembayaran Duitku gagal: ${err.message}` }, { status: 502 });
+        if (is_sandbox) {
+          checkoutUrl = `/checkout/mock?invoice_id=${transactionId}&amount=${amount}&userId=${userId}&plan=${plan}`;
+          processedGateway = "MOCK";
+        } else {
+          return NextResponse.json({ error: `Pembayaran Duitku gagal: ${err.message}` }, { status: 502 });
+        }
       }
     }
     else if (gateway === "duitku") {

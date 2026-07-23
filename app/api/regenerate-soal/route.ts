@@ -1,8 +1,8 @@
-import { generateAIContent } from "@/lib/ai";
+import { generateAIContentWithUsage } from "@/lib/ai";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
-import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
+import { getUserPoinAccess, logFailedPoinUsage } from "@/src/services/poin-service";
+import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
 
 export async function POST(req: Request) {
   try {
@@ -154,14 +154,13 @@ Balas HANYA dalam format JSON (tanpa markdown):
 
     // Call universal AI service
     let parsed: any;
-    let rawUsage = null;
+    let aiResult: Awaited<ReturnType<typeof generateAIContentWithUsage>> | null = null;
     try {
-      const aiResult = await generateAIContent(prompt);
-      const text = aiResult.data as string || "";
-      rawUsage = aiResult.rawUsage;
+      aiResult = await generateAIContentWithUsage(prompt);
+      const text = aiResult.text || "";
 
-      if (!aiResult.success || !text) {
-        throw new Error(aiResult.error || "AI generation failed");
+      if (!text) {
+        throw new Error("AI generation failed");
       }
 
       const cleanText = text.replace(/```json|```/g, "").trim();
@@ -177,18 +176,9 @@ Balas HANYA dalam format JSON (tanpa markdown):
 
     // Deduct Poin based on actual usage
     try {
-      const poinCalc = calculatePoinFromTokens(
-        rawUsage?.promptTokenCount || 0,
-        rawUsage?.candidatesTokenCount || 0,
-        rawUsage?.cachedContentTokenCount || 0
-      );
+      await deductPoinFromAIResult({ success: true, usage: aiResult?.usage || null }, userId, "regenerate-soal", {});
 
-      await consumeUserPoin(userId, poinCalc.rawTokens, "regenerate-soal", {
-        model: "gemini-2.5-flash-lite",
-        provider: "gemini",
-      });
-
-      console.log(`[Regenerate Soal] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+      console.log(`[Regenerate Soal] Poin deducted`);
     } catch (poinError: any) {
       console.error("[Regenerate Soal] Poin deduction failed:", poinError);
     }

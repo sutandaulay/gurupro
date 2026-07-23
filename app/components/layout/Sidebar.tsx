@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { useProfileStore, useTeacherStore } from "@/lib/stores";
+import AppIcon from "@/app/components/ui/AppIcon";
+import { getLucideIcon, masterMenus, resolveCategory } from "@/lib/menuConfig";
 import {
   IconX,
   IconChevronDown,
@@ -17,155 +19,13 @@ interface SidebarProps {
   onNavigate?: () => void;
 }
 
-type SubItem = {
-  label: string;
-  href: string;
-};
-
-type MenuItem = {
-  label: string;
-  icon: string;
-  href?: string;
-  submenu?: SubItem[];
-};
-
-const menuItems: MenuItem[] = [
-  { label: "Dasbor", icon: "📊", href: "/dashboard" },
-  {
-    label: "Master Data",
-    icon: "🗄️",
-    href: "/dashboard?module=sekolah",
-  },
-  {
-    label: "Presensi",
-    icon: "⏱️",
-    submenu: [
-      { label: "Presensi Saya", href: "/attendance" },
-      { label: "Presensi Mengajar", href: "/attendance/teaching" },
-      { label: "Pengajuan Izin", href: "/attendance/leave" },
-      { label: "Laporan Presensi", href: "/reports/attendance" },
-      { label: "Rekap TPG", href: "/reports/tpg" },
-    ],
-  },
-  {
-    label: "Administrasi",
-    icon: "📋",
-    submenu: [
-      { label: "AI Silabus", href: "/dashboard/administrasi?tipe=silabus" },
-      { label: "Program Tahunan (Prota)", href: "/dashboard/prota" },
-      { label: "Program Semester (Prosem)", href: "/dashboard/prosem" },
-      { label: "ATP Editor", href: "/dashboard/atp-editor" },
-      { label: "AI Modul Ajar", href: "/dashboard/administrasi?tipe=modul_ajar" },
-      { label: "AI RPP", href: "/dashboard/administrasi?tipe=rpp" },
-      { label: "AI LKPD", href: "/dashboard/administrasi?tipe=lkpd" },
-      { label: "AI Bahan Ajar", href: "/dashboard/administrasi?tipe=bahan_ajar" },
-      { label: "Buat Soal AI", href: "/dashboard?module=soal" },
-    ],
-  },
-  {
-    label: "Monitoring",
-    icon: "📊",
-    submenu: [
-      { label: "Jurnal Mengajar", href: "/dashboard?module=jurnal" },
-      { label: "Kalender Akademik", href: "/dashboard?module=kalender" },
-      { label: "Supervisi & Analitik", href: "/dashboard?module=supervisi_analitik" },
-      { label: "Tugas Harian", href: "/dashboard?module=tugas_harian" },
-      { label: "Pengingat", href: "/dashboard?module=scheduler" },
-    ],
-  },
-  {
-    label: "AI",
-    icon: "💬",
-    submenu: [
-      { label: "Chat AI", href: "/dashboard/chat" },
-      { label: "AI Performance Report", href: "/dashboard/ai-performance-report" },
-      { label: "Deep Learning", href: "/dashboard" },
-    ],
-  },
-  {
-    label: "Buku Nilai",
-    icon: "📚",
-    href: "/dashboard?module=nilai",
-  },
-  {
-    label: "Laporan",
-    icon: "📝",
-    submenu: [
-      { label: "Laporan Harian", href: "/dashboard/laporan-harian" },
-      { label: "Laporan Kinerja", href: "/dashboard/laporan-kinerja" },
-      { label: "Evidence", href: "/dashboard/evidence" },
-      { label: "Status Raport", href: "/dashboard/raport-status" },
-      { label: "Review Nilai Raport", href: "/dashboard/rapor-review" },
-      { label: "Layout Raport", href: "/dashboard/layout-raport" },
-      { label: "Pemetaan Kolom Raport", href: "/dashboard/pemetaan-kolom" },
-    ],
-  },
-  {
-    label: "Pengembangan Diri",
-    icon: "🌱",
-    submenu: [
-      { label: "Daftar Kegiatan", href: "/dashboard/pengembangan-diri" },
-      { label: "Buat Baru", href: "/dashboard/pengembangan-diri/tambah" },
-      { label: "Sertifikat", href: "/dashboard/pengembangan-diri?tab=documents" },
-    ],
-  },
-  {
-    label: "Wali Kelas",
-    icon: "👥",
-    submenu: [
-      { label: "Dashboard Wali Kelas", href: "/dashboard/wali-kelas" },
-      { label: "Daftar Siswa", href: "/dashboard/wali-kelas?tab=siswa" },
-      { label: "Catatan Wali Kelas", href: "/dashboard/wali-kelas?tab=catatan" },
-      { label: "Laporan Wali Kelas", href: "/dashboard/wali-kelas?tab=laporan" },
-    ],
-  },
-  {
-    label: "Pembina Eskul",
-    icon: "🏅",
-    submenu: [
-      { label: "Dashboard Pembina", href: "/dashboard/pembina-ekskul" },
-      { label: "Daftar Kegiatan", href: "/dashboard/pembina-ekskul?tab=daftar" },
-      { label: "Penilaian", href: "/dashboard/pembina-ekskul?tab=penilaian" },
-      { label: "Laporan", href: "/dashboard/pembina-ekskul?tab=laporan" },
-    ],
-  },
-  {
-    label: "Institusi",
-    icon: "🏛️",
-    submenu: [
-      { label: "Manajemen Institusi", href: "/dashboard/institution" },
-      { label: "Anggota Institusi", href: "/dashboard/institution/members" },
-      { label: "Pengaturan Institusi", href: "/dashboard/institution/settings" },
-    ],
-  },
-  {
-    label: "Keuangan",
-    icon: "💰",
-    href: "/dashboard?module=keuangan",
-  },
-  {
-    label: "Brankas",
-    icon: "🗂️",
-    href: "/dashboard/brankas",
-  },
-  {
-    label: "Pengaturan",
-    icon: "⚙️",
-    href: "/profile?tab=pengaturan",
-  },
-  {
-    label: "Billing",
-    icon: "💳",
-    href: "/dashboard/billing",
-  },
-];
-
 export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { data: session } = useSession();
   const profile = useProfileStore(s => s.profile);
   const [expandedItems, setExpandedItems] = useState<{[key: string]: boolean}>({});
+  const [roleFlags, setRoleFlags] = useState<{ isWaliKelas: boolean; isPembinaEkskul: boolean } | null>(null);
 
   const {
     schools,
@@ -174,6 +34,21 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
   } = useTeacherStore();
   const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false);
   const [tokenStatus, setTokenStatus] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchRoleFlags = async () => {
+      try {
+        const res = await fetch('/api/user/role-flags');
+        if (res.ok) {
+          const data = await res.json();
+          setRoleFlags(data);
+        }
+      } catch {
+        // silently fail
+      }
+    };
+    fetchRoleFlags();
+  }, []);
 
   const handleSchoolChange = (schoolId: string) => {
     setActiveSchool(schoolId);
@@ -416,78 +291,89 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
           {/* Divider jika pemilih sekolah aktif tampil */}
           {schools.length > 0 && <div className="border-b border-gray-100/80 mb-4 mx-2" />}
 
-          {menuItems.map((item) => {
+          {(() => {
+            const visibleMenus = roleFlags
+              ? masterMenus.filter((item) => {
+                  if (item.label === "Wali Kelas" && !roleFlags.isWaliKelas) return false;
+                  if (item.label === "Pembina Eskul" && !roleFlags.isPembinaEkskul) return false;
+                  return true;
+                })
+              : masterMenus;
 
+            return visibleMenus.map((item) => {
+              const Icon = getLucideIcon(item.label);
 
-            if (item.href && !item.submenu) {
-              const resolvedHref = resolveHref(item.href);
-              const active = isActive(resolvedHref);
-              return (
-                <Link
-                  key={item.label}
-                  href={resolvedHref}
-                  onClick={(e) => handleNavigateClick(e, resolvedHref)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer mb-1 ${
-                    active
-                      ? "bg-violet-600 text-white shadow-md shadow-violet-500/10"
-                      : "text-gray-600 hover:bg-gray-100"
-                  }`}
-                >
-                  <span>{item.icon}</span>
-                  <span className="flex-1 text-left">{item.label}</span>
-                </Link>
-              );
-            }
-
-            const expanded = isExpanded(item.label);
-            const anyChildActive = item.submenu?.some((s) => isActive(s.href)) || false;
-
-            return (
-              <div key={item.label} className="mb-1">
-                <button
-                  onClick={() => toggleExpand(item.label)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                    anyChildActive && !expanded
-                      ? "bg-violet-50 text-violet-650 font-semibold"
-                      : "text-gray-600 hover:bg-gray-100"
-                  }`}
-                >
-                  <span>{item.icon}</span>
-                  <span className="flex-1 text-left">{item.label}</span>
-                  <IconChevronDown
-                    size={16}
-                    stroke={1.5}
-                    className={`transition-transform duration-200 text-gray-400 ${
-                      expanded ? "rotate-180" : ""
+              if (item.href && !item.submenu) {
+                const resolvedHref = resolveHref(item.href);
+                const active = isActive(resolvedHref);
+                return (
+                  <Link
+                    key={item.label}
+                    href={resolvedHref}
+                    onClick={(e) => handleNavigateClick(e, resolvedHref)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer mb-1 ${
+                      active
+                        ? "bg-violet-600 text-white shadow-md shadow-violet-500/10"
+                        : "text-gray-600 hover:bg-gray-100"
                     }`}
-                  />
-                </button>
-                {expanded && item.submenu && (
-                  <div className="ml-4 mt-1 mb-1 rounded-lg bg-gray-50/60 border border-gray-100/80 overflow-hidden">
-                    {item.submenu.map((sub) => {
-                      const resolvedHref = resolveHref(sub.href);
-                      const active = isActive(resolvedHref);
-                      return (
-                        <Link
-                          key={sub.label}
-                          href={resolvedHref}
-                          onClick={(e) => handleNavigateClick(e, resolvedHref)}
-                          className={`flex items-center gap-3 px-4 py-2.5 text-xs transition-colors cursor-pointer ${
-                            active
-                              ? "bg-violet-50 text-violet-700 font-semibold border-l-2 border-violet-600"
-                              : "text-gray-600 hover:bg-gray-100/80"
-                          }`}
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0"></span>
-                          <span className="truncate">{sub.label}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  >
+                    {Icon && <AppIcon label={item.label} size={40} iconSize={20} category={resolveCategory(item.label)} active={active} icon={<Icon />} />}
+                    <span className="flex-1 text-left">{item.label}</span>
+                  </Link>
+                );
+              }
+
+              const expanded = isExpanded(item.label);
+              const anyChildActive = item.submenu?.some((s) => isActive(s.href)) || false;
+
+              return (
+                <div key={item.label} className="mb-1">
+                  <button
+                    onClick={() => toggleExpand(item.label)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                      anyChildActive && !expanded
+                        ? "bg-violet-50 text-violet-650 font-semibold"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    {Icon && <AppIcon label={item.label} size={40} iconSize={20} category={resolveCategory(item.label)} active={anyChildActive} icon={<Icon />} />}
+                    <span className="flex-1 text-left">{item.label}</span>
+                    <IconChevronDown
+                      size={16}
+                      stroke={1.5}
+                      className={`transition-transform duration-200 text-gray-400 ${
+                        expanded ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                  {expanded && item.submenu && (
+                    <div className="ml-4 mt-1 mb-1 rounded-lg bg-gray-50/60 border border-gray-100/80 overflow-hidden">
+                      {item.submenu.map((sub) => {
+                        const resolvedHref = resolveHref(sub.href);
+                        const active = isActive(resolvedHref);
+                        const SubIcon = getLucideIcon(sub.label);
+                        return (
+                          <Link
+                            key={sub.label}
+                            href={resolvedHref}
+                            onClick={(e) => handleNavigateClick(e, resolvedHref)}
+                            className={`flex items-center gap-3 px-4 py-2.5 text-xs transition-colors cursor-pointer ${
+                              active
+                                ? "bg-violet-50 text-violet-700 font-semibold border-l-2 border-violet-600"
+                                : "text-gray-600 hover:bg-gray-100/80"
+                            }`}
+                          >
+                            {SubIcon && <AppIcon label={sub.label} size={28} iconSize={14} category={resolveCategory(sub.label)} active={active} icon={<SubIcon />} />}
+                            <span className="truncate">{sub.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            });
+          })()}
         </nav>
 
         <div className="border-t border-gray-150 p-4 bg-white sticky bottom-0">
@@ -519,14 +405,14 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <span className={`text-[9px] font-bold uppercase tracking-wider block ${labelColor}`}>
-                      Sisa Token AI
+                      Sisa Poin AI
                     </span>
                     <div className="flex items-baseline gap-1 mt-0.5">
                       <span className={`text-lg font-extrabold leading-none ${balanceColor}`}>
                         {balance.toLocaleString("id-ID")}
                       </span>
                       <span className={`text-[9px] font-bold ${isZero ? 'text-red-500' : isLow ? 'text-amber-500' : 'text-violet-500'}`}>
-                        Token
+                        Poin
                       </span>
                     </div>
                   </div>
@@ -544,7 +430,7 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
                 {isLow && (
                   <div className="mt-2 pt-1.5 border-t border-dashed border-current/10 flex items-center justify-between gap-1 text-[8px] font-bold">
                     <span className={isZero ? "text-red-650" : "text-amber-750"}>
-                      {isZero ? "Token habis!" : "Token hampir habis!"}
+                      {isZero ? "Poin habis!" : "Poin hampir habis!"}
                     </span>
                     <a
                       href="/dashboard/billing?tab=token"

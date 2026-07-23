@@ -87,7 +87,7 @@ async function createPricingTable() {
         gracePeriodDays: 0,
         description: "Uji coba awal fitur GuruPRO",
         features: JSON.stringify([
-          { feature: "10 Token Kuota Sekali" },
+          { feature: "10 Poin Kuota Sekali" },
           { feature: "Masa Aktif 30 Hari" },
           { feature: "Generator Soal (LOTS C1-C3)" },
           { feature: "Dukungan Kurikulum Merdeka" }
@@ -105,7 +105,7 @@ async function createPricingTable() {
         gracePeriodDays: 7,
         description: "Pendamping mengajar 1 triwulan",
         features: JSON.stringify([
-          { feature: "500 Token Kuota Utama" },
+          { feature: "500 Poin Kuota Utama" },
           { feature: "Masa Aktif 90 Hari" },
           { feature: "Generator Soal HOTS (C4-C6)" },
           { feature: "Cetak Lembar Jawaban Resmi" },
@@ -124,7 +124,7 @@ async function createPricingTable() {
         gracePeriodDays: 14,
         description: "Persiapan matang untuk 2 semester",
         features: JSON.stringify([
-          { feature: "1100 Token Kuota Utama" },
+          { feature: "1100 Poin Kuota Utama" },
           { feature: "Masa Aktif 180 Hari" },
           { feature: "Generator Soal HOTS (C4-C6)" },
           { feature: "Cetak Lembar Jawaban Resmi" },
@@ -143,7 +143,7 @@ async function createPricingTable() {
         gracePeriodDays: 14,
         description: "Efisiensi maksimal jangka panjang",
         features: JSON.stringify([
-          { feature: "2500 Token Kuota Utama" },
+          { feature: "2500 Poin Kuota Utama" },
           { feature: "Masa Aktif 365 Hari" },
           { feature: "Generator Soal HOTS (C4-C6)" },
           { feature: "Cetak Lembar Jawaban Resmi" },

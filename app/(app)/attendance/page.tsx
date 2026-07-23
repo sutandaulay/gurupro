@@ -2,18 +2,18 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Clock, Building, AlertTriangle } from 'lucide-react';
+import { Clock, Building, AlertTriangle, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { FaceCaptureWidget } from '@/components/attendance/FaceCaptureWidget';
 import { GeoValidationBadge } from '@/components/attendance/GeoValidationBadge';
 import { QRScanWidget } from '@/components/attendance/QRScanWidget';
 import { AttendanceConfirmCard } from '@/components/attendance/AttendanceConfirmCard';
-import { EnhancedInstitutionSelector } from '@/components/attendance/EnhancedInstitutionSelector';
 import { ScheduleSelector, type TeachingSession } from '@/components/attendance/ScheduleSelector';
 import { SubjectSessionSelector, type Subject } from '@/components/attendance/SubjectSessionSelector';
 
@@ -34,12 +34,22 @@ interface Institution {
 interface Assignment {
   id: string;
   institutionId: string;
+  institutionName: string;
+  institutionLocation: {
+    latitude: number;
+    longitude: number;
+  };
+  institutionSettings: {
+    attendanceRadiusMeters: number;
+    qrCodeEnabled: boolean;
+  };
   subjects: Subject[];
   todaySchedule: string[];
   workingHours?: { start: string; end: string };
-  status: string;
+  status: 'aktif' | 'nonaktif';
+  isSchool?: boolean;
   todayAttendance?: {
-    status: string;
+    status: 'belum_absen' | 'hadir' | 'check_in_only' | 'completed';
     checkIn?: any;
     checkOut?: any;
     teachingSessions?: any[];
@@ -51,17 +61,33 @@ interface TeacherDashboard {
   date: string;
   dayName: string;
   assignments: Assignment[];
+  schoolAssignments: Assignment[];
+  dutyAssignmentsToday: DutyAssignment[];
   workingHours: { start: string; end: string; currentTime: string };
 }
 
+interface DutyAssignment {
+  id: string;
+  teacherId: string;
+  schoolId?: string;
+  institutionId?: string;
+  date: string;
+  purpose?: string;
+  locationLatitude?: number;
+  locationLongitude?: number;
+  radiusMeters?: number;
+  status: string;
+  approvedBy?: string;
+  createdAt?: string;
+}
+
 interface AttendanceResult {
-  type: 'check-in' | 'check-out' | 'teaching-start' | 'teaching-end';
+  type: 'check-in' | 'check-out';
   success: boolean;
   timestamp: string;
   institutionName: string;
   distanceFromInstitution?: number;
   faceMatchScore?: number;
-  trustScore?: number;
   status?: 'valid' | 'flagged' | 'rejected';
   flagReasons?: string[];
   sessionId?: string;
@@ -69,6 +95,7 @@ interface AttendanceResult {
 }
 
 export default function AttendancePage() {
+  const router = useRouter();
   const { data: session } = useSession();
   const [dashboardData, setDashboardData] = useState<TeacherDashboard | null>(null);
   const [selectedInstitution, setSelectedInstitution] = useState<Institution | null>(null);
@@ -76,7 +103,11 @@ export default function AttendancePage() {
   const [selectedSessions, setSelectedSessions] = useState<TeachingSession[]>([]);
   const [activeSessions, setActiveSessions] = useState<TeachingSession[]>([]);
   const [showScheduleSelector, setShowScheduleSelector] = useState(false);
-  const [view, setView] = useState<'institution-select' | 'schedule-select' | 'attendance'>('institution-select');
+  const [view, setView] = useState<'institution-select' | 'schedule-select' | 'attendance'>('attendance');
+  const [dutyAssignmentsToday, setDutyAssignmentsToday] = useState<DutyAssignment[]>([]);
+  const [showDutyForm, setShowDutyForm] = useState(false);
+  const [dutyForm, setDutyForm] = useState({ date: '', purpose: '', latitude: '', longitude: '', radiusMeters: 50 });
+  const [submittingDuty, setSubmittingDuty] = useState(false);
 
   // Attendance state
   const [isCheckingIn, setIsCheckingIn] = useState(false);
@@ -108,10 +139,15 @@ export default function AttendancePage() {
 
       const data = await res.json();
       setDashboardData(data.data);
+      setDutyAssignmentsToday(data.data?.dutyAssignmentsToday || []);
 
       // Auto-select if only one assignment
-      if (data.data?.assignments?.length === 1) {
-        const assignment = data.data.assignments[0];
+      const allAssignments = [
+        ...(data.data?.assignments || []),
+        ...(data.data?.schoolAssignments || []),
+      ];
+      if (allAssignments.length === 1) {
+        const assignment = allAssignments[0];
         setSelectedInstitution({
           id: assignment.institutionId,
           name: assignment.institutionName || 'Institusi',
@@ -209,8 +245,8 @@ export default function AttendancePage() {
   };
 
   // Handle face capture
-  const handleFaceCapture = (data: { embedding: string; faceMatchScore: number; livenessPassed: boolean }) => {
-    setFaceEmbedding(data.embedding);
+  const handleFaceCapture = (data: { embedding: Float32Array | null; faceMatchScore: number; livenessPassed: boolean }) => {
+    setFaceEmbedding(data.embedding ? JSON.stringify(Array.from(data.embedding)) : null);
     setFaceMatchScore(data.faceMatchScore);
     setLivenessPassed(data.livenessPassed);
     toast.success('Wajah berhasil diverifikasi!');
@@ -225,7 +261,10 @@ export default function AttendancePage() {
   // Handle institution selection
   const handleInstitutionSelect = (institution: Institution, assignment: Assignment) => {
     setSelectedInstitution(institution);
-    setSelectedAssignment(assignment);
+    setSelectedAssignment({ 
+      ...assignment, 
+      isSchool: !!dashboardData?.schoolAssignments?.find((a) => a.institutionId === assignment.institutionId) 
+    });
 
     // Check if already checked in today
     if (assignment.todayAttendance?.status !== 'belum_absen') {
@@ -245,21 +284,34 @@ export default function AttendancePage() {
     }
   };
 
-  // Handle schedule confirmation
-  const handleScheduleConfirm = (sessions: TeachingSession[], checkInNow: boolean) => {
+   // Handle schedule confirmation
+   const handleScheduleConfirm = (sessions: TeachingSession[], checkInNow: boolean) => {
     setSelectedSessions(sessions);
     if (checkInNow) {
-      // Auto trigger check-in
-      handleCheckIn();
+      const isSchool = selectedAssignment?.isSchool;
+      if (isSchool) {
+        handleCheckIn({ schoolId: selectedAssignment?.institutionId });
+      } else {
+        handleCheckIn();
+      }
     } else {
-      // Just go to attendance view
       setView('attendance');
     }
   };
 
-  // Check-in
-  const handleCheckIn = async () => {
-    if (!selectedInstitution || !location) {
+   // Check-in
+   const handleCheckIn = async (options?: { schoolId?: string; dutyAssignmentId?: string; institutionId?: string }) => {
+    const targetSchoolId = options?.schoolId;
+    const targetDutyId = options?.dutyAssignmentId;
+    const targetInstitutionId = options?.institutionId;
+    const isSchool = !!targetSchoolId;
+
+    if (!isSchool && !selectedInstitution && !targetInstitutionId) {
+      toast.error('Pilih sekolah atau institusi terlebih dahulu');
+      return;
+    }
+
+    if (!location) {
       toast.error('Harap perbarui lokasi terlebih dahulu');
       return;
     }
@@ -271,37 +323,70 @@ export default function AttendancePage() {
 
     setIsCheckingIn(true);
     try {
-      const response = await fetch('/api/attendance/check-in', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          faceEmbedding,
-          faceMatchScore,
-          livenessPassed,
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: location.accuracy,
-          institutionId: selectedInstitution.id,
-          assignmentId: selectedAssignment?.id,
-          qrCodeVerified: !!qrToken,
-          browserFingerprint,
-        }),
-      });
+      let result: any;
+      let successMessage = '';
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Gagal check-in');
+      if (isSchool) {
+        const today = new Date().toISOString().split('T')[0];
+        const res = await fetch('/api/attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'teacher',
+            school_id: targetSchoolId,
+            tanggal: today,
+            status: 'hadir',
+            catatan: targetDutyId ? 'Presensi tugas luar dengan verifikasi wajah dan lokasi' : 'Presensi via aplikasi dengan verifikasi wajah dan lokasi',
+            face_match_score: faceMatchScore,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy: location.accuracy,
+            liveness_passed: livenessPassed,
+          }),
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Gagal check-in sekolah');
+        }
+
+        result = await res.json();
+        successMessage = 'Presensi sekolah berhasil dicatat';
+      } else {
+        const response = await fetch('/api/attendance/check-in', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            faceEmbedding,
+            faceMatchScore,
+            livenessPassed,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy: location.accuracy,
+            institutionId: targetInstitutionId || selectedInstitution?.id,
+            assignmentId: targetDutyId || selectedAssignment?.id,
+            qrCodeVerified: !!qrToken,
+            browserFingerprint,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Gagal check-in');
+        }
+
+        result = await response.json();
+        successMessage = result.message || 'Check-in berhasil!';
       }
 
-      const result = await response.json();
       setAttendanceResult({
         ...result,
         type: 'check-in',
         timestamp: new Date().toLocaleString('id-ID'),
-        institutionName: selectedInstitution.name,
+        institutionName: isSchool ? 'Sekolah Mandiri' : (targetInstitutionId ? selectedInstitution?.name : selectedInstitution?.name) || '',
       });
       setView('attendance');
-      toast.success('Check-in berhasil!');
+      toast.success(successMessage);
 
       // Refresh dashboard
       fetchDashboard();
@@ -309,6 +394,44 @@ export default function AttendancePage() {
       toast.error(err.message || 'Gagal check-in');
     } finally {
       setIsCheckingIn(false);
+    }
+  };
+
+  // Submit duty assignment
+  const handleSubmitDuty = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dutyForm.date || !dutyForm.purpose) {
+      toast.error('Tanggal dan tujuan wajib diisi');
+      return;
+    }
+
+    setSubmittingDuty(true);
+    try {
+      const res = await fetch('/api/attendance/duty-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: dutyForm.date,
+          purpose: dutyForm.purpose,
+          location_latitude: dutyForm.latitude ? parseFloat(dutyForm.latitude) : null,
+          location_longitude: dutyForm.longitude ? parseFloat(dutyForm.longitude) : null,
+          radius_meters: dutyForm.radiusMeters,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Gagal mengajukan');
+      }
+
+      toast.success('Pengajuan tugas luar berhasil dikirim');
+      setShowDutyForm(false);
+      setDutyForm({ date: '', purpose: '', latitude: '', longitude: '', radiusMeters: 50 });
+      fetchDashboard();
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mengajukan tugas luar');
+    } finally {
+      setSubmittingDuty(false);
     }
   };
 
@@ -512,9 +635,9 @@ export default function AttendancePage() {
     );
   }
 
-  // Institution selection view
-  if (view === 'institution-select' && dashboardData?.assignments) {
-    const institutions = dashboardData.assignments.map((a) => ({
+   // Institution selection view
+   if (view === 'institution-select' && dashboardData) {
+    const institutions = (dashboardData.assignments || []).map((a) => ({
       id: a.institutionId,
       name: a.institutionName || 'Institusi',
       location: a.institutionLocation
@@ -527,6 +650,20 @@ export default function AttendancePage() {
           ? JSON.parse(a.institutionSettings)
           : a.institutionSettings)
         : { attendanceRadiusMeters: 100, qrCodeEnabled: false },
+    }));
+
+    const schoolOptions = (dashboardData.schoolAssignments || []).map((a) => ({
+      id: a.institutionId,
+      name: a.institutionName || 'Sekolah',
+      location: a.institutionLocation || { latitude: -6.2, longitude: 106.8 },
+      attendanceSettings: a.institutionSettings || { attendanceRadiusMeters: 100, qrCodeEnabled: false },
+      isSchool: true as const,
+    }));
+
+    type SelectableInstitution = Institution & { isSchool?: boolean };
+    const allOptions: SelectableInstitution[] = [...institutions, ...schoolOptions].map((opt: SelectableInstitution) => ({
+      ...opt,
+      isSchool: !!opt.isSchool,
     }));
 
     return (
@@ -548,12 +685,37 @@ export default function AttendancePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <EnhancedInstitutionSelector
-                institutions={institutions}
-                assignments={dashboardData.assignments}
-                onSelect={handleInstitutionSelect}
-                currentInstitutionId={selectedInstitution?.id}
-              />
+              {allOptions.length === 0 ? (
+                <div className="text-center py-8 text-sm text-slate-500">
+                  Belum ada institusi atau sekolah yang terdaftar.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {allOptions.map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => {
+                        setSelectedInstitution(opt);
+                        const assignment = dashboardData?.assignments?.find((a: any) => a.institutionId === opt.id)
+                          || dashboardData?.schoolAssignments?.find((a: any) => a.institutionId === opt.id);
+                        setSelectedAssignment(assignment || null);
+                        if (assignment?.todayAttendance?.status !== 'belum_absen') {
+                          setView('attendance');
+                        } else {
+                          setShowScheduleSelector(true);
+                          setView('schedule-select');
+                        }
+                      }}
+                      className="w-full text-left p-4 rounded-xl border border-slate-200 hover:border-indigo-400 hover:shadow-sm transition"
+                    >
+                      <div className="font-bold text-sm">{opt.name}</div>
+                      <div className="text-[10px] text-slate-500 mt-1">
+                        {opt.isSchool ? 'Sekolah Mandiri' : 'Institusi Terinstansi'} • Radius: {opt.attendanceSettings.attendanceRadiusMeters}m
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -599,10 +761,14 @@ export default function AttendancePage() {
     );
   }
 
-  // Main attendance view
-  return (
+   // Main attendance view
+   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
+        <Button variant="ghost" onClick={() => router.back()} className="gap-2">
+          <span>←</span>
+          <span>Kembali</span>
+        </Button>
         {/* Header */}
         <Card>
           <CardHeader className="pb-2">
@@ -622,6 +788,142 @@ export default function AttendancePage() {
             </div>
           </CardHeader>
         </Card>
+
+        {/* Duty Assignment Section */}
+        {dutyAssignmentsToday.length > 0 && (
+          <Card className="border-emerald-200 bg-emerald-50/40">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FileText className="h-4 w-4 text-emerald-600" />
+                Tugas Luar Hari Ini
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {dutyAssignmentsToday.map((duty) => (
+                <div key={duty.id} className="p-3 bg-white rounded-xl border border-emerald-100 text-xs space-y-1">
+                  <div className="font-bold text-emerald-800">{duty.purpose || 'Tugas Luar'}</div>
+                  <div className="text-slate-600">
+                    {duty.locationLatitude && duty.locationLongitude && (
+                      <span>Lokasi: {typeof duty.locationLatitude === 'number' ? duty.locationLatitude.toFixed(5) : 'N/A'}, {typeof duty.locationLongitude === 'number' ? duty.locationLongitude.toFixed(5) : 'N/A'} • </span>
+                    )}
+                    Radius: {duty.radiusMeters || 50}m
+                  </div>
+                  <div className="text-[10px] text-slate-500">Status: {duty.status}</div>
+                  <Button
+                    size="sm"
+                    className="mt-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={() => {
+                      setSelectedInstitution({
+                        id: duty.institutionId || duty.schoolId || '',
+                        name: duty.purpose || 'Tugas Luar',
+                        location: {
+                          latitude: duty.locationLatitude ?? -6.2088,
+                          longitude: duty.locationLongitude ?? 106.8456,
+                        },
+                        attendanceSettings: {
+                          attendanceRadiusMeters: duty.radiusMeters || 50,
+                          qrCodeEnabled: false,
+                        },
+                      });
+                      handleCheckIn({ 
+                        dutyAssignmentId: duty.id,
+                        schoolId: duty.schoolId 
+                      });
+                    }}
+                    disabled={isCheckingIn || !location || !faceEmbedding}
+                  >
+                    Check-in Tugas Luar
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {!dutyAssignmentsToday.length && (
+          <Card className="border-dashed">
+            <CardContent className="py-3 flex items-center justify-between">
+              <div className="text-xs text-slate-500">Belum ada tugas luar hari ini</div>
+              <Button size="sm" variant="outline" onClick={() => setShowDutyForm((v) => !v)}>
+                {showDutyForm ? 'Batal' : 'Ajukan Tugas Luar'}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {showDutyForm && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FileText className="h-4 w-4" />
+                Ajukan Tugas Luar
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmitDuty} className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block mb-1">Tanggal *</label>
+                    <input
+                      type="date"
+                      value={dutyForm.date}
+                      onChange={(e) => setDutyForm((f) => ({ ...f, date: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block mb-1">Radius (meter)</label>
+                    <input
+                      type="number"
+                      value={dutyForm.radiusMeters}
+                      onChange={(e) => setDutyForm((f) => ({ ...f, radiusMeters: parseInt(e.target.value) || 0 }))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1">Tujuan Kegiatan *</label>
+                  <input
+                    type="text"
+                    value={dutyForm.purpose}
+                    onChange={(e) => setDutyForm((f) => ({ ...f, purpose: e.target.value }))}
+                    placeholder="Contoh: Seminar Kurikulum di GBK"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block mb-1">Latitude (opsional)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={dutyForm.latitude}
+                      onChange={(e) => setDutyForm((f) => ({ ...f, latitude: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block mb-1">Longitude (opsional)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={dutyForm.longitude}
+                      onChange={(e) => setDutyForm((f) => ({ ...f, longitude: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button size="sm" type="submit" disabled={submittingDuty}>
+                    {submittingDuty ? 'Mengirim...' : 'Kirim Pengajuan'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Location Validation */}
         {selectedInstitution && (
@@ -646,7 +948,7 @@ export default function AttendancePage() {
         {/* Check-in/Check-out Buttons */}
         <div className="grid grid-cols-2 gap-3">
           <Button
-            onClick={handleCheckIn}
+            onClick={() => handleCheckIn()}
             disabled={isCheckingIn || !location || !faceEmbedding}
             className="h-11"
             size="sm"

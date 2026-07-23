@@ -1,9 +1,9 @@
 /**
- * TokenHabisModal Component
+ * PoinHabisModal Component
  *
- * Modal yang muncul saat token tidak mencukupi.
+ * Modal yang muncul saat poin tidak mencukupi.
  * Memberikan opsi:
- * 1. Beli Token Eceran (Top-Up)
+ * 1. Beli Poin Ekstra (Top-Up)
  * 2. Upgrade Paket
  * 3. Hubungi Admin
  *
@@ -11,7 +11,7 @@
  * ```tsx
  * const { showTokenModal, shortfall, closeModal, openTopUpModal } = useTokenError();
  *
- * <TokenHabisModal
+ * <PoinHabisModal
  *   open={showTokenModal}
  *   shortfall={shortfall}
  *   onClose={closeModal}
@@ -28,9 +28,9 @@ import dynamic from "next/dynamic";
 import { IconX, IconCreditCard, IconRocket, IconHelp } from "@tabler/icons-react";
 
 // Lazy load TopUp modal to avoid SSR issues
-const TokenTopUpModal = dynamic(() => import("./TokenTopUpModal"), { ssr: false });
+const PoinTopUpModal = dynamic(() => import("./PoinTopUpModal"), { ssr: false });
 
-interface TokenHabisModalProps {
+interface PoinHabisModalProps {
   open: boolean;
   shortfall?: number;
   currentAddon?: number;
@@ -40,7 +40,7 @@ interface TokenHabisModalProps {
   userId?: string | null;
 }
 
-export default function TokenHabisModal({
+export default function PoinHabisModal({
   open,
   shortfall = 0,
   currentAddon = 0,
@@ -48,7 +48,7 @@ export default function TokenHabisModal({
   onBuyTopUp,
   onUpgrade,
   userId,
-}: TokenHabisModalProps) {
+}: PoinHabisModalProps) {
   const [showTopUpInner, setShowTopUpInner] = useState(false);
 
   useEffect(() => {
@@ -99,7 +99,7 @@ export default function TokenHabisModal({
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Token Habis!</h3>
+                  <h3 className="text-lg font-bold text-white">Poin Habis!</h3>
                   <p className="text-xs text-violet-100">
                     Kuota utama Anda sudah terpakai
                   </p>
@@ -122,12 +122,12 @@ export default function TokenHabisModal({
                 <span className="text-2xl">⚡</span>
                 <div>
                   <p className="text-sm font-semibold text-amber-800 mb-1">
-                    Butuh {shortfall > 0 ? shortfall : "~"} Token Lagi
+                    Butuh {shortfall > 0 ? shortfall : "~"} Poin Lagi
                   </p>
                   <p className="text-xs text-amber-700">
                     {currentAddon > 0
-                      ? `Anda masih punya ${currentAddon} token ekstra yang bisa dipakai setelah kuota utama habis.`
-                      : "Kuota utama reset setiap awal bulan. Beli token ekstra untuk kebutuhan tambahan."}
+                      ? `Anda masih punya ${currentAddon} poin ekstra yang bisa dipakai setelah kuota utama habis.`
+                      : "Kuota utama reset setiap awal bulan. Beli poin ekstra untuk kebutuhan tambahan."}
                   </p>
                 </div>
               </div>
@@ -135,7 +135,7 @@ export default function TokenHabisModal({
 
             {/* Options */}
             <div className="space-y-3">
-              {/* Option 1: Beli Token Ekstra */}
+              {/* Option 1: Beli Poin Ekstra */}
               <button
                 onClick={handleBuyTopUp}
                 className="w-full flex items-center gap-4 p-4 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-xl transition-all group"
@@ -144,7 +144,7 @@ export default function TokenHabisModal({
                   <IconCreditCard size={24} />
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="font-semibold text-gray-900">Beli Token Ekstra</p>
+                  <p className="font-semibold text-gray-900">Beli Poin Ekstra</p>
                   <p className="text-xs text-gray-500">
                     Top-up instan, langsung bisa dipakai
                   </p>
@@ -191,9 +191,9 @@ export default function TokenHabisModal({
 
             {/* Footer Note */}
             <p className="mt-5 text-center text-xs text-gray-400">
-              Token ekstra tidak hangus saat reset bulanan.
+              Poin ekstra tidak hangus saat reset bulanan.
               <br />
-              Sisa token utama tidak diakumulasi ke bulan berikutnya.
+              Sisa poin utama tidak diakumulasi ke bulan berikutnya.
             </p>
           </div>
         </div>
@@ -202,7 +202,7 @@ export default function TokenHabisModal({
       {/* Nested Top-Up Modal */}
       {showTopUpInner && (
         <div className="fixed inset-0 z-[110]">
-          <TokenTopUpModal
+          <PoinTopUpModal
             open={showTopUpInner}
             onClose={handleCloseTopUp}
             userId={userId}

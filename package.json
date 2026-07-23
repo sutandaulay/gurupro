@@ -50,6 +50,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.2",
+    "exceljs": "^4.4.0",
     "face-api.js": "^0.22.2",
     "graphql": "^16.14.2",
     "jsonrepair": "^3.15.0",

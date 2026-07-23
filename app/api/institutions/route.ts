@@ -27,8 +27,8 @@ export async function GET() {
       cmsUserId = cmsUserResult.rows[0].id;
     } else {
       const newCmsUser = await pgQuery(
-        `INSERT INTO payload.cms_users (name, email, password, role, salt, hash, updated_at, created_at)
-         VALUES ($1, $2, '', 'admin', '', '', NOW(), NOW())
+        `INSERT INTO payload.cms_users (name, email, role, salt, hash, pdp_consent_given, pdp_consent_version, pdp_consent_consented_at, created_at, updated_at)
+         VALUES ($1, $2, 'admin', '', '', true, '1.0', NOW(), NOW(), NOW())
          RETURNING id`,
         [userFullName, userEmail]
       );

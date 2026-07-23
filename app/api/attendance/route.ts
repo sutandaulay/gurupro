@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     const { type } = body;
 
     if (type === "teacher") {
-      const { school_id, tanggal, status, catatan } = body;
+      const { school_id, tanggal, status, catatan, face_match_score, latitude, longitude, accuracy, liveness_passed } = body;
 
       if (!school_id || !tanggal || !status) {
         return NextResponse.json({ error: "school_id, tanggal, dan status wajib diisi" }, { status: 400 });
@@ -99,18 +99,46 @@ export async function POST(req: Request) {
 
       await verifySchoolOwner(school_id, userId);
 
+      // Auto-save school coordinates on first verified check-in
+      if (latitude && longitude && face_match_score) {
+        const schoolCheck = await query(
+          "SELECT location_latitude FROM schools WHERE id = $1",
+          [school_id]
+        );
+        if (schoolCheck.rows.length > 0 && !schoolCheck.rows[0].location_latitude) {
+          await query(
+            `UPDATE schools 
+             SET location_latitude = $1, location_longitude = $2, attendance_radius_meters = COALESCE(attendance_radius_meters, 100) 
+             WHERE id = $3`,
+            [parseFloat(latitude), parseFloat(longitude), school_id]
+          );
+        }
+      }
+
       // Delete existing record for user, school, date to prevent duplicates
       await query(
         "DELETE FROM teacher_attendance WHERE user_id = $1 AND school_id = $2 AND tanggal = $3",
         [userId, school_id, tanggal]
       );
 
-      // Insert new log
+      // Insert new log with optional verification data
       const res = await query(
-        `INSERT INTO teacher_attendance (user_id, school_id, tanggal, status, catatan)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO teacher_attendance 
+          (user_id, school_id, tanggal, status, catatan, face_match_score, latitude, longitude, accuracy, liveness_passed) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
          RETURNING *`,
-        [userId, school_id, tanggal, status, catatan || null]
+        [
+          userId, 
+          school_id, 
+          tanggal, 
+          status, 
+          catatan || null,
+          face_match_score || null,
+          latitude || null,
+          longitude || null,
+          accuracy || null,
+          liveness_passed || false
+        ]
       );
       return NextResponse.json(res.rows[0]);
     }

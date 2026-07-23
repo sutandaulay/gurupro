@@ -1,7 +1,7 @@
-import { generateAIContent } from "@/lib/ai";
+import { generateAIContentWithUsage } from "@/lib/ai";
 import { query } from "@/lib/db";
-import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
-import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
+import { getUserPoinAccess, logFailedPoinUsage } from "@/src/services/poin-service";
+import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { jsonrepair as repair } from "jsonrepair";
@@ -154,9 +154,10 @@ Hasilkan seluruh dokumen PROSEM tersebut langsung dalam format Markdown dengan t
 `;
 
     let parsed: any;
+    let aiResult: Awaited<ReturnType<typeof generateAIContentWithUsage>> | null = null;
     try {
-      const text = await generateAIContent(prompt, undefined, false);
-      const cleanMarkdown = text.trim();
+      aiResult = await generateAIContentWithUsage(prompt, undefined, false);
+      const cleanMarkdown = aiResult.text.trim();
       const docTitle = `Program Semester (Prosem) - ${mapel} ${kelas || ''} ${semesterLabel} ${tahun_ajaran || ''}`;
 
       parsed = {
@@ -219,18 +220,9 @@ Hasilkan seluruh dokumen PROSEM tersebut langsung dalam format Markdown dengan t
     // Deduct Poin based on actual usage
     if (user.role !== "admin") {
       try {
-        const poinCalc = calculatePoinFromTokens(
-          aiResult?.rawUsage?.promptTokenCount || 0,
-          aiResult?.rawUsage?.candidatesTokenCount || 0,
-          aiResult?.rawUsage?.cachedContentTokenCount || 0
-        );
+          await deductPoinFromAIResult({ success: true, usage: aiResult?.usage || null }, userId, "generate-prosem", {});
 
-        await consumeUserPoin(userId, poinCalc.rawTokens, "generate-prosem", {
-          model: "gemini-2.5-flash-lite",
-          provider: "gemini",
-        });
-
-        console.log(`[Generate Prosem] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+          console.log(`[Generate Prosem] Poin deducted`);
       } catch (poinError) {
         console.error("[Generate Prosem] Poin deduction failed:", poinError);
       }

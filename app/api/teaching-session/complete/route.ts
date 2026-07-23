@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
 import { generateJournal, generateReflection, estimateCost } from '@/lib/ai/generators';
-import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/services/poin-service';
-import { calculatePoinFromTokens } from '@/src/lib/ai-usage';
+import { getUserPoinAccess, logFailedPoinUsage } from '@/src/services/poin-service';
+import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
 
 const prisma = new PrismaClient();
 
@@ -105,6 +105,7 @@ export async function POST(request: NextRequest) {
     // Initialize results
     const results: any = {
       journal: null,
+      journalDb: null, // Separate storage for Prisma-created journal (has .id)
       reflection: null,
       attendance_saved: false,
       errors: [] as string[],
@@ -177,7 +178,8 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          results.journal = journal;
+          results.journal = journalResult; // Keep full result (has .usage for Poin)
+          results.journalDb = journal; // Prisma-created record (has .id)
           journalData = journalResult.data;
 
           // Track token usage
@@ -208,7 +210,7 @@ export async function POST(request: NextRequest) {
         });
 
         if (reflectionResult.success && reflectionResult.data) {
-          results.reflection = reflectionResult.data;
+          results.reflection = reflectionResult; // Keep full result (has .usage for Poin)
         }
       } catch (err: any) {
         results.errors.push(`Error generating reflection: ${err.message}`);
@@ -225,10 +227,10 @@ export async function POST(request: NextRequest) {
       session_date: today,
       status: 'completed',
       attendance_completed: results.attendance_saved,
-      journal_generated: !!results.journal,
+      journal_generated: !!results.journalDb,
       reflection_generated: !!results.reflection,
       attendance_data: JSON.stringify(attendance_data || []),
-      journal_id: results.journal?.id,
+      journal_id: results.journalDb?.id,
       completed_at: new Date(),
     };
 
@@ -259,7 +261,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 6. Update lesson memory
-    if (results.journal && schedule_id) {
+    if (results.journalDb && schedule_id) {
       await prisma.lesson_memories.upsert({
         where: {
           id: `${userId}-${schedule_id}`,
@@ -282,21 +284,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Deduct Poin after successful AI generation (non-admin)
+    // Merge journal + reflection usage for total Poin deduction
     if (userDb?.role !== 'admin' && (results.journal || results.reflection)) {
       try {
-        const rawUsage = results.journal?.rawUsage || results.reflection?.rawUsage || {};
-        const poinCalc = calculatePoinFromTokens(
-          rawUsage?.promptTokenCount || 0,
-          rawUsage?.candidatesTokenCount || 0,
-          rawUsage?.cachedContentTokenCount || 0
-        );
+        const journalUsage = (results.journal as any)?.usage || null;
+        const reflectionUsage = (results.reflection as any)?.usage || null;
 
-        await consumeUserPoin(userId, poinCalc.rawTokens, 'teaching-session-complete', {
-          model: 'gemini-2.5-flash-lite',
-          provider: 'gemini',
-        });
+        // Deduct journal usage
+        if (journalUsage) {
+          await deductPoinFromAIResult(
+            { success: true, usage: journalUsage },
+            userId,
+            'selesai-mengajar',
+            {}
+          );
+        }
 
-        console.log(`[Teaching Session] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+        // Deduct reflection usage
+        if (reflectionUsage) {
+          await deductPoinFromAIResult(
+            { success: true, usage: reflectionUsage },
+            userId,
+            'selesai-mengajar',
+            {}
+          );
+        }
+
+        console.log(`[Teaching Session] Poin deducted for journal + reflection`);
       } catch (poinError) {
         console.error('[Teaching Session] Poin deduction failed:', poinError);
       }

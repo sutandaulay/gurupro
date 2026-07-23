@@ -3,9 +3,8 @@ import { z } from 'zod';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { 
+import {
   attendanceSummary,
-  attendanceInsights,
   institutions as institutionsTable,
   institutionMembers,
   teacherInstitutionAssignments
@@ -16,6 +15,8 @@ import { parseISO, startOfWeek, endOfWeek, format, differenceInDays } from 'date
 import { google } from '@ai-sdk/google';
 import { generateObject } from 'ai';
 import { createId } from '@paralleldrive/cuid2';
+import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
+import { getUserPoinAccess } from '@/src/services/poin-service';
 
 // Schema untuk validasi input
 const InsightRequestSchema = z.object({
@@ -46,12 +47,12 @@ export async function POST(req: Request) {
     const targetTeacherId = validatedData.teacherId || session.user.id;
 
     // Validasi akses: hanya admin, kepala sekolah, wakasek, atau operator yang bisa melihat insight guru lain
-    if (targetTeacherId !== session.user.id && !['admin', 'kepala_sekolah', 'wakasek', 'operator'].includes(session.user.role)) {
+    if (targetTeacherId !== session.user.id && !['admin', 'kepala_sekolah', 'wakasek', 'operator'].includes(session.user.role || '')) {
       return NextResponse.json({ error: 'Forbidden: Anda tidak memiliki akses untuk melihat insight guru ini' }, { status: 403 });
     }
 
     // Jika bukan admin dan ingin melihat insight guru lain, pastikan guru tersebut berada di institusi yang sama
-    if (targetTeacherId !== session.user.id && session.user.role !== 'admin') {
+    if (targetTeacherId !== session.user.id && (session.user.role || '') !== 'admin') {
       const userInstitutionMembers = await db.select({ institutionId: institutionMembers.institutionId })
         .from(institutionMembers)
         .where(eq(institutionMembers.userId, session.user.id));
@@ -65,11 +66,26 @@ export async function POST(req: Request) {
 
       // Pastikan guru yang dituju berada di salah satu institusi tempat pengguna saat ini bertugas
       const hasAccess = teacherAssignments.some(assignment => 
-        userInstitutionMembers.some(member => member.institutionId === assignment.institutionId)
+        userInstitutionMembers.some(member => Number(member.institutionId) === assignment.institutionId)
       );
 
       if (!hasAccess) {
         return NextResponse.json({ error: 'Forbidden: Anda tidak memiliki akses ke data guru ini' }, { status: 403 });
+      }
+    }
+
+    // Poin check (non-admin) — sebelum generate AI
+    const userId = session.user.id;
+    if ((session.user.role || '') !== 'admin') {
+      const poinAccess = await getUserPoinAccess(userId);
+      if (!poinAccess.access.allowed) {
+        return NextResponse.json({
+          error: poinAccess.access.reason === 'subscription_expired'
+            ? 'Masa aktif langganan akun Anda telah habis.'
+            : 'Poin GuruPRO Anda telah habis! Silakan isi ulang.',
+          reason: poinAccess.access.reason,
+          remainingPoin: 0,
+        }, { status: 403 });
       }
     }
 
@@ -113,9 +129,20 @@ export async function POST(req: Request) {
       lte(attendanceSummary.date, endDate)
     ));
 
-    // Ambil informasi institusi
-    const institutions = await db.select()
+    // Ambil informasi institusi guru yang bersangkutan
+    const teacherAssignments = await db.select({ institutionId: teacherInstitutionAssignments.institutionId })
+      .from(teacherInstitutionAssignments)
+      .where(and(
+        eq(teacherInstitutionAssignments.teacherId, targetTeacherId),
+        eq(teacherInstitutionAssignments.status, 'aktif')
+      ));
+
+    const fallbackInstitutions = await db.select({ id: institutionsTable.id })
       .from(institutionsTable);
+
+    const institutionId = teacherAssignments[0]?.institutionId
+      ?? Number(fallbackInstitutions[0]?.id)
+      ?? 0;
 
     // Hitung statistik
     let totalMinutes = 0;
@@ -198,11 +225,38 @@ export async function POST(req: Request) {
         `,
       });
 
+      // Deduct Poin (AI SDK tidak give usage metadata langsung — estimasi)
+      if ((session.user.role || '') !== 'admin') {
+        try {
+          const estimatedInputTokens = Math.ceil(prompt.length / 4); // ~4 chars/token
+          const estimatedOutputTokens = 300; // JSON output khas
+          const estimatedTokens = estimatedInputTokens + estimatedOutputTokens;
+
+          await deductPoinFromAIResult(
+            {
+              success: true,
+              usage: {
+                inputTokens: estimatedInputTokens,
+                outputTokens: estimatedOutputTokens,
+                cachedTokens: 0,
+                provider: 'gemini',
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            userId,
+            'attendance-insight',
+            {}
+          );
+        } catch (poinErr) {
+          console.error('[Attendance Insight] Poin deduction failed:', poinErr);
+        }
+      }
+
       // Simpan hasil ke cache
       const [newInsight] = await db.insert(attendanceInsightsTable).values({
         id: createId(),
         teacherId: targetTeacherId,
-        institutionId: institutions[0]?.id || '', // Gunakan institusi pertama sebagai default
+        institutionId: institutionId, // Gunakan institusi assignment guru (atau fallback institusi pertama)
         periodType: validatedData.periodType,
         periodStart: startDate,
         periodEnd: endDate,
@@ -241,7 +295,7 @@ export async function POST(req: Request) {
         insight: {
           id: createId(),
           teacherId: targetTeacherId,
-          institutionId: institutions[0]?.id || '',
+          institutionId: institutionId,
           periodType: validatedData.periodType,
           periodStart: startDate,
           periodEnd: endDate,
@@ -263,7 +317,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { 
           error: 'Validasi input gagal', 
-          details: error.errors 
+          details: error.issues 
         }, 
         { status: 400 }
       );
@@ -296,14 +350,14 @@ export async function GET(req: Request) {
     }
 
     // Jika teacherId tidak disediakan, gunakan ID pengguna saat ini
-    const targetTeacherId = teacherId || session.user.id;
+    const targetTeacherId = teacherId || session.user.id || '';
 
     // Validasi akses (sama seperti POST)
-    if (targetTeacherId !== session.user.id && !['admin', 'kepala_sekolah', 'wakasek', 'operator'].includes(session.user.role)) {
+    if (targetTeacherId !== session.user.id && !['admin', 'kepala_sekolah', 'wakasek', 'operator'].includes(session.user.role || '')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    if (targetTeacherId !== session.user.id && session.user.role !== 'admin') {
+    if (targetTeacherId !== session.user.id && (session.user.role || '') !== 'admin') {
       const userInstitutionMembers = await db.select({ institutionId: institutionMembers.institutionId })
         .from(institutionMembers)
         .where(eq(institutionMembers.userId, session.user.id));
@@ -316,7 +370,7 @@ export async function GET(req: Request) {
         ));
 
       const hasAccess = teacherAssignments.some(assignment => 
-        userInstitutionMembers.some(member => member.institutionId === assignment.institutionId)
+        userInstitutionMembers.some(member => Number(member.institutionId) === assignment.institutionId)
       );
 
       if (!hasAccess) {
@@ -345,7 +399,7 @@ export async function GET(req: Request) {
       return NextResponse.json(
         { 
           error: 'Validasi parameter gagal', 
-          details: error.errors 
+          details: error.issues 
         }, 
         { status: 400 }
       );

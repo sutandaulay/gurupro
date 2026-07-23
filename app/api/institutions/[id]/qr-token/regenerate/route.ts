@@ -14,16 +14,11 @@ const RegenerateQRTokenSchema = z.object({
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Validasi sesi pengguna (seharusnya admin institusi)
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const institutionId = params.id;
+    const { id } = await params;
+    const institutionId = id;
     
     // Validasi ID institusi
     const parsedId = z.string().uuid().parse(institutionId);

@@ -96,10 +96,10 @@ describe('activateTransaction', () => {
     expect(result.success).toBe(true)
 
     const updateCalls = mockQuery.mock.calls.filter(
-      (c: any) => typeof c[0] === 'string' && c[0].includes('token_limit')
+      (c: any) => typeof c[0] === 'string' && c[0].includes('quota_poin_total')
     )
     expect(updateCalls.length).toBe(1)
-    expect(updateCalls[0][1][0]).toBe(500)
+    expect(updateCalls[0][1][0]).toBe(1)
     expect(updateCalls[0][1][1]).toBe('three_month')
 
     expect(vi.mocked(sendEventNotification)).toHaveBeenCalledWith(
@@ -127,10 +127,10 @@ describe('activateTransaction', () => {
     expect(result.success).toBe(true)
 
     const updateCalls = mockQuery.mock.calls.filter(
-      (c: any) => typeof c[0] === 'string' && c[0].includes('token_limit')
+      (c: any) => typeof c[0] === 'string' && c[0].includes('quota_poin_total')
     )
     expect(updateCalls.length).toBe(1)
-    expect(updateCalls[0][1][0]).toBe(2500)
+    expect(updateCalls[0][1][0]).toBe(2)
     expect(updateCalls[0][1][1]).toBe('one_year')
   })
 
@@ -152,10 +152,10 @@ describe('activateTransaction', () => {
     expect(result.success).toBe(true)
 
     const updateCalls = mockQuery.mock.calls.filter(
-      (c: any) => typeof c[0] === 'string' && c[0].includes('token_limit')
+      (c: any) => typeof c[0] === 'string' && c[0].includes('quota_poin_total')
     )
     expect(updateCalls.length).toBe(1)
-    expect(updateCalls[0][1][0]).toBe(1100)
+    expect(updateCalls[0][1][0]).toBe(1)
     expect(updateCalls[0][1][1]).toBe('six_month')
   })
 
@@ -176,7 +176,7 @@ describe('activateTransaction', () => {
     await activateTransaction(tx.id)
 
     const updateCalls = mockQuery.mock.calls.filter(
-      (c: any) => typeof c[0] === 'string' && c[0].includes('token_limit')
+      (c: any) => typeof c[0] === 'string' && c[0].includes('quota_poin_total')
     )
     expect(updateCalls.length).toBe(1)
     const newEnd = new Date(updateCalls[0][1][3])
@@ -204,7 +204,7 @@ describe('activateTransaction', () => {
     )
     expect(auditCalls.length).toBe(1)
     expect(auditCalls[0][1][1]).toContain('Aktivasi Paket')
-    expect(auditCalls[0][1][2]).toContain('+500 Token')
+    expect(auditCalls[0][1][2]).toContain('+500 Poin')
   })
 
   it('mengupdate status transaksi menjadi ACTIVATED', async () => {
@@ -345,9 +345,9 @@ describe('processSuccessPayment', () => {
     expect(result.success).toBe(true)
 
     const updateCalls = mockQuery.mock.calls.filter(
-      (c: any) => typeof c[0] === 'string' && c[0].includes('token_limit')
+      (c: any) => typeof c[0] === 'string' && c[0].includes('quota_poin_total')
     )
     expect(updateCalls.length).toBe(1)
-    expect(updateCalls[0][1][0]).toBe(2500)
+    expect(updateCalls[0][1][0]).toBe(2)
   })
 })

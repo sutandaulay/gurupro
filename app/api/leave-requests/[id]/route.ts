@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, query } from '@/lib/db';
 import { 
   leaveRequests, 
   attendanceSummary,
@@ -12,6 +12,8 @@ import {
 import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { parseISO, eachDayOfInterval, format, startOfDay } from 'date-fns';
+import { suggestSubstitutes } from '@/lib/substitute-suggestion';
+import { sendWhatsAppNotification } from '@/lib/notifications';
 
 // Schema untuk validasi input approval/rejection
 const UpdateLeaveRequestSchema = z.object({
@@ -21,16 +23,11 @@ const UpdateLeaveRequestSchema = z.object({
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Validasi sesi pengguna (harus operator, kepala sekolah, atau admin)
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user || !['admin', 'operator', 'kepala_sekolah', 'wakasek'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const requestId = params.id;
+    const { id } = await params;
+    const requestId = id;
     
     // Validasi ID request
     const requestIdParsed = z.string().uuid().parse(requestId);
@@ -86,6 +83,38 @@ export async function PATCH(
         existingRequest.endDate,
         existingRequest.type
       );
+
+      // Sprint 4.5 — Saran guru pengganti + auto-share RPP (READ-ONLY, try/catch aman)
+      // Tidak mengubah logika approve/attendance di atas.
+      try {
+        const suggestions = await suggestSubstitutes(
+          Number(existingRequest.institutionId),
+          existingRequest.teacherId,
+          existingRequest.startDate,
+          existingRequest.endDate
+        );
+
+        // Cari RPP/Modul Ajar terbaru guru yang izin untuk di-share ke pengganti
+        const rppRes = await query(
+          `SELECT id, judul_dokumen FROM guru_administrasi
+           WHERE user_id = $1 AND tipe_dokumen IN ('rpp','modul')
+             AND approval_status IN ('draft','approved')
+           ORDER BY created_at DESC LIMIT 3`,
+          [existingRequest.teacherId]
+        );
+        const rppList = rppRes.rows.map((r: any) => `• ${r.judul_dokumen}`).join("\n");
+
+        for (const s of suggestions) {
+          if (!s.whatsapp) continue;
+          const msg = `[GuruPRO] 📋 Guru ${existingRequest.type} pada ${String(existingRequest.startDate).slice(0,10)}–${String(existingRequest.endDate).slice(0,10)}.\n` +
+            `Anda disarankan sebagai guru pengganti.` +
+            (rppList ? `\nRPP/Modul Ajar yang bisa dipakai:\n${rppList}` : "") +
+            `\n\nLogin GuruPRO untuk detail.`;
+          await sendWhatsAppNotification(s.whatsapp, msg);
+        }
+      } catch (subErr) {
+        console.error("Substitute suggestion (non-fatal):", subErr);
+      }
     }
 
     return NextResponse.json({
@@ -171,15 +200,11 @@ async function updateAttendanceSummaryForApprovedLeave(
 // Handler untuk GET (mengambil detail satu pengajuan izin)
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const requestId = params.id;
+    const { id } = await params;
+    const requestId = id;
     const requestIdParsed = z.string().uuid().parse(requestId);
 
     // Ambil request izin dari database

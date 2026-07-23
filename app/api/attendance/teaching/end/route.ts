@@ -200,7 +200,7 @@ export async function POST(req: Request) {
     await updateDailyAttendanceSummary(
       userId,
       startLog.institutionId,
-      validatedData.subjectId || startLog.subjectId,
+      validatedData.subjectId || startLog.subjectId || '',
       durationInMinutes
     );
 
@@ -221,7 +221,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { 
           error: 'Validasi input gagal', 
-          details: error.errors 
+          details: error.issues 
         }, 
         { status: 400 }
       );
@@ -238,7 +238,7 @@ export async function POST(req: Request) {
 async function performAntiFraudChecks(
   validatedData: any,
   ipAddress: string,
-  institutionId: string,
+  institutionId: number,
   distance: number,
   attendanceSettings: any
 ): Promise<{ trustScore: number, flagReasons: string[] }> {
@@ -298,7 +298,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 // Fungsi untuk update summary harian
 async function updateDailyAttendanceSummary(
   teacherId: string, 
-  institutionId: string, 
+  institutionId: number, 
   subjectId: string, 
   durationInMinutes: number = 0
 ) {
@@ -310,7 +310,7 @@ async function updateDailyAttendanceSummary(
     .from(attendanceSummary)
     .where(and(
       eq(attendanceSummary.teacherId, teacherId),
-      eq(attendanceSummary.institutionId, institutionId),
+      eq(attendanceSummary.institutionId, Number(institutionId)) as any,
       eq(attendanceSummary.date, today)
     ));
 
@@ -327,8 +327,8 @@ async function updateDailyAttendanceSummary(
     
     await db.update(attendanceSummary)
       .set({
-        teachingSessionsCompleted: existingSummary.teachingSessionsCompleted + 1,
-        teachingMinutesTotal: existingSummary.teachingMinutesTotal + durationInMinutes,
+        teachingSessionsCompleted: (existingSummary.teachingSessionsCompleted || 0) + 1,
+        teachingMinutesTotal: (existingSummary.teachingMinutesTotal || 0) + durationInMinutes,
         teachingMinutesBySubject: JSON.stringify(updatedTeachingMinutesBySubject),
         updatedAt: new Date(),
       })
@@ -340,7 +340,7 @@ async function updateDailyAttendanceSummary(
     await db.insert(attendanceSummary).values({
       id: uuidv4(),
       teacherId,
-      institutionId,
+      institutionId: Number(institutionId) as any,
       date: today,
       teachingSessionsCompleted: 1,
       teachingMinutesTotal: durationInMinutes,

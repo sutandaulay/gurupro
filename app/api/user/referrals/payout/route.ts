@@ -103,7 +103,7 @@ export async function POST(req: Request) {
         [costAmount, tokensToReward, userId]
       );
 
-      await logAudit(userId, "Penukaran Token", `Menukar cashback Rp ${costAmount.toLocaleString("id-ID")} menjadi +${tokensToReward} Token`);
+      await logAudit(userId, "Penukaran Poin", `Menukar cashback Rp ${costAmount.toLocaleString("id-ID")} menjadi +${tokensToReward} Poin`);
 
       return NextResponse.json({ 
         success: true, 

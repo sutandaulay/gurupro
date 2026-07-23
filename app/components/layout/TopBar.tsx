@@ -21,7 +21,7 @@ import dynamic from "next/dynamic";
 import InstitutionSwitcher from "@/app/components/institution-switcher";
 import { useTeacherStore, useProfileStore } from "@/lib/stores";
 
-const TokenTopUpModal = dynamic(() => import("@/app/components/ui/TokenTopUpModal"), { ssr: false });
+const PoinTopUpModal = dynamic(() => import("@/app/components/ui/PoinTopUpModal"), { ssr: false });
 
 // Helper function to format time ago
 function formatTimeAgo(dateStr: string): string {
@@ -350,7 +350,7 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
             {/* Institution Switcher (Ruang Kerja) */}
             <InstitutionSwitcher />
 
-            {/* Beli Token Ekstra Quick Button */}
+             {/* Beli Poin Ekstra Quick Button */}
             <button
               onClick={() => setShowTopUp(true)}
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 hover:bg-violet-100 text-xs font-bold transition-all border border-violet-100 cursor-pointer shrink-0"
@@ -358,7 +358,7 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
               <svg className="w-3.5 h-3.5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              <span>Beli Token</span>
+              <span>Beli Poin</span>
             </button>
 
             {/* Fullscreen Toggle Button */}
@@ -490,7 +490,7 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
                       <svg className="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
-                      Beli Token Ekstra
+                       Beli Poin Ekstra
                     </button>
                     <button
                       onClick={() => { setShowDropdown(false); router.push('/settings'); }}
@@ -546,7 +546,7 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
         </div>
       </div>
       {showTopUp && (
-        <TokenTopUpModal
+        <PoinTopUpModal
           open={showTopUp}
           onClose={() => setShowTopUp(false)}
           userId={session?.user?.id || (session as any)?.id || null}

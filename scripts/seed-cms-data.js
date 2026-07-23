@@ -60,7 +60,7 @@ async function seed() {
 
   // Seed FAQ
   const faqData = [
-    { question: "Bagaimana cara kerja Token kuota?", answer: "Token dipotong setiap kali generate soal." },
+    { question: "Bagaimana cara kerja Poin kuota?", answer: "Poin dipotong setiap kali generate soal." },
     { question: "Metode pembayaran apa saja?", answer: "QRIS, GoPay, OVO, Dana, VA." }
   ];
   await client.query(
@@ -76,7 +76,7 @@ async function seed() {
     description: "Dapatkan cashback Rp10.000 untuk setiap guru yang mendaftar.",
     benefits: [
       { icon: "💰", title: "Cashback", description: "Rp10.000 per subscriber" },
-      { icon: "⚡", title: "Token", description: "+20 Token gratis" }
+      { icon: "⚡", title: "Poin", description: "+20 Poin gratis" }
     ],
     ctaText: "Mulai Undang",
     ctaLink: ""

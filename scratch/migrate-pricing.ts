@@ -44,7 +44,7 @@ async function runMigration() {
           popular: false,
           sort_order: 1,
           features: [
-            "10 Token Kuota Sekali",
+            "10 Poin Kuota Sekali",
             "Masa Aktif 30 Hari",
             "Generator Soal (LOTS C1-C3)",
             "Dukungan Kurikulum Merdeka"
@@ -58,7 +58,7 @@ async function runMigration() {
           popular: true,
           sort_order: 2,
           features: [
-            "500 Token Kuota Utama",
+            "500 Poin Kuota Utama",
             "Masa Aktif 90 Hari",
             "Generator Soal HOTS (C4-C6)",
             "Cetak Lembar Jawaban Resmi",
@@ -73,7 +73,7 @@ async function runMigration() {
           popular: false,
           sort_order: 3,
           features: [
-            "1100 Token Kuota Utama",
+            "1100 Poin Kuota Utama",
             "Masa Aktif 180 Hari",
             "Generator Soal HOTS (C4-C6)",
             "Cetak Lembar Jawaban Resmi",
@@ -88,7 +88,7 @@ async function runMigration() {
           popular: false,
           sort_order: 4,
           features: [
-            "2500 Token Kuota Utama",
+            "2500 Poin Kuota Utama",
             "Masa Aktif 365 Hari",
             "Generator Soal HOTS (C4-C6)",
             "Cetak Lembar Jawaban Resmi",

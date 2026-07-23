@@ -277,6 +277,8 @@ const initDb = async () => {
     // ALTER TABLE checks to dynamically support TAMS supervisor and homeroom teacher fields
     await pool.query('ALTER TABLE schools ADD COLUMN IF NOT EXISTS nama_pengawas VARCHAR(255)');
     await pool.query('ALTER TABLE classes ADD COLUMN IF NOT EXISTS wali_kelas VARCHAR(255)');
+    await pool.query('ALTER TABLE classes ADD COLUMN IF NOT EXISTS wali_kelas_user_id UUID REFERENCES users(id) ON DELETE SET NULL');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_classes_wali_kelas_user_id ON classes(wali_kelas_user_id)');
 
     // Signatory configuration columns in schools table
     await pool.query('ALTER TABLE schools ADD COLUMN IF NOT EXISTS nip_kepala_sekolah VARCHAR(255)');
@@ -303,6 +305,7 @@ const initDb = async () => {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_end TIMESTAMP WITHOUT TIME ZONE');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT');
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_tone VARCHAR(20) DEFAULT 'hangat' CHECK (notification_tone IN ('hangat', 'formal', 'santai'))");
     
     // Backfill default values for existing users with null subscription fields
     await pool.query(`
@@ -407,12 +410,12 @@ const initDb = async () => {
     await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS plan_id VARCHAR(50)');
     await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT');
 
-    // 21. Create addon token package table
+    // 21. Create addon poin package table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS addon_token_packages (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name VARCHAR(100) NOT NULL,
-        token_amount INTEGER NOT NULL DEFAULT 0,
+        poin_amount INTEGER NOT NULL DEFAULT 0,
         price NUMERIC(12,2) NOT NULL DEFAULT 0,
         is_active BOOLEAN NOT NULL DEFAULT TRUE,
         sort_order INTEGER NOT NULL DEFAULT 0,
@@ -422,15 +425,36 @@ const initDb = async () => {
 
     await pool.query('ALTER TABLE addon_token_packages ADD COLUMN IF NOT EXISTS description TEXT');
 
-    // Seed default addon packages if empty
+    // Seed default addon poin packages if empty
     const packageCount = await pool.query('SELECT COUNT(*) FROM addon_token_packages');
     if (parseInt(packageCount.rows[0].count) === 0) {
       await pool.query(`
-        INSERT INTO addon_token_packages (name, token_amount, price, is_active, sort_order, description)
+        INSERT INTO addon_token_packages (name, poin_amount, price, is_active, sort_order, description)
         VALUES
-          ('Paket 50 Token', 50, 25000, TRUE, 1, 'Token eceran untuk kebutuhan sesekali'),
-          ('Paket 100 Token', 100, 45000, TRUE, 2, 'Token eceran dengan nilai lebih hemat'),
-          ('Paket 250 Token', 250, 95000, TRUE, 3, 'Token eceran untuk kebutuhan intensif')
+          ('Paket 50 Poin', 50, 25000, TRUE, 1, 'Poin eceran untuk kebutuhan sesekali'),
+          ('Paket 100 Poin', 100, 45000, TRUE, 2, 'Poin eceran dengan nilai lebih hemat'),
+          ('Paket 250 Poin', 250, 95000, TRUE, 3, 'Poin eceran untuk kebutuhan intensif')
+      `);
+    } else {
+      // Rename existing seed data to Poin labels
+      await pool.query(`
+        UPDATE addon_token_packages
+        SET
+          name = CASE
+            WHEN LOWER(name) LIKE 'paket 50 token' THEN 'Paket 50 Poin'
+            WHEN LOWER(name) LIKE 'paket 100 token' THEN 'Paket 100 Poin'
+            WHEN LOWER(name) LIKE 'paket 250 token' THEN 'Paket 250 Poin'
+            ELSE name
+          END,
+          description = CASE
+            WHEN description ILIKE '%Token eceran untuk kebutuhan sesekali%' THEN 'Poin eceran untuk kebutuhan sesekali'
+            WHEN description ILIKE '%Token eceran dengan nilai lebih hemat%' THEN 'Poin eceran dengan nilai lebih hemat'
+            WHEN description ILIKE '%Token eceran untuk kebutuhan intensif%' THEN 'Poin eceran untuk kebutuhan intensif'
+            ELSE description
+          END
+        WHERE
+          name ILIKE '%Paket % Token%'
+          OR description ILIKE '%Token%'
       `);
     }
 
@@ -489,7 +513,7 @@ const initDb = async () => {
             wa_enabled: true,
             email_subject: "Selamat Datang di GuruPRO!",
             email_body: "<div style=\"font-family: sans-serif; padding: 20px;\"><h2 style=\"color: #4f46e5;\">Selamat Datang di GuruPRO, {nama_lengkap}!</h2><p>Terima kasih telah mendaftar di GuruPRO. Akun Anda berhasil dibuat dengan email <strong>{email}</strong>.</p><p>Kode referral unik Anda adalah: <strong style=\"color: #4f46e5;\">{referral_code}</strong>. Gunakan kode ini untuk mengundang guru lain dan dapatkan cashback!</p><p>Selamat berkarya!</p></div>",
-            wa_message: "Halo Ibu/Bapak *{nama_lengkap}*,\n\nSelamat datang di GuruPRO! 🎉 Akun Anda telah berhasil didaftarkan.\n\nKode referral Anda adalah: *{referral_code}*\nBagikan kode ini untuk mendapatkan saldo cashback dan token tambahan!\n\nMari bersama majukan pendidikan Indonesia dengan kemudahan administrasi sekolah! 🚀"
+            wa_message: "Halo Ibu/Bapak *{nama_lengkap}*,\n\nSelamat datang di GuruPRO! 🎉 Akun Anda telah berhasil didaftarkan.\n\nKode referral Anda adalah: *{referral_code}*\nBagikan kode ini untuk mendapatkan saldo cashback dan poin tambahan!\n\nMari bersama majukan pendidikan Indonesia dengan kemudahan administrasi sekolah! 🚀"
           },
           forgot_password: {
             email_enabled: true,
@@ -516,15 +540,15 @@ const initDb = async () => {
             email_enabled: true,
             wa_enabled: true,
             email_subject: "Pembayaran Langganan GuruPRO Berhasil",
-            email_body: "<div style=\"font-family: sans-serif; padding: 20px;\"><h2 style=\"color: #4f46e5;\">Pembayaran Berhasil!</h2><p>Halo Ibu/Bapak <strong>{nama_lengkap}</strong>,</p><p>Terima kasih atas pembayarannya! Pembayaran Anda sebesar <strong>Rp {amount}</strong> untuk paket <strong>{plan_name}</strong> telah berhasil kami terima via <strong>{payment_method}</strong>.</p><p>Kuota token Anda telah bertambah sebanyak <strong>+{tokens_added} Token</strong> dan status akun Anda sekarang aktif sebagai <strong>PRO</strong>.</p><p>Selamat berkarya!</p></div>",
-            wa_message: "Halo Ibu/Bapak *{nama_lengkap}*,\n\nTerima kasih! Pembayaran sebesar *Rp {amount}* untuk paket *{plan_name}* telah diterima via *{payment_method}*.\n\nAkun Anda telah diaktifkan ke *PRO* dan kuota Anda telah bertambah *+{tokens_added} Token*! 🎉\n\nSelamat berkreasi dengan GuruPRO! ✨"
+            email_body: "<div style=\"font-family: sans-serif; padding: 20px;\"><h2 style=\"color: #4f46e5;\">Pembayaran Berhasil!</h2><p>Halo Ibu/Bapak <strong>{nama_lengkap}</strong>,</p><p>Terima kasih atas pembayarannya! Pembayaran Anda sebesar <strong>Rp {amount}</strong> untuk paket <strong>{plan_name}</strong> telah berhasil kami terima via <strong>{payment_method}</strong>.</p><p>Kuota poin Anda telah bertambah sebanyak <strong>+{tokens_added} Poin</strong> dan status akun Anda sekarang aktif sebagai <strong>PRO</strong>.</p><p>Selamat berkarya!</p></div>",
+            wa_message: "Halo Ibu/Bapak *{nama_lengkap}*,\n\nTerima kasih! Pembayaran sebesar *Rp {amount}* untuk paket *{plan_name}* telah diterima via *{payment_method}*.\n\nAkun Anda telah diaktifkan ke *PRO* dan kuota Anda telah bertambah *+{tokens_added} Poin*! 🎉\n\nSelamat berkreasi dengan GuruPRO! ✨"
           },
           refund: {
             email_enabled: true,
             wa_enabled: true,
             email_subject: "Refund Pembayaran GuruPRO",
-            email_body: "<div style=\"font-family: sans-serif; padding: 20px;\"><h2 style=\"color: #ef4444;\">Refund Pembayaran</h2><p>Halo Ibu/Bapak <strong>{nama_lengkap}</strong>,</p><p>Mohon maaf, pengajuan refund untuk pembayaran paket <strong>{plan_name}</strong> telah diproses oleh Admin.</p><p><strong>Detail Refund:</strong></p><ul style=\"background: #fee2e2; padding: 15px; border-radius: 8px; list-style: none;\"><li><strong>Jumlah Refund:</strong> Rp {refund_amount}</li><li><strong>Token Dipotong:</strong> {refund_tokens} Token</li><li><strong>Alasan:</strong> {reason}</li></ul><p>Token Anda telah dikurangi sesuai jumlah yang tertera di atas. Jika ada pertanyaan, silakan hubungi Admin.</p></div>",
-            wa_message: "Halo Ibu/Bapak *{nama_lengkap}*,\n\nInformasi penting. Refund untuk paket *{plan_name}* telah diproses oleh Admin.\n\n📋 *Detail Refund:*\n• Jumlah: *Rp {refund_amount}*\n• Token Dipotong: *{refund_tokens} Token*\n• Alasan: {reason}\n\nToken Anda telah dikurangi. Hubungi Admin jika ada pertanyaan. Terima kasih."
+            email_body: "<div style=\"font-family: sans-serif; padding: 20px;\"><h2 style=\"color: #ef4444;\">Refund Pembayaran</h2><p>Halo Ibu/Bapak <strong>{nama_lengkap}</strong>,</p><p>Mohon maaf, pengajuan refund untuk pembayaran paket <strong>{plan_name}</strong> telah diproses oleh Admin.</p><p><strong>Detail Refund:</strong></p><ul style=\"background: #fee2e2; padding: 15px; border-radius: 8px; list-style: none;\"><li><strong>Jumlah Refund:</strong> Rp {refund_amount}</li><li><strong>Poin Dipotong:</strong> {refund_tokens} Poin</li><li><strong>Alasan:</strong> {reason}</li></ul><p>Poin Anda telah dikurangi sesuai jumlah yang tertera di atas. Jika ada pertanyaan, silakan hubungi Admin.</p></div>",
+            wa_message: "Halo Ibu/Bapak *{nama_lengkap}*,\n\nInformasi penting. Refund untuk paket *{plan_name}* telah diproses oleh Admin.\n\n📋 *Detail Refund:*\n• Jumlah: *Rp {refund_amount}*\n• Poin Dipotong: *{refund_tokens} Poin*\n• Alasan: {reason}\n\nPoin Anda telah dikurangi. Hubungi Admin jika ada pertanyaan. Terima kasih."
           }
         })]
       );
@@ -558,10 +582,10 @@ const initDb = async () => {
           { icon: "🖨️", title: "Siap Cetak & Ekspor", desc: "Dilengkapi dengan format Kop Surat Ujian resmi sekolah otomatis. Siap dicetak langsung ke printer atau disalin ke dokumen Microsoft Word Anda." }
         ],
         faq: [
-          { question: "Bagaimana cara kerja perhitungan Token kuota?", answer: "Setiap kali Anda menekan tombol generate paket butir soal baru, sistem akan memotong 1 Token dari sisa batas limit token Anda. Token ini akan otomatis diperbarui setiap masa tagihan bulanan berjalan." },
+          { question: "Bagaimana cara kerja perhitungan Poin kuota?", answer: "Setiap kali Anda menekan tombol generate paket butir soal baru, sistem akan memotong 1 Poin dari sisa batas limit poin Anda. Poin ini akan otomatis diperbarui setiap masa tagihan bulanan berjalan." },
           { question: "Apakah metode pembayaran mendukung e-Wallet lokal?", answer: "Ya! Pembayaran SaaS GuruPRO sangat fleksibel terintegrasi menggunakan QRIS, GoPay, OVO, Dana, serta transfer Virtual Account bank terkemuka di Indonesia." }
         ],
-        referral_terms: "Dapatkan cashback senilai Rp10.000 tunai dan +20 Token kuota untuk setiap guru yang mendaftar dan berlangganan menggunakan kode referral unik Anda! Teman Anda juga akan mendapatkan bonus +10 Token saat mendaftar.",
+        referral_terms: "Dapatkan cashback senilai Rp10.000 tunai dan +20 Poin kuota untuk setiap guru yang mendaftar dan berlangganan menggunakan kode referral unik Anda! Teman Anda juga akan mendapatkan bonus +10 Poin saat mendaftar.",
         min_payout_cashback: 50000,
         cashback_to_token_rate: 1000
       };
@@ -713,6 +737,25 @@ const initDb = async () => {
       console.error('Failed to create wali_kelas_assignments table:', err);
     }
 
+    // 27b. Create teacher_streaks table (Sprint 1.3 — agregasi streak harian read-only)
+    // Tabel BARU, tidak mengubah tabel teacher_journals atau tabel lain yang sudah berjalan.
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS teacher_streaks (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          current_streak INTEGER NOT NULL DEFAULT 0,
+          longest_streak INTEGER NOT NULL DEFAULT 0,
+          last_journal_date DATE,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (teacher_id)
+        )
+      `);
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_teacher_streaks_teacher ON teacher_streaks (teacher_id)');
+    } catch (err) {
+      console.error('Failed to create teacher_streaks table:', err);
+    }
+
     // 28. Create sikap, ekstrakurikuler, catatan_wali_kelas tables (File 03)
     try {
       // Tabel penilaian_sikap
@@ -752,6 +795,11 @@ const initDb = async () => {
       `);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_ekstrakurikuler_kelas ON ekstrakurikuler(kelas_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_ekstrakurikuler_pembina ON ekstrakurikuler(pembina_member_id)`);
+      await pool.query('ALTER TABLE ekstrakurikuler ALTER COLUMN pembina_member_id DROP NOT NULL');
+      await pool.query('ALTER TABLE ekstrakurikuler ADD COLUMN IF NOT EXISTS pembina_user_id UUID REFERENCES users(id) ON DELETE SET NULL');
+      await pool.query('ALTER TABLE ekstrakurikuler ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES users(id) ON DELETE CASCADE');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_ekstrakurikuler_pembina_user_id ON ekstrakurikuler(pembina_user_id)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_ekstrakurikuler_owner_id ON ekstrakurikuler(owner_id)');
 
       // Tabel penilaian_ekstrakurikuler
       await pool.query(`
@@ -1189,6 +1237,34 @@ const initDb = async () => {
       console.error('Failed to create teacher_institution_assignments table:', err);
     }
 
+    // 34b. Create attendance_insights table (used by /api/attendance/insight)
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS attendance_insights (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          teacher_id UUID NOT NULL,
+          institution_id INTEGER NOT NULL,
+          period_type VARCHAR(10) NOT NULL,
+          period_start TIMESTAMP NOT NULL,
+          period_end TIMESTAMP NOT NULL,
+          insight_data JSONB,
+          teaching_minutes_total INTEGER DEFAULT 0,
+          teaching_sessions_completed INTEGER DEFAULT 0,
+          attendance_days INTEGER DEFAULT 0,
+          late_days INTEGER DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          UNIQUE (teacher_id, institution_id, period_type, period_start)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_attendance_insights_teacher ON attendance_insights (teacher_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_attendance_insights_institution ON attendance_insights (institution_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_attendance_insights_period ON attendance_insights (period_start)`);
+      console.log('attendance_insights table created/verified');
+    } catch (err) {
+      console.error('Failed to create attendance_insights table:', err);
+    }
+
     // 34. Performance Indexes for Foreign Keys (Audit Fix)
     try {
       await pool.query('CREATE INDEX IF NOT EXISTS idx_classes_school_id ON classes(school_id)');
@@ -1243,6 +1319,175 @@ const initDb = async () => {
       }
     } catch (err) {
       console.error('Failed to add face_descriptor column:', err);
+    }
+
+    // 36b. Sprint 2.2 — Morning Briefing (cron terpisah, read-only ke data eksisting)
+    // Tabel BARU: preferensi on/off di users + hasil briefing harian per guru.
+    // Tidak mengubah tabel schedules/teacher_journals/student_grades/guru_administrasi/attendance_insights.
+    try {
+      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS morning_briefing_enabled BOOLEAN NOT NULL DEFAULT TRUE');
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS morning_briefings (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          briefing_date DATE NOT NULL,
+          jadwal JSONB DEFAULT '[]'::jsonb,
+          materi_tertinggal JSONB DEFAULT '[]'::jsonb,
+          tugas_belum_dikoreksi INTEGER NOT NULL DEFAULT 0,
+          siswa_perhatian JSONB DEFAULT '[]'::jsonb,
+          dismissed BOOLEAN NOT NULL DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (teacher_id, briefing_date)
+        )
+      `);
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_morning_briefings_teacher ON morning_briefings (teacher_id, briefing_date)');
+    } catch (err) {
+      console.error('Failed to create morning_briefings table:', err);
+    }
+
+    // 36d. Sprint 3.1 — Approval RPP/Modul Ajar (opsional per institusi)
+    // Kolom BARU dengan default, tidak mengubah alur generate-dan-pakai yang sudah jalan.
+    // Guru eksisting tetap bisa pakai langsung (status default 'draft').
+    try {
+      await pool.query(`ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) NOT NULL DEFAULT 'draft'`);
+      await pool.query(`ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS approval_note TEXT`);
+      await pool.query(`ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS approved_by UUID`);
+      await pool.query(`ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP`);
+      // Constraint nilai approval_status
+      try {
+        await pool.query(`ALTER TABLE guru_administrasi DROP CONSTRAINT IF EXISTS guru_administrasi_approval_status_check`);
+        await pool.query(`ALTER TABLE guru_administrasi ADD CONSTRAINT guru_administrasi_approval_status_check CHECK (approval_status IN ('draft','pending','approved','revisi'))`);
+      } catch (_) {}
+    } catch (err) {
+      console.error('Failed to add approval columns to guru_administrasi:', err);
+    }
+    // 36c. Sprint 2.1 — Weekly Recap Personal (cron terpisah, read-only ke data eksisting)
+    // Tabel BARU: preferensi on/off di users + hasil recap mingguan per guru.
+    // Tidak mengubah teacher_journals/student_grades/guru_administrasi yang sudah berjalan.
+    try {
+      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS weekly_recap_enabled BOOLEAN NOT NULL DEFAULT TRUE');
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS weekly_recaps (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          week_start DATE NOT NULL,
+          week_end DATE NOT NULL,
+          sesi_mengajar INTEGER NOT NULL DEFAULT 0,
+          siswa_remedial_selesai INTEGER NOT NULL DEFAULT 0,
+          progress_kurikulum JSONB DEFAULT '[]'::jsonb,
+          sent_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (teacher_id, week_start)
+        )
+      `);
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_weekly_recaps_teacher ON weekly_recaps (teacher_id, week_start)');
+    } catch (err) {
+      console.error('Failed to create weekly_recaps table:', err);
+    }
+
+    // 36e. Sprint 3.2 — Cache agregasi TPG lintas institusi (1 jam)
+    // Tabel BARU, tidak mengubah endpoint tpg-reports yang sudah berjalan.
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS tpg_cross_institution_cache (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          period_type VARCHAR(10) NOT NULL,
+          period_start DATE NOT NULL,
+          period_end DATE NOT NULL,
+          payload JSONB NOT NULL,
+          cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (teacher_id, period_type, period_start)
+        )
+      `);
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_tpg_cache_teacher ON tpg_cross_institution_cache (teacher_id, period_type, period_start)');
+    } catch (err) {
+      console.error('Failed to create tpg_cross_institution_cache table:', err);
+    }
+
+    // 36f. Sprint 3.3 — Cache dashboard eksekutif Kepsek/Wakasek (refresh cron 15-30 mnt)
+    // Tabel BARU, dipakai agar banyak Kepsek akses bersamaan tanpa beban DB produksi.
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS executive_dashboard_cache (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          institution_id INTEGER NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+          week_start DATE NOT NULL,
+          payload JSONB NOT NULL,
+          cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (institution_id, week_start)
+        )
+      `);
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_exec_dashboard_cache ON executive_dashboard_cache (institution_id, week_start)');
+    } catch (err) {
+      console.error('Failed to create executive_dashboard_cache table:', err);
+    }
+
+    // 36g. Sprint 4.4 — Well-Being Check-In (independen, agregasi ANONIM)
+    // Tabel BARU, tidak menyentuh sistem lama. Tidak ada kolom user_id di agregat.
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS well_being_checkins (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          institution_id INTEGER REFERENCES institutions(id) ON DELETE SET NULL,
+          beban_kerja INTEGER NOT NULL CHECK (beban_kerja BETWEEN 1 AND 5),
+          dukungan INTEGER NOT NULL CHECK (dukungan BETWEEN 1 AND 5),
+          minggu_ke DATE NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (teacher_id, minggu_ke)
+        )
+      `);
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_well_being_teacher ON well_being_checkins (teacher_id, minggu_ke)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_well_being_inst ON well_being_checkins (institution_id, minggu_ke)');
+
+      // 36h. Sprint 4.6 — Forum/Komunitas Guru (per-mapel, privat per-institusi)
+      // Tabel BARU, independen. Topik dibatasi per mapel, akses hanya anggota institusi yg sama.
+      try {
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS forum_topics (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            institution_id INTEGER NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+            mapel VARCHAR(100) NOT NULL,
+            author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            title VARCHAR(200) NOT NULL,
+            body TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_forum_topics_inst_mapel ON forum_topics (institution_id, mapel)');
+
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS forum_replies (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            topic_id UUID NOT NULL REFERENCES forum_topics(id) ON DELETE CASCADE,
+            author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            body TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_forum_replies_topic ON forum_replies (topic_id)');
+      } catch (err) {
+        console.error('Failed to create forum tables:', err);
+      }
+
+      // Agregat anonim per institusi per minggu (tanpa data individual)
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS well_being_weekly_summary (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          institution_id INTEGER NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+          minggu_ke DATE NOT NULL,
+          total_responden INTEGER NOT NULL DEFAULT 0,
+          rata_beban_kerja NUMERIC(3,2) NOT NULL DEFAULT 0,
+          rata_dukungan NUMERIC(3,2) NOT NULL DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (institution_id, minggu_ke)
+        )
+      `);
+    } catch (err) {
+      console.error('Failed to create well_being tables:', err);
     }
 
     // 36. Conditional Foreign Key for guru_administrasi (Audit Fix)

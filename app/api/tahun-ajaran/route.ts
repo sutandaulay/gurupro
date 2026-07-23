@@ -19,6 +19,22 @@ function getUserId(cookieHeader: string): string | null {
   }
 }
 
+// Helper: get school IDs accessible by user (owned + assigned)
+async function getAccessibleSchoolIds(userId: string): Promise<string[]> {
+  const owned = await query(
+    `SELECT id FROM schools WHERE user_id = $1`,
+    [userId]
+  )
+  const assigned = await query(
+    `SELECT schoolid FROM user_school_assignments WHERE userId = $1`,
+    [userId]
+  )
+  const ids = new Set<string>()
+  owned.rows.forEach((r: any) => ids.add(r.id))
+  assigned.rows.forEach((r: any) => ids.add(r.schoolid))
+  return Array.from(ids)
+}
+
 // GET list
 export async function GET(req: Request) {
   try {
@@ -44,8 +60,19 @@ export async function GET(req: Request) {
     const params: any[] = []
 
     if (sekolahId) {
+      const accessibleIds = await getAccessibleSchoolIds(userId)
+      if (!accessibleIds.includes(sekolahId)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
       taQuery += ` WHERE sekolah_id = $1`
       params.push(sekolahId)
+    } else {
+      const accessibleIds = await getAccessibleSchoolIds(userId)
+      if (accessibleIds.length === 0) {
+        return NextResponse.json([])
+      }
+      taQuery += ` WHERE sekolah_id = ANY($1)`
+      params.push(accessibleIds)
     }
 
     taQuery += ` ORDER BY tanggal_mulai DESC`
@@ -78,6 +105,13 @@ export async function POST(req: Request) {
         { error: 'Nama, tanggal mulai, tanggal selesai wajib diisi' },
         { status: 400 }
       )
+    }
+
+    if (sekolahId) {
+      const accessibleIds = await getAccessibleSchoolIds(userId)
+      if (!accessibleIds.includes(sekolahId)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     const result = await query(

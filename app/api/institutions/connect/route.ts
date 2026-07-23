@@ -17,21 +17,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'NPSN tidak valid' }, { status: 400 });
     }
 
-    // Cari institution by NPSN
     const instResult = await query(
-      `SELECT id, name, npsn FROM institutions WHERE npsn = $1 AND status = 'active' LIMIT 1`,
+      `SELECT id, name, npsn, status FROM payload.institutions WHERE npsn = $1 AND status = 'active' LIMIT 1`,
       [npsn.trim()]
     );
 
     if (instResult.rows.length === 0) {
-      return NextResponse.json({ error: 'Institusi dengan NPSN tersebut tidak ditemukan' }, { status: 404 });
+      return NextResponse.json({ error: 'Institusi with NPSN tersebut tidak ditemukan' }, { status: 404 });
     }
 
     const institution = instResult.rows[0];
 
-    // Cek apakah user sudah terdaftar sebagai anggota
     const cmsUser = await query(
-      `SELECT id FROM cms_users WHERE email = (SELECT email FROM users WHERE id = $1) LIMIT 1`,
+      `SELECT id FROM payload.cms_users WHERE email = (SELECT email FROM users WHERE id = $1) LIMIT 1`,
       [userId]
     );
 
@@ -39,61 +37,113 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Akun CMS tidak ditemukan' }, { status: 400 });
     }
 
+    const cmsUserId = cmsUser.rows[0].id;
+
     const existingMember = await query(
-      `SELECT id FROM institution_members WHERE user_id = $1 AND institution_id = $2 LIMIT 1`,
-      [cmsUser.rows[0].id, institution.id]
+      `SELECT id, status FROM payload.institution_members WHERE user_id = $1 AND institution_id = $2 LIMIT 1`,
+      [cmsUserId, institution.id]
     );
 
     if (existingMember.rows.length > 0) {
-      return NextResponse.json({ error: 'Anda sudah terdaftar sebagai anggota institusi ini' }, { status: 409 });
+      const currentStatus = existingMember.rows[0].status;
+      if (currentStatus === 'active' || currentStatus === 'pending' || currentStatus === 'invited') {
+        return NextResponse.json({ error: `Anda sudah memiliki koneksi dengan status "${currentStatus}"` }, { status: 409 });
+      }
     }
 
-    // Buat institution_members dengan status active
-    const newMember = await query(
-      `INSERT INTO institution_members (user_id, app_user_id, institution_id, status, joined_at)
-       VALUES ($1, $2, $3, 'active', NOW())
-       RETURNING id`,
-      [cmsUser.rows[0].id, userId, institution.id]
-    );
-
-    const memberId = newMember.rows[0].id;
-
-    // Tambah role guru
-    await query(
-      `INSERT INTO institution_members_role (order, parent_id, value)
-       VALUES (1, $1, 'guru')`,
-      [memberId]
-    );
-
-    // Sync ke user_school_assignments
     const schoolResult = await query(
       `SELECT id FROM schools WHERE npsn = $1 LIMIT 1`,
       [npsn.trim()]
     );
 
-    if (schoolResult.rows.length > 0) {
-      const existingAssign = await query(
-        `SELECT id FROM user_school_assignments WHERE userid = $1 AND schoolid = $2 LIMIT 1`,
-        [userId, schoolResult.rows[0].id]
-      );
-
-      if (existingAssign.rows.length === 0) {
-        await query(
-          `INSERT INTO user_school_assignments (userid, schoolid) VALUES ($1, $2)`,
-          [userId, schoolResult.rows[0].id]
-        );
-      }
+    if (schoolResult.rows.length === 0) {
+      return NextResponse.json({ error: 'Sekolah dengan NPSN tersebut belum terdaftar di sistem' }, { status: 404 });
     }
 
-    // Update nama_sekolah user
-    await query(
-      `UPDATE users SET nama_sekolah = $1 WHERE id = $2`,
-      [institution.name, userId]
+    const schoolId = schoolResult.rows[0].id;
+
+    const pendingRequest = await query(
+      `SELECT id FROM connection_requests WHERE user_id = $1 AND institution_id = $2 AND status = 'pending' LIMIT 1`,
+      [userId, institution.id]
     );
+
+    if (pendingRequest.rows.length > 0) {
+      return NextResponse.json({ error: 'Anda sudah memiliki pengajuan yang sedang menunggu persetujuan' }, { status: 409 });
+    }
+
+    await query(
+      `INSERT INTO connection_requests (user_id, institution_id, school_id, status)
+       VALUES ($1, $2, $3, 'pending')`,
+      [userId, institution.id, schoolId]
+    );
+
+    const memberResult = await query(
+      `INSERT INTO payload.institution_members (user_id, app_user_id, institution_id, status, joined_at, created_at, updated_at)
+       VALUES ($1, $2, $3, 'pending', NULL, NOW(), NOW())
+       RETURNING id`,
+      [cmsUserId, userId, institution.id]
+    );
+
+    const memberId = memberResult.rows[0].id;
+
+    await query(
+      `INSERT INTO institution_members_role ("order", parent_id, value)
+       VALUES ($1, $2, 'guru')
+       ON CONFLICT DO NOTHING`,
+      [1, memberId]
+    );
+
+    await query(
+      `INSERT INTO in_app_notifications (user_id, title, body, type, reference_type, reference_id, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+      [
+        userId,
+        'Pengajuan Terkirim',
+        `Anda telah mengajukan bergabung di "${institution.name}". Tunggu persetujuan admin.`,
+        'connect_request',
+        'institution',
+        String(institution.id)
+      ]
+    );
+
+    const appUserResult = await query(
+      `SELECT nama_lengkap FROM users WHERE id = $1 LIMIT 1`,
+      [userId]
+    );
+    const appUserName = appUserResult.rows[0]?.nama_lengkap || 'Seorang guru';
+
+    const adminsResult = await query(
+      `SELECT im.app_user_id FROM institution_members im
+       JOIN institution_members_role imr ON imr.parent_id = im.id
+       WHERE im.institution_id = $1
+         AND im.status = 'active'
+         AND imr.value IN ('operator', 'admin_sekolah', 'kepala_sekolah')
+         AND im.app_user_id IS NOT NULL`,
+      [institution.id]
+    );
+
+    for (const admin of adminsResult.rows) {
+      try {
+        await query(
+          `INSERT INTO in_app_notifications (user_id, title, body, type, reference_type, reference_id, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+          [
+            admin.app_user_id,
+            'Pengajuan Connect Baru',
+            `${appUserName} mengajukan bergabung ke institusi "${institution.name}".`,
+            'connect_request',
+            'institution',
+            String(institution.id)
+          ]
+        );
+      } catch { /* notification is non-critical */ }
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Berhasil terhubung dengan institusi "${institution.name}"`,
+      message: 'Pengajuan bergabung terkirim. Tunggu persetujuan admin institusi.',
+      institutionId: institution.id,
+      memberId,
     });
   } catch (error: any) {
     console.error('Connect institution error:', error);

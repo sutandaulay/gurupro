@@ -32,7 +32,7 @@ interface PricingPlan {
 interface TokenPackage {
   id: string;
   name: string;
-  token_amount: number;
+  poin_amount: number;
   price: number;
   description: string;
 }
@@ -188,12 +188,12 @@ export default function BillingPage() {
             <CreditCard className="w-8 h-8" />
             Billing & Langganan
           </h1>
-          <p className="text-blue-100 mt-1">Kelola langganan dan token akun Anda</p>
+           <p className="text-blue-100 mt-1">Kelola langganan dan poin akun Anda</p>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Token Balance Card */}
+         {/* Poin Balance Card */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -201,7 +201,7 @@ export default function BillingPage() {
                 <Coins className="w-7 h-7 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Total Token</p>
+                 <p className="text-sm text-gray-500">Total Poin</p>
                 <p className="text-3xl font-bold text-gray-900">
                   {tokenStatus?.total_token_balance || 0}
                 </p>
@@ -209,14 +209,17 @@ export default function BillingPage() {
             </div>
             <div className="flex gap-6">
               <div className="text-center">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Kuota Utama</p>
+                 <p className="text-xs text-gray-500 uppercase tracking-wide">Poin Utama</p>
                 <p className="text-xl font-semibold text-gray-900">{tokenStatus?.token_limit || 0}</p>
               </div>
               <div className="text-center">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Top-up</p>
-                <p className="text-xl font-semibold text-green-600">{tokenStatus?.addon_token_balance || 0}</p>
-              </div>
-              <div className="text-center">
+                 <p className="text-xs text-gray-500 uppercase tracking-wide">Top-up</p>
+                 <div className="mt-1">
+                   <p className="text-xl font-semibold text-green-600">{tokenStatus?.addon_token_balance || 0}</p>
+                   <p className="text-xs text-gray-500">Poin Ekstra</p>
+                  </div>
+                </div>
+               <div className="text-center">
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Status</p>
                 <div className="mt-1">
                   {getStatusBadge(tokenStatus?.subscription_status || "active")}
@@ -230,7 +233,7 @@ export default function BillingPage() {
                 className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-sm shadow-green-500/10"
               >
                 <Coins className="w-4 h-4" />
-                Beli Token Ekstra
+                Beli Poin Ekstra
               </button>
             </div>
           </div>
@@ -278,12 +281,12 @@ export default function BillingPage() {
             <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
               <div>
-                <p className="font-medium text-yellow-800">Token Habis</p>
+                 <p className="font-medium text-yellow-800">Poin Habis</p>
                 <p className="text-sm text-yellow-700 mt-1">
                   {tokenStatus?.reason === "locked"
                     ? "Akun Anda terkunci. Hubungi CS untuk membuka kembali."
-                    : tokenStatus?.reason === "Token habis"
-                    ? "Silakan upgrade paket atau top-up token untuk melanjutkan."
+                     : tokenStatus?.reason === "Poin habis"
+                     ? "Silakan upgrade paket atau top-up poin untuk melanjutkan."
                     : "Langganan Anda telah berakhir. Perpanjang untuk melanjutkan."}
                 </p>
               </div>
@@ -311,7 +314,7 @@ export default function BillingPage() {
                 : "bg-white text-gray-600 hover:bg-gray-100"
             }`}
           >
-            Top-up Token
+            Top-up Poin
           </button>
         </div>
 
@@ -342,7 +345,7 @@ export default function BillingPage() {
                   </div>
                   <div className="mt-4 flex items-center gap-2 text-sm text-green-600">
                     <Gift className="w-4 h-4" />
-                    <span>{plan.tokens} Token Kuota</span>
+                     <span>{plan.tokens} Poin Kuota</span>
                   </div>
                   <ul className="mt-4 space-y-2">
                     {(plan.features || []).map((feature, idx) => (
@@ -376,7 +379,7 @@ export default function BillingPage() {
           </div>
         )}
 
-        {/* Token Packages */}
+         {/* Poin Packages */}
         {activeTab === "token" && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {packages.map((pkg) => (
@@ -388,7 +391,7 @@ export default function BillingPage() {
                   <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                     <Coins className="w-6 h-6 text-green-600" />
                   </div>
-                  <span className="text-2xl font-bold text-gray-900">{pkg.token_amount}</span>
+                  <span className="text-2xl font-bold text-gray-900">{pkg.poin_amount}</span>
                 </div>
                 <h3 className="text-lg font-bold text-gray-900">{pkg.name}</h3>
                 <p className="text-sm text-gray-500 mt-1">{pkg.description}</p>
@@ -396,7 +399,7 @@ export default function BillingPage() {
                   <span className="text-2xl font-bold text-green-600">
                     {formatCurrency(pkg.price)}
                   </span>
-                  <span className="text-gray-500 text-sm">/ {pkg.token_amount} token</span>
+                  <span className="text-gray-500 text-sm">/ {pkg.poin_amount} poin</span>
                 </div>
                 <button
                   onClick={() => handleCheckout("addon", true, pkg.id)}

@@ -55,7 +55,7 @@ export function useTokenError(): UseTokenErrorReturn {
       shortfall: error.shortfall,
       currentMain: error.currentMain,
       currentAddon: error.currentAddon,
-      message: error.message || "Token tidak mencukupi untuk melanjutkan.",
+      message: error.message || "Poin tidak mencukupi untuk melanjutkan.",
     };
 
     setTokenError(errorInfo);
@@ -97,7 +97,7 @@ export function parseTokenError(error: any): Partial<TokenErrorInfo> {
       shortfall: error.shortfall,
       currentMain: error.currentMain,
       currentAddon: error.currentAddon,
-      message: `Token tidak mencukupi. Butuh ${error.shortfall || 0} token lagi.`,
+      message: `Poin tidak mencukupi. Butuh ${error.shortfall || 0} poin lagi.`,
     };
   }
 

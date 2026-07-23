@@ -123,16 +123,16 @@ export default function LandingContent({
   referral: referralProp,
 }: LandingContentProps) {
   const pricingPlans = pricingPlansProp || [
-    { id: "free", package_name: "Gratis", price: 0, tokens: 10, duration_days: 30, popular: false, features: ["10 Token Kuota Sekali", "Masa Aktif 30 Hari", "Generator Soal (LOTS C1-C3)", "Dukungan Kurikulum Merdeka"] },
-    { id: "three_month", package_name: "3 Bulan", price: 120000, tokens: 500, duration_days: 90, popular: true, features: ["500 Token Kuota Utama", "Masa Aktif 90 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Terpadu"] },
-    { id: "six_month", package_name: "6 Bulan", price: 220000, tokens: 1100, duration_days: 180, popular: false, features: ["1100 Token Kuota Utama", "Masa Aktif 180 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Prioritas"] },
-    { id: "one_year", package_name: "1 Tahun", price: 400000, tokens: 2500, duration_days: 365, popular: false, features: ["2500 Token Kuota Utama", "Masa Aktif 365 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "CS VIP 24/7 & Backup Riwayat"] },
+    { id: "free", package_name: "Gratis", price: 0, tokens: 10, duration_days: 30, popular: false, features: ["10 Poin Kuota Sekali", "Masa Aktif 30 Hari", "Generator Soal (LOTS C1-C3)", "Dukungan Kurikulum Merdeka"] },
+    { id: "three_month", package_name: "3 Bulan", price: 120000, tokens: 500, duration_days: 90, popular: true, features: ["500 Poin Kuota Utama", "Masa Aktif 90 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Terpadu"] },
+    { id: "six_month", package_name: "6 Bulan", price: 220000, tokens: 1100, duration_days: 180, popular: false, features: ["1100 Poin Kuota Utama", "Masa Aktif 180 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Prioritas"] },
+    { id: "one_year", package_name: "1 Tahun", price: 400000, tokens: 2500, duration_days: 365, popular: false, features: ["2500 Poin Kuota Utama", "Masa Aktif 365 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "CS VIP 24/7 & Backup Riwayat"] },
   ];
   const visiblePlans = pricingPlans.filter(plan => !(isLoggedIn && plan.price === 0));
   const faq = faqProp || [
     {
-      question: "Bagaimana cara kerja perhitungan Token kuota?",
-      answer: "Setiap kali Anda menekan tombol generate paket butir soal baru, sistem akan memotong 1 Token dari sisa batas limit token Anda. Token ini akan otomatis diperbarui setiap masa tagihan bulanan berjalan.",
+      question: "Bagaimana cara kerja perhitungan Poin kuota?",
+      answer: "Setiap kali Anda menekan tombol generate paket butir soal baru, sistem akan memotong 1 Poin dari sisa batas limit poin Anda. Poin ini akan otomatis diperbarui setiap masa tagihan bulanan berjalan.",
     },
     {
       question: "Apakah metode pembayaran mendukung e-Wallet lokal?",
@@ -141,11 +141,11 @@ export default function LandingContent({
   ];
   const referral = referralProp || {
     badge: "🎁 Program Kemitraan Guru",
-    title: "Bagikan GuruPro, Dapatkan Cashback & Token!",
-    description: "Dapatkan cashback senilai Rp10.000 tunai dan +20 Token kuota untuk setiap guru yang mendaftar dan berlangganan menggunakan kode referral unik Anda! Teman Anda juga akan mendapatkan bonus +10 Token saat mendaftar.",
+    title: "Bagikan GuruPro, Dapatkan Cashback & Poin!",
+    description: "Dapatkan cashback senilai Rp10.000 tunai dan +20 Poin kuota untuk setiap guru yang mendaftar dan berlangganan menggunakan kode referral unik Anda! Teman Anda juga akan mendapatkan bonus +10 Poin saat mendaftar.",
     benefits: [
       { icon: "💰", title: "Cashback Saldo Dompet", description: "Saldo cashback sebesar Rp10.000 ditambahkan ke dompet akun Anda setiap kali teman Anda meng-upgrade status akun menjadi PRO. Saldo ini dapat dicairkan langsung ke rekening bank." },
-      { icon: "⚡", title: "Token Kuota Tambahan", description: "Dapatkan +20 Token kuota ekstra gratis untuk generator soal Anda, sementara teman Anda mendapatkan +10 Token kuota tambahan saat mendaftar!" },
+      { icon: "⚡", title: "Poin Kuota Tambahan", description: "Dapatkan +20 Poin kuota ekstra gratis untuk generator soal Anda, sementara teman Anda mendapatkan +10 Poin kuota tambahan saat mendaftar!" },
     ],
     ctaText: "Mulai Undang Teman",
     ctaLink: "",
@@ -164,7 +164,7 @@ export default function LandingContent({
           <span>
             Anda diundang oleh teman! Daftar sekarang menggunakan kode referral{" "}
             <strong>{refCode}</strong> untuk mendapatkan bonus{" "}
-            <strong>+10 Token kuota gratis</strong>!
+            <strong>+10 Poin kuota gratis</strong>!
           </span>
         </div>
       )}

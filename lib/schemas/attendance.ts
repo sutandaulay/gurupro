@@ -1,6 +1,6 @@
 import { pgTable, uuid, varchar, integer, boolean, timestamp, doublePrecision, jsonb, primaryKey, index } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { users, institutions, formatInstitution } from './main-schema';
+import { users, institutions, formatInstitution, schools } from './main-schema';
 
 // Re-export institutions and formatInstitution for convenience
 export { institutions, formatInstitution };
@@ -204,8 +204,9 @@ export const leaveRequests = pgTable(
       .notNull()
       .references(() => users.id),
     institutionId: integer('institution_id')
-      .notNull()
       .references(() => institutions.id),
+    schoolId: uuid('school_id')
+      .references(() => schools.id),
     type: varchar('type', { length: 20 }).notNull(), // 'sakit', 'izin', 'cuti'
     startDate: timestamp('start_date').notNull(),
     endDate: timestamp('end_date').notNull(),
@@ -220,6 +221,7 @@ export const leaveRequests = pgTable(
   (table) => ({
     teacherIdx: index('idx_leave_requests_teacher_id').on(table.teacherId),
     institutionIdx: index('idx_leave_requests_institution_id').on(table.institutionId),
+    schoolIdx: index('idx_leave_requests_school_id').on(table.schoolId),
     statusIdx: index('idx_leave_requests_status').on(table.status),
   })
 );
@@ -233,9 +235,51 @@ export const leaveRequestsRelations = relations(leaveRequests, ({ one }) => ({
     fields: [leaveRequests.institutionId],
     references: [institutions.id],
   }),
+  school: one(schools, {
+    fields: [leaveRequests.schoolId],
+    references: [schools.id],
+  }),
   approver: one(users, {
     fields: [leaveRequests.approvedBy],
     references: [users.id],
     relationName: 'approver',
+  }),
+}));
+
+// Teaching sessions for school-based teachers
+export const schoolTeachingSessions = pgTable(
+  'school_teaching_sessions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id').notNull(),
+    schoolId: uuid('school_id').notNull(),
+    subjectId: varchar('subject_id', { length: 255 }),
+    classId: varchar('class_id', { length: 255 }),
+    startedAt: timestamp('started_at'),
+    endedAt: timestamp('ended_at'),
+    durationMinutes: integer('duration_minutes'),
+    latitude: numeric('latitude', { precision: 10, scale: 7 }),
+    longitude: numeric('longitude', { precision: 10, scale: 7 }),
+    accuracy: numeric('accuracy', { precision: 10, scale: 2 }),
+    faceMatchScore: numeric('face_match_score', { precision: 4, scale: 3 }),
+    livenessPassed: boolean('liveness_passed').default(false),
+    status: varchar('status', { length: 50 }).default('active'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: index('idx_school_teaching_sessions_user_id').on(table.userId),
+    schoolIdx: index('idx_school_teaching_sessions_school_id').on(table.schoolId),
+    statusIdx: index('idx_school_teaching_sessions_status').on(table.status),
+  })
+);
+
+export const schoolTeachingSessionsRelations = relations(schoolTeachingSessions, ({ one }) => ({
+  user: one(users, {
+    fields: [schoolTeachingSessions.userId],
+    references: [users.id],
+  }),
+  school: one(schools, {
+    fields: [schoolTeachingSessions.schoolId],
+    references: [schools.id],
   }),
 }));

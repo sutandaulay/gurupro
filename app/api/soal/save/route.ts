@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { query } from "@/lib/db";
 import { uploadToR2 } from "@/lib/r2";
-import { getUserTokenAccess } from "@/lib/token-system";
+import { getUserPoinAccess } from "@/src/services/poin-service";
 
 // Generate PDF buffer from soal list (simplified HTML to PDF)
 async function generateSoalPdf(soalList: any[], meta: any): Promise<Buffer> {
@@ -134,8 +134,8 @@ export async function POST(req: Request) {
     const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
-    // Get user token access
-    const tokenState = await getUserTokenAccess(userId);
+    // Get user poin access (validation)
+    const tokenState = await getUserPoinAccess(userId);
     if (!tokenState.user) {
       return NextResponse.json({ error: "Pengguna tidak ditemukan" }, { status: 404 });
     }

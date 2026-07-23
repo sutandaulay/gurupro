@@ -208,7 +208,7 @@ export async function POST(req: Request) {
             notifBody,
             "admin_broadcast",
             "admin_notification",
-            null
+            undefined
           );
           sentCount = 1;
           break;
@@ -225,7 +225,7 @@ export async function POST(req: Request) {
                 notifBody,
                 "admin_broadcast",
                 "admin_notification",
-                null
+                undefined
               );
               sentCount++;
             } catch (err: any) {
@@ -248,7 +248,7 @@ export async function POST(req: Request) {
                 notifBody,
                 "admin_broadcast",
                 "admin_notification",
-                null
+                undefined
               );
               sentCount++;
             } catch (err: any) {
@@ -271,7 +271,7 @@ export async function POST(req: Request) {
                 notifBody,
                 "admin_broadcast",
                 "admin_notification",
-                null
+                undefined
               );
               sentCount++;
             } catch (err: any) {

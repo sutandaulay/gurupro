@@ -107,7 +107,7 @@ export async function GET() {
           : isExpired
           ? "Langganan berakhir"
           : totalTokens <= 0
-          ? "Token habis"
+          ? "Poin habis"
           : "active",
     });
   } catch (error: any) {

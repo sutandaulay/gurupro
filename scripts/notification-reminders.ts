@@ -114,8 +114,8 @@ Hubungi admin jika butuh bantuan.`;
         // Send in-app notification
         await sendInAppNotification(
           user.id,
-          isCritical ? "⚠️ Kuota Token Sangat Terbatas!" : "⚠️ Kuota Token Menipis",
-          `Sisa token Anda: ${totalTokens}. ${isCritical ? 'Segera top-up untuk melanjutkan aktivitas.' : 'Pertimbangkan untuk top-up.'}`,
+          isCritical ? "⚠️ Kuota Poin Sangat Terbatas!" : "⚠️ Kuota Poin Menipis",
+          `Sisa poin Anda: ${totalTokens}. ${isCritical ? 'Segera top-up untuk melanjutkan aktivitas.' : 'Pertimbangkan untuk top-up.'}`,
           isCritical ? "token_critical" : "token_low",
           "token_balance",
           null

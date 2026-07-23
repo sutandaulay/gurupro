@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPayload } from "@/lib/payload";
-import { getUserTokenAccess } from "@/lib/token-system";
+import { getUserPoinAccess } from "@/src/services/poin-service";
+import { estimateFeaturePoinCost } from "@/src/lib/ai-usage";
 import { generateBahanAjar, estimateTotalTokenCost, type ModulAjarContext } from "@/lib/ai/generateBahanAjar";
 import { getSession } from "@/lib/session";
 import { query } from "@/lib/db";
@@ -80,9 +81,9 @@ export async function POST(req: Request) {
       nama_lengkap: user.nama_lengkap,
     });
 
-    // Token validation
-    const tokenState = await getUserTokenAccess(userId);
-    if (!tokenState.user) {
+    // Poin validation
+    const poinAccess = await getUserPoinAccess(userId);
+    if (!poinAccess.user) {
       return NextResponse.json(
         { error: "Pengguna tidak ditemukan." },
         { status: 404 }
@@ -153,7 +154,7 @@ export async function POST(req: Request) {
         ? (modulAjar.guru as any)?.id
         : modulAjar.guru;
 
-      if (guruId !== cmsUserId && tokenState.user.role !== "admin") {
+      if (guruId !== cmsUserId && poinAccess.user.role !== "admin") {
         return NextResponse.json(
           { error: "Anda bukan pemilik Modul Ajar ini." },
           { status: 403 }
@@ -191,24 +192,24 @@ export async function POST(req: Request) {
     };
     const serviceJenisOutput = jenisOutput.map((t: string) => jenisOutputMap[t]) as ("slides" | "lkpd" | "handout")[];
 
-    // Estimate token cost
-    const costEstimate = estimateTotalTokenCost(serviceJenisOutput, jumlahPertemuanEffective);
+    // Estimate poin cost (fallback estimasi fitur)
+    const estimatedPoin = estimateFeaturePoinCost("bahan-ajar");
 
-    // Check token quota
-    if (!tokenState.access.allowed) {
-      const message = tokenState.access.reason === "subscription_expired"
+    // Check poin quota
+    if (!poinAccess.access.allowed) {
+      const message = poinAccess.access.reason === "subscription_expired"
         ? "Masa aktif langganan akun Anda telah habis. Silakan perpanjang paket terlebih dahulu."
-        : "Kredit token GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.";
+        : "Poin GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan.";
       return NextResponse.json(
         { error: message },
         { status: 402 }
       );
     }
 
-    const remainingTokens = tokenState.access.remainingTokens || 0;
-    if (remainingTokens < costEstimate.estimatedTotalTokens) {
+    const remainingPoin = poinAccess.access.remainingPoin || 0;
+    if (remainingPoin < estimatedPoin) {
       return NextResponse.json(
-        { error: `Token tidak cukup. Diperlukan: ${costEstimate.estimatedTotalTokens}, Tersedia: ${remainingTokens}` },
+        { error: `Poin tidak cukup. Diperlukan: ${estimatedPoin}, Tersedia: ${remainingPoin}` },
         { status: 402 }
       );
     }
@@ -290,7 +291,7 @@ export async function POST(req: Request) {
         },
       });
 
-      if (error.message?.includes("Token tidak cukup") || error.message?.includes("Kuota")) {
+      if (error.message?.includes("Poin tidak cukup") || error.message?.includes("Kuota")) {
         return NextResponse.json(
           { error: error.message },
           { status: 402 }

@@ -140,8 +140,8 @@ export async function POST(req: Request) {
               cmsUserId = cmsCheck.rows[0].id;
             } else {
               const newCms = await query(
-                `INSERT INTO payload.cms_users (name, email, password, role, salt, hash, created_at, updated_at)
-                 VALUES ($1, $2, '', 'editor', '', '', NOW(), NOW()) 
+                `INSERT INTO payload.cms_users (name, email, role, salt, hash, pdp_consent_given, pdp_consent_version, pdp_consent_consented_at, created_at, updated_at)
+                 VALUES ($1, $2, 'editor', '', '', true, '1.0', NOW(), NOW(), NOW())
                  RETURNING id`,
                 [user.nama_lengkap, user.email]
               );

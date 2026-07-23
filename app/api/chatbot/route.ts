@@ -1,9 +1,9 @@
-import { generateAIContent } from "@/lib/ai";
+import { generateAIContentWithUsage } from "@/lib/ai";
 import { NextResponse } from "next/server";
 import { getActivePricingPlans } from "@/lib/settings";
 import { cookies } from "next/headers";
-import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
-import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
+import { getUserPoinAccess, logFailedPoinUsage } from "@/src/services/poin-service";
+import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
 
 export async function POST(req: Request) {
   try {
@@ -82,25 +82,20 @@ Berikut riwayat obrolan:
 ${messages.slice(-6).map(m => `${m.role === 'user' ? 'User' : 'Asisten'}: ${m.content}`).join("\n")}
 Asisten:`;
 
-    const reply = await generateAIContent(systemPrompt);
-    const cleanReply = (reply.data as string || reply.response?.text?.() || "").replace(/```markdown|```/g, "").trim();
-    const rawUsage = reply.rawUsage;
+    const reply = await generateAIContentWithUsage(systemPrompt, undefined, false); // isJson=false for free text
+    const cleanReply = reply.text.replace(/```markdown|```/g, "").trim();
 
     // Deduct Poin based on actual usage (non-admin)
     if (role !== "admin") {
       try {
-        const poinCalc = calculatePoinFromTokens(
-          rawUsage?.promptTokenCount || 0,
-          rawUsage?.candidatesTokenCount || 0,
-          rawUsage?.cachedContentTokenCount || 0
+        await deductPoinFromAIResult(
+          { success: true, usage: reply.usage },
+          userId,
+          "chatbot",
+          {}
         );
 
-        await consumeUserPoin(userId, poinCalc.rawTokens, "chatbot", {
-          model: "gemini-2.5-flash-lite",
-          provider: "gemini",
-        });
-
-        console.log(`[Chatbot] Poin deducted: ${poinCalc.poinNeeded} (${poinCalc.rawTokens} raw tokens)`);
+          console.log(`[Chatbot] Poin deducted`);
       } catch (poinError: any) {
         console.error("[Chatbot] Poin deduction failed:", poinError);
       }

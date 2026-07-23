@@ -114,8 +114,8 @@ describe("Light Load & Query Profiling Test (N+1 Audit)", () => {
     instId = instRes.rows[0].id;
 
     const cmsUserRes = await query(
-      `INSERT INTO payload.cms_users (name, email, role, salt, hash)
-       VALUES ('Guru Load', 'test-load-guru@example.com', 'editor', '', '') RETURNING id`
+      `INSERT INTO payload.cms_users (name, email, role, salt, hash, pdp_consent_given, pdp_consent_version, pdp_consent_consented_at)
+       VALUES ('Guru Load', 'test-load-guru@example.com', 'editor', '', '', true, '1.0', NOW()) RETURNING id`
     );
     const cmsUserId = cmsUserRes.rows[0].id;
 

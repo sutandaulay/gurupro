@@ -42,6 +42,20 @@ function AdminPageContent() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [testAiLoading, setTestAiLoading] = useState(false);
 
+  // Poin-Token Conversion States
+  const [tokensPerPoin, setTokensPerPoin] = useState<number>(2000);
+  const [ratioHistory, setRatioHistory] = useState<Array<{
+    id: number;
+    admin_username: string;
+    admin_nama: string;
+    old_ratio: number;
+    new_ratio: number;
+    note: string | null;
+    changed_at: string;
+  }>>([]);
+  const [isLoadingRatio, setIsLoadingRatio] = useState(true);
+  const [ratioNote, setRatioNote] = useState<string>("");
+
   // Test notification states
   const [testEmailAddress, setTestEmailAddress] = useState("");
   const [testEmailLoading, setTestEmailLoading] = useState(false);
@@ -203,6 +217,7 @@ function AdminPageContent() {
     fetchReferralsList();
     fetchPayoutRequestsList();
     fetchSettings();
+    fetchRatioHistory();
   }, []);
 
   const pollingCancelled = useRef(false);
@@ -395,7 +410,7 @@ function AdminPageContent() {
   };
 
   const handleRefund = async (txId: string) => {
-    if (!confirm("Apakah Anda yakin ingin melakukan refund transaksi ini? Kuota token pengguna akan dipotong, status langganan disetel ke free, dan status transaksi berubah menjadi REFUNDED.")) {
+    if (!confirm("Apakah Anda yakin ingin melakukan refund transaksi ini? Kuota poin pengguna akan dipotong, status langganan disetel ke free, dan status transaksi berubah menjadi REFUNDED.")) {
       return;
     }
 
@@ -427,7 +442,7 @@ function AdminPageContent() {
   };
 
   const handleActivateTransaction = async (txId: string) => {
-    if (!confirm("Apakah Anda yakin ingin memverifikasi dan mengaktifkan paket untuk transaksi ini? Kuota token pengguna akan ditambahkan, status langganan diaktifkan, dan status transaksi berubah menjadi ACTIVATED.")) {
+    if (!confirm("Apakah Anda yakin ingin memverifikasi dan mengaktifkan paket untuk transaksi ini? Kuota poin pengguna akan ditambahkan, status langganan diaktifkan, dan status transaksi berubah menjadi ACTIVATED.")) {
       return;
     }
 
@@ -471,11 +486,29 @@ function AdminPageContent() {
         setAiConfig(data.aiConfig);
         setPricingConfig(data.pricingConfig);
         setAppBrandingConfig(data.appBranding);
+        if (typeof data.tokensPerPoin === "number") {
+          setTokensPerPoin(data.tokensPerPoin);
+        }
       }
     } catch (e) {
       console.error("Gagal memuat pengaturan sistem:", e);
     } finally {
       setIsLoadingSettings(false);
+    }
+  };
+
+  const fetchRatioHistory = async () => {
+    setIsLoadingRatio(true);
+    try {
+      const res = await fetch("/api/admin/poin-ratio-audit");
+      if (res.ok) {
+        const data = await res.json();
+        setRatioHistory(data.audits || []);
+      }
+    } catch (e) {
+      console.error("Gagal memuat history rasio:", e);
+    } finally {
+      setIsLoadingRatio(false);
     }
   };
 
@@ -522,6 +555,67 @@ function AdminPageContent() {
     } catch (e) {
       console.error(e);
       setErrorMsg("Koneksi gagal saat memperbarui pengaturan");
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const handleUpdateRatio = async () => {
+    const newRatio = Number(tokensPerPoin);
+    if (!Number.isFinite(newRatio) || newRatio <= 0) {
+      addToast({
+        type: "error",
+        title: "Gagal",
+        message: "Rasio harus angka positif lebih dari 0",
+        duration: 4000,
+        icon: "❌"
+      });
+      return;
+    }
+    setIsSavingSettings(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update_tokens_per_poin",
+          data: { ratio: newRatio, note: ratioNote || undefined }
+        }),
+      });
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {}
+      if (res.ok) {
+        addToast({
+          type: "success",
+          title: "Berhasil!",
+          message: data.message || `Rasio berhasil diubah ke ${newRatio} token per poin`,
+          duration: 4000,
+          icon: "✅"
+        });
+        setRatioNote("");
+        fetchSettings();
+        fetchRatioHistory();
+      } else {
+        addToast({
+          type: "error",
+          title: "Gagal",
+          message: data.error || "Gagal memperbarui rasio",
+          duration: 4000,
+          icon: "❌"
+        });
+      }
+    } catch (e) {
+      addToast({
+        type: "error",
+        title: "Error",
+        message: "Koneksi gagal saat memperbarui rasio",
+        duration: 4000,
+        icon: "❌"
+      });
     } finally {
       setIsSavingSettings(false);
     }
@@ -976,7 +1070,7 @@ function AdminPageContent() {
                       <th className="px-5 py-3.5 text-center">Langganan</th>
                       <th className="px-5 py-3.5">Masa Berlangganan</th>
                       <th className="px-5 py-3.5 text-center">Peran</th>
-                      <th className="px-5 py-3.5 text-right">Kuota Token</th>
+                      <th className="px-5 py-3.5 text-right">Kuota Poin</th>
                       <th className="px-5 py-3.5 text-center">Kelola</th>
                     </tr>
                   </thead>
@@ -1117,7 +1211,7 @@ function AdminPageContent() {
                           <td className="px-5 py-4 text-right">
                             {isEditing ? (
                               <div className="flex flex-col gap-1 items-end">
-                                <label className="text-[9px] text-slate-400 font-bold uppercase">Token</label>
+                                <label className="text-[9px] text-slate-400 font-bold uppercase">Poin</label>
                                 <input
                                   type="number"
                                   value={editTokenLimit}
@@ -1134,7 +1228,7 @@ function AdminPageContent() {
                                 />
                               </div>
                             ) : (
-                              <span className="font-bold text-slate-800 text-xs">{user.token_limit || 0} Token</span>
+                              <span className="font-bold text-slate-800 text-xs">{user.token_limit || 0} Poin</span>
                             )}
                           </td>
                           <td className="px-5 py-4 text-center">
@@ -1321,7 +1415,7 @@ function AdminPageContent() {
                           <th className="px-5 py-3.5">Tanggal</th>
                           <th className="px-5 py-3.5">Pengundang (Referrer)</th>
                           <th className="px-5 py-3.5">Pendaftar (Referee)</th>
-                          <th className="px-5 py-3.5 text-center">Hadiah Token</th>
+                          <th className="px-5 py-3.5 text-center">Hadiah Poin</th>
                           <th className="px-5 py-3.5 text-right">Cashback</th>
                           <th className="px-5 py-3.5 text-right font-bold text-emerald-700">Saldo Dompet Referrer</th>
                           <th className="px-5 py-3.5 text-center">Aksi Langsung</th>
@@ -1343,7 +1437,7 @@ function AdminPageContent() {
                               <p className="text-[10px] text-slate-400 font-semibold">{ref.referee_email}</p>
                             </td>
                             <td className="px-5 py-4 text-center font-bold text-indigo-600">
-                              +{ref.reward_tokens} Tokens
+                              +{ref.reward_tokens} Poin
                             </td>
                             <td className="px-5 py-4 text-right font-semibold text-slate-700">
                               {formatter.format(ref.cashback_amount)}
@@ -1398,7 +1492,7 @@ function AdminPageContent() {
                     {[
                       { label: "🎉 Promo Berlangganan", title: "Diskon 20%!", body: "Dapatkan diskon 20% untuk paket tahunan. Promo terbatas!" },
                       { label: "📢 Maintenance", title: "Pemeliharaan Sistem", body: "Akan ada pemeliharaan sistem pada tanggal..." },
-                      { label: "💎 Token Bonus", title: "Bonus Token Gratis!", body: "Klaim bonus token gratis untuk aktivitas tertentu!" },
+                      { label: "💎 Poin Bonus", title: "Bonus Poin Gratis!", body: "Klaim bonus poin gratis untuk aktivitas tertentu!" },
                       { label: "📚 Tips & Trick", title: "Tips Menggunakan GuruPRO", body: "Berikut tips untuk memaksimalkan penggunaan platform..." },
                     ].map((template, idx) => (
                       <button
@@ -1447,12 +1541,12 @@ function AdminPageContent() {
                     <div>
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Target Pengiriman</label>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {[
+                        {([
                           { value: "single", label: "👤 Satu User", icon: "single" },
                           { value: "all", label: "👥 Semua User", icon: "all" },
                           { value: "free_users", label: "🆓 User Gratis", icon: "free" },
                           { value: "premium_users", label: "💎 User Premium", icon: "premium" },
-                        ].map((option) => (
+                        ] as const).map((option) => (
                           <button
                             key={option.value}
                             onClick={() => setNotificationTarget(option.value)}
@@ -2294,7 +2388,7 @@ function AdminPageContent() {
                                     <div><code className="text-indigo-600 font-bold font-mono">{`{amount}`}</code> : Total Bayar</div>
                                     <div><code className="text-indigo-600 font-bold font-mono">{`{plan_name}`}</code> : Nama Paket PRO</div>
                                     <div><code className="text-indigo-600 font-bold font-mono">{`{payment_method}`}</code> : Metode Bayar</div>
-                                    <div><code className="text-indigo-600 font-bold font-mono">{`{tokens_added}`}</code> : Bonus Token</div>
+                                     <div><code className="text-indigo-600 font-bold font-mono">{`{tokens_added}`}</code> : Bonus Poin</div>
                                   </>
                                 )}
                               </div>
@@ -2411,6 +2505,114 @@ function AdminPageContent() {
                         </div>
                       </div>
                     </div>
+
+                    {/* POIN-TOKEN CONVERSION SETTINGS */}
+                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4 animate-fadeIn">
+                      <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+                        <span>🔄</span> Konversi Token - Poin
+                      </h3>
+
+                      <div className="space-y-4">
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
+                          <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block mb-2">Rasio Saat Ini</p>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-3xl font-black text-indigo-900">{tokensPerPoin.toLocaleString("id-ID")}</span>
+                            <span className="text-xs font-bold text-indigo-600">token = 1 poin</span>
+                          </div>
+                          <p className="text-[10px] text-indigo-500 font-medium mt-1">
+                            Setiap <span className="font-bold">{tokensPerPoin.toLocaleString("id-ID")}</span> token yang dihabiskan akan dikonversi menjadi 1 poin bagi pengguna.
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[9px] font-bold text-slate-500 block mb-1">Rasio Baru (Token per 1 Poin)</label>
+                            <input
+                              type="number"
+                              value={tokensPerPoin}
+                              onChange={(e) => setTokensPerPoin(Number(e.target.value))}
+                              min={1}
+                              step={1}
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:border-indigo-500 focus:outline-none font-mono"
+                            />
+                            <p className="text-[9px] text-slate-400 mt-1 font-medium">Masukkan angka berapa token yang diperlukan untuk mendapatkan 1 poin.</p>
+                          </div>
+                          <div>
+                            <label className="text-[9px] font-bold text-slate-500 block mb-1">Catatan Perubahan (Opsional)</label>
+                            <input
+                              type="text"
+                              value={ratioNote}
+                              onChange={(e) => setRatioNote(e.target.value)}
+                              placeholder="Contoh: Penyesuaian kuota bulanan"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-medium text-slate-800 focus:border-indigo-500 focus:outline-none"
+                            />
+                            <p className="text-[9px] text-slate-400 mt-1 font-medium">Catatan akan tercatat di history untuk audit.</p>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end pt-2">
+                          <button
+                            type="button"
+                            onClick={handleUpdateRatio}
+                            disabled={isSavingSettings}
+                            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                          >
+                            {isSavingSettings ? "Menyimpan..." : "💾 Update Rasio Konversi"}
+                          </button>
+                        </div>
+
+                        {/* Ratio History */}
+                        <div className="border-t border-slate-100 pt-4">
+                          <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-3">📜 Riwayat Perubahan Rasio</h4>
+                          {isLoadingRatio ? (
+                            <div className="text-center py-6 text-slate-400 font-semibold text-xs">Memuat history...</div>
+                          ) : ratioHistory.length === 0 ? (
+                            <div className="text-center py-6 text-slate-400 italic text-xs">Belum ada perubahan rasio yang tercatat.</div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-xs text-left text-slate-600">
+                                <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[9px]">
+                                  <tr>
+                                    <th className="px-3 py-2">Tanggal</th>
+                                    <th className="px-3 py-2">Admin</th>
+                                    <th className="px-3 py-2 text-center">Rasio Lama</th>
+                                    <th className="px-3 py-2 text-center">Rasio Baru</th>
+                                    <th className="px-3 py-2">Catatan</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 font-medium">
+                                  {ratioHistory.map((item) => (
+                                    <tr key={item.id} className="hover:bg-slate-50/50">
+                                      <td className="px-3 py-2.5 whitespace-nowrap text-slate-400 font-mono text-[10px]">
+                                        {new Date(item.changed_at).toLocaleString("id-ID")}
+                                      </td>
+                                      <td className="px-3 py-2.5">
+                                        <p className="font-bold text-slate-800 text-[11px]">{item.admin_nama || item.admin_username}</p>
+                                        <p className="text-[9px] text-slate-400 font-mono">@{item.admin_username}</p>
+                                      </td>
+                                      <td className="px-3 py-2.5 text-center">
+                                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200">
+                                          {item.old_ratio.toLocaleString("id-ID")}
+                                        </span>
+                                      </td>
+                                      <td className="px-3 py-2.5 text-center">
+                                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                          {item.new_ratio.toLocaleString("id-ID")}
+                                        </span>
+                                      </td>
+                                      <td className="px-3 py-2.5 text-slate-500 text-[10px] italic">
+                                        {item.note || "-"}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               )}

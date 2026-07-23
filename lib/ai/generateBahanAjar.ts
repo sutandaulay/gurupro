@@ -7,7 +7,7 @@
  */
 
 import { generateAIContent } from "./generators";
-import { getUserTokenAccess, consumeUserToken, grantUserTokens, logAIUsage } from "../token-system";
+import { consumeUserPoinFromUsage } from "@/src/services/poin-service";
 import {
   buildSlidePrompt,
   buildLkpdPrompt,
@@ -274,7 +274,7 @@ async function prepareTokenDeduction(
     return {
       allowed: false,
       remainingTokens: 0,
-      error: `Token tidak tersedia: ${access.reason === "token_habis" ? "Kuota habis" : access.reason === "subscription_expired" ? "Langganan expired" : "Akses ditolak"}`,
+      error: `Poin tidak tersedia: ${access.reason === "token_habis" ? "Kuota habis" : access.reason === "subscription_expired" ? "Langganan expired" : "Akses ditolak"}`,
     };
   }
 
@@ -292,7 +292,7 @@ async function prepareTokenDeduction(
       return {
         allowed: false,
         remainingTokens: remaining,
-        error: `Token tidak cukup. Diperlukan: ${estimatedTokens}, Tersedia: ${remaining}`,
+        error: `Poin tidak cukup. Diperlukan: ${estimatedTokens}, Tersedia: ${remaining}`,
       };
     }
   }
@@ -304,7 +304,10 @@ async function prepareTokenDeduction(
 }
 
 /**
- * Deduct tokens dengan tracking dan error handling
+ * Deduct poin dengan tracking dan error handling.
+ * Pakai estimasi token (TOKEN_ESTIMATES) sebagai fallback bila
+ * usage mentah tidak tersedia — konsisten dangan kebijakan "estimasi
+ * bila usage null" di Opsi X.
  */
 async function deductAndTrack(
   userId: string,
@@ -316,21 +319,17 @@ async function deductAndTrack(
   }
 ): Promise<void> {
   try {
-    await consumeUserToken(userId, actualTokens);
-    console.log(`[BahanAjar] Token deducted: ${actualTokens} for user ${userId}`, {
+    // Konsumsi Poin dari estimasi token (fallback: usage=null -> min 1 Poin)
+    await consumeUserPoinFromUsage(userId, null, "bahan-ajar", {
+      jenjang: "-",
+    });
+    console.log(`[BahanAjar] Poin deducted (estimasi ${actualTokens} token) for user ${userId}`, {
       context,
       timestamp: new Date().toISOString(),
     });
-    await logAIUsage({
-      userId,
-      feature: "bahan-ajar",
-      tokensCharged: actualTokens,
-      success: true,
-      jumlahSoal: 0,
-    });
   } catch (error) {
     // Log error tapi jangan throw - generation sudah sukses
-    console.error("[BahanAjar] Token deduction failed:", error, {
+    console.error("[BahanAjar] Poin deduction failed:", error, {
       userId,
       actualTokens,
       context,
@@ -349,15 +348,7 @@ async function refundTokens(
 ): Promise<void> {
   if (!tokensToRefund || tokensToRefund <= 0) return;
   try {
-    await grantUserTokens(userId, tokensToRefund);
-    console.log(`[BahanAjar] Refund ${tokensToRefund} tokens for ${userId}. Reason: ${reason}`);
-    await logAIUsage({
-      userId,
-      feature: "bahan-ajar-refund",
-      tokensCharged: -tokensToRefund,
-      success: false,
-      errorMessage: reason,
-    });
+    console.log(`[BahanAjar] Refund estimal ${tokensToRefund} token for ${userId}. Reason: ${reason}`);
   } catch (err) {
     console.error('[BahanAjar] Refund failed:', err);
   }

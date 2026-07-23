@@ -56,8 +56,8 @@ export async function GET() {
       const userId = newSession.id;
 
       const userRes = await query(
-        `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, addon_token_balance,
-                 bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at, photo_url
+      `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, addon_token_balance,
+                 bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at, photo_url, notification_tone
           FROM users WHERE id = $1`,
         [userId]
       );
@@ -119,6 +119,10 @@ export async function GET() {
         subscription_end: user.subscription_end,
         created_at: user.created_at,
         photo_url: user.photo_url,
+      notification_tone: user.notification_tone || "hangat",
+      morning_briefing_enabled: user.morning_briefing_enabled !== false,
+        morning_briefing_enabled: user.morning_briefing_enabled !== false,
+        weekly_recap_enabled: user.weekly_recap_enabled !== false,
         activeSchool: activeSchool,
         memberships: memberships,
         accountMode: accountMode,
@@ -134,7 +138,7 @@ export async function GET() {
 
     const userRes = await query(
       `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, addon_token_balance,
-               bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at, photo_url
+                bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at, photo_url, notification_tone
         FROM users WHERE id = $1`,
       [userId]
     );
@@ -196,6 +200,7 @@ export async function GET() {
       subscription_end: user.subscription_end,
       created_at: user.created_at,
       photo_url: user.photo_url,
+      notification_tone: user.notification_tone || "hangat",
       activeSchool: activeSchool,
       memberships: memberships,
       accountMode: accountMode,
@@ -271,7 +276,7 @@ export async function PUT(req: Request) {
     }
 
     // Handle profile update
-    const { nama_lengkap, username, bank_name, bank_account_number, bank_account_name, whatsapp, nip } = profileData;
+    const { nama_lengkap, username, bank_name, bank_account_number, bank_account_name, whatsapp, nip, notification_tone, morning_briefing_enabled, weekly_recap_enabled } = profileData;
 
     if (!nama_lengkap) {
       return NextResponse.json({ error: "Nama lengkap wajib diisi." }, { status: 400 });
@@ -340,6 +345,26 @@ export async function PUT(req: Request) {
       idx++;
     }
 
+    if (notification_tone !== undefined) {
+      const allowed = ["hangat", "formal", "santai"];
+      const tone = allowed.includes(notification_tone) ? notification_tone : "hangat";
+      sets.push(`notification_tone = $${idx}`);
+      values.push(tone);
+      idx++;
+    }
+
+    if (morning_briefing_enabled !== undefined) {
+      sets.push(`morning_briefing_enabled = $${idx}`);
+      values.push(morning_briefing_enabled === true);
+      idx++;
+    }
+
+    if (weekly_recap_enabled !== undefined) {
+      sets.push(`weekly_recap_enabled = $${idx}`);
+      values.push(weekly_recap_enabled === true);
+      idx++;
+    }
+
     values.push(userId);
     await query(
       `UPDATE users SET ${sets.join(", ")} WHERE id = $${idx}`,
@@ -361,7 +386,7 @@ export async function PUT(req: Request) {
 
     const updatedUser = await query(
       `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, addon_token_balance,
-               bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at, photo_url
+               bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at, photo_url, notification_tone
         FROM users WHERE id = $1`,
       [userId]
     );

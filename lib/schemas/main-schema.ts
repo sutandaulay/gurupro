@@ -29,6 +29,29 @@ export const institutions = pgTable('institutions', {
   qrCodeToken: varchar('attendance_settings_qr_code_token', { length: 255 }),
 });
 
+// Schools table (independent teacher's own school)
+export const schools = pgTable('schools', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull(),
+  namaSekolah: varchar('nama_sekolah', { length: 255 }).notNull(),
+  logo: varchar('logo', { length: 500 }),
+  alamat: varchar('alamat', { length: 500 }),
+  npsn: varchar('npsn', { length: 50 }),
+  namaKepalaSekolah: varchar('nama_kepala_sekolah', { length: 255 }),
+  created_at: timestamp('created_at').defaultNow(),
+  namaPengawas: varchar('nama_pengawas', { length: 255 }),
+  nipKepalaSekolah: varchar('nip_kepala_sekolah', { length: 255 }),
+  nipPengawas: varchar('nip_pengawas', { length: 255 }),
+  namaWaliKelas: varchar('nama_wali_kelas', { length: 255 }),
+  nipWaliKelas: varchar('nip_wali_kelas', { length: 255 }),
+  showTtdKepala: boolean('show_ttd_kepala').default(true),
+  showTtdPengawas: boolean('show_ttd_pengawas').default(true),
+  showTtdWali: boolean('show_ttd_wali').default(true),
+  locationLatitude: numeric('location_latitude'),
+  locationLongitude: numeric('location_longitude'),
+  attendanceRadiusMeters: integer('attendance_radius_meters').default(100),
+});
+
 // Relations - will be set up after attendance schema is loaded
 export const usersRelations = relations(users, ({ many }) => ({
   // teacherInstitutionAssignments from attendance.ts

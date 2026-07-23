@@ -102,7 +102,7 @@ export function LaporanGeneratingOverlay({
       )}>
         <div className="text-center mb-6">
           <div className="text-4xl mb-3 animate-bounce">📊</div>
-          <h2 className="text-lg font-semibold">Sedang menyusun laporan kinerja Anda...</h2>
+          <h2 className="text-lg font-semibold">Sedang merangkum hasil kerja keras Anda...</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Biasanya selesai dalam 15-30 detik
           </p>

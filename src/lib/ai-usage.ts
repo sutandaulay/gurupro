@@ -8,9 +8,14 @@
 import {
   calculateEffectiveTokens,
   convertTokensToPoin,
-  TOKENS_PER_POIN,
+  DEFAULT_TOKENS_PER_POIN,
   MIN_POIN_PER_USAGE,
 } from '@/src/config/billing';
+
+import { getTokensPerPoin } from '@/src/config/ratio-cache';
+
+import { consumeUserPoinFromUsage, type PoinDeductionResult } from '@/src/services/poin-service';
+import type { AIUsageResult } from '@/src/lib/ai-usage-result';
 
 /**
  * Usage metadata interface - sesuai dengan format Gemini response
@@ -42,7 +47,7 @@ export interface PoinCalculationResult {
  * @param geminiResponse - Response dari Gemini API
  * @returns PoinCalculationResult dengan breakdown lengkap
  */
-export function extractGeminiUsage(geminiResponse: any): PoinCalculationResult {
+export async function extractGeminiUsage(geminiResponse: any): Promise<PoinCalculationResult> {
   // Ambil usage_metadata dari response
   const usage = geminiResponse?.response?.usageMetadata ||
                 geminiResponse?.usageMetadata ||
@@ -60,7 +65,7 @@ export function extractGeminiUsage(geminiResponse: any): PoinCalculationResult {
   });
 
   const rawTokens = effectiveInputTokens;
-  const poinNeeded = convertTokensToPoin(rawTokens);
+  const poinNeeded = convertTokensToPoin(rawTokens, await getTokensPerPoin());
 
   return {
     rawTokens,
@@ -72,6 +77,34 @@ export function extractGeminiUsage(geminiResponse: any): PoinCalculationResult {
       effectiveInputTokens,
     },
   };
+}
+
+/**
+ * Konsumsi Poin dari hasil AI generation (AIUsageResult terstandar).
+ *
+ * Downstream (route AI) CUKUP panggil ini — tidak perlu lagi
+ * membaca struktur response provider tertentu.
+ *
+ * @param result - Response dari generateAIContent ({ success, data, usage })
+ * @param userId - User ID
+ * @param feature - Nama fitur AI
+ * @param opts - Opsi tambahan (mapel, jenjang, jumlahSoal)
+ * @returns PoinDeductionResult (atau {success:false} bila generation gagal)
+ */
+export async function deductPoinFromAIResult(
+  result: { success?: boolean; usage?: AIUsageResult | null } | null,
+  userId: string,
+  feature: string,
+  opts?: { mapel?: string; jenjang?: string; jumlahSoal?: number }
+): Promise<PoinDeductionResult> {
+  if (!result || !result.success) {
+    return { success: false, poinDeducted: 0, remainingPoin: 0, rawTokens: 0, source: 'main' };
+  }
+  return consumeUserPoinFromUsage(userId, result.usage || null, feature, {
+    mapel: opts?.mapel,
+    jenjang: opts?.jenjang,
+    jumlahSoal: opts?.jumlahSoal,
+  });
 }
 
 /**
@@ -138,6 +171,7 @@ export function estimateFeaturePoinCost(feature: string): number {
     'journals-ai': 1,
     'selesai-mengajar': 3,
     'generate-image': 2,
+    'parse-keuangan': 1,
     'regenerate-soal': 1,
     'bahan-ajar': 2,
     'bahan-ajar-refund': 0,
@@ -164,20 +198,20 @@ export const POIN_CONVERSION_TESTS = [
 /**
  * Verify konversi sesuai spec
  */
-export function verifyPoinConversion(inputTokens: number, expectedPoin: number): boolean {
-  const actual = convertTokensToPoin(inputTokens);
+export async function verifyPoinConversion(inputTokens: number, expectedPoin: number): Promise<boolean> {
+  const actual = convertTokensToPoin(inputTokens, await getTokensPerPoin());
   return actual === expectedPoin;
 }
 
 /**
  * Run all conversion tests
  */
-export function runConversionTests(): { passed: boolean; results: Array<{ input: number; expected: number; actual: number }> } {
+export async function runConversionTests(): Promise<{ passed: boolean; results: Array<{ input: number; expected: number; actual: number }> }> {
   const results: Array<{ input: number; expected: number; actual: number }> = [];
   let allPassed = true;
 
   for (const [input, expected] of POIN_CONVERSION_TESTS) {
-    const actual = convertTokensToPoin(input);
+    const actual = convertTokensToPoin(input, await getTokensPerPoin());
     const passed = actual === expected;
     if (!passed) allPassed = false;
     results.push({ input, expected, actual });

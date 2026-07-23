@@ -33,7 +33,7 @@ export interface Subject {
 }
 
 export interface TeachingSession {
-  id?: string;
+  id: string;
   subjectId: string;
   subjectName: string;
   startTime: string;

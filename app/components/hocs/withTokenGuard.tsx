@@ -1,7 +1,7 @@
 /**
  * withTokenGuard Higher-Order Component
  *
- * Wraps AI-powered components with automatic token checking.
+ * Wraps AI-powered components with automatic poin checking.
  * Shows loading state during checks and handles errors gracefully.
  *
  * Usage:
@@ -18,7 +18,7 @@
 
 import { ComponentType, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import TokenHabisModal from "@/app/components/ui/TokenHabisModal";
+import PoinHabisModal from "@/app/components/ui/PoinHabisModal";
 
 interface WithTokenGuardOptions {
   featureName: string;
@@ -176,14 +176,14 @@ export function withTokenGuard<P extends object>(
               {tokenStatus.reason === "expired" &&
                 "Masa langganan Anda telah berakhir."}
               {tokenStatus.reason === "no_tokens" &&
-                "Token Anda tidak mencukupi."}
+                "Poin Anda tidak mencukupi."}
               {tokenStatus.reason === "locked" &&
                 "Akun Anda terkunci. Hubungi admin."}
             </p>
           </div>
         </div>
 
-        <TokenHabisModal
+        <PoinHabisModal
           open={showErrorModal}
           shortfall={requiredTokens}
           currentAddon={0}

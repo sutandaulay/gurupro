@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { getPayload } from '@/lib/payload';
+import { query } from '@/lib/db';
 import {
   createEkstrakurikuler,
   updateEkstrakurikuler,
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
 
 /**
  * POST /api/ekstrakurikuler
- * Body: { namaEkskul, kelasId, pembinaMemberId }
+ * Body: { namaEkskul, kelasId, pembinaMemberId?, pembinaUserId? }
  */
 export async function POST(req: Request) {
   try {
@@ -50,7 +50,12 @@ export async function POST(req: Request) {
     const body = await req.json();
     const input = EkstrakurikulerCreateSchema.parse(body);
 
-    const result = await createEkstrakurikuler(input);
+    const result = await createEkstrakurikuler({
+      namaEkskul: input.namaEkskul,
+      kelasId: input.kelasId,
+      pembinaMemberId: input.pembinaMemberId,
+      pembinaUserId: input.pembinaUserId,
+    });
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error: any) {
@@ -61,7 +66,7 @@ export async function POST(req: Request) {
 
 /**
  * PUT /api/ekstrakurikuler
- * Body: { id, namaEkskul?, pembinaMemberId? }
+ * Body: { id, namaEkskul?, pembinaMemberId?, pembinaUserId? }
  */
 export async function PUT(req: Request) {
   try {
@@ -74,11 +79,43 @@ export async function PUT(req: Request) {
     const body = await req.json();
     const input = EkstrakurikulerUpdateSchema.parse(body);
 
-    const result = await updateEkstrakurikuler(input);
+    const result = await updateEkstrakurikuler({
+      id: input.id,
+      namaEkskul: input.namaEkskul,
+      pembinaMemberId: input.pembinaMemberId,
+      pembinaUserId: input.pembinaUserId,
+    });
 
     return NextResponse.json({ data: result });
   } catch (error: any) {
     console.error('PUT /api/ekstrakurikuler error:', error);
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+}
+
+/**
+ * DELETE /api/ekstrakurikuler
+ * Query params: id
+ */
+export async function DELETE(req: Request) {
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('gurupro_session')?.value;
+    if (!sessionCookie) {
+      return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    if (!id) {
+      return NextResponse.json({ error: 'id wajib diisi' }, { status: 400 });
+    }
+
+    await query('DELETE FROM ekstrakurikuler WHERE id = $1', [id]);
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('DELETE /api/ekstrakurikuler error:', error);
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 }

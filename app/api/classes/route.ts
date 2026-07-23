@@ -62,7 +62,7 @@ export async function POST(req: Request) {
   try {
     const userId = await getUserId();
     await requireActiveTahunAjaran();
-    const { id, school_id, nama_kelas, wali_kelas } = await req.json();
+    const { id, school_id, nama_kelas, wali_kelas, wali_kelas_user_id } = await req.json();
 
     if (!school_id || !nama_kelas) {
       return NextResponse.json({ error: "school_id dan nama_kelas wajib diisi" }, { status: 400 });
@@ -71,25 +71,34 @@ export async function POST(req: Request) {
     await verifySchoolOwner(school_id, userId);
 
     if (id) {
-      // Update
       const res = await query(
         `UPDATE classes 
-         SET nama_kelas = $1, wali_kelas = $2
-         WHERE id = $3 AND school_id = $4
+         SET nama_kelas = $1, wali_kelas = $2, wali_kelas_user_id = $3
+         WHERE id = $4 AND school_id = $5
          RETURNING *`,
-        [nama_kelas.trim(), wali_kelas ? wali_kelas.trim() : null, id, school_id]
+        [
+          nama_kelas.trim(),
+          wali_kelas ? wali_kelas.trim() : null,
+          wali_kelas_user_id || null,
+          id,
+          school_id,
+        ]
       );
       if (res.rows.length === 0) {
         return NextResponse.json({ error: "Kelas tidak ditemukan" }, { status: 404 });
       }
       return NextResponse.json(res.rows[0]);
     } else {
-      // Insert
       const res = await query(
-        `INSERT INTO classes (school_id, nama_kelas, wali_kelas)
-         VALUES ($1, $2, $3)
+        `INSERT INTO classes (school_id, nama_kelas, wali_kelas, wali_kelas_user_id)
+         VALUES ($1, $2, $3, $4)
          RETURNING *`,
-        [school_id, nama_kelas.trim(), wali_kelas ? wali_kelas.trim() : null]
+        [
+          school_id,
+          nama_kelas.trim(),
+          wali_kelas ? wali_kelas.trim() : null,
+          wali_kelas_user_id || null,
+        ]
       );
       return NextResponse.json(res.rows[0]);
     }

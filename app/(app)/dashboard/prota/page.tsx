@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useTeacherStore, useKurikulumStore } from '@/lib/stores';
 import dynamic from 'next/dynamic';
-import TokenHabisModal from '@/app/components/ui/TokenHabisModal';
+import PoinHabisModal from '@/app/components/ui/PoinHabisModal';
 
 export default function ProtaPage() {
   const {
@@ -73,7 +73,7 @@ export default function ProtaPage() {
         if (err.reason === "token_habis" || err.reason === "subscription_expired") {
           setShowTokenModal(true);
           setTokenShortfall(1);
-          setError("Token habis. Silakan top-up atau upgrade paket.");
+          setError("Poin habis. Silakan top-up atau upgrade paket.");
         } else {
           setError(err.error || 'Gagal generate Prota');
         }
@@ -298,8 +298,8 @@ export default function ProtaPage() {
           </div>
         </div>
 
-        {/* Token Habis Modal */}
-        <TokenHabisModal
+        {/* Poin Habis Modal */}
+        <PoinHabisModal
           open={showTokenModal}
           shortfall={tokenShortfall}
           onClose={() => setShowTokenModal(false)}

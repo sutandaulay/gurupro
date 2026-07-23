@@ -18,6 +18,7 @@ import type {
   SelesaiMengajarResult,
 } from '@/lib/selesai-mengajar/types';
 import ProgressOverlay from './progress-overlay';
+import VoiceTextInput from '@/components/voice/VoiceTextInput';
 import HasilModal from './hasil-modal';
 
 interface StepProgress {
@@ -520,17 +521,16 @@ function SelesaiMengajarModalContent({
                 </div>
               </div>
 
-              {/* Catatan */}
+              {/* Catatan — Sprint 4.3: Voice Input (Web Speech API) */}
               <div>
                 <label className="text-sm font-semibold text-slate-700 block mb-2">
                   Catatan khusus (opsional)
                 </label>
-                <textarea
+                <VoiceTextInput
                   value={catatan}
-                  onChange={(e) => setCatatan(e.target.value)}
-                  placeholder="Contoh: Ada siswa yang kesulitan soal no.3"
+                  onChange={setCatatan}
+                  placeholder="Contoh: Ada siswa yang kesulitan soal no.3 (atau ketuk 🎤 lalu bicara)"
                   rows={2}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:border-emerald-400 focus:outline-none text-sm resize-none"
                 />
               </div>
 

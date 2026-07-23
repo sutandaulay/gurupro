@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, Suspense, useRef } from "react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
@@ -16,8 +16,16 @@ import HistoryPanel from "@/components/soal/HistoryPanel";
 import ItemAnalysisPanel from "@/components/soal/ItemAnalysisPanel";
 import type { ScheduleInfo } from "@/lib/selesai-mengajar/types";
 import { useTeacherStore, useProfileStore } from "@/lib/stores";
-import TokenHabisModal from "@/app/components/ui/TokenHabisModal";
+import PoinHabisModal from "@/app/components/ui/PoinHabisModal";
 import OnboardingWizard from "@/components/onboarding/OnboardingWizard";
+import StreakIndicator from "@/components/streaks/StreakIndicator";
+import MorningBriefingCard from "@/components/morning-briefing/MorningBriefingCard";
+import VoiceTextInput from "@/components/voice/VoiceTextInput";
+import MobileHomeMenu from "@/app/components/mobile/MobileHomeMenu";
+import MobileBottomNav from "@/app/components/mobile/MobileBottomNav";
+import AppIcon from "@/app/components/ui/AppIcon";
+import { Calendar, School, BookOpen, Users, Clock } from "lucide-react";
+import { getLucideIcon, resolveCategory } from "@/lib/menuConfig";
 
 // Dynamic CDN Loader for html2pdf.js
 const loadHtml2Pdf = () => {
@@ -202,15 +210,9 @@ function DashboardContent() {
       return "Habis";
     }
 
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
 
-    if (days > 0) {
-      return `${days}h ${hours}j ${minutes}m ${seconds}s`;
-    }
-    return `${hours}j ${minutes}m ${seconds}s`;
+    return `Tersisa ${days} hari`;
   };
 
   const isSubscriptionExpiringSoon = () => {
@@ -529,7 +531,29 @@ function DashboardContent() {
   const [invBeli, setInvBeli] = useState<string>("");
   const [invSekarang, setInvSekarang] = useState<string>("");
   const [financeDocId, setFinanceDocId] = useState<string>("");
-  const [activeFinanceTab, setActiveFinanceTab] = useState<"arus_kas" | "tabungan" | "investasi" | "analisis">("arus_kas");
+  const [activeFinanceTab, setActiveFinanceTab] = useState<"arus_kas" | "tabungan" | "investasi" | "analisis" | "chat">("arus_kas");
+
+  // Finance Chat States
+  const [financeChatMessages, setFinanceChatMessages] = useState<Array<{
+    id: string;
+    role: 'user' | 'ai';
+    type?: 'confirm' | 'saved';
+    data?: any;
+    text?: string;
+    totalToday?: number;
+    timestamp: number;
+  }>>([]);
+  const [financeChatInput, setFinanceChatInput] = useState<string>("");
+  const [financeChatLoading, setFinanceChatLoading] = useState<boolean>(false);
+  const [financeChatEditId, setFinanceChatEditId] = useState<string | null>(null);
+  const [financeChatEditDraft, setFinanceChatEditDraft] = useState<{
+    jumlah: string;
+    tipe: string;
+    kategori: string;
+    tanggal: string;
+    keterangan: string;
+  } | null>(null);
+  const financeChatEndRef = useRef<HTMLDivElement>(null);
 
   // Signatory States
   const [sigKepalaNama, setSigKepalaNama] = useState<string>("");
@@ -605,12 +629,18 @@ function DashboardContent() {
   
   // Form Inputs Tambah Kelas/Mapel/Siswa/Jadwal
   const [newClassName, setNewClassName] = useState<string>("");
+  const [newClassWali, setNewClassWali] = useState<string>("");
+  const [newClassWaliUser, setNewClassWaliUser] = useState<boolean>(false);
+  const [editingClassId, setEditingClassId] = useState<string>("");
   const [newSubjectName, setNewSubjectName] = useState<string>("");
   const [newStudentName, setNewStudentName] = useState<string>("");
   const [newStudentNisn, setNewStudentNisn] = useState<string>("");
   const [newStudentAbsen, setNewStudentAbsen] = useState<string>("");
-  const [newClassWali, setNewClassWali] = useState<string>("");
-  const [editingClassId, setEditingClassId] = useState<string>("");
+  const [editingEkskulId, setEditingEkskulId] = useState<string>("");
+  const [newEkskulName, setNewEkskulName] = useState<string>("");
+  const [newEkskulClassId, setNewEkskulClassId] = useState<string>("");
+  const [newEkskulPembinaUser, setNewEkskulPembinaUser] = useState<boolean>(false);
+  const [ekskulList, setEkskulList] = useState<any[]>([]);
   
   const [schDay, setSchDay] = useState<string>("Senin");
   const [schStart, setSchStart] = useState<string>("07:30");
@@ -620,7 +650,7 @@ function DashboardContent() {
   const [teacherStatus, setTeacherStatus] = useState<string>("Hadir");
   const [teacherNotes, setTeacherNotes] = useState<string>("");
   const [studentAttRecords, setStudentAttRecords] = useState<{ [key: string]: { status: string; catatan: string } }>({});
-  const [tabSekolah, setTabSekolah] = useState<"tahun-ajaran" | "profil" | "kelas-mapel" | "siswa" | "jadwal" | "presensi">("tahun-ajaran");
+  const [tabSekolah, setTabSekolah] = useState<"tahun-ajaran" | "profil" | "kelas-mapel" | "ekskul" | "siswa" | "jadwal" | "presensi">("tahun-ajaran");
 
   // Tahun Ajaran States
   const [tahunAjaranList, setTahunAjaranList] = useState<any[]>([]);
@@ -910,7 +940,7 @@ function DashboardContent() {
       // Handle active sub-tab for keuangan if specified
       const tabParam = searchParams.get("tab");
       if (moduleParam === "keuangan" && tabParam) {
-        const validFinanceTabs = ["arus_kas", "tabungan", "investasi", "analisis"];
+        const validFinanceTabs = ["arus_kas", "tabungan", "investasi", "analisis", "chat"];
         if (validFinanceTabs.includes(tabParam)) {
           setActiveFinanceTab(tabParam as any);
         }
@@ -1230,12 +1260,14 @@ function DashboardContent() {
       fetchJournalSchemas(selectedSchoolId);
       // eslint-disable-next-line react-hooks/immutability
       fetchTeacherJournals(selectedSchoolId);
+      fetchEkskul();
     } else {
       setClasses([]);
       setSubjects([]);
       setSchedules([]);
       setJournalSchemas([]);
       setJurnalList([]);
+      setEkskulList([]);
     }
   }, [selectedSchoolId]);
 
@@ -1386,11 +1418,13 @@ function DashboardContent() {
           school_id: selectedSchoolId,
           nama_kelas: newClassName,
           wali_kelas: newClassWali,
+          wali_kelas_user_id: newClassWaliUser ? currentUser?.id : null,
         }),
       });
       if (res.ok) {
         setNewClassName("");
         setNewClassWali("");
+        setNewClassWaliUser(false);
         setEditingClassId("");
         fetchClasses(selectedSchoolId);
         showSuccess(editingClassId ? "Kelas berhasil diperbarui!" : "Kelas berhasil ditambahkan!");
@@ -1408,6 +1442,7 @@ function DashboardContent() {
       const res = await fetch(`/api/classes?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         fetchClasses(selectedSchoolId);
+        fetchEkskul();
         showSuccess("Kelas berhasil dihapus");
       }
     } catch (e) {
@@ -1442,6 +1477,66 @@ function DashboardContent() {
       if (res.ok) {
         fetchSubjects(selectedSchoolId);
         showSuccess("Mata pelajaran berhasil dihapus");
+      }
+    } catch (e) {
+      showError("Koneksi bermasalah");
+    }
+  };
+
+  const fetchEkskul = async () => {
+    if (!selectedSchoolId) {
+      setEkskulList([]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/ekstrakurikuler?schoolId=${selectedSchoolId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setEkskulList(data.data || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch ekskul", e);
+    }
+  };
+
+  const handleAddEkskul = async () => {
+    if (!newEkskulName || !newEkskulClassId) return;
+    try {
+      const body: any = {
+        namaEkskul: newEkskulName,
+        kelasId: newEkskulClassId,
+        pembinaUserId: newEkskulPembinaUser ? currentUser?.id : null,
+      };
+      const res = await fetch("/api/ekstrakurikuler", {
+        method: editingEkskulId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(editingEkskulId ? { id: editingEkskulId } : {}),
+          ...body,
+        }),
+      });
+      if (res.ok) {
+        setNewEkskulName("");
+        setNewEkskulClassId("");
+        setNewEkskulPembinaUser(false);
+        setEditingEkskulId("");
+        fetchEkskul();
+        showSuccess(editingEkskulId ? "Ekstrakurikuler berhasil diperbarui!" : "Ekstrakurikuler berhasil ditambahkan!");
+      } else {
+        showError(editingEkskulId ? "Gagal memperbarui ekstrakurikuler" : "Gagal menambahkan ekstrakurikuler");
+      }
+    } catch (e) {
+      showError("Koneksi bermasalah");
+    }
+  };
+
+  const handleDeleteEkskul = async (id: string) => {
+    if (!confirm("Hapus ekstrakurikuler ini?")) return;
+    try {
+      const res = await fetch(`/api/ekstrakurikuler?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        fetchEkskul();
+        showSuccess("Ekstrakurikuler berhasil dihapus");
       }
     } catch (e) {
       showError("Koneksi bermasalah");
@@ -3265,7 +3360,169 @@ function DashboardContent() {
     showSuccess("Investasi berhasil dihapus.");
   };
 
-  
+  // Finance Chat Helpers
+  useEffect(() => {
+    if (activeFinanceTab === 'chat') {
+      const key = financeLedger.map((t) => t.id).join(',');
+      const savedKey = (window as any).__financeChatLoadedKey;
+      if (savedKey !== key) {
+        (window as any).__financeChatLoadedKey = key;
+        setFinanceChatMessages(financeLedger.map((tx) => ({
+          id: tx.id,
+          role: 'ai' as const,
+          type: 'saved' as const,
+          data: tx,
+          text: `Tercatat: ${tx.tipe === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'} ${tx.keterangan} sebesar ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(tx.jumlah))} pada ${new Date(tx.tanggal + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}.`,
+          timestamp: Date.now(),
+        })));
+        setFinanceChatEditId(null);
+        setFinanceChatEditDraft(null);
+      }
+    } else {
+      (window as any).__financeChatLoadedKey = undefined;
+    }
+  }, [activeFinanceTab]);
+
+  const onFinanceSendChat = async () => {
+    const text = financeChatInput.trim();
+    if (!text || financeChatLoading) return;
+
+    const userMsgId = `chat-${Date.now()}`;
+    setFinanceChatMessages((prev) => [...prev, { id: userMsgId, role: 'user', text, timestamp: Date.now() }]);
+    setFinanceChatInput('');
+    setFinanceChatLoading(true);
+    (window as any).__financeChatLoadedKey = undefined;
+
+    try {
+      const res = await fetch('/api/administrasi/parse-keuangan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal memproses');
+
+      const aiMsgId = `chat-${Date.now() + 1}`;
+      setFinanceChatMessages((prev) => [
+        ...prev,
+        {
+          id: aiMsgId,
+          role: 'ai',
+          type: 'confirm',
+          data: data.data,
+          timestamp: Date.now(),
+        },
+      ]);
+    } catch (err: any) {
+      const aiMsgId = `chat-${Date.now() + 1}`;
+      setFinanceChatMessages((prev) => [
+        ...prev,
+        {
+          id: aiMsgId,
+          role: 'ai',
+          text: err.message || 'Gagal memproses teks. Coba lagi.',
+          timestamp: Date.now(),
+        },
+      ]);
+    } finally {
+      setFinanceChatLoading(false);
+    }
+  };
+
+  const onFinanceSaveDraft = async (msgId: string, data: any) => {
+    const newTx = {
+      id: `tx-${generateId()}`,
+      keterangan: data.keterangan,
+      jumlah: Number(data.jumlah),
+      tipe: data.tipe,
+      kategori: data.kategori,
+      tanggal: data.tanggal,
+    };
+    const updated = [...financeLedger, newTx];
+    setFinanceLedger(updated);
+    saveFinance(updated, financeSavings, financeInvestments);
+
+    const savedText = `Tercatat: ${data.tipe === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'} ${data.keterangan} sebesar ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(data.jumlah))} pada ${new Date(data.tanggal + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
+
+    setFinanceChatMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, type: 'saved', data: newTx, text: savedText } : m)));
+
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+    const todayTotal = updated.filter((t) => t.tanggal === today && t.tipe === 'pengeluaran').reduce((sum, t) => sum + Number(t.jumlah), 0);
+
+    setFinanceChatMessages((prev) => [
+      ...prev,
+      {
+        id: `chat-${Date.now()}`,
+        role: 'ai',
+        type: 'saved',
+        text: `Total pengeluaran hari ini: ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(todayTotal)}.`,
+        totalToday: todayTotal,
+        timestamp: Date.now(),
+      },
+    ]);
+
+    showSuccess('Transaksi berhasil ditambahkan!');
+  };
+
+  const onFinanceStartEdit = (msgId: string, data: any) => {
+    setFinanceChatEditId(msgId);
+    setFinanceChatEditDraft({
+      jumlah: String(data.jumlah),
+      tipe: data.tipe,
+      kategori: data.kategori,
+      tanggal: data.tanggal,
+      keterangan: data.keterangan,
+    });
+  };
+
+  const onFinanceConfirmEdit = async (msgId: string) => {
+    if (!financeChatEditDraft) return;
+    const newTx = {
+      id: `tx-${generateId()}`,
+      keterangan: financeChatEditDraft.keterangan,
+      jumlah: Number(financeChatEditDraft.jumlah),
+      tipe: financeChatEditDraft.tipe,
+      kategori: financeChatEditDraft.kategori,
+      tanggal: financeChatEditDraft.tanggal,
+    };
+    const updated = [...financeLedger, newTx];
+    setFinanceLedger(updated);
+    saveFinance(updated, financeSavings, financeInvestments);
+
+    const savedText = `Tercatat: ${newTx.tipe === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'} ${newTx.keterangan} sebesar ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(newTx.jumlah)} pada ${new Date(newTx.tanggal + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
+
+    setFinanceChatMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, type: 'saved', data: newTx, text: savedText } : m)));
+
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+    const todayTotal = updated.filter((t) => t.tanggal === today && t.tipe === 'pengeluaran').reduce((sum, t) => sum + Number(t.jumlah), 0);
+
+    setFinanceChatMessages((prev) => [
+      ...prev,
+      {
+        id: `chat-${Date.now()}`,
+        role: 'ai',
+        type: 'saved',
+        text: `Total pengeluaran hari ini: ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(todayTotal)}.`,
+        totalToday: todayTotal,
+        timestamp: Date.now(),
+      },
+    ]);
+
+    setFinanceChatEditId(null);
+    setFinanceChatEditDraft(null);
+    showSuccess('Transaksi berhasil ditambahkan!');
+  };
+
+  const onFinanceCancelEdit = () => {
+    setFinanceChatEditId(null);
+    setFinanceChatEditDraft(null);
+  };
+
+  useEffect(() => {
+    if (activeFinanceTab === 'chat' && financeChatEndRef.current) {
+      financeChatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeFinanceTab, financeChatMessages, financeChatLoading]);
 
   const handlePlanCheckout = async (planType: string) => {
     if (!currentUser) return;
@@ -3342,7 +3599,7 @@ function DashboardContent() {
           if (errData.reason === "token_habis" || errData.reason === "subscription_expired") {
             setShowTokenModal(true);
             setTokenShortfall(1);
-            throw new Error("Token habis. Silakan top-up atau upgrade paket.");
+            throw new Error("Poin habis. Silakan top-up atau upgrade paket.");
           }
           throw new Error(errData.error || `Gagal membuat soal (HTTP ${response.status}).`);
         }
@@ -4605,12 +4862,13 @@ function DashboardContent() {
           {/* Sub-Tab Navigator */}
           <div className="flex flex-wrap bg-slate-100 p-1 rounded-2xl gap-0.5 shrink-0 self-start sm:self-auto">
             {[
-              { id: "tahun-ajaran", label: "TA", icon: "📅" },
-              { id: "profil", label: "Profil", icon: "🏫" },
-              { id: "kelas-mapel", label: "Kelas & Mapel", icon: "📚" },
-              { id: "siswa", label: "Siswa", icon: "👥" },
-              { id: "jadwal", label: "Jadwal", icon: "📅" },
-              { id: "presensi", label: "Presensi", icon: "📝" },
+              { id: "tahun-ajaran", label: "TA", icon: Calendar },
+              { id: "profil", label: "Profil", icon: School },
+              { id: "kelas-mapel", label: "Kelas & Mapel", icon: BookOpen },
+              { id: "ekskul", label: "Ekskul", icon: Users },
+              { id: "siswa", label: "Siswa", icon: Users },
+              { id: "jadwal", label: "Jadwal", icon: Calendar },
+              { id: "presensi", label: "Presensi", icon: Clock },
             ].map((tab) => {
               const isActive = tabSekolah === tab.id;
               const hasActiveTa = tahunAjaranList.some((ta: any) => ta.is_active);
@@ -4631,7 +4889,7 @@ function DashboardContent() {
                     isActive ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
-                  <span>{tab.icon}</span>
+                  <AppIcon label={tab.label} size={36} iconSize={18} category={resolveCategory(tab.label)} active={isActive} icon={<tab.icon size={18} />} />
                   <span>{tab.label}</span>
                   {isLocked && <span className="text-[9px]">🔒</span>}
                 </button>
@@ -4987,6 +5245,17 @@ function DashboardContent() {
                           className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-semibold text-slate-800"
                         />
                       </div>
+                      <div className="col-span-2">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={newClassWaliUser}
+                            onChange={(e) => setNewClassWaliUser(e.target.checked)}
+                            className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          />
+                          <span className="text-[10px] font-semibold text-slate-600">Saya Wali Kelas kelas ini</span>
+                        </label>
+                      </div>
                     </div>
                     <div className="flex gap-2 justify-end">
                       {editingClassId && (
@@ -4996,6 +5265,7 @@ function DashboardContent() {
                             setEditingClassId("");
                             setNewClassName("");
                             setNewClassWali("");
+                            setNewClassWaliUser(false);
                           }}
                           className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-bold transition cursor-pointer"
                         >
@@ -5025,16 +5295,17 @@ function DashboardContent() {
                             )}
                           </div>
                           <div className="flex gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingClassId(cls.id);
-                                setNewClassName(cls.nama_kelas);
-                                setNewClassWali(cls.wali_kelas || "");
-                              }}
-                              className="p-1 hover:bg-slate-200 border border-transparent text-indigo-600 rounded-lg text-xs cursor-pointer"
-                              title="Ubah"
-                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingClassId(cls.id);
+                                  setNewClassName(cls.nama_kelas);
+                                  setNewClassWali(cls.wali_kelas || "");
+                                  setNewClassWaliUser(!!cls.wali_kelas_user_id);
+                                }}
+                                className="p-1 hover:bg-slate-200 border border-transparent text-indigo-600 rounded-lg text-xs cursor-pointer"
+                                title="Ubah"
+                              >
                               ✏️
                             </button>
                             <button
@@ -5092,6 +5363,122 @@ function DashboardContent() {
                       ))
                     )}
                   </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Sub-Tab: Ekskul */}
+        {tabSekolah === "ekskul" && (
+          <div className="space-y-6">
+            {!selectedSchoolId ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 text-center text-amber-800 text-xs font-medium">
+                ⚠️ Silakan pilih sekolah terlebih dahulu untuk mengelola ekstrakurikuler.
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 space-y-4">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">🎯 Kelola Ekstrakurikuler</h4>
+
+                <div className="space-y-2 bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-400 block mb-0.5">Nama Ekskul</label>
+                      <input
+                        type="text"
+                        value={newEkskulName}
+                        onChange={(e) => setNewEkskulName(e.target.value)}
+                        placeholder="Contoh: Pramuka, Paskibra"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-semibold text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-400 block mb-0.5">Kelas</label>
+                      <select
+                        value={newEkskulClassId}
+                        onChange={(e) => setNewEkskulClassId(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-semibold text-slate-800"
+                      >
+                        <option value="">-- Pilih Kelas --</option>
+                        {classes.map((cls) => (
+                          <option key={cls.id} value={cls.id}>{cls.nama_kelas}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="newEkskulPembinaUser"
+                      type="checkbox"
+                      checked={newEkskulPembinaUser}
+                      onChange={(e) => setNewEkskulPembinaUser(e.target.checked)}
+                      className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <label htmlFor="newEkskulPembinaUser" className="text-[10px] font-semibold text-slate-600 cursor-pointer select-none">
+                      Saya Pembina ekskul ini
+                    </label>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    {editingEkskulId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingEkskulId("");
+                          setNewEkskulName("");
+                          setNewEkskulClassId("");
+                          setNewEkskulPembinaUser(false);
+                        }}
+                        className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-bold transition cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleAddEkskul}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-md shadow-indigo-100 cursor-pointer shrink-0"
+                    >
+                      {editingEkskulId ? "Simpan Perubahan" : "Tambah Ekskul"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {ekskulList.length === 0 ? (
+                    <p className="text-[10px] text-slate-400 font-medium text-center py-4">Belum ada ekstrakurikuler.</p>
+                  ) : (
+                    ekskulList.map((ekskul) => (
+                      <div key={ekskul.id} className="flex justify-between items-center bg-slate-50 hover:bg-slate-100/70 border border-slate-100 px-3.5 py-2.5 rounded-xl transition">
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold text-slate-800 block">{ekskul.nama_ekskul}</span>
+                          <span className="text-[9px] font-semibold text-slate-500 block">{ekskul.nama_kelas || "-"}</span>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingEkskulId(ekskul.id);
+                              setNewEkskulName(ekskul.nama_ekskul);
+                              setNewEkskulClassId(ekskul.kelas_id || "");
+                              setNewEkskulPembinaUser(!!ekskul.pembina_user_id);
+                            }}
+                            className="p-1 hover:bg-slate-200 border border-transparent text-indigo-600 rounded-lg text-xs cursor-pointer"
+                            title="Ubah"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteEkskul(ekskul.id)}
+                            className="p-1 hover:bg-slate-200 border border-transparent text-rose-500 rounded-lg text-xs cursor-pointer"
+                            title="Hapus"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -5842,9 +6229,153 @@ function DashboardContent() {
             📊 Analisis Keuangan
             {activeFinanceTab === "analisis" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />}
           </button>
+          <button
+            onClick={() => setActiveFinanceTab("chat")}
+            className={`pb-3 transition relative cursor-pointer ${
+              activeFinanceTab === "chat" ? "text-amber-600" : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            💬 Catat via Chat
+            {activeFinanceTab === "chat" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 rounded-full" />}
+          </button>
         </div>
 
-        {/* Tab 1: Arus Kas */}
+        {/* Tab Chat: Catat via Chat */}
+        {activeFinanceTab === "chat" && (
+          <div className="space-y-4">
+            <div className="bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col" style={{ height: '520px' }}>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3" id="finance-chat-messages">
+                {financeChatMessages.length === 0 && !financeChatLoading && (
+                  <div className="text-center text-slate-400 text-xs mt-10">
+                    Mulai dengan mengetik transaksi Anda, misal:<br/>
+                    <span className="italic">"200rb biaya makan"</span> atau <span className="italic">"gaji ngajar les 500rb"</span>
+                  </div>
+                )}
+                {financeChatMessages.map((msg) => (
+                  <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed ${
+                      msg.role === 'user'
+                        ? 'bg-indigo-600 text-white rounded-br-sm'
+                        : 'bg-slate-100 text-slate-800 rounded-bl-sm'
+                    }`}>
+                      {msg.role === 'user' ? (
+                        <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {msg.type === 'confirm' && msg.data ? (
+                            <>
+                              <p className="font-medium">
+                                Oke, saya catat: <span className={msg.data.tipe === 'pemasukan' ? 'text-emerald-600' : 'text-rose-600'}>
+                                  {msg.data.tipe === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}
+                                </span> {msg.data.keterangan} sebesar <span className="font-bold">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(msg.data.jumlah)}</span> pada {new Date(msg.data.tanggal + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}.
+                              </p>
+                              <div className="flex gap-2 pt-1">
+                                <button
+                                  onClick={() => onFinanceSaveDraft(msg.id, msg.data!)}
+                                  className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition cursor-pointer"
+                                >
+                                  Simpan
+                                </button>
+                                <button
+                                  onClick={() => onFinanceStartEdit(msg.id, msg.data!)}
+                                  className="px-3 py-1 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                                >
+                                  Edit
+                                </button>
+                              </div>
+                              {financeChatEditId === msg.id && financeChatEditDraft && (
+                                <div className="mt-3 bg-white border border-slate-200 rounded-xl p-3 space-y-2">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Jumlah (Rp)</label>
+                                      <input type="number" value={financeChatEditDraft.jumlah} onChange={(e) => setFinanceChatEditDraft({...financeChatEditDraft, jumlah: e.target.value})} className="w-full px-2 py-1 border border-slate-200 rounded-lg text-[11px] bg-white" />
+                                    </div>
+                                    <div>
+                                      <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Tipe</label>
+                                      <select value={financeChatEditDraft.tipe} onChange={(e) => setFinanceChatEditDraft({...financeChatEditDraft, tipe: e.target.value})} className="w-full px-2 py-1 border border-slate-200 rounded-lg text-[11px] bg-white">
+                                        <option value="pemasukan">Pemasukan</option>
+                                        <option value="pengeluaran">Pengeluaran</option>
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Kategori</label>
+                                      <select value={financeChatEditDraft.kategori} onChange={(e) => setFinanceChatEditDraft({...financeChatEditDraft, kategori: e.target.value})} className="w-full px-2 py-1 border border-slate-200 rounded-lg text-[11px] bg-white">
+                                        <option value="Gaji">Gaji Pokok</option>
+                                        <option value="Honor">Honor Mengajar</option>
+                                        <option value="ATK">ATK & Cetak</option>
+                                        <option value="Transport">Transportasi</option>
+                                        <option value="Konsumsi">Konsumsi</option>
+                                        <option value="Sampingan">Sampingan</option>
+                                        <option value="Lainnya">Lainnya</option>
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Tanggal</label>
+                                      <input type="date" value={financeChatEditDraft.tanggal} onChange={(e) => setFinanceChatEditDraft({...financeChatEditDraft, tanggal: e.target.value})} className="w-full px-2 py-1 border border-slate-200 rounded-lg text-[11px] bg-white" />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Keterangan</label>
+                                    <input type="text" value={financeChatEditDraft.keterangan} onChange={(e) => setFinanceChatEditDraft({...financeChatEditDraft, keterangan: e.target.value})} className="w-full px-2 py-1 border border-slate-200 rounded-lg text-[11px] bg-white" />
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button onClick={() => onFinanceConfirmEdit(msg.id)} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition cursor-pointer">Simpan Perubahan</button>
+                                    <button onClick={onFinanceCancelEdit} className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[11px] font-bold transition cursor-pointer">Batal</button>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          ) : msg.type === 'saved' ? (
+                            <>
+                              <p className="text-emerald-700 font-medium">Tercatat! {msg.text}</p>
+                            </>
+                          ) : (
+                            <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {financeChatLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-slate-100 text-slate-800 rounded-2xl rounded-bl-sm px-4 py-2.5 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={financeChatEndRef} />
+              </div>
+              <div className="border-t border-slate-200 p-3 bg-slate-50 rounded-b-3xl">
+                <form onSubmit={(e) => { e.preventDefault(); onFinanceSendChat(); }} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={financeChatInput}
+                    onChange={(e) => setFinanceChatInput(e.target.value)}
+                    placeholder="Ketik transaksi, misal: 200rb biaya makan"
+                    className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-xs bg-white focus:border-amber-300 outline-none text-slate-800"
+                    disabled={financeChatLoading}
+                  />
+                  <button
+                    type="submit"
+                    disabled={financeChatLoading || !financeChatInput.trim()}
+                    className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+                  >
+                    Kirim
+                  </button>
+                </form>
+                <p className="text-[10px] text-slate-400 mt-1.5 text-center">
+                  AI akan merangkum teks bebas Anda ke dalam data transaksi terstruktur.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeFinanceTab === "arus_kas" && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -6655,23 +7186,21 @@ const renderJurnalModule = () => {
 
                     <div>
                       <label className="text-[10px] font-bold text-slate-500 block mb-1">Tujuan Pembelajaran <span className="text-rose-500">*</span></label>
-                      <textarea
+                      <VoiceTextInput
                         value={journalTujuan}
-                        onChange={(e) => setJournalTujuan(e.target.value)}
+                        onChange={setJournalTujuan}
                         placeholder="Contoh: Siswa mampu menyederhanakan bentuk pecahan aljabar secara mandiri."
                         rows={2}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800 resize-none"
                       />
                     </div>
 
                     <div>
                       <label className="text-[10px] font-bold text-slate-500 block mb-1">Aktivitas Pembelajaran <span className="text-rose-500">*</span></label>
-                      <textarea
+                      <VoiceTextInput
                         value={journalAktivitas}
-                        onChange={(e) => setJournalAktivitas(e.target.value)}
+                        onChange={setJournalAktivitas}
                         placeholder="Uraikan rangkaian kegiatan ajar guru dan siswa..."
                         rows={3}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800 resize-none"
                       />
                     </div>
 
@@ -6717,22 +7246,20 @@ const renderJurnalModule = () => {
                       <div className="space-y-3">
                         <div>
                           <label className="text-[10px] font-bold text-slate-500 block mb-1">Refleksi Pembelajaran (Guru &amp; Siswa)</label>
-                          <textarea
+                          <VoiceTextInput
                             value={journalRefleksi}
-                            onChange={(e) => setJournalRefleksi(e.target.value)}
+                            onChange={setJournalRefleksi}
                             placeholder="Tulis tingkat keberhasilan, kendala, maupun umpan balik reflektif..."
                             rows={3}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800 resize-none"
                           />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-slate-500 block mb-1">Rencana Tindak Lanjut</label>
-                          <textarea
+                          <VoiceTextInput
                             value={journalTindakLanjut}
-                            onChange={(e) => setJournalTindakLanjut(e.target.value)}
+                            onChange={setJournalTindakLanjut}
                             placeholder="Rencana remedial untuk siswa di bawah KKM, atau materi pengayaan berikutnya..."
                             rows={3}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800 resize-none"
                           />
                         </div>
                       </div>
@@ -7510,7 +8037,7 @@ const renderJurnalModule = () => {
                   disabled={isGeneratingAssessRubric}
                   className="w-full py-2.5 bg-white hover:bg-indigo-50 text-indigo-900 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shadow"
                 >
-                  {isGeneratingAssessRubric ? "AI Merumuskan..." : "⚡ Rancang via AI (1 Token)"}
+                  {isGeneratingAssessRubric ? "AI Merumuskan..." : "⚡ Rancang via AI (1 Poin)"}
                 </button>
               </div>
             </div>
@@ -8413,7 +8940,7 @@ const renderJurnalModule = () => {
               disabled={isGeneratingDoc}
               className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow cursor-pointer text-center flex items-center justify-center gap-1.5 disabled:opacity-50 font-sans"
             >
-              {isGeneratingDoc ? "⏳ Menghubungi GuruPRO AI..." : "🚀 Generate Dokumen AI (1 Token)"}
+              {isGeneratingDoc ? "⏳ Menghubungi GuruPRO AI..." : "🚀 Generate Dokumen AI (1 Poin)"}
             </button>
 
             <div className="pt-4 border-t border-slate-200 space-y-2">
@@ -8851,7 +9378,7 @@ const renderJurnalModule = () => {
           <div className="flex items-center gap-3">
             <div className="bg-violet-50 border border-violet-100 text-violet-700 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5">
               <span>⚡</span>
-              <span>{currentUser?.token_limit !== undefined ? `${currentUser.token_limit} Token` : "0 Token"}</span>
+              <span>{currentUser?.token_limit !== undefined ? `${currentUser.token_limit} Poin` : "0 Poin"}</span>
             </div>
             {currentUser?.status_langganan && currentUser.status_langganan !== 'free' && currentUser.subscription_end ? (
               <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold px-3 py-1.5 rounded-xl text-xs whitespace-nowrap">
@@ -8860,6 +9387,12 @@ const renderJurnalModule = () => {
             ) : null}
           </div>
         </div>
+
+        {/* Bagian 1b — Indikator Streak Harian (Sprint 1.3) */}
+        <StreakIndicator />
+
+        {/* Bagian 1c — Morning Briefing Card (Sprint 2.2) */}
+        <MorningBriefingCard />
 
         {/* Bagian 2 — Stat Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -9605,102 +10138,6 @@ const renderJurnalModule = () => {
         ` }} />
       )}
 
-      {/* GLOBAL HEADER */}
-      <header className="bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-3xl p-4 sm:p-5 flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm no-print">
-        <div className="flex items-center justify-between w-full md:w-auto">
-          <div className="flex items-center gap-3">
-            {brandingConfig?.app_logo ? (
-              <Image src={brandingConfig.app_logo} alt={brandingConfig.app_name} width={40} height={40} className="rounded-2xl object-contain shadow-sm border border-slate-100" />
-            ) : (
-              <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white text-lg font-black shadow-md shadow-indigo-100">
-                {brandingConfig?.app_name ? brandingConfig.app_name.substring(0, 2).toUpperCase() : "GP"}
-              </div>
-            )}
-            <div>
-              <h1 className="text-base font-black text-slate-900 tracking-tight">{brandingConfig?.app_name || "GuruPRO"}</h1>
-              <p className="text-[10px] text-indigo-600 font-bold tracking-wider uppercase"></p>
-            </div>
-          </div>
-        </div>
-
-        {/* Module Navigation Tabs */}
-        {!isSidebarOpen && (
-          <nav className="flex flex-wrap items-center justify-center bg-slate-100 p-1.5 rounded-2xl gap-0.5 animate-fade-in no-print">
-            {[
-               ...(currentUser?.role === 'admin' || currentUser?.role === 'operator' || currentUser?.role === 'guru' || currentUser?.role === 'kepala_sekolah' || !currentUser?.role ? [
-                { id: "sekolah", label: "🏫 Master Data", icon: "" }
-              ] : []),
-              ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
-                { id: "soal", label: "📝 Buat Soal AI", icon: "" }
-              ] : []),
-              ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
-                { id: "administrasi", label: "📚 RPP / Silabus", icon: "" }
-              ] : []),
-              { id: "presensi", label: "⏱️ Presensi", icon: "", isLink: true, href: "/attendance" },
-              ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || currentUser?.role === 'kepala_sekolah' || !currentUser?.role ? [
-                { id: "jurnal", label: "📓 Jurnal & Ceklis", icon: "" }
-              ] : []),
-              ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
-                { id: "nilai", label: "📊 Buku Nilai", icon: "" }
-              ] : []),
-              ...(currentUser?.role === 'admin' || currentUser?.role === 'operator' ? [
-                { id: "kalender", label: "📅 Kalender", icon: "" }
-              ] : []),
-              ...(currentUser?.role === 'admin' || currentUser?.role === 'kepala_sekolah' || currentUser?.role === 'pengawas' ? [
-                { id: "supervisi_analitik", label: "🛡️ Supervisi & Analitik", icon: "" }
-              ] : []),
-              ...(currentUser?.role === 'admin' || currentUser?.role === 'guru' || !currentUser?.role ? [
-                { id: "keuangan", label: "💰 Keuangan", icon: "" }
-              ] : []),
-              { id: "tugas_harian", label: "⚡ Tugas Harian", icon: "" },
-              { id: "storage_saya", label: "📂 Storage Saya", icon: "", isLink: true, href: "/dashboard/brankas" },
-              { id: "scheduler", label: "⏰ Pengingat", icon: "" },
-              { id: "profil", label: "👤 Profil", icon: "", isLink: true, href: "/profile" },
-              { id: "laporan_harian", label: "📋 Laporan Harian", icon: "", isLink: true, href: "/dashboard/laporan-harian" },
-              { id: "laporan_kinerja", label: "📋 Laporan Kinerja", icon: "", isLink: true, href: "/dashboard/laporan-kinerja" },
-              { id: "pengembangan_diri", label: "🎓 Pengembangan Diri", icon: "", isLink: true, href: "/dashboard/pengembangan-diri" },
-              { id: "rapor", label: "📑 Status Raport", icon: "", isLink: true, href: "/dashboard/raport-status" },
-              { id: "wali_kelas", label: "👥 Wali Kelas", icon: "", isLink: true, href: "/dashboard/wali-kelas" },
-              { id: "pembina_ekskul", label: "🏅 Pembina Eskul", icon: "", isLink: true, href: "/dashboard/pembina-ekskul" },
-              { id: "institusi", label: "🏛️ Institusi", icon: "", isLink: true, href: "/dashboard/institution" },
-              { id: "pengaturan", label: "⚙️ Pengaturan", icon: "", isLink: true, href: "/settings" },
-              { id: "billing", label: "💳 Billing", icon: "", isLink: true, href: "/dashboard/billing" },
-            ].map((tab) => {
-              const isActive = currentModule === tab.id;
-              const cls = `px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                isActive
-                  ? "bg-white text-indigo-600 shadow-sm"
-                  : "text-slate-500 hover:text-slate-800"
-              }`;
-              if (tab.isLink) {
-                return (
-                  <Link
-                    key={tab.id}
-                    href={tab.href || "#"}
-                    className={cls}
-                  >
-                    <span>{tab.icon}</span>
-                    <span>{tab.label}</span>
-                  </Link>
-                );
-              }
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setCurrentModule(tab.id as any)}
-                  className={cls}
-                >
-                  <span>{tab.icon}</span>
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        )}
-
-
-      </header>
-
       {/* SUBSCRIPTION REMINDER BANNERS */}
       {currentUser && (
         <div className="no-print space-y-3">
@@ -9805,7 +10242,7 @@ const renderJurnalModule = () => {
                 <span className="font-bold text-indigo-600">2.</span>
                 <p>
                   <strong>Kuota Harian Habis (Daily Quota):</strong> Model <code>gemini-2.5-flash</code> pada tingkat gratis dibatasi hanya <strong>20 request per hari</strong>. Jika kuota harian habis, Anda harus menunggu hingga hari berikutnya atau beralih ke berbayar.
-                  <br /><span className="text-slate-400">Solusi Premium:</span> Aktifkan penagihan (<strong>Pay-as-you-go</strong>) di Google AI Studio. Biayanya sangat murah (hanya sekitar Rp 1,50 per 1.000 token input).
+                  <br /><span className="text-slate-400">Solusi Premium:</span> Aktifkan penagihan (<strong>Pay-as-you-go</strong>) di Google AI Studio. Biayanya sangat murah (hanya sekitar Rp 1,50 per 1.000 poin input).
                 </p>
               </div>
             </div>
@@ -10677,6 +11114,13 @@ const renderJurnalModule = () => {
         )}
       </div>
     </div>
+        </div>
+      )}
+
+      {/* Mobile home menu grid — only on tugas_harian module */}
+      {currentModule === 'tugas_harian' && (
+        <div className="md:hidden px-4 pt-2 pb-4">
+          <MobileHomeMenu currentModule={currentModule} />
         </div>
       )}
 
@@ -12001,13 +12445,16 @@ const renderJurnalModule = () => {
       />
 
       {/* TOKEN HABIS MODAL */}
-      <TokenHabisModal
+      <PoinHabisModal
         open={showTokenModal}
         shortfall={tokenShortfall}
         onClose={() => setShowTokenModal(false)}
         onBuyTopUp={() => window.location.href = '/profile?tab=billing'}
         onUpgrade={() => window.location.href = '/profile?tab=billing'}
       />
+
+      {/* Mobile bottom nav */}
+      <MobileBottomNav />
 
     </main>
   );

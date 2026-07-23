@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { leaveRequests, attendanceSummary } from '@/lib/schemas/attendance';
+import { leaveRequests, attendanceSummary, schools, teacherInstitutionAssignments } from '@/lib/schemas/attendance';
 import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { parseISO, eachDayOfInterval, isWithinInterval } from 'date-fns';
+import { query } from '@/lib/db';
 
 // Schema untuk validasi input pengajuan izin
 const LeaveRequestSchema = z.object({
@@ -15,6 +16,8 @@ const LeaveRequestSchema = z.object({
   endDate: z.string().transform((val) => parseISO(val)),
   reason: z.string().min(10, { message: 'Alasan harus diisi minimal 10 karakter' }),
   attachmentUrl: z.string().url().optional().nullable(),
+  school_id: z.string().uuid().optional().nullable(),
+  institution_id: z.string().uuid().optional().nullable(),
 });
 
 export async function POST(req: Request) {
@@ -69,15 +72,47 @@ export async function POST(req: Request) {
     }
 
     // Dapatkan institusi dari assignment guru
-    // Dalam implementasi nyata, ini akan mengambil institusi aktif dari teacher_institution_assignments
-    // Untuk simulasi, kita asumsikan guru terdaftar di satu institusi
-    const teacherInstitutionId = 'default-inst-id'; // Ini harus diambil dari assignment guru
+    // Untuk guru terinstansi, gunakan institution_id dari assignment
+    // Untuk guru mandiri, gunakan school_id jika ada
+    let teacherInstitutionId = null;
+    let teacherSchoolId = null;
+    
+    if (validatedData.institution_id) {
+      teacherInstitutionId = parseInt(validatedData.institution_id, 10);
+    } else if (validatedData.school_id) {
+      // Untuk guru mandiri, gunakan school_id
+      teacherSchoolId = validatedData.school_id;
+    } else {
+      // Cek apakah guru memiliki sekolah mandiri
+      const schoolResult = await db.select({ id: schools.id })
+        .from(schools)
+        .where(eq(schools.userId, session.user.id))
+        .limit(1);
+      
+      if (schoolResult.length > 0) {
+        teacherSchoolId = schoolResult[0].id;
+      } else {
+        // Cek institution assignment sebagai fallback
+        const assignmentResult = await db.select({ institutionId: teacherInstitutionAssignments.institutionId })
+          .from(teacherInstitutionAssignments)
+          .where(and(
+            eq(teacherInstitutionAssignments.teacherId, session.user.id),
+            eq(teacherInstitutionAssignments.status, 'aktif')
+          ))
+          .limit(1);
+        
+        if (assignmentResult.length > 0) {
+          teacherInstitutionId = assignmentResult[0].institutionId;
+        }
+      }
+    }
 
     // Buat record pengajuan izin
     const [newLeaveRequest] = await db.insert(leaveRequests).values({
       id: uuidv4(),
       teacherId: session.user.id,
       institutionId: teacherInstitutionId,
+      schoolId: teacherSchoolId,
       type: validatedData.type,
       startDate: validatedData.startDate,
       endDate: validatedData.endDate,

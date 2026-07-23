@@ -155,11 +155,12 @@ export default function InstitutionsManager() {
 
   const openMembersModal = (inst: Institution) => {
     setSelectedInst(inst);
+    const randomPassword = 'gurupro' + Math.random().toString(36).slice(2, 8) + '!';
     setMemberForm({
       email: '',
       name: '',
       whatsapp: '',
-      password: 'gurupro123@operator', // password default
+      password: randomPassword,
       role: 'operator',
     });
     setMemberError('');

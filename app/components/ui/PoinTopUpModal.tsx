@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-type AddonPkg = { id: string; name: string; tokenAmount: number; price: number };
+type AddonPkg = { id: string; name: string; poinAmount: number; price: number };
 
-export default function TokenTopUpModal({ open, onClose, userId }: { open: boolean; onClose: () => void; userId?: string | null }) {
+export default function PoinTopUpModal({ open, onClose, userId }: { open: boolean; onClose: () => void; userId?: string | null }) {
   const [packages, setPackages] = useState<AddonPkg[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +49,7 @@ export default function TokenTopUpModal({ open, onClose, userId }: { open: boole
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-lg w-full max-w-lg p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold">Beli Token Ekstra</h3>
+          <h3 className="text-lg font-bold">Beli Poin Ekstra</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">Tutup</button>
         </div>
         {error && <div className="text-sm text-red-600 mb-2">{error}</div>}
@@ -60,7 +60,7 @@ export default function TokenTopUpModal({ open, onClose, userId }: { open: boole
             <div key={p.id} className="flex items-center justify-between p-3 border rounded-lg">
               <div>
                 <div className="text-sm font-semibold">{p.name}</div>
-                <div className="text-xs text-gray-500">{p.tokenAmount} token</div>
+                <div className="text-xs text-gray-500">{p.poinAmount} poin</div>
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-sm font-semibold">Rp{Number(p.price).toLocaleString()}</div>

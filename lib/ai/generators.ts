@@ -67,6 +67,8 @@ export interface GenerationResult<T = any> {
     outputTokens: number;
     totalTokens: number;
     cachedTokens?: number; // For context caching
+    provider: string; // "gemini" | "openai" | "anthropic" | "deepseek" | dst
+    model: string; // nama model spesifik yang dipakai
   };
   // Raw usage metadata for Poin calculation
   rawUsage?: {
@@ -89,6 +91,8 @@ export async function generateAIContent<T>(
   }
 ): Promise<GenerationResult<T>> {
   try {
+    const config = await getAIConfig();
+    const modelName = config.gemini.model_name || 'gemini-2.5-flash';
     const model = await getModel('v1');
 
     const generationConfig = {
@@ -113,6 +117,8 @@ export async function generateAIContent<T>(
       outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
       totalTokens: response.usageMetadata?.totalTokenCount || 0,
       cachedTokens: response.usageMetadata?.cachedContentTokenCount || 0,
+      provider: 'gemini',
+      model: modelName,
     };
 
     // Raw usage metadata for accurate Poin calculation
@@ -493,6 +499,8 @@ User: ${params.userMessage}
 `;
 
   try {
+    const config = await getAIConfig();
+    const modelName = config.gemini.model_name || 'gemini-2.5-flash';
     const model = await getModel('v1');
 
     const generationConfig = {
@@ -516,6 +524,8 @@ User: ${params.userMessage}
       outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
       totalTokens: response.usageMetadata?.totalTokenCount || 0,
       cachedTokens: response.usageMetadata?.cachedContentTokenCount || 0,
+      provider: 'gemini',
+      model: modelName,
     };
 
     const rawUsage = {
@@ -525,10 +535,28 @@ User: ${params.userMessage}
       cachedContentTokenCount: response.usageMetadata?.cachedContentTokenCount || 0,
     };
 
+    const cleanedText = text.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '').trim();
+    let action: { type: string; data: any } | undefined;
+    let finalResponse = cleanedText;
+
+    try {
+      const jsonMatch = cleanedText.match(/\{[\s\S]*"action"[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.action && parsed.action.type && parsed.action.data) {
+          action = parsed.action;
+          finalResponse = parsed.response || cleanedText;
+        }
+      }
+    } catch {
+      finalResponse = cleanedText;
+    }
+
     return {
       success: true,
       data: {
-        response: text,
+        response: finalResponse,
+        action,
         suggestions: [],
       },
       usage,

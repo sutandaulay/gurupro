@@ -17,7 +17,8 @@ import {
   XCircle, 
   Clock, 
   AlertTriangle,
-  Eye
+  Eye,
+  Users
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -53,77 +54,37 @@ export default function LeaveApprovalPage() {
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [notes, setNotes] = useState('');
+  const [substitutes, setSubstitutes] = useState<any[]>([]);
+  const [loadingSubs, setLoadingSubs] = useState(false);
 
-  // Simulasi pengambilan data dari API
   useEffect(() => {
     const fetchLeaveRequests = async () => {
       try {
         setLoading(true);
-        
-        // Dalam implementasi nyata, ini akan mengambil data dari API
-        // Untuk simulasi, kita buat data dummy
-        const dummyData: LeaveRequest[] = [
-          {
-            id: 'req-1',
-            teacherId: 'teacher-1',
-            teacherName: 'Ahmad Fauzi',
-            teacherEmail: 'ahmad.fauzi@example.com',
-            institutionId: 'inst-1',
-            institutionName: 'SDN Cempaka Putih 01',
-            type: 'sakit',
-            startDate: '2024-06-20T00:00:00Z',
-            endDate: '2024-06-21T00:00:00Z',
-            reason: 'Sakit demam dan flu, sudah diperiksakan ke dokter',
-            attachmentUrl: '/surat-dokter.pdf',
-            status: 'pending',
-          },
-          {
-            id: 'req-2',
-            teacherId: 'teacher-2',
-            teacherName: 'Siti Nurhaliza',
-            teacherEmail: 'siti.nur@example.com',
-            institutionId: 'inst-1',
-            institutionName: 'SDN Cempaka Putih 01',
-            type: 'izin',
-            startDate: '2024-06-25T00:00:00Z',
-            endDate: '2024-06-25T00:00:00Z',
-            reason: 'Acara keluarga penting',
-            status: 'pending',
-          },
-          {
-            id: 'req-3',
-            teacherId: 'teacher-3',
-            teacherName: 'Budi Santoso',
-            teacherEmail: 'budi.santoso@example.com',
-            institutionId: 'inst-2',
-            institutionName: 'SMPN 1 Jakarta',
-            type: 'cuti',
-            startDate: '2024-07-01T00:00:00Z',
-            endDate: '2024-07-05T00:00:00Z',
-            reason: 'Liburan tahunan bersama keluarga',
-            status: 'approved',
-            approvedBy: 'admin-1',
-            approvedAt: '2024-06-18T10:30:00Z',
-          },
-          {
-            id: 'req-4',
-            teacherId: 'teacher-4',
-            teacherName: 'Dewi Kartika',
-            teacherEmail: 'dewi.kartika@example.com',
-            institutionId: 'inst-1',
-            institutionName: 'SDN Cempaka Putih 01',
-            type: 'sakit',
-            startDate: '2024-06-19T00:00:00Z',
-            endDate: '2024-06-19T00:00:00Z',
-            reason: 'Sakit kepala berat',
-            status: 'rejected',
-            approvedBy: 'admin-1',
-            approvedAt: '2024-06-18T14:20:00Z',
-            notes: 'Dokumentasi medis tidak mencukupi'
-          },
-        ];
-        
-        setLeaveRequests(dummyData);
+        const res = await fetch('/api/leave-requests', { cache: 'no-store' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Gagal mengambil data');
+
+        // Normalisasi field agar cocok dengan interface LeaveRequest
+        const mapped: LeaveRequest[] = (data.leaveRequests || []).map((r: any) => ({
+          id: r.id,
+          teacherId: r.teacherId,
+          teacherName: r.teacherName || r.teacher_name || 'Guru',
+          teacherEmail: r.teacherEmail || r.teacher_email || '-',
+          institutionId: String(r.institutionId ?? r.institution_id ?? ''),
+          institutionName: r.institutionName || r.institution_name || 'Institusi',
+          type: r.type || 'izin',
+          startDate: r.startDate || r.start_date,
+          endDate: r.endDate || r.end_date,
+          reason: r.reason || '',
+          attachmentUrl: r.attachmentUrl || r.attachment_url,
+          status: r.status || 'pending',
+          approvedBy: r.approvedBy || r.approved_by,
+          approvedAt: r.approvedAt || r.approved_at,
+          notes: r.notes,
+        }));
+
+        setLeaveRequests(mapped);
       } catch (err: any) {
         console.error('Error fetching leave requests:', err);
         setError(err.message || 'Gagal mengambil data pengajuan izin');
@@ -193,7 +154,7 @@ export default function LeaveApprovalPage() {
       // Update lokal
       const updatedRequests = leaveRequests.map(req => 
         req.id === selectedRequest.id 
-          ? { ...req, status: 'approved', notes: notes || req.notes, approvedAt: new Date().toISOString() } 
+          ? { ...req, status: 'approved' as const, notes: notes || req.notes, approvedAt: new Date().toISOString() } 
           : req
       );
       
@@ -235,7 +196,7 @@ export default function LeaveApprovalPage() {
       // Update lokal
       const updatedRequests = leaveRequests.map(req => 
         req.id === selectedRequest.id 
-          ? { ...req, status: 'rejected', notes: notes || req.notes, approvedAt: new Date().toISOString() } 
+          ? { ...req, status: 'rejected' as const, notes: notes || req.notes, approvedAt: new Date().toISOString() } 
           : req
       );
       
@@ -251,9 +212,22 @@ export default function LeaveApprovalPage() {
     }
   };
 
-  const handleViewDetails = (request: LeaveRequest) => {
+  const handleViewDetails = async (request: LeaveRequest) => {
     setSelectedRequest(request);
     setNotes(request.notes || '');
+    setSubstitutes([]);
+
+    // Sprint 4.5 — Ambil saran guru pengganti (READ-ONLY).
+    setLoadingSubs(true);
+    try {
+      const res = await fetch(`/api/leave-requests/${request.id}/substitutes?leaveId=${request.id}`, { cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok) setSubstitutes(data.suggestions || []);
+    } catch {
+      /* abaikan, panel opsional */
+    } finally {
+      setLoadingSubs(false);
+    }
   };
 
   if (loading) {
@@ -548,6 +522,46 @@ export default function LeaveApprovalPage() {
                   </div>
                 </div>
               )}
+
+              {/* Sprint 4.5 — Saran Guru Pengganti */}
+              <div className="border-t pt-4">
+                <h4 className="font-medium text-sm text-slate-700 flex items-center gap-2">
+                  <Users className="h-4 w-4" /> Saran Guru Pengganti
+                </h4>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Guru lain di sekolah yang bisa menggantikan selama izin berlangsung.
+                </p>
+                {loadingSubs ? (
+                  <p className="text-xs text-slate-400 mt-2">Mencari guru tersedia…</p>
+                ) : substitutes.length === 0 ? (
+                  <p className="text-xs text-slate-400 mt-2">Belum ada saran tersedia.</p>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    {substitutes.map((s) => (
+                      <div key={s.userId} className="flex items-center justify-between gap-2 bg-slate-50 rounded-lg p-2.5">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-700 truncate">{s.nama}</p>
+                          {s.mapel?.length > 0 && (
+                            <p className="text-[11px] text-slate-400 truncate">{s.mapel.join(', ')}</p>
+                          )}
+                        </div>
+                        {s.whatsapp ? (
+                          <a
+                            href={`https://wa.me/${s.whatsapp.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-emerald-600 hover:underline shrink-0"
+                          >
+                            Hubungi
+                          </a>
+                        ) : (
+                          <span className="text-[11px] text-slate-300 shrink-0">No WA</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </DialogContent>
         )}

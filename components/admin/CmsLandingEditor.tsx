@@ -133,7 +133,7 @@ const tabs: { id: TabId; label: string }[] = [
   { id: "features", label: "Fitur" },
   { id: "why", label: "Kenapa" },
   { id: "pricing", label: "Paket" },
-  { id: "addons", label: "Token Ekstra" },
+  { id: "addons", label: "Poin Ekstra" },
   { id: "school", label: "Sekolah" },
   { id: "cta", label: "CTA" },
   { id: "footer", label: "Footer" },
@@ -228,14 +228,34 @@ export default function CmsLandingEditor() {
       console.log("[CMS Landing] Starting to load data...");
 
       try {
-        // Load hero
-        const heroRes = await fetchWithRetry("/api/admin/landing/hero");
+        // Load all resources in parallel to minimize total load time
+        const [
+          heroRes,
+          featuresRes,
+          whyRes,
+          footerRes,
+          chatbotRes,
+          pricingRes,
+          addonsRes,
+          settingsRes,
+        ] = await Promise.all([
+          fetchWithRetry("/api/admin/landing/hero"),
+          fetchWithRetry("/api/admin/landing/features"),
+          fetchWithRetry("/api/admin/landing/why"),
+          fetchWithRetry("/api/admin/landing/footer"),
+          fetchWithRetry("/api/admin/landing/chatbot"),
+          fetchWithRetry("/api/admin/pricing"),
+          fetchWithRetry("/api/admin/token-packages"),
+          fetchWithRetry("/api/admin/settings"),
+        ]);
+
+        // Hero
         if (heroRes?.ok) {
           const heroData = await heroRes.json();
           setHero({
             heroBadgeText: heroData.badge || heroData.heroBadgeText || "",
             heroHeadline: heroData.headline || heroData.heroHeadline || "",
-            heroSubheadline: heroData.subheadline || heroData.heroSubheadline || "",
+            heroSubheadline: heroData.subheadline || heroData.subheadline || "",
             heroStats: (heroData.stats || heroData.heroStats || []).map((s: any) => ({
               number: s.value || s.number || "",
               label: s.label || "",
@@ -251,8 +271,7 @@ export default function CmsLandingEditor() {
           console.warn("[CMS Landing] Failed to load hero:", heroRes?.status);
         }
 
-        // Load features
-        const featuresRes = await fetchWithRetry("/api/admin/landing/features");
+        // Features
         if (featuresRes?.ok) {
           const featuresData = await featuresRes.json();
           setFeatures(featuresData.docs || []);
@@ -261,8 +280,7 @@ export default function CmsLandingEditor() {
           console.warn("[CMS Landing] Failed to load features:", featuresRes?.status);
         }
 
-        // Load why points
-        const whyRes = await fetchWithRetry("/api/admin/landing/why");
+        // Why points
         if (whyRes?.ok) {
           const whyData = await whyRes.json();
           setWhyPoints(whyData.docs || []);
@@ -271,8 +289,7 @@ export default function CmsLandingEditor() {
           console.warn("[CMS Landing] Failed to load why points:", whyRes?.status);
         }
 
-        // Load footer
-        const footerRes = await fetchWithRetry("/api/admin/landing/footer");
+        // Footer
         if (footerRes?.ok) {
           const footerData = await footerRes.json();
           setFooter(footerData || {});
@@ -281,8 +298,7 @@ export default function CmsLandingEditor() {
           console.warn("[CMS Landing] Failed to load footer:", footerRes?.status);
         }
 
-        // Load chatbot
-        const chatbotRes = await fetchWithRetry("/api/admin/landing/chatbot");
+        // Chatbot
         if (chatbotRes?.ok) {
           const chatbotData = await chatbotRes.json();
           setChatbot(chatbotData || {});
@@ -291,8 +307,7 @@ export default function CmsLandingEditor() {
           console.warn("[CMS Landing] Failed to load chatbot:", chatbotRes?.status);
         }
 
-        // Load pricing
-        const pricingRes = await fetchWithRetry("/api/admin/pricing");
+        // Pricing
         if (pricingRes?.ok) {
           const pricingData = await pricingRes.json();
           setPricingPlans(pricingData.plans || pricingData.docs || []);
@@ -301,8 +316,7 @@ export default function CmsLandingEditor() {
           console.warn("[CMS Landing] Failed to load pricing:", pricingRes?.status);
         }
 
-        // Load token packages (addons)
-        const addonsRes = await fetchWithRetry("/api/admin/token-packages");
+        // Token packages (addons)
         if (addonsRes?.ok) {
           const addonsData = await addonsRes.json();
           setAddonPackages(addonsData.docs || []);
@@ -311,12 +325,7 @@ export default function CmsLandingEditor() {
           console.warn("[CMS Landing] Failed to load addons:", addonsRes?.status);
         }
 
-        // Load blog data
-        // eslint-disable-next-line react-hooks/immutability
-        await fetchBlogData();
-
-        // Load FAQ & Referral & Legal from settings
-        const settingsRes = await fetchWithRetry("/api/admin/settings");
+        // FAQ & Referral & Legal from settings
         if (settingsRes?.ok) {
           const settingsData = await settingsRes.json();
           if (settingsData.faqConfig) setFaqItems(settingsData.faqConfig);
@@ -330,6 +339,10 @@ export default function CmsLandingEditor() {
         } else {
           console.warn("[CMS Landing] Failed to load settings:", settingsRes?.status);
         }
+
+        // Load blog data (independent, run after main content is ready)
+        // eslint-disable-next-line react-hooks/immutability
+        await fetchBlogData();
 
         console.log("[CMS Landing] Data loading complete!");
       } catch (err) {
@@ -1190,7 +1203,7 @@ export default function CmsLandingEditor() {
                 <th className="px-4 py-3">Nama Paket</th>
                 <th className="px-4 py-3 text-right">Harga</th>
                 <th className="px-4 py-3 text-center">Durasi</th>
-                <th className="px-4 py-3 text-center">Token</th>
+                <th className="px-4 py-3 text-center">Poin</th>
                 <th className="px-4 py-3 text-center">Popular</th>
                 <th className="px-4 py-3 text-center">Aksi</th>
               </tr>
@@ -1252,7 +1265,7 @@ export default function CmsLandingEditor() {
                     {plan.price === 0 ? "GRATIS" : `Rp ${Number(plan.price).toLocaleString("id-ID")}`}
                   </td>
                   <td className="px-4 py-3 text-center text-neutral-600">{plan.duration_days} hari</td>
-                  <td className="px-4 py-3 text-center text-neutral-600">{plan.tokens || 0} Token</td>
+                  <td className="px-4 py-3 text-center text-neutral-600">{plan.tokens || 0} Poin</td>
                   <td className="px-4 py-3 text-center">
                     <button onClick={() => togglePricingPopular(plan)} className="cursor-pointer mx-auto">
                       {plan.popular ? <IconToggleRight size={22} className="text-emerald-500" /> : <IconToggleLeft size={22} className="text-neutral-300" />}
@@ -1292,7 +1305,7 @@ export default function CmsLandingEditor() {
                 <input type="number" value={editPricing?.duration_days || 30} onChange={(e) => setEditPricing({ ...editPricing, duration_days: parseInt(e.target.value) || 30 })}
                   className="input-field" placeholder="90" />
               </Field>
-              <Field label="Jumlah Token">
+              <Field label="Jumlah Poin">
                 <input type="number" value={editPricing?.tokens || 0} onChange={(e) => setEditPricing({ ...editPricing, tokens: parseInt(e.target.value) || 0 })}
                   className="input-field" placeholder="500" />
               </Field>
@@ -1339,9 +1352,9 @@ export default function CmsLandingEditor() {
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-black text-neutral-900 flex items-center gap-2">
             <IconCreditCard size={20} className="text-primary-600" />
-            Paket Token Ekstra (Top-Up)
+            Paket Poin Ekstra (Top-Up)
           </h3>
-          <button onClick={() => { setEditAddon({ name: "", token_amount: 50, price: 15000, description: "", is_active: true }); setShowAddonModal(true); }}
+          <button onClick={() => { setEditAddon({ name: "", poin_amount: 50, price: 15000, description: "", is_active: true }); setShowAddonModal(true); }}
             className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl transition cursor-pointer">
             <IconPlus size={16} />
             Tambah Paket Ekstra
@@ -1354,7 +1367,7 @@ export default function CmsLandingEditor() {
               <tr>
                 <th className="px-4 py-3">Nama Paket</th>
                 <th className="px-4 py-3 text-right">Harga</th>
-                <th className="px-4 py-3 text-center">Jumlah Token</th>
+                <th className="px-4 py-3 text-center">Jumlah Poin</th>
                 <th className="px-4 py-3">Deskripsi</th>
                 <th className="px-4 py-3 text-center">Status</th>
                 <th className="px-4 py-3 text-center">Aksi</th>
@@ -1371,7 +1384,7 @@ export default function CmsLandingEditor() {
                   <td className="px-4 py-3 text-right font-bold text-emerald-600">
                     Rp {Number(addon.price).toLocaleString("id-ID")}
                   </td>
-                  <td className="px-4 py-3 text-center text-neutral-600">{addon.token_amount} Token</td>
+                  <td className="px-4 py-3 text-center text-neutral-600">{addon.poin_amount} Poin</td>
                   <td className="px-4 py-3 text-neutral-500 max-w-xs truncate">{addon.description || "-"}</td>
                   <td className="px-4 py-3 text-center">
                     <button onClick={() => toggleAddonActive(addon)} className="cursor-pointer mx-auto">
@@ -1406,19 +1419,19 @@ export default function CmsLandingEditor() {
               <h3 className="text-sm font-black text-neutral-900">{editAddon?.id ? "Edit Paket Ekstra" : "Tambah Paket Ekstra Baru"}</h3>
               <Field label="Nama Paket">
                 <input type="text" value={editAddon?.name || ""} onChange={(e) => setEditAddon({ ...editAddon, name: e.target.value })}
-                  className="input-field" placeholder="Paket 50 Token" />
+                   className="input-field" placeholder="Paket 50 Poin" />
               </Field>
               <Field label="Harga (Rp)">
                 <input type="number" value={editAddon?.price || 0} onChange={(e) => setEditAddon({ ...editAddon, price: parseInt(e.target.value) || 0 })}
                   className="input-field" placeholder="25000" />
               </Field>
-              <Field label="Jumlah Token">
-                <input type="number" value={editAddon?.token_amount || 0} onChange={(e) => setEditAddon({ ...editAddon, token_amount: parseInt(e.target.value) || 0 })}
+              <Field label="Jumlah Poin">
+                <input type="number" value={editAddon?.poin_amount || 0} onChange={(e) => setEditAddon({ ...editAddon, poin_amount: parseInt(e.target.value) || 0 })}
                   className="input-field" placeholder="50" />
               </Field>
               <Field label="Deskripsi">
                 <textarea rows={3} value={editAddon?.description || ""} onChange={(e) => setEditAddon({ ...editAddon, description: e.target.value })}
-                  className="input-field" placeholder="Keterangan singkat paket token..." />
+                  className="input-field" placeholder="Keterangan singkat paket poin..." />
               </Field>
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2 text-xs font-semibold text-neutral-600 cursor-pointer">
@@ -1725,7 +1738,7 @@ export default function CmsLandingEditor() {
           <Field label="Judul">
             <input type="text" value={referral.title}
               onChange={(e) => setReferral({ ...referral, title: e.target.value })}
-              className="input-field" placeholder="Bagikan GuruPro, Dapatkan Cashback &amp; Token!" />
+              className="input-field" placeholder="Bagikan GuruPro, Dapatkan Cashback &amp; Poin!" />
           </Field>
           <Field label="Deskripsi">
             <textarea rows={3} value={referral.description}

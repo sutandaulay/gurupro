@@ -353,12 +353,12 @@ export default function AttendanceReportsPage() {
                   <Label>Periode Kustom</Label>
                   <DateRangePicker 
                     dateRange={{ from: filters.startDate, to: filters.endDate }} 
-                    setDateRange={(range) => {
+                    onDateRangeChange={(range) => {
                       if (range) {
                         setFilters(prev => ({
                           ...prev,
-                          startDate: range.from,
-                          endDate: range.to
+                          startDate: range.from || new Date(),
+                          endDate: range.to || new Date()
                         }));
                       }
                     }}
