@@ -3,6 +3,8 @@
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import AppIcon from "@/app/components/ui/AppIcon";
+import { getLucideIcon, resolveCategory } from "@/lib/menuConfig";
 
 type SubItem = {
   label: string;
@@ -11,21 +13,18 @@ type SubItem = {
 
 type MenuItem = {
   label: string;
-  icon: string;
   href?: string;
   submenu?: (SubItem | { label: string; href?: string; submenu: SubItem[] })[];
 };
 
 const menuItems: MenuItem[] = [
-  { label: "Dasbor", icon: "📊", href: "/dashboard" },
+  { label: "Dasbor", href: "/dashboard" },
   {
     label: "Master Data",
-    icon: "🗄️",
     href: "/dashboard?module=sekolah",
   },
   {
     label: "Presensi",
-    icon: "⏱️",
     submenu: [
       { label: "Presensi Saya", href: "/attendance" },
       { label: "Presensi Mengajar", href: "/attendance/teaching" },
@@ -36,7 +35,6 @@ const menuItems: MenuItem[] = [
   },
   {
     label: "Administrasi",
-    icon: "📋",
     submenu: [
       { label: "AI Silabus", href: "/dashboard/administrasi?tipe=silabus" },
       { label: "Program Tahunan (Prota)", href: "/dashboard/prota" },
@@ -51,7 +49,6 @@ const menuItems: MenuItem[] = [
   },
   {
     label: "Monitoring",
-    icon: "📊",
     submenu: [
       { label: "Jurnal Mengajar", href: "/dashboard?module=jurnal" },
       { label: "Kalender Akademik", href: "/dashboard?module=kalender" },
@@ -62,7 +59,6 @@ const menuItems: MenuItem[] = [
   },
   {
     label: "AI",
-    icon: "💬",
     submenu: [
       { label: "Chat AI", href: "/dashboard/chat" },
       { label: "AI Performance Report", href: "/dashboard/ai-performance-report" },
@@ -71,12 +67,10 @@ const menuItems: MenuItem[] = [
   },
   {
     label: "Buku Nilai",
-    icon: "📚",
     href: "/dashboard?module=nilai",
   },
   {
     label: "Laporan",
-    icon: "📝",
     submenu: [
       { label: "Laporan Harian", href: "/dashboard/laporan-harian" },
       {
@@ -90,14 +84,19 @@ const menuItems: MenuItem[] = [
         ],
       },
       { label: "Evidence", href: "/dashboard/evidence" },
+    ],
+  },
+  {
+    label: "Raport",
+    submenu: [
       { label: "Status Raport", href: "/dashboard/raport-status" },
       { label: "Review Nilai Raport", href: "/dashboard/rapor-review" },
       { label: "Layout Raport", href: "/dashboard/layout-raport" },
+      { label: "Pemetaan Kolom Raport", href: "/dashboard/pemetaan-kolom" },
     ],
   },
   {
     label: "Pengembangan Diri",
-    icon: "🌱",
     submenu: [
       { label: "Daftar Kegiatan", href: "/dashboard/pengembangan-diri" },
       { label: "Buat Baru", href: "/dashboard/pengembangan-diri/tambah" },
@@ -106,7 +105,6 @@ const menuItems: MenuItem[] = [
   },
   {
     label: "Wali Kelas",
-    icon: "👥",
     submenu: [
       { label: "Dashboard Wali Kelas", href: "/dashboard/wali-kelas" },
       { label: "Daftar Siswa", href: "/dashboard/wali-kelas?tab=siswa" },
@@ -116,7 +114,6 @@ const menuItems: MenuItem[] = [
   },
   {
     label: "Pembina Eskul",
-    icon: "🏅",
     submenu: [
       { label: "Dashboard Pembina", href: "/dashboard/pembina-ekskul" },
       { label: "Daftar Kegiatan", href: "/dashboard/pembina-ekskul?tab=daftar" },
@@ -126,7 +123,6 @@ const menuItems: MenuItem[] = [
   },
   {
     label: "Institusi",
-    icon: "🏛️",
     submenu: [
       { label: "Manajemen Institusi", href: "/dashboard/institution" },
       { label: "Anggota Institusi", href: "/dashboard/institution/members" },
@@ -135,7 +131,6 @@ const menuItems: MenuItem[] = [
   },
   {
     label: "Keuangan",
-    icon: "💰",
     submenu: [
       { label: "Pemasukan", href: "/dashboard?module=keuangan" },
       { label: "Pengeluaran", href: "/dashboard?module=keuangan" },
@@ -144,16 +139,13 @@ const menuItems: MenuItem[] = [
   },
   {
     label: "Brankas",
-    icon: "🗂️",
   },
   {
     label: "Pengaturan",
-    icon: "⚙️",
     href: "/settings",
   },
   {
     label: "Billing",
-    icon: "💳",
     href: "/dashboard/billing",
   },
 ];
@@ -201,6 +193,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
         <div className="flex items-center gap-1 w-full overflow-x-auto thin-scrollbar">
           {menuItems.map((item) => {
             const active = isDropdownActive(item);
+            const Icon = getLucideIcon(item.label);
 
             if (item.label === "Brankas") {
               return (
@@ -213,7 +206,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                       : "text-gray-600 border-transparent hover:text-violet-500 hover:bg-violet-50"
                   }`}
                 >
-                  <span>{item.icon}</span>
+                  {Icon && <AppIcon label={item.label} size={40} iconSize={20} category={resolveCategory(item.label)} active={active} icon={<Icon />} />}
                   {item.label}
                 </button>
               );
@@ -231,7 +224,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                       : "text-gray-600 border-transparent hover:text-violet-500 hover:bg-violet-50"
                   }`}
                 >
-                  <span>{item.icon}</span>
+                  {Icon && <AppIcon label={item.label} size={40} iconSize={20} category={resolveCategory(item.label)} active={active} icon={<Icon />} />}
                   {item.label}
                 </a>
               );
@@ -246,7 +239,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                       : "text-gray-600 border-transparent hover:text-violet-500 hover:bg-violet-50"
                   }`}
                 >
-                  <span>{item.icon}</span>
+                  {Icon && <AppIcon label={item.label} size={40} iconSize={20} category={resolveCategory(item.label)} active={active} icon={<Icon />} />}
                   {item.label}
                   <svg className="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -258,6 +251,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                     {item.submenu.map((sub) => {
                       if ("submenu" in sub && sub.submenu) {
                         const parentActive = sub.href ? isActive(sub.href) : sub.submenu.some((s) => isActive(s.href));
+                        const ParentSubIcon = getLucideIcon(sub.label);
                         return (
                           <div key={sub.label} className="relative group/sub">
                             <div
@@ -267,6 +261,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                                   : "text-gray-700 hover:bg-gray-50"
                               }`}
                             >
+                              {ParentSubIcon && <AppIcon label={sub.label} size={28} iconSize={14} category={resolveCategory(sub.label)} active={parentActive} icon={<ParentSubIcon />} />}
                               <span className="flex-1 truncate">{sub.label}</span>
                               <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -276,6 +271,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                               <div className="p-2 pl-3">
                                 {sub.submenu.map((s) => {
                                   const sActive = isActive(s.href);
+                                  const SIcon = getLucideIcon(s.label);
                                   return (
                                     <a
                                       key={s.label}
@@ -287,6 +283,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                                           : "text-gray-700 hover:bg-gray-50"
                                       }`}
                                     >
+                                      {SIcon && <AppIcon label={s.label} size={24} iconSize={12} category={resolveCategory(s.label)} active={sActive} icon={<SIcon />} />}
                                       <span className="truncate">{s.label}</span>
                                     </a>
                                   );
@@ -299,6 +296,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
 
                       const s = sub as SubItem;
                       const sActive = isActive(s.href);
+                      const SubIcon = getLucideIcon(s.label);
 
                       if (s.label === "Keluar") {
                         return (
@@ -323,6 +321,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                               : "text-gray-700 hover:bg-gray-50"
                           }`}
                         >
+                          {SubIcon && <AppIcon label={s.label} size={28} iconSize={14} category={resolveCategory(s.label)} active={sActive} icon={<SubIcon />} />}
                           <span className="truncate">{s.label}</span>
                         </a>
                       );
