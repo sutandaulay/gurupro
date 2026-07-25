@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -44,8 +45,8 @@ export default function LaporanKinerjaListPage() {
       const lapParams = activeSchoolId ? `?sekolah_id=${activeSchoolId}` : ''
 
       const [skpRes, laporanRes] = await Promise.all([
-        fetch(`/api/skp${skpParams}`),
-        fetch(`/api/laporan-kinerja${lapParams}`),
+        apiFetch(`/api/skp${skpParams}`),
+        apiFetch(`/api/laporan-kinerja${lapParams}`),
       ])
 
       if (skpRes.ok) {

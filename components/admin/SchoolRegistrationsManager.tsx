@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useEffect, useState } from 'react';
 
@@ -39,7 +40,7 @@ export default function SchoolRegistrationsManager() {
   const fetchRegistrations = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/school-registrations');
+      const res = await apiFetch('/api/admin/school-registrations');
       if (!res.ok) throw new Error('Gagal memuat data');
       const data = await res.json();
       setRegistrations(data);
@@ -59,7 +60,7 @@ export default function SchoolRegistrationsManager() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/admin/school-registrations', {
+      const res = await apiFetch('/api/admin/school-registrations', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -85,7 +86,7 @@ export default function SchoolRegistrationsManager() {
   const handleDelete = async (id: string) => {
     if (!confirm('Yakin ingin menghapus pendaftaran ini?')) return;
     try {
-      const res = await fetch('/api/admin/school-registrations', {
+      const res = await apiFetch('/api/admin/school-registrations', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),

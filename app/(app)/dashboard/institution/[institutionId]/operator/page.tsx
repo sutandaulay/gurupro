@@ -1,4 +1,5 @@
 "use client"
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
@@ -74,8 +75,8 @@ export default function OperatorDashboardPage() {
     setError("")
     try {
       const [instRes, membersRes] = await Promise.all([
-        fetch(`/api/institution/${institutionId}`),
-        fetch(`/api/institution/${institutionId}/members`),
+        apiFetch(`/api/institution/${institutionId}`),
+        apiFetch(`/api/institution/${institutionId}/members`),
       ])
       if (instRes.status === 403 || membersRes.status === 403) {
         router.push("/dashboard")
@@ -290,7 +291,7 @@ function MembersTable({
     if (!confirm(`${newStatus === "left" ? "Nonaktifkan" : "Aktifkan"} anggota ${member.nama_lengkap || member.cms_user_name}?`)) return
 
     try {
-      const res = await fetch(`/api/institution/${member.institution_id}/members/${member.id}`, {
+      const res = await apiFetch(`/api/institution/${member.institution_id}/members/${member.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
@@ -425,7 +426,7 @@ function AddTeacherModal({
     if (!validate()) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/institution/${institutionId}/members`, {
+      const res = await apiFetch(`/api/institution/${institutionId}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -522,7 +523,7 @@ function ImportExcelModal({
     try {
       const formData = new FormData()
       formData.append("file", file)
-      const res = await fetch(`/api/institution/${institutionId}/members/import`, {
+      const res = await apiFetch(`/api/institution/${institutionId}/members/import`, {
         method: "POST",
         body: formData,
       })
@@ -638,7 +639,7 @@ function ResetPasswordModal({
   const handleReset = async () => {
     setSending(true)
     try {
-      const res = await fetch(`/api/institution/${institutionId}/members/reset-password`, {
+      const res = await apiFetch(`/api/institution/${institutionId}/members/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ memberId: member.id }),
@@ -695,7 +696,7 @@ function EditAssignmentModal({
   const handleSave = async () => {
     setSaving(true)
     try {
-      const res = await fetch(`/api/institution/${member.institution_id}/members/${member.id}`, {
+      const res = await apiFetch(`/api/institution/${member.institution_id}/members/${member.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mapel, kelas }),
@@ -754,7 +755,7 @@ function AcademicYearModal({
   const handleSave = async () => {
     setSaving(true)
     try {
-      const res = await fetch(`/api/institution/${institution.id}`, {
+      const res = await apiFetch(`/api/institution/${institution.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ academic_year_active: academicYear }),
@@ -837,7 +838,7 @@ function DapodikExportCard({ institutionId, academicYear }: { institutionId: num
         tahunAjaran: academicYear,
         version,
       });
-      const res = await fetch(`/api/export/dapodik?${qs.toString()}`);
+      const res = await apiFetch(`/api/export/dapodik?${qs.toString()}`);
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         alert(d.error || "Gagal mengekspor file");

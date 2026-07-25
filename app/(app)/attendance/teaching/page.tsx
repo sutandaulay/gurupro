@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -79,9 +80,9 @@ export default function TeachingAttendancePage() {
         
         // Simulasi API call untuk mendapatkan jadwal mengajar hari ini
         const [scheduleRes, institutionRes, subjectRes] = await Promise.all([
-          fetch('/api/attendance/schedule/today'),
-          fetch('/api/institutions'),
-          fetch('/api/subjects')
+          apiFetch('/api/attendance/schedule/today'),
+          apiFetch('/api/institutions'),
+          apiFetch('/api/subjects')
         ]);
 
         if (!scheduleRes.ok || !institutionRes.ok || !subjectRes.ok) {
@@ -203,7 +204,7 @@ export default function TeachingAttendancePage() {
       
       if (isSchoolBased) {
         // Untuk sekolah mandiri, gunakan API teaching session khusus
-        const startResponse = await fetch('/api/attendance/teaching/school', {
+        const startResponse = await apiFetch('/api/attendance/teaching/school', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -257,7 +258,7 @@ export default function TeachingAttendancePage() {
           throw new Error('Institusi tidak ditemukan');
         }
 
-        const response = await fetch('/api/attendance/teaching/start', {
+        const response = await apiFetch('/api/attendance/teaching/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -318,7 +319,7 @@ export default function TeachingAttendancePage() {
 
       if (isSchoolBased) {
         // Untuk sekolah mandiri, gunakan API teaching session end
-        const endResponse = await fetch('/api/attendance/teaching/school/end', {
+        const endResponse = await apiFetch('/api/attendance/teaching/school/end', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -340,7 +341,7 @@ export default function TeachingAttendancePage() {
         console.log('Sesi mengajar selesai, durasi:', endResult.durationMinutes, 'menit');
         toast.success(`Sesi mengajar selesai (${endResult.durationMinutes} menit)`);
       } else {
-        const response = await fetch('/api/attendance/teaching/end', {
+        const response = await apiFetch('/api/attendance/teaching/end', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

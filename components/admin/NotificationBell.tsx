@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
 
@@ -75,7 +76,7 @@ export default function NotificationBell({ onNotificationClick, onBadgeClick }: 
         ? `/api/admin/notifications?limit=20&since=${encodeURIComponent(lastTimestamp)}`
         : "/api/admin/notifications?limit=20";
 
-      const res = await fetch(url);
+      const res = await apiFetch(url);
       if (res.ok) {
         const data = await res.json();
 

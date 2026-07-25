@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
@@ -97,7 +98,7 @@ function LaporanHarianDetailContent() {
     async function fetchDetail() {
       setLoading(true)
       try {
-        const res = await fetch(`/api/laporan-harian/${tanggal}${apiQuery ? `?${apiQuery}` : ''}`)
+        const res = await apiFetch(`/api/laporan-harian/${tanggal}${apiQuery ? `?${apiQuery}` : ''}`)
         if (res.ok) {
           const data = await res.json()
           setReport(data)

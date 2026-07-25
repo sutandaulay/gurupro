@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
 
@@ -128,7 +129,7 @@ Terima kasih 🙏`;
     setResult(null);
 
     try {
-      const res = await fetch("/api/admin/transactions", {
+      const res = await apiFetch("/api/admin/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

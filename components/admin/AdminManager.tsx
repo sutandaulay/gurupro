@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
 
@@ -30,7 +31,7 @@ export default function AdminManager({ onSuccess, onError }: AdminManagerProps) 
   const fetchAdmins = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/admin/admins');
+      const res = await apiFetch('/api/admin/admins');
       if (res.ok) {
         const data = await res.json();
         setAdmins(data);
@@ -114,7 +115,7 @@ export default function AdminManager({ onSuccess, onError }: AdminManagerProps) 
 
     try {
       const action = modalMode === "create" ? "create" : "update";
-      const res = await fetch('/api/admin/admins', {
+      const res = await apiFetch('/api/admin/admins', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -145,7 +146,7 @@ export default function AdminManager({ onSuccess, onError }: AdminManagerProps) 
     }
 
     try {
-      const res = await fetch('/api/admin/admins', {
+      const res = await apiFetch('/api/admin/admins', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -169,7 +170,7 @@ export default function AdminManager({ onSuccess, onError }: AdminManagerProps) 
 
   const handleToggleActive = async (admin: any) => {
     try {
-      const res = await fetch('/api/admin/admins', {
+      const res = await apiFetch('/api/admin/admins', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

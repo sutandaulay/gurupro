@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -67,7 +68,7 @@ export default function LeaderAttendanceView({ params }: { params: { token: stri
       try {
         setLoading(true);
         
-        const response = await fetch(`/api/performance-share/attendance-data/${token}`);
+        const response = await apiFetch(`/api/performance-share/attendance-data/${token}`);
         
         if (!response.ok) {
           throw new Error('Gagal mengambil data presensi');

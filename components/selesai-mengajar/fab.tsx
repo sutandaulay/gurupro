@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import React, { useState, useEffect } from 'react';
 import { IconCheck, IconX, IconClock } from '@tabler/icons-react';
@@ -50,7 +51,7 @@ export default function SelesaiMengajarFAB({ className = '' }: SelesaiMengajarFA
     // Fetch schedules
     const fetchData = async () => {
       try {
-        const response = await fetch('/api/selesai-mengajar');
+        const response = await apiFetch('/api/selesai-mengajar');
 
         // Handle non-OK responses
         if (!response.ok) {

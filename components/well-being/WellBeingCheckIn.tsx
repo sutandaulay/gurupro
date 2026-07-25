@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
 
@@ -20,7 +21,7 @@ export default function WellBeingCheckIn() {
   useEffect(() => {
     const lastShown = localStorage.getItem("wellbeing_last_week");
 
-    fetch("/api/well-being/checkin", { cache: "no-store" })
+    apiFetch("/api/well-being/checkin", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         const serverWeek = data.week;
@@ -58,7 +59,7 @@ export default function WellBeingCheckIn() {
   const submit = async () => {
     setSubmitting(true);
     try {
-      const res = await fetch("/api/well-being/checkin", {
+      const res = await apiFetch("/api/well-being/checkin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(answers),

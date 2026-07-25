@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -35,7 +36,7 @@ export default function ObservasiListPage() {
       const url = activeSchoolId
         ? `/api/observasi?sekolah_id=${activeSchoolId}`
         : '/api/observasi'
-      const res = await fetch(url)
+      const res = await apiFetch(url)
       if (res.ok) {
         const data = await res.json()
         setObservasiList(data)
@@ -50,7 +51,7 @@ export default function ObservasiListPage() {
   const handleHapus = async (id: string) => {
     if (!confirm('Hapus observasi ini?')) return
     try {
-      const res = await fetch(`/api/observasi/${id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/observasi/${id}`, { method: 'DELETE' })
       if (res.ok) {
         setObservasiList(prev => prev.filter(o => o.id !== id))
       }

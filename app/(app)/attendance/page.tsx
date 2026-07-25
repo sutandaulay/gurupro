@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
@@ -129,7 +130,7 @@ export default function AttendancePage() {
       setLoading(true);
       setError(null);
 
-      const res = await fetch('/api/attendance/teacher-dashboard');
+      const res = await apiFetch('/api/attendance/teacher-dashboard');
       if (!res.ok) {
         if (res.status === 401) {
           throw new Error('Sesi tidak valid. Silakan login kembali.');
@@ -328,7 +329,7 @@ export default function AttendancePage() {
 
       if (isSchool) {
         const today = new Date().toISOString().split('T')[0];
-        const res = await fetch('/api/attendance', {
+        const res = await apiFetch('/api/attendance', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -353,7 +354,7 @@ export default function AttendancePage() {
         result = await res.json();
         successMessage = 'Presensi sekolah berhasil dicatat';
       } else {
-        const response = await fetch('/api/attendance/check-in', {
+        const response = await apiFetch('/api/attendance/check-in', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -407,7 +408,7 @@ export default function AttendancePage() {
 
     setSubmittingDuty(true);
     try {
-      const res = await fetch('/api/attendance/duty-assignments', {
+      const res = await apiFetch('/api/attendance/duty-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -444,7 +445,7 @@ export default function AttendancePage() {
 
     setIsCheckingOut(true);
     try {
-      const response = await fetch('/api/attendance/check-out', {
+      const response = await apiFetch('/api/attendance/check-out', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -486,7 +487,7 @@ export default function AttendancePage() {
   const handleStartTeaching = async (session: TeachingSession) => {
     setIsStartingSession(true);
     try {
-      const response = await fetch('/api/attendance/teaching/start', {
+      const response = await apiFetch('/api/attendance/teaching/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -532,7 +533,7 @@ export default function AttendancePage() {
   // End teaching session
   const handleEndTeaching = async (session: TeachingSession) => {
     try {
-      const response = await fetch('/api/attendance/teaching/end', {
+      const response = await apiFetch('/api/attendance/teaching/end', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

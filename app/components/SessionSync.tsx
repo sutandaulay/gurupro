@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
@@ -16,7 +17,7 @@ export default function SessionSync() {
     async function syncAndProcess() {
       try {
         // 1. Sync NextAuth session → gurupro_session cookie
-        const syncRes = await fetch("/api/auth/sync-session", { method: "POST" });
+        const syncRes = await apiFetch("/api/auth/sync-session", { method: "POST" });
         if (!syncRes.ok) {
           console.error("[SessionSync] Failed to sync session");
           return;
@@ -26,7 +27,7 @@ export default function SessionSync() {
         // 2. Check if session changed - if so, refresh profile
         if (cachedUserId) {
           try {
-            const sessionDataRes = await fetch("/api/auth/active-context", {
+            const sessionDataRes = await apiFetch("/api/auth/active-context", {
               credentials: 'include'
             });
 
@@ -50,7 +51,7 @@ export default function SessionSync() {
         const refCode = localStorage.getItem("referral_code");
         if (refCode) {
           try {
-            await fetch("/api/auth/referral/process", {
+            await apiFetch("/api/auth/referral/process", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ referral_code: refCode }),

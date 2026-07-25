@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
@@ -107,7 +108,7 @@ function ProfileContent() {
   const fetchUserProfile = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/user/profile");
+      const res = await apiFetch("/api/user/profile");
       if (res.ok) {
         const data = await res.json();
         setUser(data);
@@ -136,7 +137,7 @@ function ProfileContent() {
 
   const fetchReferrals = async () => {
     try {
-      const res = await fetch("/api/user/referrals").then((r) => r.json());
+      const res = await apiFetch("/api/user/referrals").then((r) => r.json());
       if (Array.isArray(res)) setReferralsList(res);
     } catch (e) {
       console.error("Gagal mengambil referrals:", e);
@@ -219,7 +220,7 @@ function ProfileContent() {
     }
     setIsSavingProfile(true);
     try {
-      const response = await fetch("/api/user/profile", {
+      const response = await apiFetch("/api/user/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -252,7 +253,7 @@ function ProfileContent() {
   ) => {
     setIsProcessingReferralAction(true);
     try {
-      const res = await fetch("/api/user/referrals/payout", {
+      const res = await apiFetch("/api/user/referrals/payout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, amount, bank_name: bankName, bank_account_number: bankAccNum, bank_account_name: bankAccName })
@@ -278,7 +279,7 @@ function ProfileContent() {
     if (!user) return;
     setIsCheckingOut(true);
     try {
-      const response = await fetch("/api/checkout", {
+      const response = await apiFetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan: planType, userId: user.id })
@@ -1089,7 +1090,7 @@ function ProfileContent() {
                   onClick={async () => {
                     setIsSavingTone(true);
                     try {
-                      const res = await fetch("/api/user/profile", {
+                      const res = await apiFetch("/api/user/profile", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ notification_tone: notificationTone }),
@@ -1142,7 +1143,7 @@ function ProfileContent() {
                     setIsSavingBriefing(true);
                     const next = !morningBriefing;
                     try {
-                      const res = await fetch("/api/user/profile", {
+                      const res = await apiFetch("/api/user/profile", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ morning_briefing_enabled: next }),
@@ -1202,7 +1203,7 @@ function ProfileContent() {
                     setIsSavingRecap(true);
                     const next = !weeklyRecap;
                     try {
-                      const res = await fetch("/api/user/profile", {
+                      const res = await apiFetch("/api/user/profile", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ weekly_recap_enabled: next }),

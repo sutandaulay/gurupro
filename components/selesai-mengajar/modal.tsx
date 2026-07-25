@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -71,7 +72,7 @@ function SelesaiMengajarModalContent({
 
   const fetchSchedules = async () => {
     try {
-      const response = await fetch('/api/selesai-mengajar');
+      const response = await apiFetch('/api/selesai-mengajar');
       if (response.ok) {
         const data = await response.json();
         setSchedules(data.schedules || []);
@@ -141,7 +142,7 @@ function SelesaiMengajarModalContent({
     setProgress(steps);
 
     try {
-      const response = await fetch('/api/selesai-mengajar', {
+      const response = await apiFetch('/api/selesai-mengajar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

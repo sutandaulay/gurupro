@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -64,7 +65,7 @@ export default function TambahPelatihanPage() {
       const semester = typeof window !== 'undefined' ? (localStorage.getItem('semester') || '') : ''
       const tahunAjaranId = typeof window !== 'undefined' ? (localStorage.getItem('tahunAjaranId') || '') : ''
 
-      const res = await fetch('/api/pelatihan', {
+      const res = await apiFetch('/api/pelatihan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

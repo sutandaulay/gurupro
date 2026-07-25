@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useEffect, useState, FormEvent } from 'react';
 
@@ -94,7 +95,7 @@ export default function InstitutionsManager() {
   const fetchInstitutions = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/institutions');
+      const res = await apiFetch('/api/admin/institutions');
       if (!res.ok) throw new Error('Gagal memuat data lembaga');
       const data = await res.json();
       setInstitutions(data);
@@ -107,7 +108,7 @@ export default function InstitutionsManager() {
 
   const fetchActiveAcademicYear = async () => {
     try {
-      const res = await fetch('/api/admin/active-academic-year');
+      const res = await apiFetch('/api/admin/active-academic-year');
       if (res.ok) {
         const data = await res.json();
         if (data.active_academic_year) {
@@ -142,7 +143,7 @@ export default function InstitutionsManager() {
   const fetchMembers = async (instId: number) => {
     setMembersLoading(true);
     try {
-      const res = await fetch(`/api/admin/institutions/${instId}/members`);
+      const res = await apiFetch(`/api/admin/institutions/${instId}/members`);
       if (!res.ok) throw new Error('Gagal memuat anggota');
       const data = await res.json();
       setMembers(data);
@@ -177,7 +178,7 @@ export default function InstitutionsManager() {
     setMemberSuccess('');
 
     try {
-      const res = await fetch(`/api/admin/institutions/${selectedInst.id}/members`, {
+      const res = await apiFetch(`/api/admin/institutions/${selectedInst.id}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(memberForm),
@@ -227,7 +228,7 @@ export default function InstitutionsManager() {
     const method = isEdit ? 'PUT' : 'POST';
 
     try {
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(isEdit ? { id: editingId, ...form } : form),
@@ -253,7 +254,7 @@ export default function InstitutionsManager() {
     if (!confirm(`Apakah Anda yakin ingin menghapus lembaga "${name}"? Seluruh data anggota dan data terkait lembaga ini akan terpengaruh.`)) return;
 
     try {
-      const res = await fetch('/api/admin/institutions', {
+      const res = await apiFetch('/api/admin/institutions', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),

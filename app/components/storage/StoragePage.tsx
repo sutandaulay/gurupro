@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useTeacherStore } from "@/lib/stores";
@@ -144,12 +145,12 @@ export default function StoragePage() {
       const schoolQuery = selectedSchoolId ? `?school_id=${selectedSchoolId}` : '';
 
       const [docsRes, journalsRes, assessmentsRes, fileSayaRes, laporanKinerjaRes, raportRes] = await Promise.all([
-        fetch(`/api/administrasi${schoolQuery}`).then(r => r.ok ? r.json() : []),
-        fetch(`/api/journals${schoolQuery}`).then(r => r.ok ? r.json() : []),
-        fetch(`/api/assessments${schoolQuery}`).then(r => r.ok ? r.json() : []),
-        fetch(`/api/dokumen-bukti?${params.toString()}`).then(r => r.ok ? r.json() : []),
-        fetch(`/api/laporan-kinerja${schoolQuery}`).then(r => r.ok ? r.json() : []),
-        fetch(`/api/raport${schoolQuery}`).then(r => r.ok ? r.json() : [])
+        apiFetch(`/api/administrasi${schoolQuery}`).then(r => r.ok ? r.json() : []),
+        apiFetch(`/api/journals${schoolQuery}`).then(r => r.ok ? r.json() : []),
+        apiFetch(`/api/assessments${schoolQuery}`).then(r => r.ok ? r.json() : []),
+        apiFetch(`/api/dokumen-bukti?${params.toString()}`).then(r => r.ok ? r.json() : []),
+        apiFetch(`/api/laporan-kinerja${schoolQuery}`).then(r => r.ok ? r.json() : []),
+        apiFetch(`/api/raport${schoolQuery}`).then(r => r.ok ? r.json() : [])
       ]);
 
       const docs = Array.isArray(docsRes) ? docsRes : [];
@@ -259,7 +260,7 @@ export default function StoragePage() {
           url += `${sep}school_id=${selectedSchoolId}`;
         }
 
-        const res = await fetch(url);
+        const res = await apiFetch(url);
         if (res.ok) {
           const rawData = await res.json();
           const items = Array.isArray(rawData) ? rawData : [];
@@ -374,8 +375,8 @@ export default function StoragePage() {
         const fileParams = folderId ? `?folder_id=${folderId}` : `?folder_id=null`;
 
         const [foldersRes, filesRes] = await Promise.all([
-          fetch(`/api/storage/folders${folderParams}`),
-          fetch(`/api/storage/files${fileParams}`),
+          apiFetch(`/api/storage/folders${folderParams}`),
+          apiFetch(`/api/storage/files${fileParams}`),
         ]);
 
         if (foldersRes.ok) {
@@ -418,7 +419,7 @@ export default function StoragePage() {
   useEffect(() => {
     if (previewFile && previewFile.is_system && previewFile.folder_id === "system_nilai") {
       setGradesLoading(true);
-      fetch(`/api/assessments/grades?assessment_id=${previewFile.id}`)
+      apiFetch(`/api/assessments/grades?assessment_id=${previewFile.id}`)
         .then(res => res.json())
         .then(data => {
           setGradesData(Array.isArray(data) ? data : []);
@@ -458,7 +459,7 @@ export default function StoragePage() {
     if (!newFolderName.trim()) return;
     setCreatingFolder(true);
     try {
-      const res = await fetch("/api/storage/folders", {
+      const res = await apiFetch("/api/storage/folders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newFolderName.trim(), parent_id: currentFolderId }),
@@ -487,7 +488,7 @@ export default function StoragePage() {
         renameTarget.type === "folder"
           ? `/api/storage/folders?id=${renameTarget.id}`
           : `/api/storage/files?id=${renameTarget.id}`;
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: renameValue.trim() }),
@@ -540,7 +541,7 @@ export default function StoragePage() {
             : `/api/storage/files?id=${target.id}`;
       }
 
-      const res = await fetch(endpoint, { method });
+      const res = await apiFetch(endpoint, { method });
       if (res.ok) {
         showToast(`${label === "folder" ? "Folder" : "File"} berhasil dihapus`);
         setContextMenu(null);
@@ -578,7 +579,7 @@ export default function StoragePage() {
     setVerifyingPin(true);
     setPinError("");
     try {
-      const res = await fetch("/api/storage/folders/pin", {
+      const res = await apiFetch("/api/storage/folders/pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "verify", folder_id: showPinModal.folder.id, pin: pinInput }),
@@ -608,7 +609,7 @@ export default function StoragePage() {
     }
     setSettingPin(true);
     try {
-      const res = await fetch("/api/storage/folders/pin", {
+      const res = await apiFetch("/api/storage/folders/pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -636,7 +637,7 @@ export default function StoragePage() {
   const handleRemovePin = async (folder: Folder) => {
     if (!confirm("Hapus PIN folder ini?")) return;
     try {
-      const res = await fetch("/api/storage/folders/pin", {
+      const res = await apiFetch("/api/storage/folders/pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "remove", folder_id: folder.id }),
@@ -658,7 +659,7 @@ export default function StoragePage() {
     if (!showPinModal) return;
     setResettingPin(true);
     try {
-      const res = await fetch("/api/storage/folders/pin", {
+      const res = await apiFetch("/api/storage/folders/pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "forgot", folder_id: showPinModal.folder.id }),
@@ -686,7 +687,7 @@ export default function StoragePage() {
     }
     setResettingPin(true);
     try {
-      const res = await fetch("/api/storage/folders/pin", {
+      const res = await apiFetch("/api/storage/folders/pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -728,7 +729,7 @@ export default function StoragePage() {
     if (currentFolderId) formData.append("folder_id", currentFolderId);
 
     try {
-      const res = await fetch("/api/storage/files", {
+      const res = await apiFetch("/api/storage/files", {
         method: "POST",
         body: formData,
       });

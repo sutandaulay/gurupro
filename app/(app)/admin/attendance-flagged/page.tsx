@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,7 +63,7 @@ export default function AttendanceFlaggedPage() {
         
         // Simulasi API call untuk mendapatkan log presensi yang di-flag
         // Dalam implementasi nyata, ini akan memanggil API endpoint
-        const response = await fetch('/api/attendance/logs/flagged');
+        const response = await apiFetch('/api/attendance/logs/flagged');
         
         // Karena ini hanya simulasi, kita buat data dummy
         const dummyData: AttendanceLog[] = [

@@ -1,6 +1,7 @@
 import { query } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { requireSchoolAccess } from "@/lib/school-access";
 
 export async function GET(req: Request) {
   try {
@@ -11,10 +12,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "school_id wajib diisi" }, { status: 400 });
     }
 
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
-    const session = sessionCookie ? JSON.parse(sessionCookie) : null;
-    const userId = session?.id;
+    await requireSchoolAccess(schoolId)
 
     // 1. Count master metrics
     const classCount = await query("SELECT COUNT(*) AS count FROM classes WHERE school_id = $1", [schoolId]);

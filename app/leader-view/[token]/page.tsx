@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
@@ -93,7 +94,7 @@ export default function LeaderViewPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch(`/api/performance-share/token/${token}`);
+      const res = await apiFetch(`/api/performance-share/token/${token}`);
       const result = await res.json();
 
       if (!res.ok) {
@@ -134,7 +135,7 @@ export default function LeaderViewPage() {
     setResendLoading(category);
 
     try {
-      const res = await fetch(`/api/performance-share/token/${token}`, {
+      const res = await apiFetch(`/api/performance-share/token/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -169,7 +170,7 @@ export default function LeaderViewPage() {
     setOtpError(null);
 
     try {
-      const res = await fetch(`/api/performance-share/token/${token}/verify-otp`, {
+      const res = await apiFetch(`/api/performance-share/token/${token}/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -200,7 +201,7 @@ export default function LeaderViewPage() {
     setOtpError(null);
 
     try {
-      const res = await fetch(`/api/performance-share/token/${token}/resend-otp`, {
+      const res = await apiFetch(`/api/performance-share/token/${token}/resend-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ channel: "whatsapp" }),

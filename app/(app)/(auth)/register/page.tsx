@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -305,7 +306,7 @@ function RegisterContent() {
     if (token) {
       setInvitationToken(token);
       setLoading(true);
-      fetch(`/api/auth/invitation/verify?token=${token}`)
+      apiFetch(`/api/auth/invitation/verify?token=${token}`)
         .then((res) => res.json())
         .then((data) => {
           if (data.success && data.invitation) {
@@ -395,7 +396,7 @@ function RegisterContent() {
     const formattedPhone = phone.startsWith("+") ? phone : `+62${phone.replace(/^0+/, "")}`;
 
     try {
-      const res = await fetch("/api/auth/register", {
+      const res = await apiFetch("/api/auth/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -448,7 +449,7 @@ function RegisterContent() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/otp/verify", {
+      const res = await apiFetch("/api/auth/otp/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -580,7 +581,7 @@ function RegisterContent() {
                   setSuccess(null);
                   setLoading(true);
                   try {
-                    const res = await fetch("/api/auth/otp/request", {
+                    const res = await apiFetch("/api/auth/otp/request", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ userId: otpUserId, purpose: "account_verification" }),

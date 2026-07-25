@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -147,7 +148,7 @@ function AdministrasiContent() {
     const fase = getFaseFromKelas(formData.kelas);
 
     try {
-      const res = await fetch('/api/modul-ajar/save', {
+      const res = await apiFetch('/api/modul-ajar/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -189,7 +190,7 @@ function AdministrasiContent() {
     setSaveError(null);
 
     try {
-      const res = await fetch('/api/generate-administrasi', {
+      const res = await apiFetch('/api/generate-administrasi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

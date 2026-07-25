@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import Image from "next/image";
 import { useEffect, useState, useCallback } from "react";
@@ -200,7 +201,7 @@ export default function CmsLandingEditor() {
 
       try {
         console.log(`[CMS] Fetching ${url} (attempt ${attempt + 1}/${retries + 1})`);
-        const res = await fetch(url, { signal: controller.signal });
+        const res = await apiFetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
         return res;
       } catch (err: any) {
@@ -404,7 +405,7 @@ export default function CmsLandingEditor() {
         seoDescription: hero.seoDescription || "",
         ogImage: hero.ogImage ?? null,
       };
-      const res = await fetch("/api/admin/landing/hero", {
+      const res = await apiFetch("/api/admin/landing/hero", {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       if (res.ok) showToast("success", "Hero berhasil disimpan!");
@@ -422,7 +423,7 @@ export default function CmsLandingEditor() {
     setSaving("feature");
     try {
       const method = editFeature.id ? "PUT" : "POST";
-      const res = await fetch("/api/admin/landing/features", {
+      const res = await apiFetch("/api/admin/landing/features", {
         method, headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editFeature),
       });
@@ -431,7 +432,7 @@ export default function CmsLandingEditor() {
         setShowFeatureModal(false);
         setEditFeature(null);
         setShowIconPicker(false);
-        const d = await fetch("/api/admin/landing/features").then((r) => r.json());
+        const d = await apiFetch("/api/admin/landing/features").then((r) => r.json());
         setFeatures(d.docs || []);
       } else showToast("error", "Gagal menyimpan fitur");
     } catch { showToast("error", "Koneksi gagal"); }
@@ -441,7 +442,7 @@ export default function CmsLandingEditor() {
   const deleteFeature = async (id: string) => {
     if (!confirm("Hapus fitur ini?")) return;
     try {
-      const res = await fetch(`/api/admin/landing/features?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/admin/landing/features?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         showToast("success", "Fitur dihapus!");
         setFeatures((prev) => prev.filter((f) => f.id !== id));
@@ -451,7 +452,7 @@ export default function CmsLandingEditor() {
 
   const toggleFeature = async (item: FeatureItem) => {
     try {
-      const res = await fetch("/api/admin/landing/features", {
+      const res = await apiFetch("/api/admin/landing/features", {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...item, isActive: !item.isActive }),
       });
@@ -469,11 +470,11 @@ export default function CmsLandingEditor() {
     updated.forEach((f, i) => f.order = i);
     setFeatures(updated);
     try {
-      await fetch("/api/admin/landing/features", {
+      await apiFetch("/api/admin/landing/features", {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: updated[index].id, order: updated[index].order }),
       });
-      await fetch("/api/admin/landing/features", {
+      await apiFetch("/api/admin/landing/features", {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: updated[newIndex].id, order: updated[newIndex].order }),
       });
@@ -482,7 +483,7 @@ export default function CmsLandingEditor() {
 
   const saveWhyPoint = async (point: WhyPoint) => {
     try {
-      const res = await fetch("/api/admin/landing/why", {
+      const res = await apiFetch("/api/admin/landing/why", {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(point),
       });
       if (res.ok) showToast("success", "Point diperbarui!");
@@ -493,13 +494,13 @@ export default function CmsLandingEditor() {
   const addWhyPoint = async () => {
     setSaving("why");
     try {
-      const res = await fetch("/api/admin/landing/why", {
+      const res = await apiFetch("/api/admin/landing/why", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ point: "Point baru...", order: whyPoints.length, isActive: true }),
       });
       if (res.ok) {
         showToast("success", "Point ditambahkan!");
-        const d = await fetch("/api/admin/landing/why").then((r) => r.json());
+        const d = await apiFetch("/api/admin/landing/why").then((r) => r.json());
         setWhyPoints(d.docs || []);
       }
     } catch { showToast("error", "Koneksi gagal"); }
@@ -509,7 +510,7 @@ export default function CmsLandingEditor() {
   const deleteWhyPoint = async (id: string) => {
     if (!confirm("Hapus point ini?")) return;
     try {
-      await fetch(`/api/admin/landing/why?id=${id}`, { method: "DELETE" });
+      await apiFetch(`/api/admin/landing/why?id=${id}`, { method: "DELETE" });
       setWhyPoints((prev) => prev.filter((p) => p.id !== id));
       showToast("success", "Point dihapus!");
     } catch { showToast("error", "Koneksi gagal"); }
@@ -517,7 +518,7 @@ export default function CmsLandingEditor() {
 
   const toggleWhyPoint = async (item: WhyPoint) => {
     try {
-      const res = await fetch("/api/admin/landing/why", {
+      const res = await apiFetch("/api/admin/landing/why", {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...item, isActive: !item.isActive }),
       });
@@ -528,7 +529,7 @@ export default function CmsLandingEditor() {
   const saveFooter = async () => {
     setSaving("footer");
     try {
-      const res = await fetch("/api/admin/landing/footer", {
+      const res = await apiFetch("/api/admin/landing/footer", {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(footer),
       });
       if (res.ok) showToast("success", "Footer berhasil disimpan!");
@@ -540,7 +541,7 @@ export default function CmsLandingEditor() {
   const saveFaq = async () => {
     setSaving("faq");
     try {
-      const res = await fetch("/api/admin/settings", {
+      const res = await apiFetch("/api/admin/settings", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "update_faq_config", data: faqItems }),
       });
@@ -553,7 +554,7 @@ export default function CmsLandingEditor() {
   const saveReferral = async () => {
     setSaving("referral");
     try {
-      const res = await fetch("/api/admin/settings", {
+      const res = await apiFetch("/api/admin/settings", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "update_referral_config", data: referral }),
       });
@@ -573,7 +574,7 @@ export default function CmsLandingEditor() {
         terms_conditions: "update_terms_conditions",
         refund_policy: "update_refund_policy",
       };
-      const res = await fetch("/api/admin/settings", {
+      const res = await apiFetch("/api/admin/settings", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: actionMap[key], data: { ...data, last_updated: new Date().toLocaleDateString("id-ID") } }),
       });
@@ -589,7 +590,7 @@ export default function CmsLandingEditor() {
     setSaving("pricing");
     try {
       const method = editPricing.id ? "PUT" : "POST";
-      const res = await fetch("/api/admin/pricing", {
+      const res = await apiFetch("/api/admin/pricing", {
         method, headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editPricing),
       });
@@ -597,7 +598,7 @@ export default function CmsLandingEditor() {
         showToast("success", editPricing.id ? "Paket diperbarui!" : "Paket ditambahkan!");
         setShowPricingModal(false);
         setEditPricing(null);
-        const d = await fetch("/api/admin/pricing").then((r) => r.json());
+        const d = await apiFetch("/api/admin/pricing").then((r) => r.json());
         setPricingPlans(d.docs || []);
       } else showToast("error", "Gagal menyimpan paket");
     } catch { showToast("error", "Koneksi gagal"); }
@@ -606,7 +607,7 @@ export default function CmsLandingEditor() {
 
   const togglePricingPopular = async (plan: any) => {
     try {
-      const res = await fetch("/api/admin/pricing", {
+      const res = await apiFetch("/api/admin/pricing", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...plan, popular: !plan.popular }),
@@ -614,7 +615,7 @@ export default function CmsLandingEditor() {
       if (res.ok) {
         showToast("success", `Paket ${plan.package_name} ${plan.popular ? "tidak" : "menjadi"} populer!`);
         setPricingPlans((prev) => prev.map((p) => p.id === plan.id ? { ...p, popular: !p.popular } : p));
-        const d = await fetch("/api/admin/pricing").then((r) => r.json());
+        const d = await apiFetch("/api/admin/pricing").then((r) => r.json());
         setPricingPlans(d.docs || []);
       } else showToast("error", "Gagal mengubah status populer");
     } catch { showToast("error", "Koneksi gagal"); }
@@ -623,7 +624,7 @@ export default function CmsLandingEditor() {
   const deletePricing = async (id: number) => {
     if (!confirm("Hapus paket ini?")) return;
     try {
-      const res = await fetch(`/api/admin/pricing?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/admin/pricing?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         showToast("success", "Paket dihapus!");
         setPricingPlans((prev) => prev.filter((p) => p.id !== id));
@@ -637,7 +638,7 @@ export default function CmsLandingEditor() {
     setSaving("addons");
     try {
       const method = editAddon.id ? "PUT" : "POST";
-      const res = await fetch("/api/admin/token-packages", {
+      const res = await apiFetch("/api/admin/token-packages", {
         method, headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editAddon),
       });
@@ -645,7 +646,7 @@ export default function CmsLandingEditor() {
         showToast("success", editAddon.id ? "Paket ekstra diperbarui!" : "Paket ekstra ditambahkan!");
         setShowAddonModal(false);
         setEditAddon(null);
-        const d = await fetch("/api/admin/token-packages").then((r) => r.json());
+        const d = await apiFetch("/api/admin/token-packages").then((r) => r.json());
         setAddonPackages(d.docs || []);
       } else showToast("error", "Gagal menyimpan paket ekstra");
     } catch { showToast("error", "Koneksi gagal"); }
@@ -654,7 +655,7 @@ export default function CmsLandingEditor() {
 
   const toggleAddonActive = async (addon: any) => {
     try {
-      const res = await fetch("/api/admin/token-packages", {
+      const res = await apiFetch("/api/admin/token-packages", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...addon, is_active: !addon.is_active }),
@@ -662,7 +663,7 @@ export default function CmsLandingEditor() {
       if (res.ok) {
         showToast("success", `Paket ekstra ${addon.name} ${addon.is_active ? "dinonaktifkan" : "diaktifkan"}!`);
         setAddonPackages((prev) => prev.map((p) => p.id === addon.id ? { ...p, is_active: !p.is_active } : p));
-        const d = await fetch("/api/admin/token-packages").then((r) => r.json());
+        const d = await apiFetch("/api/admin/token-packages").then((r) => r.json());
         setAddonPackages(d.docs || []);
       } else showToast("error", "Gagal mengubah status aktif");
     } catch { showToast("error", "Koneksi gagal"); }
@@ -671,7 +672,7 @@ export default function CmsLandingEditor() {
   const deleteAddonPackage = async (id: string) => {
     if (!confirm("Hapus paket ekstra ini?")) return;
     try {
-      const res = await fetch(`/api/admin/token-packages?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/admin/token-packages?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         showToast("success", "Paket ekstra dihapus!");
         setAddonPackages((prev) => prev.filter((p) => p.id !== id));
@@ -685,7 +686,7 @@ export default function CmsLandingEditor() {
     setSaving("post");
     try {
       const method = editPost.id ? "PUT" : "POST";
-      const res = await fetch("/api/admin/posts", {
+      const res = await apiFetch("/api/admin/posts", {
         method, headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editPost),
       });
@@ -702,7 +703,7 @@ export default function CmsLandingEditor() {
   const deletePost = async (id: number) => {
     if (!confirm("Hapus artikel ini?")) return;
     try {
-      const res = await fetch(`/api/admin/posts?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/admin/posts?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         showToast("success", "Artikel dihapus!");
         setBlogPosts((prev) => prev.filter((p) => p.id !== id));
@@ -712,7 +713,7 @@ export default function CmsLandingEditor() {
 
   const togglePostStatus = async (post: any) => {
     try {
-      const res = await fetch("/api/admin/posts", {
+      const res = await apiFetch("/api/admin/posts", {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...post, status: post.status === "published" ? "draft" : "published" }),
       });
@@ -729,7 +730,7 @@ export default function CmsLandingEditor() {
     setSaving("category");
     try {
       const method = editCategory.id ? "PUT" : "POST";
-      const res = await fetch("/api/admin/categories", {
+      const res = await apiFetch("/api/admin/categories", {
         method, headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editCategory),
       });
@@ -749,7 +750,7 @@ export default function CmsLandingEditor() {
   const deleteCategory = async (id: number) => {
     if (!confirm("Hapus kategori ini?")) return;
     try {
-      const res = await fetch(`/api/admin/categories?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/admin/categories?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         showToast("success", "Kategori dihapus!");
         setBlogCategories((prev) => prev.filter((c) => c.id !== id));
@@ -763,7 +764,7 @@ export default function CmsLandingEditor() {
   const saveChatbot = async () => {
     setSaving("chatbot");
     try {
-      const res = await fetch("/api/admin/landing/chatbot", {
+      const res = await apiFetch("/api/admin/landing/chatbot", {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(chatbot),
       });
       if (res.ok) showToast("success", "Konfigurasi chatbot disimpan!");
@@ -928,7 +929,7 @@ export default function CmsLandingEditor() {
                       const fd = new FormData();
                       fd.append("file", file);
                       try {
-                        const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+                        const res = await apiFetch("/api/admin/upload", { method: "POST", body: fd });
                         if (res.ok) {
                           const data = await res.json();
                           setHero({ ...hero, ogImage: data.url });
@@ -1221,12 +1222,12 @@ export default function CmsLandingEditor() {
                         [updated[idx], updated[idx - 1]] = [updated[idx - 1], updated[idx]];
                         updated.forEach((p, i) => p.sort_order = i);
                         setPricingPlans(updated);
-                        await fetch("/api/admin/pricing", {
+                        await apiFetch("/api/admin/pricing", {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ id: plan.id, sort_order: idx - 1 }),
                         });
-                        await fetch("/api/admin/pricing", {
+                        await apiFetch("/api/admin/pricing", {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ id: updated[idx].id, sort_order: idx }),
@@ -1241,12 +1242,12 @@ export default function CmsLandingEditor() {
                         [updated[idx], updated[idx + 1]] = [updated[idx + 1], updated[idx]];
                         updated.forEach((p, i) => p.sort_order = i);
                         setPricingPlans(updated);
-                        await fetch("/api/admin/pricing", {
+                        await apiFetch("/api/admin/pricing", {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ id: plan.id, sort_order: idx + 1 }),
                         });
-                        await fetch("/api/admin/pricing", {
+                        await apiFetch("/api/admin/pricing", {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ id: updated[idx].id, sort_order: idx }),

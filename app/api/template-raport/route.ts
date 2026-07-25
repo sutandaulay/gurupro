@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { requireSchoolAccess } from '@/lib/school-access';
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const sekolahId = searchParams.get('sekolah_id');
     const id = searchParams.get('id');
+
+    if (sekolahId) await requireSchoolAccess(sekolahId)
 
     // Check if table exists
     const tableCheck = await query(`

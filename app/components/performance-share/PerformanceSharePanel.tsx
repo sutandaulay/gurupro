@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -94,7 +95,7 @@ export default function PerformanceSharePanel({
 
   const fetchLeaderContacts = useCallback(async () => {
     try {
-      const res = await fetch("/api/leader-contacts");
+      const res = await apiFetch("/api/leader-contacts");
       const data = await res.json();
       if (data.leaderContacts) {
         setLeaderContacts(data.leaderContacts);
@@ -106,7 +107,7 @@ export default function PerformanceSharePanel({
 
   const fetchShareLinks = useCallback(async () => {
     try {
-      const res = await fetch("/api/performance-share");
+      const res = await apiFetch("/api/performance-share");
       const data = await res.json();
       if (data.shareLinks) {
         setShareLinks(data.shareLinks);
@@ -118,7 +119,7 @@ export default function PerformanceSharePanel({
 
   const fetchDocumentGrants = useCallback(async (linkId: string) => {
     try {
-      const res = await fetch(`/api/performance-share/${linkId}`);
+      const res = await apiFetch(`/api/performance-share/${linkId}`);
       if (!res.ok) return null;
       const data = await res.json();
       return data.level2?.grants || [];
@@ -165,7 +166,7 @@ export default function PerformanceSharePanel({
         body.id = data.id;
       }
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -190,7 +191,7 @@ export default function PerformanceSharePanel({
     if (!confirm("Hapus kontak ini?")) return;
 
     try {
-      const res = await fetch(`/api/leader-contacts?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/leader-contacts?id=${id}`, { method: "DELETE" });
       if (!res.ok) {
         const result = await res.json();
         throw new Error(result.error || "Gagal menghapus kontak");
@@ -207,7 +208,7 @@ export default function PerformanceSharePanel({
     setShareResult(null);
 
     try {
-      const res = await fetch("/api/performance-share/create", {
+      const res = await apiFetch("/api/performance-share/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leaderContactId, aggregatedStats }),
@@ -235,7 +236,7 @@ export default function PerformanceSharePanel({
     if (!confirm("Cabut link ini? Link tidak akan bisa dilihat lagi.")) return;
 
     try {
-      const res = await fetch(`/api/performance-share?id=${linkId}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/performance-share?id=${linkId}`, { method: "DELETE" });
       if (!res.ok) {
         const result = await res.json();
         throw new Error(result.error || "Gagal mencabut link");
@@ -255,7 +256,7 @@ export default function PerformanceSharePanel({
     setError(null);
 
     try {
-      const res = await fetch(`/api/performance-share/${linkId}/grant-document-access`, {
+      const res = await apiFetch(`/api/performance-share/${linkId}/grant-document-access`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ documentCategory: category, channel }),
@@ -278,7 +279,7 @@ export default function PerformanceSharePanel({
 
   const handleRevokeDocumentAccess = async (linkId: string, grantId: string) => {
     try {
-      const res = await fetch(`/api/performance-share/${linkId}/revoke-document-access/${grantId}`, {
+      const res = await apiFetch(`/api/performance-share/${linkId}/revoke-document-access/${grantId}`, {
         method: "DELETE",
       });
 

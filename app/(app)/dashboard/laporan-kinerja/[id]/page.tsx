@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
@@ -73,7 +74,7 @@ export default function ViewLaporanKinerjaPage() {
 
   const fetchLaporan = async () => {
     try {
-      const res = await fetch(`/api/laporan-kinerja/${id}`)
+      const res = await apiFetch(`/api/laporan-kinerja/${id}`)
       const data = await res.json()
 
       if (!res.ok) {
@@ -84,7 +85,7 @@ export default function ViewLaporanKinerjaPage() {
 
       // Fetch SKP and observasi related to this laporan
       if (data.skp_id) {
-        const skpDetailRes = await fetch(`/api/skp/${data.skp_id}`)
+        const skpDetailRes = await apiFetch(`/api/skp/${data.skp_id}`)
         if (skpDetailRes.ok) {
           const skpDetail = await skpDetailRes.json()
           setSkpData(skpDetail)
@@ -92,11 +93,11 @@ export default function ViewLaporanKinerjaPage() {
         }
       } else if (data.tahun_ajaran_id && data.semester) {
         const taId = data.tahun_ajaran_id
-        const skpRes = await fetch(`/api/skp?tahun_ajaran_id=${taId}`)
+        const skpRes = await apiFetch(`/api/skp?tahun_ajaran_id=${taId}`)
         if (skpRes.ok) {
           const skpArr = await skpRes.json()
           if (skpArr.length > 0) {
-            const skpDetailRes = await fetch(`/api/skp/${skpArr[0].id}`)
+            const skpDetailRes = await apiFetch(`/api/skp/${skpArr[0].id}`)
             if (skpDetailRes.ok) {
               const skpDetail = await skpDetailRes.json()
               setSkpData(skpDetail)
@@ -119,7 +120,7 @@ export default function ViewLaporanKinerjaPage() {
   const handleDownload = async (format: 'pdf' | 'docx') => {
     setDownloading(true)
     try {
-      const res = await fetch(`/api/laporan-kinerja/${id}/download?format=${format}`)
+      const res = await apiFetch(`/api/laporan-kinerja/${id}/download?format=${format}`)
       if (res.ok) {
         const blob = await res.blob()
         const url = URL.createObjectURL(blob)
@@ -140,7 +141,7 @@ export default function ViewLaporanKinerjaPage() {
 
   const handleFinalize = async () => {
     try {
-      const res = await fetch(`/api/laporan-kinerja/${id}`, {
+      const res = await apiFetch(`/api/laporan-kinerja/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'final' }),
@@ -167,7 +168,7 @@ export default function ViewLaporanKinerjaPage() {
       : null
 
     try {
-      const res = await fetch(`/api/laporan-kinerja/${id}/predikat`, {
+      const res = await apiFetch(`/api/laporan-kinerja/${id}/predikat`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

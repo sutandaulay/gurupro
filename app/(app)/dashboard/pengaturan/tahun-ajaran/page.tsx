@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -51,7 +52,7 @@ export default function TahunAjaranPage() {
     setLoading(true)
     try {
       const params = activeSchoolId ? `?sekolah_id=${activeSchoolId}` : ''
-      const res = await fetch(`/api/tahun-ajaran${params}`)
+      const res = await apiFetch(`/api/tahun-ajaran${params}`)
       const data = await res.json()
 
       if (res.ok) {
@@ -72,7 +73,7 @@ export default function TahunAjaranPage() {
   const handleActivate = async (id: string) => {
     setActivatingId(id)
     try {
-      const res = await fetch(`/api/tahun-ajaran/${id}`, {
+      const res = await apiFetch(`/api/tahun-ajaran/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'activate' }),
@@ -115,7 +116,7 @@ export default function TahunAjaranPage() {
     setError('')
 
     try {
-      const res = await fetch('/api/tahun-ajaran', {
+      const res = await apiFetch('/api/tahun-ajaran', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, sekolahId: activeSchoolId || null }),
@@ -141,7 +142,7 @@ export default function TahunAjaranPage() {
     setDeletingTa(true)
     setDeleteTaError('')
     try {
-      const res = await fetch('/api/tahun-ajaran/' + deleteModalTa.id, {
+      const res = await apiFetch('/api/tahun-ajaran/' + deleteModalTa.id, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: deletePassword }),

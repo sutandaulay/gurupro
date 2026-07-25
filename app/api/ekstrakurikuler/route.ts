@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
+import { requireSchoolAccess } from '@/lib/school-access';
 import {
   createEkstrakurikuler,
   updateEkstrakurikuler,
@@ -24,6 +25,8 @@ export async function GET(req: Request) {
       pembinaMemberId: searchParams.get('pembinaMemberId') || undefined,
       schoolId: searchParams.get('schoolId') || undefined,
     };
+
+    if (filters.schoolId) await requireSchoolAccess(filters.schoolId)
 
     const validated = EkstrakurikulerQuerySchema.parse(filters);
     const result = await getEkstrakurikuler(validated);

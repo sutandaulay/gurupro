@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { requireSchoolAccess } from '@/lib/school-access';
 
 function isValidUUID(str: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -10,7 +11,10 @@ function isValidUUID(str: string): boolean {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
+    const schoolId = searchParams.get('school_id');
     const kelasId = searchParams.get('kelas_id');
+
+    if (schoolId) await requireSchoolAccess(schoolId)
     const siswaId = searchParams.get('siswa_id');
     const status = searchParams.get('status');
     const periode = searchParams.get('periode');

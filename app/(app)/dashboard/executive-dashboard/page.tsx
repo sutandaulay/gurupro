@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -16,7 +17,7 @@ export default function ExecutiveDashboardPage() {
     setError(null);
     try {
       const qs = instId ? `?institutionId=${instId}` : "";
-      const res = await fetch(`/api/executive-dashboard${qs}`, { cache: "no-store" });
+      const res = await apiFetch(`/api/executive-dashboard${qs}`, { cache: "no-store" });
       if (res.status === 403) {
         setError("Halaman ini hanya untuk Kepala Sekolah atau Wakasek.");
         return;

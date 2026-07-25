@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react';
 
@@ -48,7 +49,7 @@ export default function PenilaianEkstrakurikulerForm({
   useEffect(() => {
     // Get ekskul details if not passed as prop
     if (!ekskul && ekstrakurikulerId) {
-      fetch(`/api/ekstrakurikuler`)
+      apiFetch(`/api/ekstrakurikuler`)
         .then((res) => res.json())
         .then((data) => {
           if (data.data && data.data.length > 0) {
@@ -56,7 +57,7 @@ export default function PenilaianEkstrakurikulerForm({
             if (found) {
               setEkskul(found);
               // Get students in the same class
-              fetch(`/api/students?class_id=${found.kelasId}`)
+              apiFetch(`/api/students?class_id=${found.kelasId}`)
                 .then((res) => res.json())
                 .then((data) => {
                   if (data.data) {
@@ -72,7 +73,7 @@ export default function PenilaianEkstrakurikulerForm({
         .catch(console.error);
     } else if (ekskul && ekskul.kelasId) {
       // Get students if ekskul is passed as prop
-      fetch(`/api/students?class_id=${ekskul.kelasId}`)
+      apiFetch(`/api/students?class_id=${ekskul.kelasId}`)
         .then((res) => res.json())
         .then((data) => {
           if (data.data) {
@@ -104,7 +105,7 @@ export default function PenilaianEkstrakurikulerForm({
     }
 
     try {
-      const res = await fetch('/api/penilaian-ekskul', {
+      const res = await apiFetch('/api/penilaian-ekskul', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useEffect, useState } from "react";
 
@@ -12,7 +13,7 @@ export default function PoinTopUpModal({ open, onClose, userId }: { open: boolea
   useEffect(() => {
     if (!open) return;
     setLoading(true);
-    fetch("/api/token-packages")
+    apiFetch("/api/token-packages")
       .then((r) => r.json())
       .then((data) => {
         setPackages(data.packages || []);
@@ -24,7 +25,7 @@ export default function PoinTopUpModal({ open, onClose, userId }: { open: boolea
   async function handleBuy(pkgId: string) {
     setLoading(true);
     try {
-      const res = await fetch("/api/checkout", {
+      const res = await apiFetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan: "addon", userId: userId || null, packageId: pkgId }),

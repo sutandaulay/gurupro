@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
@@ -22,7 +23,7 @@ export default function DetailSkpPage() {
   const fetchSkp = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/skp/${id}`)
+      const res = await apiFetch(`/api/skp/${id}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Gagal mengambil data')
       setSkp(data)
@@ -36,7 +37,7 @@ export default function DetailSkpPage() {
   const handleSubmit = async () => {
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/skp/${id}/submit`, { method: 'POST' })
+      const res = await apiFetch(`/api/skp/${id}/submit`, { method: 'POST' })
       if (res.ok) {
         setSkp((prev: any) => ({ ...prev, status: 'submitted' }))
       } else {
@@ -53,7 +54,7 @@ export default function DetailSkpPage() {
   const handleHapus = async () => {
     if (!confirm('Hapus SKP ini?')) return
     try {
-      const res = await fetch(`/api/skp/${id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/skp/${id}`, { method: 'DELETE' })
       if (res.ok) {
         router.push('/dashboard/laporan-kinerja')
       }

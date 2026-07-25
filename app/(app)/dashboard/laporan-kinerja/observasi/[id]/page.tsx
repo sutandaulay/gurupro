@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
@@ -45,7 +46,7 @@ export default function DetailObservasiPage() {
   const fetchObservasi = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/observasi/${id}`)
+      const res = await apiFetch(`/api/observasi/${id}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Gagal mengambil data')
       setObservasi(data)
@@ -58,7 +59,7 @@ export default function DetailObservasiPage() {
 
   const handleSelesai = async () => {
     try {
-      const res = await fetch(`/api/observasi/${id}`, {
+      const res = await apiFetch(`/api/observasi/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'completed' }),
@@ -75,7 +76,7 @@ export default function DetailObservasiPage() {
   const handleHapus = async () => {
     if (!confirm('Hapus observasi ini?')) return
     try {
-      const res = await fetch(`/api/observasi/${id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/observasi/${id}`, { method: 'DELETE' })
       if (res.ok) {
         router.push('/dashboard/laporan-kinerja/observasi')
       }

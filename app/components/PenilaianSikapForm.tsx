@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react';
 
@@ -115,7 +116,7 @@ export default function PenilaianSikapForm({
 
   useEffect(() => {
     if (kelasId) {
-      fetch(`/api/students?class_id=${kelasId}`)
+      apiFetch(`/api/students?class_id=${kelasId}`)
         .then((res) => res.json())
         .then((data) => {
           if (data.data) {
@@ -176,7 +177,7 @@ export default function PenilaianSikapForm({
     }
 
     try {
-      const res = await fetch('/api/penilaian-sikap', {
+      const res = await apiFetch('/api/penilaian-sikap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -25,7 +26,7 @@ export default function InstitutionInvitationAcceptPage() {
       setStatus('accepting')
       try {
         const tokenValue = new URLSearchParams(window.location.search).get('token')
-        const res = await fetch(`/api/institution-invitation/accept?token=${encodeURIComponent(tokenValue || '')}`, {
+        const res = await apiFetch(`/api/institution-invitation/accept?token=${encodeURIComponent(tokenValue || '')}`, {
           method: 'GET',
         })
         const data = await res.json()

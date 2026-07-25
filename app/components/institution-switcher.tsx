@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback } from "react";
 import { IconBuilding, IconUser } from "@tabler/icons-react";
@@ -20,7 +21,7 @@ export default function InstitutionSwitcher() {
 
   const fetchContext = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/active-context');
+      const res = await apiFetch('/api/auth/active-context');
       if (res.ok) {
         setState(await res.json());
       }
@@ -44,7 +45,7 @@ export default function InstitutionSwitcher() {
       newContext = { institutionId: Number(value) };
     }
 
-    const res = await fetch('/api/auth/active-context', {
+    const res = await apiFetch('/api/auth/active-context', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ activeContext: newContext }),

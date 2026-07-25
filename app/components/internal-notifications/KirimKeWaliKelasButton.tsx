@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState } from 'react';
 import { IconSend } from '@tabler/icons-react';
@@ -29,7 +30,7 @@ export default function KirimKeWaliKelasButton({
     setError(null);
     
     try {
-      const res = await fetch('/api/internal-notifications/nilai-to-wali-kelas', {
+      const res = await apiFetch('/api/internal-notifications/nilai-to-wali-kelas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

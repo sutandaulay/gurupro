@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
@@ -81,7 +82,7 @@ export default function MobileHomeMenu({ currentModule, onNavigate }: MobileHome
   useEffect(() => {
     const fetchRoleFlags = async () => {
       try {
-        const res = await fetch('/api/user/role-flags');
+        const res = await apiFetch('/api/user/role-flags');
         if (res.ok) {
           const data = await res.json();
           setRoleFlags(data);

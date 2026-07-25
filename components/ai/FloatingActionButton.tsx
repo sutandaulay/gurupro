@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import React, { useState, useEffect } from "react";
 import {
@@ -62,7 +63,7 @@ export default function FloatingActionButton() {
 
   const fetchTodayData = async () => {
     try {
-      const response = await fetch("/api/teaching-session");
+      const response = await apiFetch("/api/teaching-session");
       if (response.ok) {
         const data = await response.json();
         setTodaySession(data.session);

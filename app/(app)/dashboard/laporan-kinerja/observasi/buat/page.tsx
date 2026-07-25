@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -52,8 +53,8 @@ export default function BuatObservasiPage() {
     setLoading(true)
     try {
       const [skpRes, indRes] = await Promise.all([
-        fetch(taId ? `/api/skp?tahun_ajaran_id=${taId}` : '/api/skp'),
-        fetch('/api/indikator-kinerja'),
+        apiFetch(taId ? `/api/skp?tahun_ajaran_id=${taId}` : '/api/skp'),
+        apiFetch('/api/indikator-kinerja'),
       ])
 
       if (skpRes.ok) {
@@ -98,7 +99,7 @@ export default function BuatObservasiPage() {
     setError('')
 
     try {
-      const res = await fetch('/api/observasi', {
+      const res = await apiFetch('/api/observasi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

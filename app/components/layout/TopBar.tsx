@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
@@ -69,7 +70,7 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
 
     setIsLoadingNotifications(true);
     try {
-      const res = await fetch("/api/user/notifications?limit=10");
+      const res = await apiFetch("/api/user/notifications?limit=10");
       if (res.ok) {
         const data = await res.json();
         setNotifications(data.notifications || []);
@@ -85,7 +86,7 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
   // Mark all notifications as read
   const markAllNotificationsRead = async () => {
     try {
-      await fetch("/api/user/notifications?markAllRead=true", { method: "PUT" });
+      await apiFetch("/api/user/notifications?markAllRead=true", { method: "PUT" });
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
     } catch (err) {
@@ -169,7 +170,7 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
     // Only proceed if profile is loaded and not loading
     if (!profile || isLoading) return;
 
-    fetch("/api/schools")
+    apiFetch("/api/schools")
       .then(async (r) => {
         if (!r.ok) return [];
         const data = await r.json();
@@ -252,7 +253,7 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
 
   const markAllRead = useCallback(async () => {
     try {
-      await fetch("/api/user/notifications?markAllRead=true", { method: "PUT" });
+      await apiFetch("/api/user/notifications?markAllRead=true", { method: "PUT" });
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
     } catch (err) {
@@ -527,7 +528,7 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
                         }
 
                         try {
-                          await fetch("/api/auth/logout", { method: "POST" });
+                          await apiFetch("/api/auth/logout", { method: "POST" });
                         } catch (err) {
                           console.error("Logout error:", err);
                         }

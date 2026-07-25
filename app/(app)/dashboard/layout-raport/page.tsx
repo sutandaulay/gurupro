@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback, startTransition, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
@@ -134,8 +135,8 @@ function LayoutRaportContent() {
 
       try {
         const [memberRes, schoolRes] = await Promise.all([
-          fetch('/api/raport/guru-member-id'),
-          fetch('/api/schools'),
+          apiFetch('/api/raport/guru-member-id'),
+          apiFetch('/api/schools'),
         ]);
 
         if (!schoolRes.ok) {
@@ -206,7 +207,7 @@ function LayoutRaportContent() {
       const params = new URLSearchParams();
       if (schoolId) params.append('sekolah_id', schoolId);
 
-      const tRes = await fetch(`/api/template-raport?${params}`);
+      const tRes = await apiFetch(`/api/template-raport?${params}`);
       const text = await tRes.text();
 
       if (!tRes.ok) {
@@ -236,7 +237,7 @@ function LayoutRaportContent() {
   const fetchLayouts = useCallback(async () => {
     if (!selectedTemplateId) return;
     try {
-      const res = await fetch(`/api/raport/layout?template_raport_id=${selectedTemplateId}`);
+      const res = await apiFetch(`/api/raport/layout?template_raport_id=${selectedTemplateId}`);
       if (res.ok) {
         const data = await res.json();
         setLayouts(data);
@@ -281,7 +282,7 @@ function LayoutRaportContent() {
 
     try {
       if (selectedLayout) {
-        const res = await fetch('/api/raport/layout', {
+        const res = await apiFetch('/api/raport/layout', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -298,7 +299,7 @@ function LayoutRaportContent() {
 
         setSuccess('Layout berhasil diperbarui!');
       } else {
-        const res = await fetch('/api/raport/layout', {
+        const res = await apiFetch('/api/raport/layout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -330,7 +331,7 @@ function LayoutRaportContent() {
     if (!confirm('Hapus layout ini?')) return;
 
     try {
-      const res = await fetch(`/api/raport/layout?id=${layoutId}`, {
+      const res = await apiFetch(`/api/raport/layout?id=${layoutId}`, {
         method: 'DELETE',
       });
 
@@ -356,7 +357,7 @@ function LayoutRaportContent() {
     setError(null);
 
     try {
-      const res = await fetch('/api/template-raport', {
+      const res = await apiFetch('/api/template-raport', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

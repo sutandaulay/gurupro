@@ -1,6 +1,7 @@
 import { query, logAudit } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { requireSchoolAccess } from "@/lib/school-access";
 
 export async function GET(req: Request) {
   try {

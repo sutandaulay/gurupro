@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
@@ -96,7 +97,7 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
       const formData = new FormData();
       formData.append("photo", file);
 
-      const res = await fetch("/api/user/upload-photo", {
+      const res = await apiFetch("/api/user/upload-photo", {
         method: "POST",
         body: formData,
       });
@@ -163,7 +164,7 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
     setResult(null);
 
     try {
-      const res = await fetch('/api/user/profile', {
+      const res = await apiFetch('/api/user/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -211,7 +212,7 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
     setResult(null);
 
     try {
-      const res = await fetch('/api/user/profile', {
+      const res = await apiFetch('/api/user/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

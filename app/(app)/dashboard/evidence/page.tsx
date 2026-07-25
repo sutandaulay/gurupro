@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -67,7 +68,7 @@ export default function EvidenceDashboardPage() {
 
       const url = `/api/evidence/summary?${params.toString()}`
 
-      const res = await fetch(url)
+      const res = await apiFetch(url)
       const json = await res.json()
 
       if (res.ok) {

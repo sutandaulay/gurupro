@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -201,7 +202,7 @@ function LoginContent() {
     // Check for invitation token
     if (token) {
       setInvitationToken(token);
-      fetch(`/api/auth/invitation/verify?token=${token}`)
+      apiFetch(`/api/auth/invitation/verify?token=${token}`)
         .then(res => res.json())
         .then(data => {
           if (data.success && data.invitation) {
@@ -248,7 +249,7 @@ function LoginContent() {
     const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
 
     try {
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method: 'POST',
         headers: {
           'X-Requested-With': 'XMLHttpRequest',
@@ -289,7 +290,7 @@ function LoginContent() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/otp/verify', {
+      const res = await apiFetch('/api/auth/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -326,7 +327,7 @@ function LoginContent() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/otp/request', {
+      const res = await apiFetch('/api/auth/otp/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ login: forgotEmail }),
@@ -357,7 +358,7 @@ function LoginContent() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/otp/verify', {
+      const res = await apiFetch('/api/auth/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -595,7 +596,7 @@ function LoginContent() {
                   setSuccess(null);
                   setLoading(true);
                   try {
-                    const res = await fetch('/api/auth/otp/request', {
+                    const res = await apiFetch('/api/auth/otp/request', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ userId: otpUserId, purpose: 'account_verification' }),

@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -67,7 +68,7 @@ export default function BuatLaporanKinerjaPage() {
 
       const url = `/api/evidence/summary?${params.toString()}`
 
-      const res = await fetch(url)
+      const res = await apiFetch(url)
       const data = await res.json()
 
       if (res.ok) {
@@ -85,7 +86,7 @@ export default function BuatLaporanKinerjaPage() {
     setError('')
 
     try {
-      const response = await fetch('/api/ai/laporan-kinerja', {
+      const response = await apiFetch('/api/ai/laporan-kinerja', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

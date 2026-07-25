@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback } from "react";
 import FollowUpModal from "./FollowUpModal";
@@ -87,7 +88,7 @@ export default function TransactionsManager({ onSuccess, onError }: Transactions
       if (endDate) params.append("endDate", endDate);
       params.append("includeStats", "true");
 
-      const res = await fetch(`/api/admin/transactions?${params.toString()}`);
+      const res = await apiFetch(`/api/admin/transactions?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setTransactions(data.transactions);
@@ -119,7 +120,7 @@ export default function TransactionsManager({ onSuccess, onError }: Transactions
       if (endDate) params.append("endDate", endDate);
       params.append("includeStats", "false");
 
-      const res = await fetch(`/api/admin/transactions?${params.toString()}`);
+      const res = await apiFetch(`/api/admin/transactions?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setTransactions(data.transactions);
@@ -161,7 +162,7 @@ export default function TransactionsManager({ onSuccess, onError }: Transactions
   const handleAction = async (txId: string, action: string) => {
     setIsProcessing((prev) => ({ ...prev, [txId]: true }));
     try {
-      const res = await fetch("/api/admin/transactions", {
+      const res = await apiFetch("/api/admin/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transactionId: txId, action })

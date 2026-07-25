@@ -15,6 +15,7 @@
  */
 
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { ComponentType, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -57,7 +58,7 @@ export function withTokenGuard<P extends object>(
     useEffect(() => {
       async function checkTokenAccess() {
         try {
-          const res = await fetch("/api/user/token-status");
+          const res = await apiFetch("/api/user/token-status");
           if (!res.ok) {
             if (res.status === 401 && redirectToLogin) {
               router.push("/login");

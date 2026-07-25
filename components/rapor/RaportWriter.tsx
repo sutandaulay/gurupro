@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import React, { useState } from "react";
 import {
@@ -68,7 +69,7 @@ export default function RaportWriter({
     setError(null);
 
     try {
-      const response = await fetch("/api/ai/rapor/generate", {
+      const response = await apiFetch("/api/ai/rapor/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

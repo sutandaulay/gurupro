@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
@@ -92,7 +93,7 @@ export default function FaceEnrollmentSection({ onEnrollmentChange }: FaceEnroll
     let cancelled = false;
     const checkEnrollment = async (attempt = 1) => {
       try {
-        const res = await fetch('/api/face-enrollment');
+        const res = await apiFetch('/api/face-enrollment');
         if (cancelled) return;
         if (res.ok) {
           const data = await res.json();
@@ -312,7 +313,7 @@ export default function FaceEnrollmentSection({ onEnrollmentChange }: FaceEnroll
         throw new Error('Harap selesaikan semua perekaman wajah sebelum menyimpan.');
       }
 
-      const response = await fetch('/api/face-enrollment', {
+      const response = await apiFetch('/api/face-enrollment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -351,7 +352,7 @@ export default function FaceEnrollmentSection({ onEnrollmentChange }: FaceEnroll
 
     setIsLoading(true);
     try {
-      const res = await fetch('/api/face-enrollment', { method: 'DELETE' });
+      const res = await apiFetch('/api/face-enrollment', { method: 'DELETE' });
       if (res.ok) {
         toast.success('Data wajah berhasil dihapus!');
         setIsEnrolled(false);

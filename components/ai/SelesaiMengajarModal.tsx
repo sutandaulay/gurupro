@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import React, { useState, useEffect } from "react";
 import {
@@ -96,7 +97,7 @@ function SelesaiMengajarModalContent({
       }
 
       // Call API to complete teaching session
-      const response = await fetch("/api/teaching-session/complete", {
+      const response = await apiFetch("/api/teaching-session/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

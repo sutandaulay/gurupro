@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react';
 
@@ -40,7 +41,7 @@ export default function AIMonitoringDashboard() {
       const params = new URLSearchParams();
       if (filter !== 'all') params.set('feature', filter);
 
-      const res = await fetch(`/api/ai-monitoring?${params}`);
+      const res = await apiFetch(`/api/ai-monitoring?${params}`);
       const data = await res.json();
 
       setEvents(data.recentTruncations || []);

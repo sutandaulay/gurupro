@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -27,7 +28,7 @@ function OptOutContent() {
     setSuccess(null);
 
     try {
-      const res = await fetch("/api/opt-out", {
+      const res = await apiFetch("/api/opt-out", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

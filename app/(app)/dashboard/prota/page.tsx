@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import React, { useState } from 'react';
 import { useTeacherStore, useKurikulumStore } from '@/lib/stores';
@@ -48,7 +49,7 @@ export default function ProtaPage() {
     setError(null);
 
     try {
-      const res = await fetch('/api/generate-prota', {
+      const res = await apiFetch('/api/generate-prota', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

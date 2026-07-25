@@ -5,6 +5,7 @@
  */
 
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -68,7 +69,7 @@ export default function BahanAjarResultsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/bahan-ajar/${bahanAjarId}`);
+      const res = await apiFetch(`/api/bahan-ajar/${bahanAjarId}`);
       const result = await res.json();
 
       if (!res.ok) {
@@ -89,7 +90,7 @@ export default function BahanAjarResultsPage() {
     setError(null);
 
     try {
-      const res = await fetch(`/api/bahan-ajar/${bahanAjarId}/regenerate`, {
+      const res = await apiFetch(`/api/bahan-ajar/${bahanAjarId}/regenerate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jenis }),

@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,7 +51,7 @@ export default function ForumPage() {
     try {
       const qs = new URLSearchParams({ scope });
       if (filterMapel) qs.set("mapel", filterMapel);
-      const res = await fetch(`/api/forum?${qs.toString()}`, { cache: "no-store" });
+      const res = await apiFetch(`/api/forum?${qs.toString()}`, { cache: "no-store" });
       const data = await res.json();
       if (res.ok) setTopics(data.topics || []);
       else toast.error(data.error || "Gagal memuat forum");
@@ -70,7 +71,7 @@ export default function ForumPage() {
     }
     setPosting(true);
     try {
-      const res = await fetch("/api/forum", {
+      const res = await apiFetch("/api/forum", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mapel: newMapel, title: newTitle, body: newBody }),
@@ -96,7 +97,7 @@ export default function ForumPage() {
     setOpenTopic(t);
     setReplies([]);
     try {
-      const res = await fetch(`/api/forum/${t.id}/replies`, { cache: "no-store" });
+      const res = await apiFetch(`/api/forum/${t.id}/replies`, { cache: "no-store" });
       const data = await res.json();
       if (res.ok) setReplies(data.replies || []);
     } catch {}
@@ -106,7 +107,7 @@ export default function ForumPage() {
     if (!replyText.trim() || !openTopic) return;
     setSendingReply(true);
     try {
-      const res = await fetch("/api/forum", {
+      const res = await apiFetch("/api/forum", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topicId: openTopic.id, body: replyText }),
@@ -114,7 +115,7 @@ export default function ForumPage() {
       const data = await res.json();
       if (res.ok) {
         setReplyText("");
-        const r = await fetch(`/api/forum/${openTopic.id}/replies`, { cache: "no-store" });
+        const r = await apiFetch(`/api/forum/${openTopic.id}/replies`, { cache: "no-store" });
         const rd = await r.json();
         if (r.ok) setReplies(rd.replies || []);
         fetchTopics();

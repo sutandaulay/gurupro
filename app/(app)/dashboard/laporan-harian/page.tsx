@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
@@ -60,7 +61,7 @@ export default function LaporanHarianPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(buildUrl())
+      const res = await apiFetch(buildUrl())
       if (res.ok) {
         const data = await res.json()
         setReports(data.reports || [])

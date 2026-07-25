@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
@@ -64,7 +65,7 @@ function EditPelatihanContent() {
 
   const fetchPelatihan = async () => {
     try {
-      const res = await fetch(`/api/pelatihan/${id}`)
+      const res = await apiFetch(`/api/pelatihan/${id}`)
       const data = await res.json()
 
       if (!res.ok) {
@@ -103,7 +104,7 @@ function EditPelatihanContent() {
     setError('')
 
     try {
-      const res = await fetch(`/api/pelatihan/${id}`, {
+      const res = await apiFetch(`/api/pelatihan/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -157,7 +158,7 @@ function EditPelatihanContent() {
       const fd = new FormData()
       fd.append('file', selectedFile)
 
-      const res = await fetch(`/api/pelatihan/${id}/upload-sertifikat`, {
+      const res = await apiFetch(`/api/pelatihan/${id}/upload-sertifikat`, {
         method: 'POST',
         body: fd,
       })

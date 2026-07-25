@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useEffect } from "react";
 import { REFERRAL_STORAGE_KEY } from "@/lib/oauth";
@@ -16,7 +17,7 @@ export default function ReferralProcessor() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/auth/referral/process", {
+        const res = await apiFetch("/api/auth/referral/process", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ referralCode: code }),

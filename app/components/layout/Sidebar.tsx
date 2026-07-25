@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -38,7 +39,7 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
   useEffect(() => {
     const fetchRoleFlags = async () => {
       try {
-        const res = await fetch('/api/user/role-flags');
+        const res = await apiFetch('/api/user/role-flags');
         if (res.ok) {
           const data = await res.json();
           setRoleFlags(data);
@@ -61,7 +62,7 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
   useEffect(() => {
     const fetchTokenStatus = async () => {
       try {
-        const res = await fetch("/api/user/token-status");
+        const res = await apiFetch("/api/user/token-status");
         if (res.ok) {
           const data = await res.json();
           setTokenStatus(data);
@@ -142,7 +143,7 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
     }
 
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await apiFetch("/api/auth/logout", { method: "POST" });
     } catch (err) {
       console.error("Logout error:", err);
     }

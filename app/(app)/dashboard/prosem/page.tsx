@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import React, { useState } from 'react';
 import { useTeacherStore, useKurikulumStore } from '@/lib/stores';
@@ -48,7 +49,7 @@ export default function ProsemPage() {
     setError(null);
 
     try {
-      const res = await fetch('/api/generate-prosem', {
+      const res = await apiFetch('/api/generate-prosem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

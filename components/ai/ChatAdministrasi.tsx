@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -143,7 +144,7 @@ Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      const response = await fetch("/api/ai/chat", {
+      const response = await apiFetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -194,7 +195,7 @@ Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
 
   const handleFinanceSave = async (msgId: string, rawText: string) => {
     try {
-      const res = await fetch('/api/administrasi/parse-keuangan', {
+      const res = await apiFetch('/api/administrasi/parse-keuangan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: rawText }),
@@ -202,7 +203,7 @@ Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Gagal memproses transaksi');
 
-      const financeRes = await fetch('/api/administrasi?tipe=keuangan');
+      const financeRes = await apiFetch('/api/administrasi?tipe=keuangan');
       let docId = '';
       let existingTransactions: any[] = [];
       if (financeRes.ok) {
@@ -225,7 +226,7 @@ Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
 
       const updatedTransactions = [...existingTransactions, newTx];
 
-      const saveRes = await fetch('/api/administrasi', {
+      const saveRes = await apiFetch('/api/administrasi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

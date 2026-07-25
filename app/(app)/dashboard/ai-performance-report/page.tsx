@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback } from "react";
 import PerformanceSharePanel from "@/app/components/performance-share/PerformanceSharePanel";
@@ -44,14 +45,14 @@ export default function AiPerformanceReportPage() {
 
     try {
       // Fetch user session
-      const sessionRes = await fetch("/api/me");
+      const sessionRes = await apiFetch("/api/me");
       if (sessionRes.ok) {
         const sessionData = await sessionRes.json();
         setUser(sessionData.user || null);
       }
 
       // Fetch aggregated stats
-      const statsRes = await fetch(`/api/aggregated-stats?school_id=${activeSchoolId}`);
+      const statsRes = await apiFetch(`/api/aggregated-stats?school_id=${activeSchoolId}`);
       if (!statsRes.ok) {
         throw new Error("Gagal mengambil data statistik");
       }

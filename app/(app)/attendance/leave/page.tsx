@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -85,7 +86,7 @@ export default function LeaveRequestPage() {
       }
 
       // Kirim permintaan ke API
-      const response = await fetch('/api/leave-requests', {
+      const response = await apiFetch('/api/leave-requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

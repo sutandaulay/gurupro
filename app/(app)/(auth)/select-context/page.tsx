@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -22,7 +23,7 @@ function SelectContextPage() {
   useEffect(() => {
     async function loadContext() {
       try {
-        const res = await fetch("/api/auth/active-context");
+        const res = await apiFetch("/api/auth/active-context");
         if (res.ok) {
           const data = await res.json();
           setInstitutions(data.institutions || []);
@@ -47,7 +48,7 @@ function SelectContextPage() {
     }
 
     try {
-      const res = await fetch("/api/auth/active-context", {
+      const res = await apiFetch("/api/auth/active-context", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ activeContext: newContext }),
@@ -65,7 +66,7 @@ function SelectContextPage() {
 
   const handleLogout = async () => {
     try {
-      const res = await fetch("/api/auth/logout", { method: "POST" });
+      const res = await apiFetch("/api/auth/logout", { method: "POST" });
       if (res.ok) {
         router.push("/login");
       }

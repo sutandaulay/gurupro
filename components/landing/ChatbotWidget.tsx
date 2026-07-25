@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useRef, useEffect } from "react";
 import { IconRobot, IconX, IconSend, IconSparklesFilled } from "@tabler/icons-react";
@@ -51,7 +52,7 @@ export default function ChatbotWidget({
     setIsLoading(true);
 
     try {
-      const res = await fetch(apiEndpoint, {
+      const res = await apiFetch(apiEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: updatedMessages }),

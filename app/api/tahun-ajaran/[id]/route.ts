@@ -6,11 +6,15 @@ import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { comparePassword } from '@/lib/auth'
 import { cookies } from 'next/headers'
+import { requireSchoolAccess } from '@/lib/school-access'
 
 // GET /api/tahun-ajaran/[id]
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
+    const { searchParams } = new URL(req.url)
+    const schoolId = searchParams.get('school_id')
+    if (schoolId) await requireSchoolAccess(schoolId)
     const res = await query('SELECT * FROM tahun_ajaran WHERE id = $1', [id])
     if (!res.rows[0]) {
       return NextResponse.json({ error: 'Tidak ditemukan' }, { status: 404 })

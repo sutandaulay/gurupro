@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react';
 import PenilaianEkstrakurikulerForm from '@/app/components/PenilaianEkstrakurikulerForm';
@@ -19,7 +20,7 @@ export default function PembinaEkskulDashboard() {
     setPeriode(`${year}/${nextYear}-${semester}`);
 
     // Fetch ekskul list for current user (pembina)
-    fetch('/api/ekstrakurikuler/my-ekskul')
+    apiFetch('/api/ekstrakurikuler/my-ekskul')
       .then((res) => res.json())
       .then((data) => {
         if (data.data && data.data.length > 0) {
@@ -115,7 +116,7 @@ function DaftarNilaiEkskul({ ekstrakurikulerId, periode }: { ekstrakurikulerId: 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/penilaian-ekskul?ekstrakurikulerId=${ekstrakurikulerId}&periode=${periode}`)
+    apiFetch(`/api/penilaian-ekskul?ekstrakurikulerId=${ekstrakurikulerId}&periode=${periode}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.data) {

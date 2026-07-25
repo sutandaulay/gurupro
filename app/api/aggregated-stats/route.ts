@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { requireSchoolAccess } from "@/lib/school-access";
 
 export async function GET(req: Request) {
   try {
@@ -11,6 +12,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "school_id wajib diisi" }, { status: 400 });
     }
 
+    await requireSchoolAccess(schoolId)
     const session = await getSession();
     if (!session?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

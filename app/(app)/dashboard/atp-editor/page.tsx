@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import React, { useState, useEffect } from 'react';
 import { useTeacherStore, useKurikulumStore } from '@/lib/stores';
@@ -57,7 +58,7 @@ export default function ATPEditorPage() {
       }
 
       try {
-        const res = await fetch(`/api/subjects?school_id=${activeSchoolId}`);
+        const res = await apiFetch(`/api/subjects?school_id=${activeSchoolId}`);
         if (!res.ok) return;
 
         const data = await res.json();
@@ -81,7 +82,7 @@ export default function ATPEditorPage() {
       if (activeSchoolId) params.set('school_id', activeSchoolId);
       if (activeSubjectId) params.set('subject_id', activeSubjectId);
 
-      const res = await fetch(`/api/atp?${params}`);
+      const res = await apiFetch(`/api/atp?${params}`);
       const data = await res.json();
       setAtpList(data.data || []);
     } catch (err) {
@@ -100,7 +101,7 @@ export default function ATPEditorPage() {
     setIsLoading(true);
     try {
       const kurikulumCtx = serializeForAPI();
-      const res = await fetch('/api/atp', {
+      const res = await apiFetch('/api/atp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -156,7 +157,7 @@ export default function ATPEditorPage() {
 
     setIsLoading(true);
     try {
-      const res = await fetch('/api/atp/generate', {
+      const res = await apiFetch('/api/atp/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

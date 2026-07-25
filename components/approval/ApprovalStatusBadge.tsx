@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState } from "react";
 
@@ -35,7 +36,7 @@ export function SubmitApprovalButton({ docId, status, onSubmitted }: {
     if (!confirm("Ajukan dokumen ini ke Kepsek untuk disetujui?")) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/administrasi/${docId}/submit-approval`, { method: "POST" });
+      const res = await apiFetch(`/api/administrasi/${docId}/submit-approval`, { method: "POST" });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         alert(d.error || "Gagal mengajukan dokumen");

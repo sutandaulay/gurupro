@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSchoolAccess, badRequest } from '@/lib/school-access';
 import { getPemetaanKolomProfile, upsertPemetaanKolomProfile, isPemetaanProfileExpired } from '@/lib/raport/kontak-eksternal-repository';
 import { CreatePemetaanKolomInputSchema, UpdatePemetaanKolomInputSchema } from '@/lib/raport/schemas';
 
@@ -11,6 +12,8 @@ export async function GET(request: NextRequest) {
     if (!sekolahId || !jalurRegulasi) {
       return NextResponse.json({ error: 'sekolahId dan jalurRegulasi wajib diisi' }, { status: 400 });
     }
+
+    await requireSchoolAccess(sekolahId)
 
     if (!['kemendikdasmen', 'kemenag'].includes(jalurRegulasi)) {
       return NextResponse.json({ error: 'jalurRegulasi harus kemendikdasmen atau kemenag' }, { status: 400 });

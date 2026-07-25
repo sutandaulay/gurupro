@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, FormEvent } from 'react';
 import Link from 'next/link';
@@ -60,7 +61,7 @@ export default function DaftarSekolahPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/public/school-register', {
+      const res = await apiFetch('/api/public/school-register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

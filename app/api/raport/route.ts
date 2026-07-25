@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 import { query, logAudit } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { requireSchoolAccess } from '@/lib/school-access';
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
+    const schoolId = searchParams.get('school_id');
     const siswaId = searchParams.get('siswa_id');
     const kelasId = searchParams.get('kelas_id');
     const periode = searchParams.get('periode');
     const status = searchParams.get('status');
+
+    if (schoolId) await requireSchoolAccess(schoolId)
 
     let sql = `
       SELECT dr.*,

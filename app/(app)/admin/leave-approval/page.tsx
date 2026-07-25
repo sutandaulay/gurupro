@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,7 +62,7 @@ export default function LeaveApprovalPage() {
     const fetchLeaveRequests = async () => {
       try {
         setLoading(true);
-        const res = await fetch('/api/leave-requests', { cache: 'no-store' });
+        const res = await apiFetch('/api/leave-requests', { cache: 'no-store' });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Gagal mengambil data');
 
@@ -136,7 +137,7 @@ export default function LeaveApprovalPage() {
       
       // Dalam implementasi nyata, ini akan mengirim ke API
       // Untuk simulasi, kita hanya memperbarui status lokal
-      const response = await fetch(`/api/leave-requests/${selectedRequest.id}`, {
+      const response = await apiFetch(`/api/leave-requests/${selectedRequest.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -178,7 +179,7 @@ export default function LeaveApprovalPage() {
       
       // Dalam implementasi nyata, ini akan mengirim ke API
       // Untuk simulasi, kita hanya memperbarui status lokal
-      const response = await fetch(`/api/leave-requests/${selectedRequest.id}`, {
+      const response = await apiFetch(`/api/leave-requests/${selectedRequest.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -220,7 +221,7 @@ export default function LeaveApprovalPage() {
     // Sprint 4.5 — Ambil saran guru pengganti (READ-ONLY).
     setLoadingSubs(true);
     try {
-      const res = await fetch(`/api/leave-requests/${request.id}/substitutes?leaveId=${request.id}`, { cache: 'no-store' });
+      const res = await apiFetch(`/api/leave-requests/${request.id}/substitutes?leaveId=${request.id}`, { cache: 'no-store' });
       const data = await res.json();
       if (res.ok) setSubstitutes(data.suggestions || []);
     } catch {

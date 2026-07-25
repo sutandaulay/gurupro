@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -175,7 +176,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
 
   const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
-    await fetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/api/auth/logout", { method: "POST" });
     signOut({ callbackUrl: "/login" });
   };
 

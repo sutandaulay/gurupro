@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
+import { requireSchoolAccess } from '@/lib/school-access';
 import { getPayload } from '@/lib/payload';
 import {
   insertPenilaianSikap,

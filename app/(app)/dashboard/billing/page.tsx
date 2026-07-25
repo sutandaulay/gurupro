@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -99,9 +100,9 @@ export default function BillingPage() {
     try {
       setLoading(true);
       const [tokenRes, pricingRes, tokenPkgRes] = await Promise.all([
-        fetch("/api/user/token-status"),
-        fetch("/api/pricing"),
-        fetch("/api/token-packages"),
+        apiFetch("/api/user/token-status"),
+        apiFetch("/api/pricing"),
+        apiFetch("/api/token-packages"),
       ]);
 
       const tokenData = await tokenRes.json();
@@ -127,7 +128,7 @@ export default function BillingPage() {
         payload.packageId = packageId;
       }
 
-      const res = await fetch("/api/checkout", {
+      const res = await apiFetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

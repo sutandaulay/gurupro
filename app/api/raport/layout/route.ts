@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query, logAudit } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { requireSchoolAccess } from '@/lib/school-access';
 import {
   createLayout,
   updateLayout,
@@ -16,6 +17,8 @@ export async function GET(req: Request) {
     const id = searchParams.get('id');
     const templateRaportId = searchParams.get('template_raport_id');
     const sekolahId = searchParams.get('sekolah_id');
+
+    if (sekolahId) await requireSchoolAccess(sekolahId)
 
     if (id) {
       const layout = await getLayoutById(id);

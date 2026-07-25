@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -31,7 +32,7 @@ export function LaporanGeneratingOverlay({
   useEffect(() => {
     const startGeneration = async () => {
       try {
-        const response = await fetch('/api/ai/laporan-kinerja', {
+        const response = await apiFetch('/api/ai/laporan-kinerja', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

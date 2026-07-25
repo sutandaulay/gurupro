@@ -6,6 +6,7 @@
  */
 
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -230,7 +231,7 @@ function GenerateConfirmationModal({
   const fetchQuotaInfo = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/user/token-status");
+      const res = await apiFetch("/api/user/token-status");
       if (res.ok) {
         const data = await res.json();
         const estimatedCost = calculateEstimatedCost(selectedOutputs);
@@ -307,7 +308,7 @@ function GenerateConfirmationModal({
         requestBody.alokasiWaktu = standaloneForm.alokasiWaktu;
       }
 
-      const res = await fetch("/api/bahan-ajar/generate", {
+      const res = await apiFetch("/api/bahan-ajar/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),

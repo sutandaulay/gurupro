@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 import React, { useState, useEffect, Suspense, useRef } from "react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
@@ -668,7 +669,7 @@ function DashboardContent() {
     setDeleteTaError('');
 
     try {
-      const res = await fetch('/api/tahun-ajaran/' + deleteModalTa.id, {
+      const res = await apiFetch('/api/tahun-ajaran/' + deleteModalTa.id, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: deletePassword }),
@@ -693,7 +694,7 @@ function DashboardContent() {
   const fetchTahunAjaran = async () => {
     try {
       const params = selectedSchoolId ? `?sekolah_id=${selectedSchoolId}` : ''
-      const res = await fetch(`/api/tahun-ajaran${params}`);
+      const res = await apiFetch(`/api/tahun-ajaran${params}`);
       if (res.ok) {
         const data = await res.json();
         setTahunAjaranList(data);
@@ -717,7 +718,7 @@ function DashboardContent() {
       }
 
       // Call API
-      const res = await fetch('/api/tahun-ajaran/' + id, {
+      const res = await apiFetch('/api/tahun-ajaran/' + id, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'activate', semester: semester }),
@@ -739,7 +740,7 @@ function DashboardContent() {
     }
     try {
       console.log('Creating TA:', tahunAjaranForm);
-      const res = await fetch('/api/tahun-ajaran', {
+      const res = await apiFetch('/api/tahun-ajaran', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -798,7 +799,7 @@ function DashboardContent() {
 
     const fetchBranding = async () => {
       try {
-        const res = await fetch("/api/branding");
+        const res = await apiFetch("/api/branding");
         if (res.ok) {
           const data = await res.json();
           setBrandingConfig(data);
@@ -959,7 +960,7 @@ function DashboardContent() {
     const paymentStatus = params.get("payment");
     const txId = params.get("tx");
     if (paymentStatus === "success" && txId) {
-      fetch("/api/checkout/verify", {
+      apiFetch("/api/checkout/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transactionId: txId }),
@@ -1059,7 +1060,7 @@ function DashboardContent() {
     }
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/institutions/lookup?npsn=${encodeURIComponent(schNpsn.trim())}`);
+        const res = await apiFetch(`/api/institutions/lookup?npsn=${encodeURIComponent(schNpsn.trim())}`);
         const data = await res.json();
         if (data.found) {
           setFoundInstitution(data.institution);
@@ -1077,7 +1078,7 @@ function DashboardContent() {
     if (!foundInstitution) return;
     setConnectingInstitution(true);
     try {
-      const res = await fetch("/api/institutions/connect", {
+      const res = await apiFetch("/api/institutions/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ npsn: schNpsn.trim() }),
@@ -1123,7 +1124,7 @@ function DashboardContent() {
     }
 
     try {
-      const res = await fetch("/api/schools").then(r => r.json());
+      const res = await apiFetch("/api/schools").then(r => r.json());
       if (Array.isArray(res)) {
         setSchools(res);
         
@@ -1166,7 +1167,7 @@ function DashboardContent() {
   const fetchClasses = async (schoolId: string) => {
     if (!schoolId) return;
     try {
-      const res = await fetch(`/api/classes?school_id=${schoolId}`).then(r => r.json());
+      const res = await apiFetch(`/api/classes?school_id=${schoolId}`).then(r => r.json());
       if (Array.isArray(res)) {
         setClasses(res);
         if (res.length > 0) setSelectedClassId(res[0].id);
@@ -1180,7 +1181,7 @@ function DashboardContent() {
   const fetchSubjects = async (schoolId: string) => {
     if (!schoolId) return;
     try {
-      const res = await fetch(`/api/subjects?school_id=${schoolId}`).then(r => r.json());
+      const res = await apiFetch(`/api/subjects?school_id=${schoolId}`).then(r => r.json());
       if (Array.isArray(res)) {
         setSubjects(res);
         if (res.length > 0) setSelectedSubjectId(res[0].id);
@@ -1194,11 +1195,11 @@ function DashboardContent() {
   const fetchSchedules = async (schoolId: string) => {
     if (!schoolId) return;
     try {
-      const res = await fetch(`/api/schedules?school_id=${schoolId}`).then(r => r.json());
+      const res = await apiFetch(`/api/schedules?school_id=${schoolId}`).then(r => r.json());
       if (Array.isArray(res)) setSchedules(res);
 
       // Fetch completed teaching sessions
-      const sesiRes = await fetch('/api/selesai-mengajar').catch(() => null);
+      const sesiRes = await apiFetch('/api/selesai-mengajar').catch(() => null);
       if (sesiRes?.ok) {
         const sesiData = await sesiRes.json();
         const completed = new Set<string>();
@@ -1216,7 +1217,7 @@ function DashboardContent() {
     setIsSeedingData(true);
     try {
       // Use seed-all endpoint that creates school, classes, subjects, and schedules
-      const res = await fetch('/api/selesai-mengajar/seed-all', { method: 'POST' });
+      const res = await apiFetch('/api/selesai-mengajar/seed-all', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
         showSuccess(`Data berhasil dibuat: ${data.message}`);
@@ -1242,7 +1243,7 @@ function DashboardContent() {
       return;
     }
     try {
-      const res = await fetch(`/api/students?class_id=${classId}`).then(r => r.json());
+      const res = await apiFetch(`/api/students?class_id=${classId}`).then(r => r.json());
       if (Array.isArray(res)) setStudents(res);
     } catch (e) {
       console.error(e);
@@ -1282,7 +1283,7 @@ function DashboardContent() {
 
   const fetchTeacherAttendance = async () => {
     try {
-      const res = await fetch(`/api/attendance?type=teacher&school_id=${selectedSchoolId}`).then(r => r.json());
+      const res = await apiFetch(`/api/attendance?type=teacher&school_id=${selectedSchoolId}`).then(r => r.json());
       if (Array.isArray(res)) {
         const todayLog = res.find((l: any) => l.tanggal.split("T")[0] === attendanceDate);
         if (todayLog) {
@@ -1300,7 +1301,7 @@ function DashboardContent() {
 
   const fetchStudentAttendance = async () => {
     try {
-      const res = await fetch(`/api/attendance?type=student&schedule_id=${selectedScheduleId}&tanggal=${attendanceDate}`).then(r => r.json());
+      const res = await apiFetch(`/api/attendance?type=student&schedule_id=${selectedScheduleId}&tanggal=${attendanceDate}`).then(r => r.json());
       const records: any = {};
       if (Array.isArray(res)) {
         res.forEach((log: any) => {
@@ -1339,7 +1340,7 @@ function DashboardContent() {
       return;
     }
     try {
-      const res = await fetch("/api/schools", {
+      const res = await apiFetch("/api/schools", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1388,7 +1389,7 @@ function DashboardContent() {
   const handleDeleteSchool = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus sekolah ini beserta seluruh kelas, murid, jadwal, dan absensi di dalamnya?")) return;
     try {
-      const res = await fetch(`/api/schools?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/schools?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         showSuccess("Sekolah berhasil dihapus");
         if (selectedSchoolId === id) setSelectedSchoolId("");
@@ -1410,7 +1411,7 @@ function DashboardContent() {
       }
     }
     try {
-      const res = await fetch("/api/classes", {
+      const res = await apiFetch("/api/classes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1439,7 +1440,7 @@ function DashboardContent() {
   const handleDeleteClass = async (id: string) => {
     if (!confirm("Hapus kelas ini beserta data siswa di dalamnya?")) return;
     try {
-      const res = await fetch(`/api/classes?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/classes?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         fetchClasses(selectedSchoolId);
         fetchEkskul();
@@ -1453,7 +1454,7 @@ function DashboardContent() {
   const handleAddSubject = async () => {
     if (!newSubjectName || !selectedSchoolId) return;
     try {
-      const res = await fetch("/api/subjects", {
+      const res = await apiFetch("/api/subjects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ school_id: selectedSchoolId, nama_mapel: newSubjectName }),
@@ -1473,7 +1474,7 @@ function DashboardContent() {
   const handleDeleteSubject = async (id: string) => {
     if (!confirm("Hapus mata pelajaran ini?")) return;
     try {
-      const res = await fetch(`/api/subjects?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/subjects?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         fetchSubjects(selectedSchoolId);
         showSuccess("Mata pelajaran berhasil dihapus");
@@ -1489,7 +1490,7 @@ function DashboardContent() {
       return;
     }
     try {
-      const res = await fetch(`/api/ekstrakurikuler?schoolId=${selectedSchoolId}`);
+      const res = await apiFetch(`/api/ekstrakurikuler?schoolId=${selectedSchoolId}`);
       if (res.ok) {
         const data = await res.json();
         setEkskulList(data.data || []);
@@ -1507,7 +1508,7 @@ function DashboardContent() {
         kelasId: newEkskulClassId,
         pembinaUserId: newEkskulPembinaUser ? currentUser?.id : null,
       };
-      const res = await fetch("/api/ekstrakurikuler", {
+      const res = await apiFetch("/api/ekstrakurikuler", {
         method: editingEkskulId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1533,7 +1534,7 @@ function DashboardContent() {
   const handleDeleteEkskul = async (id: string) => {
     if (!confirm("Hapus ekstrakurikuler ini?")) return;
     try {
-      const res = await fetch(`/api/ekstrakurikuler?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/ekstrakurikuler?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         fetchEkskul();
         showSuccess("Ekstrakurikuler berhasil dihapus");
@@ -1552,7 +1553,7 @@ function DashboardContent() {
       }
     }
     try {
-      const res = await fetch("/api/students", {
+      const res = await apiFetch("/api/students", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1579,7 +1580,7 @@ function DashboardContent() {
   const handleDeleteStudent = async (id: string) => {
     if (!confirm("Hapus siswa ini?")) return;
     try {
-      const res = await fetch(`/api/students?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/students?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         fetchStudents(selectedClassId);
         showSuccess("Siswa berhasil dihapus");
@@ -1595,7 +1596,7 @@ function DashboardContent() {
       return;
     }
     try {
-      const res = await fetch("/api/schedules", {
+      const res = await apiFetch("/api/schedules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1621,7 +1622,7 @@ function DashboardContent() {
   const handleDeleteSchedule = async (id: string) => {
     if (!confirm("Hapus jadwal ini?")) return;
     try {
-      const res = await fetch(`/api/schedules?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/schedules?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         fetchSchedules(selectedSchoolId);
         showSuccess("Jadwal berhasil dihapus");
@@ -1635,7 +1636,7 @@ function DashboardContent() {
     if (!selectedSchoolId || !attendanceDate) return;
     try {
       // 1. Simpan absensi mengajar guru
-      await fetch("/api/attendance", {
+      await apiFetch("/api/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1655,7 +1656,7 @@ function DashboardContent() {
           catatan: studentAttRecords[s.id]?.catatan || "",
         }));
 
-        await fetch("/api/attendance", {
+        await apiFetch("/api/attendance", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1707,7 +1708,7 @@ function DashboardContent() {
     reader.onload = async (event) => {
       const text = event.target?.result as string;
       try {
-        const res = await fetch("/api/students/import", {
+        const res = await apiFetch("/api/students/import", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ class_id: selectedClassId, csvContent: text }),
@@ -1761,7 +1762,7 @@ function DashboardContent() {
     reader.onload = async (event) => {
       const text = event.target?.result as string;
       try {
-        const res = await fetch("/api/schedules/import", {
+        const res = await apiFetch("/api/schedules/import", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ school_id: selectedSchoolId, csvContent: text }),
@@ -1802,7 +1803,7 @@ function DashboardContent() {
   const fetchJournalSchemas = async (schoolId: string) => {
     if (!schoolId) return;
     try {
-      const res = await fetch(`/api/journals/schemas?school_id=${schoolId}`).then(r => r.json());
+      const res = await apiFetch(`/api/journals/schemas?school_id=${schoolId}`).then(r => r.json());
       if (Array.isArray(res)) {
         setJournalSchemas(res);
         if (res.length > 0) setActiveSchema(res[0]);
@@ -1816,7 +1817,7 @@ function DashboardContent() {
   const fetchTeacherJournals = async (schoolId: string) => {
     if (!schoolId) return;
     try {
-      const res = await fetch(`/api/journals?school_id=${schoolId}`).then(r => r.json());
+      const res = await apiFetch(`/api/journals?school_id=${schoolId}`).then(r => r.json());
       if (Array.isArray(res)) setJurnalList(res);
     } catch (e) {
       console.error(e);
@@ -1825,7 +1826,7 @@ function DashboardContent() {
 
   const fetchSupervisions = async () => {
     try {
-      const res = await fetch("/api/journals/supervision").then(r => r.json());
+      const res = await apiFetch("/api/journals/supervision").then(r => r.json());
       if (Array.isArray(res)) setSupervisionList(res);
     } catch (e) {
       console.error(e);
@@ -1834,7 +1835,7 @@ function DashboardContent() {
 
   const fetchAllUsers = async () => {
     try {
-      const res = await fetch("/api/users").then(r => r.json());
+      const res = await apiFetch("/api/users").then(r => r.json());
       if (Array.isArray(res)) setAllUsers(res);
     } catch (e) {
       console.error(e);
@@ -1844,7 +1845,7 @@ function DashboardContent() {
   const handleSaveSchema = async () => {
     if (!selectedSchoolId || !schemaNama) return;
     try {
-      const res = await fetch("/api/journals/schemas", {
+      const res = await apiFetch("/api/journals/schemas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1870,7 +1871,7 @@ function DashboardContent() {
   const handleDeleteSchema = async (id: string) => {
     if (!confirm("Hapus format jurnal ini?")) return;
     try {
-      const res = await fetch(`/api/journals/schemas?id=${id}&school_id=${selectedSchoolId}`, {
+      const res = await apiFetch(`/api/journals/schemas?id=${id}&school_id=${selectedSchoolId}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -1916,7 +1917,7 @@ function DashboardContent() {
         supervisor_id: journalSupervisorId || null,
       };
 
-      const res = await fetch("/api/journals", {
+      const res = await apiFetch("/api/journals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -1948,7 +1949,7 @@ function DashboardContent() {
   const handleDeleteJournal = async (id: string) => {
     if (!confirm("Hapus jurnal ini secara permanen?")) return;
     try {
-      const res = await fetch(`/api/journals?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/journals?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         showSuccess("Jurnal berhasil dihapus");
         fetchTeacherJournals(selectedSchoolId);
@@ -2370,7 +2371,7 @@ function DashboardContent() {
       return;
     }
     try {
-      const res = await fetch("/api/journals/supervision", {
+      const res = await apiFetch("/api/journals/supervision", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2409,7 +2410,7 @@ function DashboardContent() {
       const selClass = classes.find(c => c.id === selectedClassId)?.nama_kelas || "";
       const selMapel = subjects.find(s => s.id === selectedSubjectId)?.nama_mapel || "";
       
-      const res = await fetch("/api/journals/ai", {
+      const res = await apiFetch("/api/journals/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2463,7 +2464,7 @@ function DashboardContent() {
   const fetchAcademicCalendar = async (schoolId: string) => {
     if (!schoolId) return;
     try {
-      const res = await fetch(`/api/academic-calendar?school_id=${schoolId}`).then(r => r.json());
+      const res = await apiFetch(`/api/academic-calendar?school_id=${schoolId}`).then(r => r.json());
       if (Array.isArray(res)) setAcademicEvents(res);
     } catch (e) {
       console.error("Gagal memuat kalender akademik:", e);
@@ -2473,7 +2474,7 @@ function DashboardContent() {
   const fetchAssessments = async (schoolId: string, classId: string, subjectId: string) => {
     if (!schoolId || !classId || !subjectId) return;
     try {
-      const res = await fetch(`/api/assessments?school_id=${schoolId}&class_id=${classId}&subject_id=${subjectId}`).then(r => r.json());
+      const res = await apiFetch(`/api/assessments?school_id=${schoolId}&class_id=${classId}&subject_id=${subjectId}`).then(r => r.json());
       if (Array.isArray(res)) setAssessments(res);
     } catch (e) {
       console.error("Gagal memuat daftar asesmen:", e);
@@ -2483,7 +2484,7 @@ function DashboardContent() {
   const fetchStudentGrades = async (assessmentId: string) => {
     if (!assessmentId) return;
     try {
-      const res = await fetch(`/api/assessments/grades?assessment_id=${assessmentId}`).then(r => r.json());
+      const res = await apiFetch(`/api/assessments/grades?assessment_id=${assessmentId}`).then(r => r.json());
       if (Array.isArray(res)) setStudentGrades(res);
     } catch (e) {
       console.error("Gagal memuat nilai siswa:", e);
@@ -2493,7 +2494,7 @@ function DashboardContent() {
   const fetchAnalytics = async (schoolId: string) => {
     if (!schoolId) return;
     try {
-      const res = await fetch(`/api/analytics?school_id=${schoolId}`).then(r => r.json());
+      const res = await apiFetch(`/api/analytics?school_id=${schoolId}`).then(r => r.json());
       setAnalyticsData(res);
     } catch (e) {
       console.error("Gagal memuat data analitik:", e);
@@ -2503,7 +2504,7 @@ function DashboardContent() {
   const fetchSupervisionDocs = async (schoolId: string) => {
     if (!schoolId) return;
     try {
-      const res = await fetch(`/api/admin/supervision/documents?school_id=${schoolId}`).then(r => r.json());
+      const res = await apiFetch(`/api/admin/supervision/documents?school_id=${schoolId}`).then(r => r.json());
       if (Array.isArray(res)) {
         setSupervisionDocsList(res);
       }
@@ -2514,7 +2515,7 @@ function DashboardContent() {
 
   const fetchAuditLogs = async () => {
     try {
-      const res = await fetch("/api/audit-logs").then(r => r.json());
+      const res = await apiFetch("/api/audit-logs").then(r => r.json());
       if (Array.isArray(res)) setAuditLogs(res);
     } catch (e) {
       console.error("Gagal memuat log audit:", e);
@@ -2527,7 +2528,7 @@ function DashboardContent() {
       return;
     }
     try {
-      const res = await fetch("/api/academic-calendar", {
+      const res = await apiFetch("/api/academic-calendar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2559,7 +2560,7 @@ function DashboardContent() {
   const handleDeleteCalendarEvent = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus agenda akademik ini?")) return;
     try {
-      const res = await fetch(`/api/academic-calendar?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/academic-calendar?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         showSuccess("Agenda akademik dihapus!");
         fetchAcademicCalendar(selectedSchoolId);
@@ -2577,7 +2578,7 @@ function DashboardContent() {
       return;
     }
     try {
-      const res = await fetch("/api/assessments", {
+      const res = await apiFetch("/api/assessments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2605,7 +2606,7 @@ function DashboardContent() {
   const handleDeleteAssessment = async (id: string) => {
     if (!confirm("Hapus asesmen ini beserta seluruh nilai siswa di dalamnya?")) return;
     try {
-      const res = await fetch(`/api/assessments?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/assessments?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         showSuccess("Asesmen dihapus!");
         setActiveAssessId("");
@@ -2632,7 +2633,7 @@ function DashboardContent() {
         nilai_remedial: sg.nilai_remedial,
         catatan: sg.catatan
       }));
-      const res = await fetch("/api/assessments/grades", {
+      const res = await apiFetch("/api/assessments/grades", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -2667,7 +2668,7 @@ function DashboardContent() {
       const mapelName = subjects.find(s => s.id === selectedSubjectId)?.nama_mapel || "Mata Pelajaran";
       const kelasName = classes.find(c => c.id === selectedClassId)?.nama_kelas || "Kelas";
 
-      const res = await fetch("/api/assessments/ai", {
+      const res = await apiFetch("/api/assessments/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2730,10 +2731,10 @@ function DashboardContent() {
       if (tahunAjaranId) params.set('tahun_ajaran_id', tahunAjaranId)
 
       const [docs, journals, assessments, dokumenBuktis] = await Promise.all([
-        fetch(`/api/administrasi${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`).then((r) => r.json()),
-        fetch(`/api/journals${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`).then((r) => r.json()),
-        fetch(`/api/assessments${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`).then((r) => r.json()),
-        fetch(`/api/dokumen-bukti?${params.toString()}`).then((r) => r.json())
+        apiFetch(`/api/administrasi${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`).then((r) => r.json()),
+        apiFetch(`/api/journals${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`).then((r) => r.json()),
+        apiFetch(`/api/assessments${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`).then((r) => r.json()),
+        apiFetch(`/api/dokumen-bukti?${params.toString()}`).then((r) => r.json())
       ]);
       if (Array.isArray(docs)) setAllExplorerDocs(docs);
       if (Array.isArray(journals)) setAllExplorerJournals(journals);
@@ -2749,7 +2750,7 @@ function DashboardContent() {
   const fetchExplorerAssessmentGrades = async (assessmentId: string) => {
     setIsLoadingGrades(true);
     try {
-      const res = await fetch(`/api/assessments/grades?assessment_id=${assessmentId}`).then((r) => r.json());
+      const res = await apiFetch(`/api/assessments/grades?assessment_id=${assessmentId}`).then((r) => r.json());
       if (Array.isArray(res)) {
         setExplorerGrades(res);
       } else {
@@ -2811,7 +2812,7 @@ function DashboardContent() {
     }
 
     try {
-      const response = await fetch("/api/user/profile");
+      const response = await apiFetch("/api/user/profile");
       if (response.ok) {
         const data = await response.json();
         setCurrentUser(data);
@@ -2857,7 +2858,7 @@ function DashboardContent() {
 
   const fetchSavedDocs = async () => {
     try {
-      const res = await fetch(`/api/administrasi${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`).then((r) => r.json());
+      const res = await apiFetch(`/api/administrasi${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`).then((r) => r.json());
       if (Array.isArray(res)) {
         const filtered = res.filter((d) =>
           ["rpp", "modul", "silabus", "lkpd", "laporan_lkpd", "bahan_ajar"].includes(d.tipe_dokumen)
@@ -2871,7 +2872,7 @@ function DashboardContent() {
 
   const fetchJournals = async () => {
     try {
-      const res = await fetch(`/api/administrasi?tipe=jurnal${selectedSchoolId ? `&school_id=${selectedSchoolId}` : ''}`).then((r) => r.json());
+      const res = await apiFetch(`/api/administrasi?tipe=jurnal${selectedSchoolId ? `&school_id=${selectedSchoolId}` : ''}`).then((r) => r.json());
       if (Array.isArray(res)) setJurnalList(res);
     } catch (e) {
       console.error(e);
@@ -2880,7 +2881,7 @@ function DashboardContent() {
 
   const fetchChecklist = async () => {
     try {
-      const res = await fetch(`/api/administrasi?tipe=ceklis${selectedSchoolId ? `&school_id=${selectedSchoolId}` : ''}`).then((r) => r.json());
+      const res = await apiFetch(`/api/administrasi?tipe=ceklis${selectedSchoolId ? `&school_id=${selectedSchoolId}` : ''}`).then((r) => r.json());
       if (Array.isArray(res) && res.length > 0 && res[0].konten?.tasks?.length > 0) {
         setCeklisTasks(res[0].konten.tasks);
       } else {
@@ -2899,7 +2900,7 @@ function DashboardContent() {
 
   const fetchKeuangan = async () => {
     try {
-      const res = await fetch("/api/administrasi?tipe=keuangan").then((r) => r.json());
+      const res = await apiFetch("/api/administrasi?tipe=keuangan").then((r) => r.json());
       if (Array.isArray(res) && res.length > 0) {
         const doc = res[0];
         setFinanceDocId(doc.id);
@@ -2921,7 +2922,7 @@ function DashboardContent() {
 
   const saveFinance = async (ledger: any[], savings: any[], investments: any[]) => {
     try {
-      await fetch("/api/administrasi", {
+      await apiFetch("/api/administrasi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2943,7 +2944,7 @@ function DashboardContent() {
 
   const fetchSignatures = async () => {
     try {
-      const response = await fetch("/api/administrasi?tipe=tanda_tangan");
+      const response = await apiFetch("/api/administrasi?tipe=tanda_tangan");
       if (response.ok) {
         const list = await response.json();
         if (list && list.length > 0) {
@@ -2967,7 +2968,7 @@ function DashboardContent() {
 
   const saveSignatures = async () => {
     try {
-      await fetch("/api/administrasi", {
+      await apiFetch("/api/administrasi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3013,7 +3014,7 @@ function DashboardContent() {
 
   const fetchSchedulers = async () => {
     try {
-      const response = await fetch("/api/administrasi?tipe=scheduler");
+      const response = await apiFetch("/api/administrasi?tipe=scheduler");
       if (response.ok) {
         const list = await response.json();
         if (list && list.length > 0) {
@@ -3028,7 +3029,7 @@ function DashboardContent() {
 
   const saveSchedulers = async (updatedList: any[]) => {
     try {
-      await fetch("/api/administrasi", {
+      await apiFetch("/api/administrasi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3073,7 +3074,7 @@ function DashboardContent() {
 
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/api/auth/logout", { method: "POST" });
     signOut({ callbackUrl: "/login" });
   };
 
@@ -3089,7 +3090,7 @@ function DashboardContent() {
     }
     setIsGeneratingDoc(true);
     try {
-      const response = await fetch("/api/generate-administrasi", {
+      const response = await apiFetch("/api/generate-administrasi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3121,7 +3122,7 @@ function DashboardContent() {
     const saveGeneratedDoc = async () => {
     if (!generatedDoc) return;
     try {
-      const response = await fetch("/api/administrasi", {
+      const response = await apiFetch("/api/administrasi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3160,7 +3161,7 @@ function DashboardContent() {
   const updateSavedDoc = async () => {
     if (!viewingDoc) return;
     try {
-      const response = await fetch("/api/administrasi", {
+      const response = await apiFetch("/api/administrasi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3182,7 +3183,7 @@ function DashboardContent() {
   const deleteSavedDoc = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus dokumen ini?")) return;
     try {
-      const response = await fetch(`/api/administrasi?id=${id}`, {
+      const response = await apiFetch(`/api/administrasi?id=${id}`, {
         method: "DELETE"
       });
       if (!response.ok) throw new Error("Gagal menghapus dokumen.");
@@ -3200,7 +3201,7 @@ function DashboardContent() {
       return;
     }
     try {
-      const response = await fetch("/api/administrasi", {
+      const response = await apiFetch("/api/administrasi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3225,7 +3226,7 @@ function DashboardContent() {
   const deleteJournal = async (id: string) => {
     if (!confirm("Hapus jurnal ini?")) return;
     try {
-      await fetch(`/api/administrasi?id=${id}`, { method: "DELETE" });
+      await apiFetch(`/api/administrasi?id=${id}`, { method: "DELETE" });
       showSuccess("Jurnal terhapus.");
       fetchJournals();
     } catch (err: any) {
@@ -3235,7 +3236,7 @@ function DashboardContent() {
 
   const saveChecklist = async (tasksList: any[]) => {
     try {
-      await fetch("/api/administrasi", {
+      await apiFetch("/api/administrasi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3394,7 +3395,7 @@ function DashboardContent() {
     (window as any).__financeChatLoadedKey = undefined;
 
     try {
-      const res = await fetch('/api/administrasi/parse-keuangan', {
+      const res = await apiFetch('/api/administrasi/parse-keuangan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
@@ -3528,7 +3529,7 @@ function DashboardContent() {
     if (!currentUser) return;
     setIsCheckingOut(true);
     try {
-      const response = await fetch("/api/checkout", {
+      const response = await apiFetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan: planType, userId: currentUser.id })
@@ -3584,7 +3585,7 @@ function DashboardContent() {
 
       if (totalSoal <= BATCH_THRESHOLD) {
         setLoadingProgress("Menghubungi GuruPRO AI...");
-        const response = await fetch('/api/generate-soal', {
+        const response = await apiFetch('/api/generate-soal', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
@@ -3623,7 +3624,7 @@ function DashboardContent() {
         
         for (let i = 0; i < batches.length; i++) {
           setLoadingProgress(`Membuat batch ${i + 1} dari ${batches.length}... (${allSoal.length}/${totalSoal} selesai)`);
-          const response = await fetch('/api/generate-soal', {
+          const response = await apiFetch('/api/generate-soal', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(batches[i]),
@@ -3804,7 +3805,7 @@ function DashboardContent() {
         oldSoal
       };
 
-      const response = await fetch('/api/regenerate-soal', {
+      const response = await apiFetch('/api/regenerate-soal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -3863,7 +3864,7 @@ function DashboardContent() {
     setGeneratingImageIndexes(prev => ({ ...prev, [index]: true }));
 
     try {
-      const response = await fetch('/api/generate-image', {
+      const response = await apiFetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description: desc })
@@ -4003,7 +4004,7 @@ function DashboardContent() {
 
     try {
       // Use new R2-enabled API route
-      const response = await fetch("/api/soal/save", {
+      const response = await apiFetch("/api/soal/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -9838,7 +9839,7 @@ const renderJurnalModule = () => {
           url = `/api/dokumen-bukti?id=${file.id}`;
         }
 
-        const response = await fetch(url, { method: "DELETE" });
+        const response = await apiFetch(url, { method: "DELETE" });
         if (response.ok) {
           showSuccess("Berkas berhasil dihapus secara permanen!");
           fetchExplorerData();
@@ -11604,7 +11605,7 @@ const renderJurnalModule = () => {
                       <button
                         onClick={async () => {
                           try {
-                            const response = await fetch("/api/administrasi", {
+                            const response = await apiFetch("/api/administrasi", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({

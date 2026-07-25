@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback, startTransition, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
@@ -105,7 +106,7 @@ function RaportStatusContent() {
       }
 
       try {
-        const res = await fetch('/api/schools');
+        const res = await apiFetch('/api/schools');
         const data = await res.json();
 
         if (!res.ok || !Array.isArray(data)) {
@@ -164,7 +165,7 @@ function RaportStatusContent() {
     if (!schoolId) return;
 
     try {
-      const res = await fetch(`/api/classes?school_id=${schoolId}`);
+      const res = await apiFetch(`/api/classes?school_id=${schoolId}`);
       if (res.ok) {
         const data = await res.json();
         setClasses(data);
@@ -198,7 +199,7 @@ function RaportStatusContent() {
         params.append('periode', selectedPeriode);
       }
 
-      const res = await fetch(`/api/raport/status?${params}`);
+      const res = await apiFetch(`/api/raport/status?${params}`);
       if (!res.ok) {
         throw new Error('Failed to fetch raport status');
       }
@@ -221,7 +222,7 @@ function RaportStatusContent() {
     setSuccess(null);
 
     try {
-      const res = await fetch('/api/raport/status', {
+      const res = await apiFetch('/api/raport/status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

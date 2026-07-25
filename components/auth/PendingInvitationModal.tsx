@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
 import {
@@ -84,7 +85,7 @@ export default function PendingInvitationModal({
         }
 
         // Otherwise check API (for users who registered via form with invitation)
-        const res = await fetch("/api/auth/invitation/pending");
+        const res = await apiFetch("/api/auth/invitation/pending");
         if (res.ok) {
           const data = await res.json();
           if (data.hasPending && data.invitation) {
@@ -111,7 +112,7 @@ export default function PendingInvitationModal({
     setError(null);
 
     try {
-      const res = await fetch("/api/auth/invitation/accept", {
+      const res = await apiFetch("/api/auth/invitation/accept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: localStorageToken }),

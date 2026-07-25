@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { query, logAudit } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { requireSchoolAccess } from '@/lib/school-access';
 import { handleNilaiBerubahSetelahKonfirmasi } from '@/lib/raport/repository';
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
+    const schoolId = searchParams.get('school_id');
     const dataRaportId = searchParams.get('data_raport_id');
+
+    if (schoolId) await requireSchoolAccess(schoolId)
 
     if (!dataRaportId) {
       return NextResponse.json({ error: 'data_raport_id wajib diisi' }, { status: 400 });

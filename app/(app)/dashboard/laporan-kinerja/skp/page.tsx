@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -41,8 +42,8 @@ export default function SkpPlanningPage() {
     setLoading(true)
     try {
       const [indikatorRes, skpRes] = await Promise.all([
-        fetch('/api/indikator-kinerja'),
-        taId ? fetch(`/api/skp?tahun_ajaran_id=${taId}`) : Promise.resolve(null),
+        apiFetch('/api/indikator-kinerja'),
+        taId ? apiFetch(`/api/skp?tahun_ajaran_id=${taId}`) : Promise.resolve(null),
       ])
 
       if (indikatorRes.ok) {
@@ -110,7 +111,7 @@ export default function SkpPlanningPage() {
     setError('')
 
     try {
-      const res = await fetch('/api/skp', {
+      const res = await apiFetch('/api/skp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

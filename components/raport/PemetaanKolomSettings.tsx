@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
 import { IconAlertTriangle, IconCheck, IconLoader2, IconSettings } from "@tabler/icons-react";
@@ -45,7 +46,7 @@ export default function PemetaanKolomSettings({ sekolahId }: PemetaanKolomSettin
   const fetchProfile = async () => {
     setLoading(true);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/raport/pemetaan-kolom?sekolahId=${sekolahId}&jalurRegulasi=${jalurRegulasi}`
       );
       const result = await res.json();
@@ -89,7 +90,7 @@ export default function PemetaanKolomSettings({ sekolahId }: PemetaanKolomSettin
     setMessage(null);
 
     try {
-      const res = await fetch(`/api/raport/pemetaan-kolom`, {
+      const res = await apiFetch(`/api/raport/pemetaan-kolom`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

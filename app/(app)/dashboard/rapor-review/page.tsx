@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback, startTransition, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
@@ -101,7 +102,7 @@ function RapotReviewContent() {
       }
 
       try {
-        const res = await fetch('/api/schools');
+        const res = await apiFetch('/api/schools');
         const data = await res.json();
 
         if (!res.ok || !Array.isArray(data)) {
@@ -162,7 +163,7 @@ function RapotReviewContent() {
     if (!schoolId) return;
 
     try {
-      const res = await fetch(`/api/classes?school_id=${schoolId}`);
+      const res = await apiFetch(`/api/classes?school_id=${schoolId}`);
       if (res.ok) {
         const data = await res.json();
         setClasses(data);
@@ -179,7 +180,7 @@ function RapotReviewContent() {
 
   const fetchGuruMemberId = async () => {
     try {
-      const res = await fetch('/api/raport/guru-member-id');
+      const res = await apiFetch('/api/raport/guru-member-id');
       if (res.ok) {
         const data = await res.json();
         if (data.guru_mapel_member_id) {
@@ -198,7 +199,7 @@ function RapotReviewContent() {
     setSelectedRaport(null);
 
     try {
-      const res = await fetch(`/api/raport/review?kelas_id=${selectedKelas}`);
+      const res = await apiFetch(`/api/raport/review?kelas_id=${selectedKelas}`);
       if (!res.ok) throw new Error('Gagal memuat data raport');
       const data = await res.json();
       setRaports(data);
@@ -222,7 +223,7 @@ function RapotReviewContent() {
     if (mapelToOpen.length > 0) {
       try {
         const promises = mapelToOpen.map(nm =>
-          fetch('/api/raport/nilai-mapel', {
+          apiFetch('/api/raport/nilai-mapel', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -252,7 +253,7 @@ function RapotReviewContent() {
     setError(null);
 
     try {
-      const res = await fetch('/api/raport/generate-deskripsi-capaian', {
+      const res = await apiFetch('/api/raport/generate-deskripsi-capaian', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -280,7 +281,7 @@ function RapotReviewContent() {
         );
         setSelectedRaport({ ...selectedRaport, nilai_mapel: updatedMapel });
 
-        await fetch('/api/raport/nilai-mapel', {
+        await apiFetch('/api/raport/nilai-mapel', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -308,7 +309,7 @@ function RapotReviewContent() {
     setSuccess(null);
 
     try {
-      const res = await fetch('/api/raport/nilai-mapel', {
+      const res = await apiFetch('/api/raport/nilai-mapel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -334,7 +335,7 @@ function RapotReviewContent() {
     setError(null);
 
     try {
-      const res = await fetch('/api/raport/nilai-mapel', {
+      const res = await apiFetch('/api/raport/nilai-mapel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

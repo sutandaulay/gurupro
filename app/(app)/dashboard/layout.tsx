@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
@@ -23,7 +24,7 @@ export default function DashboardLayout({
   useEffect(() => {
     const fetchTokenStatus = async () => {
       try {
-        const res = await fetch("/api/user/token-status");
+        const res = await apiFetch("/api/user/token-status");
         if (res.ok) {
           const data = await res.json();
           setTokenStatus(data);

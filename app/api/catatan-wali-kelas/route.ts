@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { requireSchoolAccess } from '@/lib/school-access';
 import { getPayload } from '@/lib/payload';
 import {
   upsertCatatanWaliKelas,

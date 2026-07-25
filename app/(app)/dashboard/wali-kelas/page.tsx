@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -42,7 +43,7 @@ function WaliKelasDashboardContent() {
     setPeriode(`${year}/${nextYear}-${semester}`);
 
     // Fetch kelas list for current user (wali kelas)
-    fetch('/api/wali-kelas/my-classes')
+    apiFetch('/api/wali-kelas/my-classes')
       .then((res) => res.json())
       .then((data) => {
         if (data.data && data.data.length > 0) {

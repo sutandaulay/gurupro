@@ -2,6 +2,7 @@ import { query, logAudit } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getContextFilters } from "@/lib/session";
+import { requireSchoolAccess } from "@/lib/school-access";
 
 export async function GET(req: Request) {
   try {
@@ -10,13 +11,7 @@ export async function GET(req: Request) {
     const classId = searchParams.get("class_id");
     const subjectId = searchParams.get("subject_id");
 
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
-    if (!sessionCookie) {
-      return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
-    }
-    const session = JSON.parse(sessionCookie);
-    const userId = session.id;
+    if (schoolId) await requireSchoolAccess(schoolId)
     const filters = await getContextFilters(userId);
 
     let res;

@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react';
 
@@ -32,7 +33,7 @@ export default function CatatanWaliKelasForm({
 
   useEffect(() => {
     if (kelasId) {
-      fetch(`/api/students?class_id=${kelasId}`)
+      apiFetch(`/api/students?class_id=${kelasId}`)
         .then((res) => res.json())
         .then((data) => {
           if (data.data) {
@@ -65,7 +66,7 @@ export default function CatatanWaliKelasForm({
     }
 
     try {
-      const res = await fetch('/api/catatan-wali-kelas', {
+      const res = await apiFetch('/api/catatan-wali-kelas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

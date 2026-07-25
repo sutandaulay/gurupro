@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -20,7 +21,7 @@ export default function ApproveSchoolRegistrationPage() {
 
     async function approve() {
       try {
-        const res = await fetch(`/api/public/school-registrations/approve?token=${encodeURIComponent(token)}`, {
+        const res = await apiFetch(`/api/public/school-registrations/approve?token=${encodeURIComponent(token)}`, {
           method: 'GET',
         })
         const data = await res.json()

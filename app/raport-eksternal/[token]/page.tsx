@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
@@ -70,7 +71,7 @@ export default function RaportEksternalPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch(`/api/raport/kontak-eksternal/token/${token}`);
+      const res = await apiFetch(`/api/raport/kontak-eksternal/token/${token}`);
       const result = await res.json();
 
       if (!res.ok) {
@@ -113,7 +114,7 @@ export default function RaportEksternalPage() {
     setOtpError(null);
 
     try {
-      const res = await fetch(`/api/raport/kontak-eksternal/token/${token}/resend-otp`, {
+      const res = await apiFetch(`/api/raport/kontak-eksternal/token/${token}/resend-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ channel: data?.kontak.kontakWA ? "whatsapp" : "email" }),
@@ -143,7 +144,7 @@ export default function RaportEksternalPage() {
     setOtpError(null);
 
     try {
-      const res = await fetch(`/api/raport/kontak-eksternal/token/${token}/verify-otp`, {
+      const res = await apiFetch(`/api/raport/kontak-eksternal/token/${token}/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ otpCode, kontakId: data?.kontak.id }),
@@ -170,7 +171,7 @@ export default function RaportEksternalPage() {
     setOtpError(null);
 
     try {
-      const res = await fetch(`/api/raport/kontak-eksternal/token/${token}/resend-otp`, {
+      const res = await apiFetch(`/api/raport/kontak-eksternal/token/${token}/resend-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ channel: data?.kontak.kontakWA ? "whatsapp" : "email" }),
@@ -192,7 +193,7 @@ export default function RaportEksternalPage() {
     setExportLoading(true);
 
     try {
-      const res = await fetch(`/api/raport/eksternal/generate-pdf`, {
+      const res = await apiFetch(`/api/raport/eksternal/generate-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -222,7 +223,7 @@ export default function RaportEksternalPage() {
     setExportWarning(null);
 
     try {
-      const res = await fetch(`/api/raport/eksternal/generate-excel`, {
+      const res = await apiFetch(`/api/raport/eksternal/generate-excel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
@@ -50,7 +51,7 @@ function MockCheckoutContent() {
     try {
       const pmLabel = paymentMethod === "qris" ? "QRIS" : "VIRTUAL_ACCOUNT";
       // Call mock checkout API to verify transaction and grant tokens
-      const response = await fetch(`/api/checkout/mock?invoice_id=${invoiceId}&userId=${userId}&payment_method=${pmLabel}`, {
+      const response = await apiFetch(`/api/checkout/mock?invoice_id=${invoiceId}&userId=${userId}&payment_method=${pmLabel}`, {
         method: "GET",
       });
 

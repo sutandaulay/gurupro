@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -28,7 +29,7 @@ export default function ApprovalRppPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/administrasi/pending-approval", { cache: "no-store" });
+      const res = await apiFetch("/api/administrasi/pending-approval", { cache: "no-store" });
       if (res.status === 403) {
         setError("Halaman ini hanya untuk Kepala Sekolah atau Wakasek.");
         setDocs([]);
@@ -53,7 +54,7 @@ export default function ApprovalRppPage() {
     }
     setProcessingId(id);
     try {
-      const res = await fetch(`/api/administrasi/${id}/approve`, {
+      const res = await apiFetch(`/api/administrasi/${id}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ aksi, catatan: note[id] || null }),

@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -100,7 +101,7 @@ export default function TambahDokumenPage() {
       fd.append('tahun_ajaran_id', tahunAjaranId)
       fd.append('sekolah_id', activeSchoolId)
 
-      const res = await fetch('/api/dokumen-bukti', {
+      const res = await apiFetch('/api/dokumen-bukti', {
         method: 'POST',
         body: fd,
       })

@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -90,7 +91,7 @@ export default function AttendanceReportsPage() {
         
         // Simulasi API call untuk mendapatkan laporan presensi
         // Dalam implementasi nyata, ini akan memanggil API endpoint
-        const response = await fetch('/api/attendance/reports', {
+        const response = await apiFetch('/api/attendance/reports', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',

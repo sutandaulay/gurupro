@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -63,7 +64,7 @@ export default function TPGReportPage() {
     setCrossLoading(true);
     setCrossError(null);
     try {
-      const res = await fetch("/api/attendance/tpg-reports-cross-institution", { cache: "no-store" });
+      const res = await apiFetch("/api/attendance/tpg-reports-cross-institution", { cache: "no-store" });
       if (!res.ok) throw new Error("Gagal memuat agregat lintas institusi");
       const data = await res.json();
       setCrossData(data);
@@ -83,7 +84,7 @@ export default function TPGReportPage() {
         
         // Simulasi API call untuk mendapatkan laporan TPG
         // Dalam implementasi nyata, ini akan memanggil API endpoint
-        const response = await fetch('/api/attendance/tpg-reports', {
+        const response = await apiFetch('/api/attendance/tpg-reports', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -177,7 +178,7 @@ export default function TPGReportPage() {
     setGeneratingInsight(true);
     try {
       // Simulasi API call untuk generate insight
-      const response = await fetch('/api/attendance/insight', {
+      const response = await apiFetch('/api/attendance/insight', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

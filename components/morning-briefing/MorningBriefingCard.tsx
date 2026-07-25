@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
 
@@ -19,7 +20,7 @@ export default function MorningBriefingCard() {
     let cancelled = false;
     const fetchBriefing = async () => {
       try {
-        const res = await fetch("/api/morning-briefing", { cache: "no-store" });
+        const res = await apiFetch("/api/morning-briefing", { cache: "no-store" });
         if (!res.ok) throw new Error("Gagal memuat briefing");
         const data = await res.json();
         if (cancelled) return;
@@ -41,7 +42,7 @@ export default function MorningBriefingCard() {
   const handleDismiss = async () => {
     setDismissed(true);
     try {
-      await fetch("/api/morning-briefing", {
+      await apiFetch("/api/morning-briefing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "dismiss" }),
@@ -55,7 +56,7 @@ export default function MorningBriefingCard() {
     const next = !enabled;
     setEnabled(next);
     try {
-      await fetch("/api/morning-briefing", {
+      await apiFetch("/api/morning-briefing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "toggle_preference", enabled: next }),

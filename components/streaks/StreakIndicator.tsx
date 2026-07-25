@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
 
@@ -32,7 +33,7 @@ export default function StreakIndicator() {
 
     const fetchStreak = async () => {
       try {
-        const res = await fetch("/api/streaks", { cache: "no-store" });
+        const res = await apiFetch("/api/streaks", { cache: "no-store" });
         if (!res.ok) throw new Error("Gagal memuat streak");
         const data = await res.json();
         if (!cancelled) setStreak(data);

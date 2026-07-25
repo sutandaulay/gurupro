@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -79,7 +80,7 @@ function PengembanganDiriContent() {
       }
 
       // Fetch Pelatihan
-      const res = await fetch(`/api/pelatihan?${params}`)
+      const res = await apiFetch(`/api/pelatihan?${params}`)
       const data = await res.json()
 
       if (res.ok) {
@@ -88,7 +89,7 @@ function PengembanganDiriContent() {
       }
 
       // Fetch Dokumen Bukti (Other Documents)
-      const docRes = await fetch(`/api/dokumen-bukti?${params}`)
+      const docRes = await apiFetch(`/api/dokumen-bukti?${params}`)
       if (docRes.ok) {
         const docData = await docRes.json()
         setDocuments(docData || [])
@@ -118,7 +119,7 @@ function PengembanganDiriContent() {
     if (!confirm('Yakin ingin menghapus pelatihan ini?')) return
 
     try {
-      const res = await fetch(`/api/pelatihan/${id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/pelatihan/${id}`, { method: 'DELETE' })
       if (res.ok) {
         setPelatihan(prev => prev.filter(p => p.id !== id))
       }

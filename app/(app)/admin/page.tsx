@@ -1,4 +1,5 @@
 "use client";
+import { apiFetch } from "@/lib/api-client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { signOut } from "next-auth/react";
@@ -153,7 +154,7 @@ function AdminPageContent() {
 
     setIsSendingNotification(true);
     try {
-      const res = await fetch("/api/admin/notifications", {
+      const res = await apiFetch("/api/admin/notifications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -227,7 +228,7 @@ function AdminPageContent() {
       const controller = new AbortController();
       try {
         const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const res = await fetch("/api/admin/notifications?limit=5", { signal: controller.signal });
+        const res = await apiFetch("/api/admin/notifications?limit=5", { signal: controller.signal });
         clearTimeout(timeoutId);
         if (res.ok) {
           const data = await res.json();
@@ -287,7 +288,7 @@ function AdminPageContent() {
   const fetchUsers = async (queryStr = "") => {
     setIsLoadingUsers(true);
     try {
-      const res = await fetch(`/api/admin/users?q=${encodeURIComponent(queryStr)}`);
+      const res = await apiFetch(`/api/admin/users?q=${encodeURIComponent(queryStr)}`);
       if (res.ok) {
         const data = await res.json();
         setUsers(data);
@@ -310,7 +311,7 @@ function AdminPageContent() {
   const fetchTransactions = async (queryStr = "") => {
     setIsLoadingTx(true);
     try {
-      const res = await fetch(`/api/admin/transactions?q=${encodeURIComponent(queryStr)}&includeStats=true`);
+      const res = await apiFetch(`/api/admin/transactions?q=${encodeURIComponent(queryStr)}&includeStats=true`);
       if (res.ok) {
         const data = await res.json();
         // Support both old format (array) and new format (object with transactions key)
@@ -343,7 +344,7 @@ function AdminPageContent() {
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/api/auth/logout", { method: "POST" });
     signOut({ callbackUrl: "/login" });
   };
 
@@ -374,7 +375,7 @@ function AdminPageContent() {
   const saveUserConfig = async (userId: any) => {
     setIsSavingUser(true);
     try {
-      const res = await fetch("/api/admin/users", {
+      const res = await apiFetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -416,7 +417,7 @@ function AdminPageContent() {
 
     setIsRefunding((prev) => ({ ...prev, [txId]: true }));
     try {
-      const res = await fetch("/api/admin/transactions", {
+      const res = await apiFetch("/api/admin/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transactionId: txId, action: "refund" }),
@@ -448,7 +449,7 @@ function AdminPageContent() {
 
     setIsRefunding((prev) => ({ ...prev, [txId]: true }));
     try {
-      const res = await fetch("/api/admin/transactions", {
+      const res = await apiFetch("/api/admin/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transactionId: txId, action: "activate" }),
@@ -476,7 +477,7 @@ function AdminPageContent() {
   const fetchSettings = async () => {
     setIsLoadingSettings(true);
     try {
-      const res = await fetch("/api/admin/settings");
+      const res = await apiFetch("/api/admin/settings");
       if (res.ok) {
         const data = await res.json();
         setPgConfig(data.paymentGateway);
@@ -500,7 +501,7 @@ function AdminPageContent() {
   const fetchRatioHistory = async () => {
     setIsLoadingRatio(true);
     try {
-      const res = await fetch("/api/admin/poin-ratio-audit");
+      const res = await apiFetch("/api/admin/poin-ratio-audit");
       if (res.ok) {
         const data = await res.json();
         setRatioHistory(data.audits || []);
@@ -537,7 +538,7 @@ function AdminPageContent() {
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      const res = await fetch("/api/admin/settings", {
+      const res = await apiFetch("/api/admin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, data })
@@ -576,7 +577,7 @@ function AdminPageContent() {
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      const res = await fetch("/api/admin/settings", {
+      const res = await apiFetch("/api/admin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -630,7 +631,7 @@ function AdminPageContent() {
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      const res = await fetch("/api/admin/settings", {
+      const res = await apiFetch("/api/admin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -663,7 +664,7 @@ function AdminPageContent() {
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      const res = await fetch("/api/admin/settings", {
+      const res = await apiFetch("/api/admin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -692,7 +693,7 @@ function AdminPageContent() {
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      const res = await fetch("/api/admin/settings", {
+      const res = await apiFetch("/api/admin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -719,7 +720,7 @@ function AdminPageContent() {
   const fetchReferralsList = async () => {
     setIsLoadingReferrals(true);
     try {
-      const res = await fetch("/api/admin/referrals");
+      const res = await apiFetch("/api/admin/referrals");
       if (res.ok) {
         const data = await res.json();
         setReferralsList(data);
@@ -739,7 +740,7 @@ function AdminPageContent() {
 
     setIsProcessingPayout((prev) => ({ ...prev, [email]: true }));
     try {
-      const res = await fetch("/api/admin/referrals", {
+      const res = await apiFetch("/api/admin/referrals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -767,7 +768,7 @@ function AdminPageContent() {
   const fetchPayoutRequestsList = async () => {
     setIsLoadingPayouts(true);
     try {
-      const res = await fetch("/api/admin/referrals/payouts");
+      const res = await apiFetch("/api/admin/referrals/payouts");
       if (res.ok) {
         const data = await res.json();
         setPayoutRequestsList(data);
@@ -787,7 +788,7 @@ function AdminPageContent() {
 
     setIsProcessingAdminPayout((prev) => ({ ...prev, [requestId]: true }));
     try {
-      const res = await fetch("/api/admin/referrals/payouts", {
+      const res = await apiFetch("/api/admin/referrals/payouts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId, status }),
