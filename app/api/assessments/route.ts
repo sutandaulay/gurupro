@@ -11,20 +11,24 @@ export async function GET(req: Request) {
     const classId = searchParams.get("class_id");
     const subjectId = searchParams.get("subject_id");
 
-    if (schoolId) await requireSchoolAccess(schoolId)
+    if (!schoolId) {
+      return NextResponse.json({ error: "school_id wajib diisi" }, { status: 400 });
+    }
+
+    const { userId } = await requireSchoolAccess(schoolId)
     const filters = await getContextFilters(userId);
 
     let res;
-    if (!schoolId || !classId || !subjectId) {
+    if (!classId || !subjectId) {
       res = await query(
         `SELECT a.*, c.nama_kelas, sb.nama_mapel, s.nama_sekolah
          FROM assessments a
          JOIN classes c ON a.class_id = c.id
          JOIN subjects sb ON a.subject_id = sb.id
          JOIN schools s ON a.school_id = s.id
-         WHERE s.user_id = $1
+         WHERE a.school_id = $1
          ORDER BY a.created_at DESC`,
-        [userId]
+        [schoolId]
       );
     } else {
       res = await query(
@@ -56,8 +60,9 @@ export async function GET(req: Request) {
 
     return NextResponse.json(rows);
   } catch (error: any) {
+    const status = error.message === "Forbidden" ? 403 : error.message === "Unauthorized" ? 401 : 500;
     console.error("Assessments GET error:", error);
-    return NextResponse.json({ error: error.message || "Gagal memuat asesmen." }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Gagal memuat asesmen." }, { status });
   }
 }
 

@@ -620,8 +620,6 @@ function DashboardContent() {
   const [schPengawas, setSchPengawas] = useState<string>("");
   const [schNipKepala, setSchNipKepala] = useState<string>("");
   const [schNipPengawas, setSchNipPengawas] = useState<string>("");
-  const [schWaliKelas, setSchWaliKelas] = useState<string>("");
-  const [schNipWali, setSchNipWali] = useState<string>("");
   const [schShowTtdKepala, setSchShowTtdKepala] = useState<boolean>(true);
   const [schShowTtdPengawas, setSchShowTtdPengawas] = useState<boolean>(true);
   const [schShowTtdWali, setSchShowTtdWali] = useState<boolean>(true);
@@ -631,9 +629,13 @@ function DashboardContent() {
   // Form Inputs Tambah Kelas/Mapel/Siswa/Jadwal
   const [newClassName, setNewClassName] = useState<string>("");
   const [newClassWali, setNewClassWali] = useState<string>("");
+  const [newClassWaliNip, setNewClassWaliNip] = useState<string>("");
   const [newClassWaliUser, setNewClassWaliUser] = useState<boolean>(false);
   const [editingClassId, setEditingClassId] = useState<string>("");
   const [newSubjectName, setNewSubjectName] = useState<string>("");
+  const [editingSubjectId, setEditingSubjectId] = useState<string>("");
+  const [editingSubjectName, setEditingSubjectName] = useState<string>("");
+  const [editingStudentId, setEditingStudentId] = useState<string>("");
   const [newStudentName, setNewStudentName] = useState<string>("");
   const [newStudentNisn, setNewStudentNisn] = useState<string>("");
   const [newStudentAbsen, setNewStudentAbsen] = useState<string>("");
@@ -646,6 +648,7 @@ function DashboardContent() {
   const [schDay, setSchDay] = useState<string>("Senin");
   const [schStart, setSchStart] = useState<string>("07:30");
   const [schEnd, setSchEnd] = useState<string>("09:00");
+  const [editingScheduleId, setEditingScheduleId] = useState<string>("");
 
   // Presensi States
   const [teacherStatus, setTeacherStatus] = useState<string>("Hadir");
@@ -691,9 +694,10 @@ function DashboardContent() {
   };
 
   // Fetch tahun ajaran list
-  const fetchTahunAjaran = async () => {
+  const fetchTahunAjaran = async (overrideSchoolId?: string) => {
     try {
-      const params = selectedSchoolId ? `?sekolah_id=${selectedSchoolId}` : ''
+      const schoolId = overrideSchoolId ?? selectedSchoolId
+      const params = schoolId ? `?school_id=${schoolId}` : ''
       const res = await apiFetch(`/api/tahun-ajaran${params}`);
       if (res.ok) {
         const data = await res.json();
@@ -738,6 +742,10 @@ function DashboardContent() {
       alert('Nama tahun ajaran wajib diisi');
       return;
     }
+    if (!selectedSchoolId) {
+      alert('Pilih sekolah terlebih dahulu sebelum membuat Tahun Ajaran');
+      return;
+    }
     try {
       console.log('Creating TA:', tahunAjaranForm);
       const res = await apiFetch('/api/tahun-ajaran', {
@@ -747,7 +755,7 @@ function DashboardContent() {
           nama: tahunAjaranForm.nama,
           tanggalMulai: tahunAjaranForm.tanggalMulai,
           tanggalSelesai: tahunAjaranForm.tanggalSelesai,
-          sekolahId: selectedSchoolId || null,
+          sekolahId: selectedSchoolId,
         }),
       });
 
@@ -771,15 +779,13 @@ function DashboardContent() {
     }
   };
 
-  // Load on mount
-  useEffect(() => { fetchTahunAjaran(); }, []);
-
   // Listen to school changes from global TopBar
   useEffect(() => {
     const handleGlobalSchoolChange = () => {
       const savedSchoolId = typeof window !== "undefined" ? sessionStorage.getItem("gurupro_school_selected") : null;
       if (savedSchoolId) {
         setSelectedSchoolId(savedSchoolId);
+        fetchTahunAjaran(savedSchoolId);
       }
     };
     window.addEventListener("gurupro_school_changed", handleGlobalSchoolChange);
@@ -1261,6 +1267,8 @@ function DashboardContent() {
       fetchJournalSchemas(selectedSchoolId);
       // eslint-disable-next-line react-hooks/immutability
       fetchTeacherJournals(selectedSchoolId);
+      // eslint-disable-next-line react-hooks/immutability
+      fetchTahunAjaran(selectedSchoolId);
       fetchEkskul();
     } else {
       setClasses([]);
@@ -1268,6 +1276,7 @@ function DashboardContent() {
       setSchedules([]);
       setJournalSchemas([]);
       setJurnalList([]);
+      setTahunAjaranList([]);
       setEkskulList([]);
     }
   }, [selectedSchoolId]);
@@ -1353,8 +1362,6 @@ function DashboardContent() {
           nama_pengawas: schPengawas,
           nip_kepala_sekolah: schNipKepala,
           nip_pengawas: schNipPengawas,
-          nama_wali_kelas: schWaliKelas,
-          nip_wali_kelas: schNipWali,
           show_ttd_kepala: schShowTtdKepala,
           show_ttd_pengawas: schShowTtdPengawas,
           show_ttd_wali: schShowTtdWali
@@ -1371,8 +1378,6 @@ function DashboardContent() {
         setSchPengawas("");
         setSchNipKepala("");
         setSchNipPengawas("");
-        setSchWaliKelas("");
-        setSchNipWali("");
         setSchShowTtdKepala(true);
         setSchShowTtdPengawas(true);
         setSchShowTtdWali(true);
@@ -1404,6 +1409,7 @@ function DashboardContent() {
 
   const handleAddClass = async () => {
     if (!newClassName || !selectedSchoolId) return;
+    if (!newClassWali) { showError("Wali kelas wajib diisi"); return; }
     if (isSubscriptionExpired()) {
       if (classes.length >= 2 && !editingClassId) {
         showError("Masa aktif langganan habis. Anda hanya dapat membuat maksimal 2 kelas. Perbarui paket untuk akses tanpa batas.");
@@ -1419,12 +1425,14 @@ function DashboardContent() {
           school_id: selectedSchoolId,
           nama_kelas: newClassName,
           wali_kelas: newClassWali,
+          wali_kelas_nip: newClassWaliNip,
           wali_kelas_user_id: newClassWaliUser ? currentUser?.id : null,
         }),
       });
       if (res.ok) {
         setNewClassName("");
         setNewClassWali("");
+        setNewClassWaliNip("");
         setNewClassWaliUser(false);
         setEditingClassId("");
         fetchClasses(selectedSchoolId);
@@ -1454,17 +1462,23 @@ function DashboardContent() {
   const handleAddSubject = async () => {
     if (!newSubjectName || !selectedSchoolId) return;
     try {
+      const isEdit = !!editingSubjectId;
       const res = await apiFetch("/api/subjects", {
-        method: "POST",
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ school_id: selectedSchoolId, nama_mapel: newSubjectName }),
+        body: JSON.stringify(
+          isEdit
+            ? { id: editingSubjectId, nama_mapel: newSubjectName }
+            : { school_id: selectedSchoolId, nama_mapel: newSubjectName }
+        ),
       });
       if (res.ok) {
         setNewSubjectName("");
+        setEditingSubjectId("");
         fetchSubjects(selectedSchoolId);
-        showSuccess("Mata pelajaran berhasil ditambahkan");
+        showSuccess(isEdit ? "Mata pelajaran berhasil diperbarui!" : "Mata pelajaran berhasil ditambahkan");
       } else {
-        showError("Gagal menambahkan mata pelajaran");
+        showError(isEdit ? "Gagal memperbarui mata pelajaran" : "Gagal menambahkan mata pelajaran");
       }
     } catch (e) {
       showError("Koneksi bermasalah");
@@ -1534,7 +1548,7 @@ function DashboardContent() {
   const handleDeleteEkskul = async (id: string) => {
     if (!confirm("Hapus ekstrakurikuler ini?")) return;
     try {
-      const res = await apiFetch(`/api/ekstrakurikuler?id=${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/ekstrakurikuler?id=${id}&school_id=${selectedSchoolId}`, { method: "DELETE" });
       if (res.ok) {
         fetchEkskul();
         showSuccess("Ekstrakurikuler berhasil dihapus");
@@ -1546,17 +1560,19 @@ function DashboardContent() {
 
   const handleAddStudent = async () => {
     if (!newStudentName || !selectedClassId) return;
-    if (isSubscriptionExpired()) {
+    if (!editingStudentId && isSubscriptionExpired()) {
       if (students.length >= 5) {
         showError("Masa aktif langganan habis. Anda hanya dapat menambahkan maksimal 5 siswa per kelas. Perbarui paket untuk akses tanpa batas.");
         return;
       }
     }
     try {
+      const isEdit = !!editingStudentId;
       const res = await apiFetch("/api/students", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ...(isEdit ? { id: editingStudentId } : {}),
           class_id: selectedClassId,
           nama_siswa: newStudentName,
           nisn: newStudentNisn,
@@ -1567,10 +1583,11 @@ function DashboardContent() {
         setNewStudentName("");
         setNewStudentNisn("");
         setNewStudentAbsen("");
+        setEditingStudentId("");
         fetchStudents(selectedClassId);
-        showSuccess("Siswa berhasil ditambahkan");
+        showSuccess(isEdit ? "Siswa berhasil diperbarui!" : "Siswa berhasil ditambahkan");
       } else {
-        showError("Gagal menambahkan siswa");
+        showError(isEdit ? "Gagal memperbarui siswa" : "Gagal menambahkan siswa");
       }
     } catch (e) {
       showError("Koneksi bermasalah");
@@ -1596,23 +1613,22 @@ function DashboardContent() {
       return;
     }
     try {
+      const isEdit = !!editingScheduleId;
       const res = await apiFetch("/api/schedules", {
-        method: "POST",
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          school_id: selectedSchoolId,
-          class_id: selectedClassId,
-          subject_id: selectedSubjectId,
-          hari: schDay,
-          jam_mulai: schStart,
-          jam_selesai: schEnd,
-        }),
+        body: JSON.stringify(
+          isEdit
+            ? { id: editingScheduleId, class_id: selectedClassId, subject_id: selectedSubjectId, hari: schDay, jam_mulai: schStart, jam_selesai: schEnd }
+            : { school_id: selectedSchoolId, class_id: selectedClassId, subject_id: selectedSubjectId, hari: schDay, jam_mulai: schStart, jam_selesai: schEnd }
+        ),
       });
       if (res.ok) {
+        setEditingScheduleId("");
         fetchSchedules(selectedSchoolId);
-        showSuccess("Jadwal berhasil ditambahkan");
+        showSuccess(isEdit ? "Jadwal berhasil diperbarui!" : "Jadwal berhasil ditambahkan");
       } else {
-        showError("Gagal menambahkan jadwal");
+        showError(isEdit ? "Gagal memperbarui jadwal" : "Gagal menambahkan jadwal");
       }
     } catch (e) {
       showError("Koneksi bermasalah");
@@ -1835,7 +1851,7 @@ function DashboardContent() {
 
   const fetchAllUsers = async () => {
     try {
-      const res = await apiFetch("/api/users").then(r => r.json());
+      const res = await apiFetch(`/api/users?school_id=${selectedSchoolId}`).then(r => r.json());
       if (Array.isArray(res)) setAllUsers(res);
     } catch (e) {
       console.error(e);
@@ -2034,8 +2050,8 @@ function DashboardContent() {
             <p>&nbsp;</p>
             <p style="font-weight: bold;">Wali Kelas</p>
             <div style="height: 60px;"></div>
-            <p style="text-decoration: underline; font-weight: bold;">( ${school.nama_wali_kelas || waliName} )</p>
-            <p style="font-size: 10px; color: #555;">NIP: ${school.nip_wali_kelas || "..........................................."}</p>
+            <p style="text-decoration: underline; font-weight: bold;">( ${waliName || school.nama_wali_kelas} )</p>
+            <p style="font-size: 10px; color: #555;">NIP: ${clsObj?.wali_kelas_nip || school.nip_wali_kelas || "..........................................."}</p>
           </div>
         `;
       }
@@ -2249,7 +2265,7 @@ function DashboardContent() {
             <p>&nbsp;</p>
             <p style="font-weight: bold; margin-top: 0;">Wali Kelas</p>
             <div style="height: 60px;"></div>
-            <p style="text-decoration: underline; font-weight: bold;">( ${school.nama_wali_kelas || uniqueWaliKelas} )</p>
+            <p style="text-decoration: underline; font-weight: bold;">( ${uniqueWaliKelas || school.nama_wali_kelas} )</p>
             <p style="margin: 0; font-size: 8pt; color: #555;">NIP: ${school.nip_wali_kelas || "......................................."}</p>
           </div>
         `;
@@ -2484,7 +2500,7 @@ function DashboardContent() {
   const fetchStudentGrades = async (assessmentId: string) => {
     if (!assessmentId) return;
     try {
-      const res = await apiFetch(`/api/assessments/grades?assessment_id=${assessmentId}`).then(r => r.json());
+      const res = await apiFetch(`/api/assessments/grades?assessment_id=${assessmentId}&school_id=${selectedSchoolId}`).then(r => r.json());
       if (Array.isArray(res)) setStudentGrades(res);
     } catch (e) {
       console.error("Gagal memuat nilai siswa:", e);
@@ -2750,7 +2766,7 @@ function DashboardContent() {
   const fetchExplorerAssessmentGrades = async (assessmentId: string) => {
     setIsLoadingGrades(true);
     try {
-      const res = await apiFetch(`/api/assessments/grades?assessment_id=${assessmentId}`).then((r) => r.json());
+      const res = await apiFetch(`/api/assessments/grades?assessment_id=${assessmentId}&school_id=${selectedSchoolId}`).then((r) => r.json());
       if (Array.isArray(res)) {
         setExplorerGrades(res);
       } else {
@@ -4884,6 +4900,7 @@ function DashboardContent() {
                       setTabSekolah(tab.id as any);
                     }
                   }}
+                  title={isLocked ? "Aktifkan Tahun Ajaran terlebih dahulu di tab TA" : tab.label}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
                     isLocked ? "cursor-not-allowed opacity-50" : "cursor-pointer"
                   } ${
@@ -4921,12 +4938,13 @@ function DashboardContent() {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-slate-500 block mb-1">NPSN</label>
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1">NPSN <span className="text-rose-500">*</span></label>
                   <input
                     type="text"
                     value={schNpsn}
                     onChange={(e) => setSchNpsn(e.target.value)}
                     placeholder="Masukkan Nomor Pokok Sekolah Nasional"
+                    required
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800"
                   />
                   {foundInstitution && (
@@ -4988,28 +5006,6 @@ function DashboardContent() {
                     value={schNipPengawas}
                     onChange={(e) => setSchNipPengawas(e.target.value)}
                     placeholder="Masukkan NIP Pengawas Pembina"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 block mb-1">Nama Wali Kelas (Default)</label>
-                  <input
-                    type="text"
-                    value={schWaliKelas}
-                    onChange={(e) => setSchWaliKelas(e.target.value)}
-                    placeholder="Contoh: Siti Aminah, S.Pd."
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 block mb-1">NIP Wali Kelas (Default)</label>
-                  <input
-                    type="text"
-                    value={schNipWali}
-                    onChange={(e) => setSchNipWali(e.target.value)}
-                    placeholder="Masukkan NIP Wali Kelas"
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800"
                   />
                 </div>
@@ -5181,8 +5177,6 @@ function DashboardContent() {
                                 setSchPengawas(sch.nama_pengawas || "");
                                 setSchNipKepala(sch.nip_kepala_sekolah || "");
                                 setSchNipPengawas(sch.nip_pengawas || "");
-                                setSchWaliKelas(sch.nama_wali_kelas || "");
-                                setSchNipWali(sch.nip_wali_kelas || "");
                                 setSchShowTtdKepala(sch.show_ttd_kepala !== false);
                                 setSchShowTtdPengawas(sch.show_ttd_pengawas !== false);
                                 setSchShowTtdWali(sch.show_ttd_wali !== false);
@@ -5237,12 +5231,23 @@ function DashboardContent() {
                         />
                       </div>
                       <div>
-                        <label className="text-[9px] font-bold text-slate-400 block mb-0.5">Wali Kelas (Opsional)</label>
+                        <label className="text-[9px] font-bold text-slate-400 block mb-0.5">Wali Kelas <span className="text-rose-500">*</span></label>
                         <input
                           type="text"
                           value={newClassWali}
                           onChange={(e) => setNewClassWali(e.target.value)}
                           placeholder="Contoh: Budi Cahyono, S.Pd."
+                          required
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-semibold text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 block mb-0.5">NIP Wali Kelas</label>
+                        <input
+                          type="text"
+                          value={newClassWaliNip}
+                          onChange={(e) => setNewClassWaliNip(e.target.value)}
+                          placeholder="Masukkan NIP Wali Kelas"
                           className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-semibold text-slate-800"
                         />
                       </div>
@@ -5266,6 +5271,7 @@ function DashboardContent() {
                             setEditingClassId("");
                             setNewClassName("");
                             setNewClassWali("");
+                            setNewClassWaliNip("");
                             setNewClassWaliUser(false);
                           }}
                           className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-bold transition cursor-pointer"
@@ -5292,7 +5298,7 @@ function DashboardContent() {
                           <div className="space-y-0.5">
                             <span className="text-xs font-bold text-slate-800 block">{cls.nama_kelas}</span>
                             {cls.wali_kelas && (
-                              <span className="text-[9px] font-semibold text-indigo-600 block">Wali Kelas: {cls.wali_kelas}</span>
+                              <span className="text-[9px] font-semibold text-indigo-600 block">Wali Kelas: {cls.wali_kelas}{cls.wali_kelas_nip ? ` (NIP: ${cls.wali_kelas_nip})` : ''}</span>
                             )}
                           </div>
                           <div className="flex gap-1.5">
@@ -5302,6 +5308,7 @@ function DashboardContent() {
                                   setEditingClassId(cls.id);
                                   setNewClassName(cls.nama_kelas);
                                   setNewClassWali(cls.wali_kelas || "");
+                                  setNewClassWaliNip(cls.wali_kelas_nip || "");
                                   setNewClassWaliUser(!!cls.wali_kelas_user_id);
                                 }}
                                 className="p-1 hover:bg-slate-200 border border-transparent text-indigo-600 rounded-lg text-xs cursor-pointer"
@@ -5336,12 +5343,21 @@ function DashboardContent() {
                       placeholder="Mata Pelajaran (Contoh: Matematika Wajib)"
                       className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs focus:border-indigo-400 focus:outline-none bg-white font-medium text-slate-800"
                     />
+                    {editingSubjectId && (
+                      <button
+                        type="button"
+                        onClick={() => { setEditingSubjectId(""); setNewSubjectName(""); }}
+                        className="px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-bold transition cursor-pointer shrink-0"
+                      >
+                        Batal
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleAddSubject}
                       className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-md shadow-indigo-100 cursor-pointer shrink-0"
                     >
-                      Tambah Mapel
+                      {editingSubjectId ? "Simpan Perubahan" : "Tambah Mapel"}
                     </button>
                   </div>
 
@@ -5352,14 +5368,27 @@ function DashboardContent() {
                       subjects.map((sb) => (
                         <div key={sb.id} className="flex justify-between items-center bg-slate-50 hover:bg-slate-100/70 border border-slate-100 px-3.5 py-2 rounded-xl transition">
                           <span className="text-xs font-semibold text-slate-800">{sb.nama_mapel}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteSubject(sb.id)}
-                            className="text-rose-500 hover:text-rose-700 text-xs cursor-pointer p-1"
-                            title="Hapus"
-                          >
-                            🗑️
-                          </button>
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingSubjectId(sb.id);
+                                setNewSubjectName(sb.nama_mapel);
+                              }}
+                              className="p-1 hover:bg-slate-200 border border-transparent text-indigo-600 rounded-lg text-xs cursor-pointer"
+                              title="Ubah"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSubject(sb.id)}
+                              className="p-1 hover:bg-slate-200 border border-transparent text-rose-500 rounded-lg text-xs cursor-pointer"
+                              title="Hapus"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </div>
                       ))
                     )}
@@ -5451,16 +5480,16 @@ function DashboardContent() {
                     ekskulList.map((ekskul) => (
                       <div key={ekskul.id} className="flex justify-between items-center bg-slate-50 hover:bg-slate-100/70 border border-slate-100 px-3.5 py-2.5 rounded-xl transition">
                         <div className="space-y-0.5">
-                          <span className="text-xs font-bold text-slate-800 block">{ekskul.nama_ekskul}</span>
-                          <span className="text-[9px] font-semibold text-slate-500 block">{ekskul.nama_kelas || "-"}</span>
+                          <span className="text-xs font-bold text-slate-800 block">{ekskul.namaEkskul}</span>
+                          <span className="text-[9px] font-semibold text-slate-500 block">{ekskul.namaKelas || "-"}</span>
                         </div>
                         <div className="flex gap-1.5">
                           <button
                             type="button"
                             onClick={() => {
                               setEditingEkskulId(ekskul.id);
-                              setNewEkskulName(ekskul.nama_ekskul);
-                              setNewEkskulClassId(ekskul.kelas_id || "");
+                              setNewEkskulName(ekskul.namaEkskul);
+                              setNewEkskulClassId(ekskul.kelasId || "");
                               setNewEkskulPembinaUser(!!ekskul.pembina_user_id);
                             }}
                             className="p-1 hover:bg-slate-200 border border-transparent text-indigo-600 rounded-lg text-xs cursor-pointer"
@@ -5555,12 +5584,21 @@ function DashboardContent() {
                       </div>
                     </div>
 
+                    {editingStudentId && (
+                      <button
+                        type="button"
+                        onClick={() => { setEditingStudentId(""); setNewStudentName(""); setNewStudentNisn(""); setNewStudentAbsen(""); }}
+                        className="w-full py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-bold transition cursor-pointer"
+                      >
+                        Batal Edit
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleAddStudent}
                       className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-md shadow-indigo-100 cursor-pointer"
                     >
-                      Tambah Siswa
+                      {editingStudentId ? "Simpan Perubahan" : "Tambah Siswa"}
                     </button>
                   </div>
 
@@ -5628,14 +5666,29 @@ function DashboardContent() {
                                 <td className="py-2.5 px-3 text-slate-900">{st.nama_siswa}</td>
                                 <td className="py-2.5 px-3 text-slate-500 font-mono">{st.nisn || "-"}</td>
                                 <td className="py-2.5 px-3 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteStudent(st.id)}
-                                    className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"
-                                    title="Hapus"
-                                  >
-                                    🗑️
-                                  </button>
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingStudentId(st.id);
+                                        setNewStudentName(st.nama_siswa);
+                                        setNewStudentNisn(st.nisn || "");
+                                        setNewStudentAbsen(st.nomor_absen ? String(st.nomor_absen) : "");
+                                      }}
+                                      className="text-indigo-500 hover:text-indigo-700 p-1 cursor-pointer"
+                                      title="Ubah"
+                                    >
+                                      ✏️
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteStudent(st.id)}
+                                      className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"
+                                      title="Hapus"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             ))}
@@ -5661,7 +5714,7 @@ function DashboardContent() {
                 {/* Form Tambah Jadwal */}
                 <div className="lg:col-span-1 bg-white border border-slate-200/80 rounded-3xl p-6 space-y-6">
                   <div className="space-y-4">
-                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">📅 Tambah Jadwal Manual</h4>
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{editingScheduleId ? "✏️ Edit Jadwal" : "📅 Tambah Jadwal Manual"}</h4>
                     
                     <div className="space-y-3">
                       <div>
@@ -5727,12 +5780,28 @@ function DashboardContent() {
                       </div>
                     </div>
 
+                    {editingScheduleId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingScheduleId("");
+                          setSelectedClassId(classes.length > 0 ? classes[0].id : "");
+                          setSelectedSubjectId(subjects.length > 0 ? subjects[0].id : "");
+                          setSchDay("Senin");
+                          setSchStart("07:30");
+                          setSchEnd("09:00");
+                        }}
+                        className="w-full py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-bold transition cursor-pointer"
+                      >
+                        Batal Edit
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleAddSchedule}
                       className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-md shadow-indigo-100 cursor-pointer"
                     >
-                      Simpan Jadwal
+                      {editingScheduleId ? "Simpan Perubahan" : "Simpan Jadwal"}
                     </button>
                   </div>
 
@@ -5801,14 +5870,31 @@ function DashboardContent() {
                                         {sch.nama_mapel}
                                       </span>
                                     </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteSchedule(sch.id)}
-                                      className="text-rose-500 hover:text-rose-700 text-xs cursor-pointer p-1"
-                                      title="Hapus Jadwal"
-                                    >
-                                      🗑️
-                                    </button>
+                                    <div className="flex gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingScheduleId(sch.id);
+                                          setSelectedClassId(sch.class_id);
+                                          setSelectedSubjectId(sch.subject_id);
+                                          setSchDay(sch.hari);
+                                          setSchStart(sch.jam_mulai);
+                                          setSchEnd(sch.jam_selesai);
+                                        }}
+                                        className="p-1 hover:bg-slate-200 border border-transparent text-indigo-600 rounded-lg text-xs cursor-pointer"
+                                        title="Ubah Jadwal"
+                                      >
+                                        ✏️
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteSchedule(sch.id)}
+                                        className="p-1 hover:bg-slate-200 border border-transparent text-rose-500 rounded-lg text-xs cursor-pointer"
+                                        title="Hapus Jadwal"
+                                      >
+                                        🗑️
+                                      </button>
+                                    </div>
                                   </div>
                                 ))}
                             </div>
@@ -11681,12 +11767,15 @@ const renderJurnalModule = () => {
                               `;
                             }
                             if (school.show_ttd_wali !== false) {
+                              const clsWali = classes.find(c => c.id === selectedClassId);
+                              const waliNama = clsWali?.wali_kelas || school.nama_wali_kelas || "___________________________";
+                              const waliNip = clsWali?.wali_kelas_nip || school.nip_wali_kelas || "...........................................";
                               signaturesHtml += `
                                 <div style="width: 45%; margin-bottom: 20px; text-align: right;">
                                   <p>&nbsp;</p>
                                   <p style="font-weight: bold; margin-bottom: 50px; text-align: right;">Wali Kelas</p>
-                                  <p style="text-decoration: underline; font-weight: bold; margin: 0; text-align: right;">( ${school.nama_wali_kelas || "___________________________"} )</p>
-                                  <p style="margin: 0; color: #555; text-align: right;">NIP: ${school.nip_wali_kelas || "..........................................."}</p>
+                                  <p style="text-decoration: underline; font-weight: bold; margin: 0; text-align: right;">( ${waliNama} )</p>
+                                  <p style="margin: 0; color: #555; text-align: right;">NIP: ${waliNip}</p>
                                 </div>
                               `;
                             }

@@ -1,21 +1,29 @@
 import { query } from "@/lib/db";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { requireSchoolAccess } from "@/lib/school-access";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
-    if (!sessionCookie) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { searchParams } = new URL(req.url);
+    const schoolId = searchParams.get("school_id");
+    if (!schoolId) {
+      return NextResponse.json({ error: "school_id wajib diisi" }, { status: 400 });
     }
 
+    await requireSchoolAccess(schoolId);
+
     const users = await query(
-      "SELECT id, username, email, nama_lengkap, role FROM users ORDER BY nama_lengkap ASC"
+      `SELECT DISTINCT u.id, u.username, u.email, u.nama_lengkap, u.role
+       FROM users u
+       LEFT JOIN schools s ON s.user_id = u.id
+       LEFT JOIN user_school_assignments usa ON usa."userId" = u.id
+       WHERE s.id = $1 OR usa."schoolId" = $1
+       ORDER BY u.nama_lengkap ASC`,
+      [schoolId]
     );
     return NextResponse.json(users.rows);
   } catch (error: any) {
-    console.error("Users list GET error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    const status = error.message === "Forbidden" ? 403 : error.message === "Unauthorized" ? 401 : 500;
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
   }
 }

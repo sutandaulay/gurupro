@@ -1,37 +1,16 @@
 import { query } from "@/lib/db";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-
-async function verifySchoolOwner(schoolId: string, userId: string) {
-  const check = await query(
-    "SELECT id FROM schools WHERE id = $1 AND user_id = $2",
-    [schoolId, userId]
-  );
-  if (check.rows.length === 0) {
-    throw new Error("Forbidden");
-  }
-}
-
-async function getUserId() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("gurupro_session")?.value;
-  if (!sessionCookie) {
-    throw new Error("Unauthorized");
-  }
-  const session = JSON.parse(sessionCookie);
-  return session.id;
-}
+import { requireSchoolAccess } from "@/lib/school-access";
 
 export async function POST(req: Request) {
   try {
-    const userId = await getUserId();
     const { school_id, csvContent } = await req.json();
 
     if (!school_id || !csvContent) {
       return NextResponse.json({ error: "school_id dan csvContent wajib diisi" }, { status: 400 });
     }
 
-    await verifySchoolOwner(school_id, userId);
+    await requireSchoolAccess(school_id);
 
     // Split CSV into lines
     const lines = csvContent.split(/\r?\n/);

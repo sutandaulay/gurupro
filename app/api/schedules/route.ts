@@ -1,32 +1,10 @@
 import { query, requireActiveTahunAjaran } from "@/lib/db";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getContextFilters } from "@/lib/session";
-
-async function verifySchoolOwner(schoolId: string, userId: string) {
-  const check = await query(
-    "SELECT id FROM schools WHERE id = $1 AND user_id = $2",
-    [schoolId, userId]
-  );
-  if (check.rows.length === 0) {
-    throw new Error("Forbidden");
-  }
-}
-
-async function getUserId() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("gurupro_session")?.value;
-  if (!sessionCookie) {
-    throw new Error("Unauthorized");
-  }
-  const session = JSON.parse(sessionCookie);
-  return session.id;
-}
+import { requireSchoolAccess } from "@/lib/school-access";
 
 export async function GET(req: Request) {
   try {
-    const userId = await getUserId();
-    const filters = await getContextFilters(userId);
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get("school_id");
 
@@ -34,7 +12,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "school_id is required" }, { status: 400 });
     }
 
-    await verifySchoolOwner(schoolId, userId);
+    const { userId } = await requireSchoolAccess(schoolId);
+    const filters = await getContextFilters(userId);
 
     const schedules = await query(
       `SELECT sc.*, c.nama_kelas, sb.nama_mapel 
@@ -81,7 +60,6 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const userId = await getUserId();
     await requireActiveTahunAjaran();
     const { school_id, class_id, subject_id, hari, jam_mulai, jam_selesai } = await req.json();
 
@@ -89,7 +67,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Semua field jadwal wajib diisi" }, { status: 400 });
     }
 
-    await verifySchoolOwner(school_id, userId);
+    await requireSchoolAccess(school_id);
 
     // Verify class and subject belong to the same school
     const classCheck = await query("SELECT id FROM classes WHERE id = $1 AND school_id = $2", [class_id, school_id]);
@@ -114,9 +92,37 @@ export async function POST(req: Request) {
   }
 }
 
+export async function PUT(req: Request) {
+  try {
+    await requireActiveTahunAjaran();
+    const { id, class_id, subject_id, hari, jam_mulai, jam_selesai } = await req.json();
+
+    if (!id || !class_id || !subject_id || !hari || !jam_mulai || !jam_selesai) {
+      return NextResponse.json({ error: "Semua field jadwal wajib diisi" }, { status: 400 });
+    }
+
+    const schedCheck = await query("SELECT school_id FROM schedules WHERE id = $1", [id]);
+    if (!schedCheck.rows[0]) {
+      return NextResponse.json({ error: "Jadwal tidak ditemukan" }, { status: 404 });
+    }
+    await requireSchoolAccess(schedCheck.rows[0].school_id);
+
+    const res = await query(
+      `UPDATE schedules SET class_id = $1, subject_id = $2, hari = $3, jam_mulai = $4, jam_selesai = $5
+       WHERE id = $6 RETURNING *`,
+      [class_id, subject_id, hari.trim(), jam_mulai.trim(), jam_selesai.trim(), id]
+    );
+    return NextResponse.json(res.rows[0]);
+  } catch (error: any) {
+    console.error("Schedules PUT error:", error);
+    const isTaError = error.message?.includes?.('tahun ajaran');
+    const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : isTaError ? 400 : 500;
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+  }
+}
+
 export async function DELETE(req: Request) {
   try {
-    const userId = await getUserId();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
@@ -124,17 +130,12 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
-    // Verify ownership of the schedule
-    const check = await query(
-      `SELECT sc.id FROM schedules sc 
-       JOIN schools s ON sc.school_id = s.id 
-       WHERE sc.id = $1 AND s.user_id = $2`,
-      [id, userId]
-    );
-
-    if (check.rows.length === 0) {
-      return NextResponse.json({ error: "Jadwal tidak ditemukan atau tidak memiliki hak akses" }, { status: 403 });
+    // Get school_id from schedule
+    const schedCheck = await query("SELECT school_id FROM schedules WHERE id = $1", [id]);
+    if (!schedCheck.rows[0]) {
+      return NextResponse.json({ error: "Jadwal tidak ditemukan" }, { status: 404 });
     }
+    await requireSchoolAccess(schedCheck.rows[0].school_id);
 
     await query("DELETE FROM schedules WHERE id = $1", [id]);
     return NextResponse.json({ success: true, message: "Jadwal berhasil dihapus" });

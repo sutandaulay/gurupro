@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { uploadBase64ToR2 } from "@/lib/r2";
 import { getContextFilters } from "@/lib/session";
+import { requireSchoolAccess } from "@/lib/school-access";
 
 async function getUserId() {
   const cookieStore = await cookies();
@@ -37,22 +38,10 @@ export async function GET(req: Request) {
     const schoolId = searchParams.get("school_id");
 
     if (!schoolId) {
-      const journals = await query(
-        `SELECT tj.*, c.nama_kelas, sb.nama_mapel, u.nama_lengkap as nama_guru, us.nama_lengkap as nama_supervisor,
-                s.nama_sekolah
-         FROM teacher_journals tj
-         JOIN classes c ON tj.class_id = c.id
-         JOIN subjects sb ON tj.subject_id = sb.id
-         JOIN users u ON tj.teacher_id = u.id
-         JOIN schools s ON tj.school_id = s.id
-         LEFT JOIN users us ON tj.supervisor_id = us.id
-         WHERE tj.teacher_id = $1 OR tj.supervisor_id = $1
-         ORDER BY tj.tanggal DESC, tj.created_at DESC`,
-        [userId]
-      );
-      const result = await applyContextFilter(journals.rows, filters);
-      return NextResponse.json(result);
+      return NextResponse.json({ error: "school_id wajib diisi" }, { status: 400 });
     }
+
+    await requireSchoolAccess(schoolId);
 
     const schoolOwnerRes = await query("SELECT user_id FROM schools WHERE id = $1", [schoolId]);
     if (schoolOwnerRes.rows.length === 0) {

@@ -51,7 +51,7 @@ export default function TahunAjaranPage() {
   const fetchTahunAjaran = async () => {
     setLoading(true)
     try {
-      const params = activeSchoolId ? `?sekolah_id=${activeSchoolId}` : ''
+      const params = activeSchoolId ? `?school_id=${activeSchoolId}` : ''
       const res = await apiFetch(`/api/tahun-ajaran${params}`)
       const data = await res.json()
 
@@ -66,9 +66,11 @@ export default function TahunAjaranPage() {
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchTahunAjaran()
-  }, [])
+    if (activeSchoolId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchTahunAjaran()
+    }
+  }, [activeSchoolId])
 
   const handleActivate = async (id: string) => {
     setActivatingId(id)

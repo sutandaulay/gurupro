@@ -4,31 +4,11 @@
  */
 
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import {
   updateWaliKelasStatus,
 } from '@/lib/wali-kelas';
 import { query } from '@/lib/db';
-
-async function getUserId() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('gurupro_session')?.value;
-  if (!sessionCookie) {
-    throw new Error('Unauthorized');
-  }
-  const session = JSON.parse(sessionCookie);
-  return session.id;
-}
-
-async function verifySchoolOwner(schoolId: string, userId: string) {
-  const check = await query(
-    'SELECT id FROM schools WHERE id = $1 AND user_id = $2',
-    [schoolId, userId]
-  );
-  if (check.rows.length === 0) {
-    throw new Error('Forbidden');
-  }
-}
+import { requireSchoolAccess } from '@/lib/school-access';
 
 // PUT /api/wali-kelas/[id]
 // Body: { status }
@@ -37,7 +17,6 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserId();
     const { id } = await params;
     const body = await req.json();
 
@@ -50,7 +29,7 @@ export async function PUT(
       );
     }
 
-    // Verify ownership by checking if the kelas belongs to user's school
+    // Verify access by checking if the kelas belongs to user's school
     const assignmentCheck = await query(
       `SELECT w.kelas_id, c.school_id
        FROM wali_kelas_assignments w
@@ -64,7 +43,7 @@ export async function PUT(
     }
 
     const { school_id } = assignmentCheck.rows[0];
-    await verifySchoolOwner(school_id, userId);
+    await requireSchoolAccess(school_id);
 
     const result = await updateWaliKelasStatus(id, status);
     return NextResponse.json(result);
@@ -86,10 +65,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserId();
     const { id } = await params;
 
-    // Verify ownership
+    // Verify access
     const assignmentCheck = await query(
       `SELECT w.kelas_id, c.school_id
        FROM wali_kelas_assignments w
@@ -103,7 +81,7 @@ export async function DELETE(
     }
 
     const { school_id } = assignmentCheck.rows[0];
-    await verifySchoolOwner(school_id, userId);
+    await requireSchoolAccess(school_id);
 
     // Only allow deleting non-aktif assignments
     const statusCheck = await query(

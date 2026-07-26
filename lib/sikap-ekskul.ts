@@ -362,7 +362,7 @@ export async function getEkskulByPembina(pembinaMemberId: string): Promise<Ekstr
   return getEkstrakurikuler({ pembinaMemberId });
 }
 
-function mapEkstrakurikulerRowToResponse(row: EkstrakurikulerRow): EkstrakurikulerResponse {
+function mapEkstrakurikulerRowToResponse(row: any): EkstrakurikulerResponse & { namaKelas?: string } {
   return {
     id: row.id,
     namaEkskul: row.nama_ekskul,
@@ -371,6 +371,7 @@ function mapEkstrakurikulerRowToResponse(row: EkstrakurikulerRow): Ekstrakurikul
     pembinaUserId: row.pembina_user_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    namaKelas: row.nama_kelas,
   };
 }
 

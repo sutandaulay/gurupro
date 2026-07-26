@@ -13,6 +13,14 @@ import {
   IconChevronDown,
   IconBuilding,
 } from "@tabler/icons-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -34,6 +42,7 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
     setActiveSchool,
   } = useTeacherStore();
   const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false);
+  const [pendingSchool, setPendingSchool] = useState<{ id: string; name: string } | null>(null);
   const [tokenStatus, setTokenStatus] = useState<any>(null);
 
   useEffect(() => {
@@ -263,7 +272,7 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
                       <button
                         key={school.id}
                         onClick={() => {
-                          handleSchoolChange(school.id);
+                          setPendingSchool({ id: school.id, name: school.nama_sekolah });
                           setIsSchoolDropdownOpen(false);
                         }}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs text-left hover:bg-gray-50 transition-colors cursor-pointer ${
@@ -291,6 +300,38 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
 
           {/* Divider jika pemilih sekolah aktif tampil */}
           {schools.length > 0 && <div className="border-b border-gray-100/80 mb-4 mx-2" />}
+
+          <Dialog open={!!pendingSchool} onOpenChange={(open) => { if (!open) setPendingSchool(null); }}>
+            <DialogContent className="sm:max-w-[400px]">
+              <DialogHeader>
+                <DialogTitle>Pindah Sekolah</DialogTitle>
+                <DialogDescription>
+                  Yakin ingin pindah ke <span className="font-semibold text-slate-800">{pendingSchool?.name}</span>?
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <button
+                  type="button"
+                  onClick={() => setPendingSchool(null)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (pendingSchool) {
+                      handleSchoolChange(pendingSchool.id);
+                      setPendingSchool(null);
+                    }
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 transition-colors"
+                >
+                  Ya, Pindah
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {(() => {
             const visibleMenus = roleFlags

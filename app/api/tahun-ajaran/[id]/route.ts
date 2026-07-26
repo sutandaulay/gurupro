@@ -34,7 +34,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     // Activate
     if (action === 'activate') {
-      await query('UPDATE tahun_ajaran SET is_active = false')
+      const target = await query('SELECT sekolah_id FROM tahun_ajaran WHERE id = $1', [id])
+      if (!target.rows[0]) {
+        return NextResponse.json({ error: 'Tidak ditemukan' }, { status: 404 })
+      }
+      const sekolahId = target.rows[0].sekolah_id
+      await query('UPDATE tahun_ajaran SET is_active = false WHERE sekolah_id = $1', [sekolahId])
       await query(
         'UPDATE tahun_ajaran SET is_active = true, semester = $1 WHERE id = $2',
         [body.semester || 'ganjil', id]

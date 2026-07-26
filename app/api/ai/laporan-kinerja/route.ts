@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { requireSchoolAccess } from '@/lib/school-access'
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai'
 import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/services/poin-service'
 import { deductPoinFromAIResult } from '@/src/lib/ai-usage'
@@ -38,6 +39,10 @@ export async function POST(req: Request) {
 
   const body = await req.json()
   const { tahunAjaranId, semester, catatanTambahan, kurikulum = 'merdeka', sekolahId } = body
+
+  if (sekolahId) {
+    await requireSchoolAccess(sekolahId)
+  }
 
   const kurikulumLabel: Record<string, string> = {
     merdeka: 'Kurikulum Merdeka',
@@ -227,9 +232,9 @@ async function getSekolahData(guruId: string, sekolahId?: string) {
     const result = await query(
       `SELECT s.nama_sekolah, s.npsn, s.alamat, s.nama_kepala_sekolah
        FROM schools s
-       WHERE s.id = $1 AND s.user_id = $2
+       WHERE s.id = $1
        LIMIT 1`,
-      [sekolahId, guruId]
+      [sekolahId]
     )
     if (result.rows[0]) return result.rows[0]
   }

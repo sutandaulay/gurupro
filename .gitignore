@@ -51,3 +51,6 @@ payload-types.ts
 next-env.d.ts
 
 nul
+
+# scratch / temp debug scripts
+scratch/

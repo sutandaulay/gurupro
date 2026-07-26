@@ -1,32 +1,9 @@
 import { query, requireActiveTahunAjaran } from "@/lib/db";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-
-async function verifyClassOwner(classId: string, userId: string) {
-  const check = await query(
-    `SELECT c.id FROM classes c 
-     JOIN schools s ON c.school_id = s.id 
-     WHERE c.id = $1 AND s.user_id = $2`,
-    [classId, userId]
-  );
-  if (check.rows.length === 0) {
-    throw new Error("Forbidden");
-  }
-}
-
-async function getUserId() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("gurupro_session")?.value;
-  if (!sessionCookie) {
-    throw new Error("Unauthorized");
-  }
-  const session = JSON.parse(sessionCookie);
-  return session.id;
-}
+import { requireSchoolAccess } from "@/lib/school-access";
 
 export async function GET(req: Request) {
   try {
-    const userId = await getUserId();
     const { searchParams } = new URL(req.url);
     const classId = searchParams.get("class_id");
 
@@ -34,7 +11,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "class_id is required" }, { status: 400 });
     }
 
-    await verifyClassOwner(classId, userId);
+    const classCheck = await query("SELECT school_id FROM classes WHERE id = $1", [classId]);
+    if (!classCheck.rows[0]) {
+      return NextResponse.json({ error: "Kelas tidak ditemukan" }, { status: 404 });
+    }
+    await requireSchoolAccess(classCheck.rows[0].school_id);
 
     const students = await query(
       "SELECT * FROM students WHERE class_id = $1 ORDER BY nomor_absen ASC, nama_siswa ASC",
@@ -50,7 +31,6 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const userId = await getUserId();
     await requireActiveTahunAjaran();
     const { id, class_id, nama_siswa, nisn, nomor_absen } = await req.json();
 
@@ -58,7 +38,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "class_id dan nama_siswa wajib diisi" }, { status: 400 });
     }
 
-    await verifyClassOwner(class_id, userId);
+    const classCheck = await query("SELECT school_id FROM classes WHERE id = $1", [class_id]);
+    if (!classCheck.rows[0]) {
+      return NextResponse.json({ error: "Kelas tidak ditemukan" }, { status: 404 });
+    }
+    await requireSchoolAccess(classCheck.rows[0].school_id);
 
     if (id) {
       // Edit student
@@ -93,7 +77,6 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const userId = await getUserId();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
@@ -101,18 +84,14 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
-    // Verify class ownership of student
-    const check = await query(
-      `SELECT st.id FROM students st 
-       JOIN classes c ON st.class_id = c.id
-       JOIN schools s ON c.school_id = s.id 
-       WHERE st.id = $1 AND s.user_id = $2`,
-      [id, userId]
+    const studentCheck = await query(
+      "SELECT c.school_id FROM students st JOIN classes c ON st.class_id = c.id WHERE st.id = $1",
+      [id]
     );
-
-    if (check.rows.length === 0) {
-      return NextResponse.json({ error: "Siswa tidak ditemukan atau tidak memiliki hak akses" }, { status: 403 });
+    if (!studentCheck.rows[0]) {
+      return NextResponse.json({ error: "Siswa tidak ditemukan" }, { status: 404 });
     }
+    await requireSchoolAccess(studentCheck.rows[0].school_id);
 
     await query("DELETE FROM students WHERE id = $1", [id]);
     return NextResponse.json({ success: true, message: "Siswa berhasil dihapus" });

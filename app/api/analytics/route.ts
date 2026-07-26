@@ -12,7 +12,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "school_id wajib diisi" }, { status: 400 });
     }
 
-    await requireSchoolAccess(schoolId)
+    const { userId } = await requireSchoolAccess(schoolId)
 
     // 1. Count master metrics
     const classCount = await query("SELECT COUNT(*) AS count FROM classes WHERE school_id = $1", [schoolId]);

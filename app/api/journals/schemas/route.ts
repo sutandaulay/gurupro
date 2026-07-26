@@ -1,30 +1,9 @@
 import { query } from "@/lib/db";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-
-async function verifySchoolOwner(schoolId: string, userId: string) {
-  const check = await query(
-    "SELECT id FROM schools WHERE id = $1 AND user_id = $2",
-    [schoolId, userId]
-  );
-  if (check.rows.length === 0) {
-    throw new Error("Forbidden");
-  }
-}
-
-async function getUserId() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("gurupro_session")?.value;
-  if (!sessionCookie) {
-    throw new Error("Unauthorized");
-  }
-  const session = JSON.parse(sessionCookie);
-  return session.id;
-}
+import { requireSchoolAccess } from "@/lib/school-access";
 
 export async function GET(req: Request) {
   try {
-    const userId = await getUserId();
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get("school_id");
 
@@ -32,8 +11,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "school_id is required" }, { status: 400 });
     }
 
-    // Verify ownership
-    await verifySchoolOwner(schoolId, userId);
+    await requireSchoolAccess(schoolId);
 
     const schemas = await query(
       "SELECT * FROM journal_schemas WHERE school_id = $1 ORDER BY created_at DESC",
@@ -49,14 +27,13 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const userId = await getUserId();
     const { id, school_id, nama_skema, fields } = await req.json();
 
     if (!school_id || !nama_skema || !fields) {
       return NextResponse.json({ error: "school_id, nama_skema, dan fields wajib diisi" }, { status: 400 });
     }
 
-    await verifySchoolOwner(school_id, userId);
+    await requireSchoolAccess(school_id);
 
     const fieldsJson = JSON.stringify(fields);
 
@@ -89,7 +66,6 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const userId = await getUserId();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     const schoolId = searchParams.get("school_id");
@@ -98,7 +74,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "id dan school_id wajib diisi" }, { status: 400 });
     }
 
-    await verifySchoolOwner(schoolId, userId);
+    await requireSchoolAccess(schoolId);
 
     await query("DELETE FROM journal_schemas WHERE id = $1 AND school_id = $2", [id, schoolId]);
     return NextResponse.json({ success: true, message: "Skema format jurnal berhasil dihapus" });

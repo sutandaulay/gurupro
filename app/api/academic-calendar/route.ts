@@ -1,31 +1,6 @@
 import { query, logAudit } from "@/lib/db";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-
-// Helper: get user ID dari cookie
-function getUserId(cookieHeader: string): string | null {
-  try {
-    const cookies = cookieHeader.split(';').map(c => c.trim())
-    const session = cookies.find(c => c.startsWith('gurupro_session='))
-    if (!session) return null
-    const value = session.split('=')[1] || ''
-    const data = JSON.parse(decodeURIComponent(value))
-    return data.id || null
-  } catch {
-    return null
-  }
-}
-
-// Helper: verify user owns school
-async function verifySchoolOwner(schoolId: string, userId: string) {
-  const check = await query(
-    `SELECT id FROM schools WHERE id = $1 AND user_id = $2`,
-    [schoolId, userId]
-  );
-  if (check.rows.length === 0) {
-    throw new Error("Forbidden");
-  }
-}
+import { requireSchoolAccess } from "@/lib/school-access";
 
 export async function GET(req: Request) {
   try {
@@ -36,12 +11,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "school_id wajib diisi" }, { status: 400 });
     }
 
-    const userId = getUserId(req.headers.get('cookie') || '')
-    if (!userId) {
-      return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
-    }
-
-    await verifySchoolOwner(schoolId, userId);
+    await requireSchoolAccess(schoolId);
 
     const res = await query(
       `SELECT * FROM academic_calendars 
@@ -60,21 +30,14 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
-    if (!sessionCookie) {
-      return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
-    }
-    const session = JSON.parse(sessionCookie);
-    const userId = session.id;
-
-    const { id, school_id, event_name, tanggal_mulai, tanggal_selesai, keterangan } = await req.json();
+    const body = await req.json();
+    const { id, school_id, event_name, tanggal_mulai, tanggal_selesai, keterangan } = body;
 
     if (!school_id || !event_name || !tanggal_mulai || !tanggal_selesai) {
       return NextResponse.json({ error: "school_id, event_name, tanggal_mulai, dan tanggal_selesai wajib diisi" }, { status: 400 });
     }
 
-    await verifySchoolOwner(school_id, userId);
+    const { userId } = await requireSchoolAccess(school_id);
 
     if (id) {
       await query(
@@ -105,14 +68,6 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
-    if (!sessionCookie) {
-      return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
-    }
-    const session = JSON.parse(sessionCookie);
-    const userId = session.id;
-
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
@@ -124,7 +79,7 @@ export async function DELETE(req: Request) {
     if (check.rows.length > 0) {
       const eventName = check.rows[0].event_name;
       const schoolId = check.rows[0].school_id;
-      await verifySchoolOwner(schoolId, userId);
+      const { userId } = await requireSchoolAccess(schoolId);
       await query("DELETE FROM academic_calendars WHERE id = $1", [id]);
       await logAudit(userId, "DELETE_CALENDAR", `Menghapus agenda akademik: ${eventName}`);
     }

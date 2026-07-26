@@ -66,6 +66,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Nama sekolah wajib diisi" }, { status: 400 });
     }
 
+    if (!npsn) {
+      return NextResponse.json({ error: "NPSN wajib diisi" }, { status: 400 });
+    }
+
+    // Check NPSN uniqueness
+    const npsnExists = id
+      ? await query("SELECT id FROM schools WHERE npsn = $1 AND id != $2 LIMIT 1", [npsn.trim(), id])
+      : await query("SELECT id FROM schools WHERE npsn = $1 LIMIT 1", [npsn.trim()]);
+    if ((npsnExists.rows[0])) {
+      return NextResponse.json({ error: "NPSN sudah terdaftar untuk sekolah lain" }, { status: 409 });
+    }
+
     if (id) {
       // Update
       const res = await query(

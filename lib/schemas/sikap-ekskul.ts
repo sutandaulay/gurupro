@@ -154,6 +154,7 @@ export const EkstrakurikulerResponseSchema = z.object({
   pembinaUserId: z.string().uuid().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  namaKelas: z.string().optional(),
 });
 
 export type EkstrakurikulerCreate = z.infer<typeof EkstrakurikulerCreateSchema>;

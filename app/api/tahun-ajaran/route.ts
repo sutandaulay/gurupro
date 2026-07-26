@@ -4,8 +4,9 @@
 
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { requireSchoolAccess } from '@/lib/school-access'
 
-// Helper: get user ID dari cookie
+// Helper: get user ID dari cookie (untuk POST)
 function getUserId(cookieHeader: string): string | null {
   try {
     const cookies = cookieHeader.split(';').map(c => c.trim())
@@ -19,29 +20,17 @@ function getUserId(cookieHeader: string): string | null {
   }
 }
 
-// Helper: get school IDs accessible by user (owned + assigned)
-async function getAccessibleSchoolIds(userId: string): Promise<string[]> {
-  const owned = await query(
-    `SELECT id FROM schools WHERE user_id = $1`,
-    [userId]
-  )
-  const assigned = await query(
-    `SELECT schoolid FROM user_school_assignments WHERE userId = $1`,
-    [userId]
-  )
-  const ids = new Set<string>()
-  owned.rows.forEach((r: any) => ids.add(r.id))
-  assigned.rows.forEach((r: any) => ids.add(r.schoolid))
-  return Array.from(ids)
-}
-
-// GET list
+// GET list — wajib sekolah_id
 export async function GET(req: Request) {
   try {
-    const userId = getUserId(req.headers.get('cookie') || '')
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { searchParams } = new URL(req.url)
+    const schoolId = searchParams.get('school_id') || searchParams.get('sekolah_id')
+
+    if (!schoolId) {
+      return NextResponse.json({ error: 'school_id wajib diisi' }, { status: 400 })
     }
+
+    await requireSchoolAccess(schoolId)
 
     // Check table exists
     const check = await query(
@@ -52,37 +41,19 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Table tahun_ajaran tidak ada. Jalankan migration SQL dulu.' }, { status: 500 })
     }
 
-    const { searchParams } = new URL(req.url)
-    const sekolahId = searchParams.get('sekolah_id')
-
-    let taQuery = `SELECT id, nama, tanggal_mulai, tanggal_selesai, is_active, semester_type, semester, sekolah_id, created_at
-             FROM tahun_ajaran`
-    const params: any[] = []
-
-    if (sekolahId) {
-      const accessibleIds = await getAccessibleSchoolIds(userId)
-      if (!accessibleIds.includes(sekolahId)) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
-      taQuery += ` WHERE sekolah_id = $1`
-      params.push(sekolahId)
-    } else {
-      const accessibleIds = await getAccessibleSchoolIds(userId)
-      if (accessibleIds.length === 0) {
-        return NextResponse.json([])
-      }
-      taQuery += ` WHERE sekolah_id = ANY($1)`
-      params.push(accessibleIds)
-    }
-
-    taQuery += ` ORDER BY tanggal_mulai DESC`
-
-    const result = await query(taQuery, params)
+    const result = await query(
+      `SELECT id, nama, tanggal_mulai, tanggal_selesai, is_active, semester_type, semester, sekolah_id, created_at
+       FROM tahun_ajaran
+       WHERE sekolah_id = $1
+        ORDER BY tanggal_mulai DESC`,
+      [schoolId]
+    )
 
     return NextResponse.json(result.rows)
   } catch (err: any) {
+    const status = err.message === "Forbidden" ? 403 : err.message === "Unauthorized" ? 401 : 500
     console.error('GET /api/tahun-ajaran:', err?.message)
-    return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 })
+    return NextResponse.json({ error: err?.message || 'Server error' }, { status })
   }
 }
 
@@ -100,25 +71,20 @@ export async function POST(req: Request) {
     const tanggalSelesai = (body.tanggalSelesai || '').trim()
     const sekolahId = (body.sekolahId || '').trim()
 
-    if (!nama || !tanggalMulai || !tanggalSelesai) {
+    if (!nama || !tanggalMulai || !tanggalSelesai || !sekolahId) {
       return NextResponse.json(
-        { error: 'Nama, tanggal mulai, tanggal selesai wajib diisi' },
+        { error: 'Nama, tanggal mulai, tanggal selesai, dan sekolah_id wajib diisi' },
         { status: 400 }
       )
     }
 
-    if (sekolahId) {
-      const accessibleIds = await getAccessibleSchoolIds(userId)
-      if (!accessibleIds.includes(sekolahId)) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
-    }
+    await requireSchoolAccess(sekolahId)
 
     const result = await query(
       `INSERT INTO tahun_ajaran (nama, tanggal_mulai, tanggal_selesai, semester_type, semester, sekolah_id, created_by)
       VALUES ($1, $2, $3, 'full', $4, $5, $6)
       RETURNING *`,
-      [nama, tanggalMulai, tanggalSelesai, 'ganjil', sekolahId || null, userId]
+      [nama, tanggalMulai, tanggalSelesai, 'ganjil', sekolahId, userId]
     )
 
     return NextResponse.json(result.rows[0], { status: 201 })

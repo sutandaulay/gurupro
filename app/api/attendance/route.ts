@@ -1,42 +1,9 @@
 import { query } from "@/lib/db";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-
-async function verifySchoolOwner(schoolId: string, userId: string) {
-  const check = await query(
-    "SELECT id FROM schools WHERE id = $1 AND user_id = $2",
-    [schoolId, userId]
-  );
-  if (check.rows.length === 0) {
-    throw new Error("Forbidden");
-  }
-}
-
-async function verifyScheduleOwner(scheduleId: string, userId: string) {
-  const check = await query(
-    `SELECT sc.id FROM schedules sc 
-     JOIN schools s ON sc.school_id = s.id 
-     WHERE sc.id = $1 AND s.user_id = $2`,
-    [scheduleId, userId]
-  );
-  if (check.rows.length === 0) {
-    throw new Error("Forbidden");
-  }
-}
-
-async function getUserId() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("gurupro_session")?.value;
-  if (!sessionCookie) {
-    throw new Error("Unauthorized");
-  }
-  const session = JSON.parse(sessionCookie);
-  return session.id;
-}
+import { requireSchoolAccess } from "@/lib/school-access";
 
 export async function GET(req: Request) {
   try {
-    const userId = await getUserId();
     const { searchParams } = new URL(req.url);
     const type = searchParams.get("type");
 
@@ -46,7 +13,7 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "school_id is required" }, { status: 400 });
       }
 
-      await verifySchoolOwner(schoolId, userId);
+      const { userId } = await requireSchoolAccess(schoolId);
 
       const logs = await query(
         "SELECT * FROM teacher_attendance WHERE user_id = $1 AND school_id = $2 ORDER BY tanggal DESC",
@@ -63,7 +30,11 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "schedule_id dan tanggal wajib diisi" }, { status: 400 });
       }
 
-      await verifyScheduleOwner(scheduleId, userId);
+      const schedCheck = await query("SELECT school_id FROM schedules WHERE id = $1", [scheduleId]);
+      if (!schedCheck.rows[0]) {
+        return NextResponse.json({ error: "Jadwal tidak ditemukan" }, { status: 404 });
+      }
+      await requireSchoolAccess(schedCheck.rows[0].school_id);
 
       const logs = await query(
         `SELECT sa.*, s.nama_siswa, s.nomor_absen 
@@ -86,7 +57,6 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const userId = await getUserId();
     const body = await req.json();
     const { type } = body;
 
@@ -97,7 +67,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "school_id, tanggal, dan status wajib diisi" }, { status: 400 });
       }
 
-      await verifySchoolOwner(school_id, userId);
+      const { userId } = await requireSchoolAccess(school_id);
 
       // Auto-save school coordinates on first verified check-in
       if (latitude && longitude && face_match_score) {
@@ -150,7 +120,11 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "schedule_id, tanggal, dan records wajib diisi" }, { status: 400 });
       }
 
-      await verifyScheduleOwner(schedule_id, userId);
+      const schedCheck = await query("SELECT school_id FROM schedules WHERE id = $1", [schedule_id]);
+      if (!schedCheck.rows[0]) {
+        return NextResponse.json({ error: "Jadwal tidak ditemukan" }, { status: 404 });
+      }
+      await requireSchoolAccess(schedCheck.rows[0].school_id);
 
       await query("BEGIN");
       try {

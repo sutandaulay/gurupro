@@ -1,39 +1,20 @@
 import { query } from "@/lib/db";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-
-async function verifyClassOwner(classId: string, userId: string) {
-  const check = await query(
-    `SELECT c.id FROM classes c 
-     JOIN schools s ON c.school_id = s.id 
-     WHERE c.id = $1 AND s.user_id = $2`,
-    [classId, userId]
-  );
-  if (check.rows.length === 0) {
-    throw new Error("Forbidden");
-  }
-}
-
-async function getUserId() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("gurupro_session")?.value;
-  if (!sessionCookie) {
-    throw new Error("Unauthorized");
-  }
-  const session = JSON.parse(sessionCookie);
-  return session.id;
-}
+import { requireSchoolAccess } from "@/lib/school-access";
 
 export async function POST(req: Request) {
   try {
-    const userId = await getUserId();
     const { class_id, csvContent } = await req.json();
 
     if (!class_id || !csvContent) {
       return NextResponse.json({ error: "class_id dan csvContent wajib diisi" }, { status: 400 });
     }
 
-    await verifyClassOwner(class_id, userId);
+    const classCheck = await query("SELECT school_id FROM classes WHERE id = $1", [class_id]);
+    if (!classCheck.rows[0]) {
+      return NextResponse.json({ error: "Kelas tidak ditemukan" }, { status: 404 });
+    }
+    await requireSchoolAccess(classCheck.rows[0].school_id);
 
     // Split CSV into lines
     const lines = csvContent.split(/\r?\n/);

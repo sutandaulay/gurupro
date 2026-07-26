@@ -7,10 +7,26 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const assessmentId = searchParams.get("assessment_id");
+    const schoolId = searchParams.get("school_id");
 
     if (!assessmentId) {
       return NextResponse.json({ error: "assessment_id wajib diisi" }, { status: 400 });
     }
+    if (!schoolId) {
+      return NextResponse.json({ error: "school_id wajib diisi" }, { status: 400 });
+    }
+
+    const assessCheck = await query(
+      "SELECT id, school_id FROM assessments WHERE id = $1", [assessmentId]
+    );
+    if (!assessCheck.rows[0]) {
+      return NextResponse.json({ error: "Asesmen tidak ditemukan" }, { status: 404 });
+    }
+    if (assessCheck.rows[0].school_id !== schoolId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    await requireSchoolAccess(schoolId);
 
     const res = await query(
       `SELECT 
@@ -35,8 +51,9 @@ export async function GET(req: Request) {
 
     return NextResponse.json(res.rows);
   } catch (error: any) {
+    const status = error.message === "Forbidden" ? 403 : error.message === "Unauthorized" ? 401 : 500;
     console.error("Student Grades GET error:", error);
-    return NextResponse.json({ error: error.message || "Gagal memuat nilai siswa." }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Gagal memuat nilai siswa." }, { status });
   }
 }
 
