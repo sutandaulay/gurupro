@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
         if (!groupedByStudent[row.nama_siswa]) {
           groupedByStudent[row.nama_siswa] = [];
         }
-        groupedByStudent[row.nama_siswa].forEach(row);
+        groupedByStudent[row.nama_siswa].push(row);
       });
 
       // Format for export

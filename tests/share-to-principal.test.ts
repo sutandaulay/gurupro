@@ -37,7 +37,7 @@ const VALID_UUID = '11111111-1111-1111-1111-111111111111';
 const VALID_UUID2 = '22222222-2222-2222-2222-222222222222';
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
 });
 
 // ============================================
@@ -359,17 +359,9 @@ describe('Share-to-Principal - Upsell Trigger', () => {
 
   describe('Trigger Condition Detection', () => {
     it('should detect when 2+ teachers share to same contact', async () => {
-      // Count unique teachers sharing to same contact
-      mockQuery.mockResolvedValueOnce({
-        rows: [
-          { contact_id: VALID_UUID, teacher_id: VALID_UUID2 },
-          { contact_id: VALID_UUID, teacher_id: VALID_UUID }, // Same contact, different teacher
-        ],
-      });
-
       const shares = [
         { contact_id: VALID_UUID, teacher_id: VALID_UUID2 },
-        { contact_id: VALID_UUID, teacher_id: VALID_UUID },
+        { contact_id: VALID_UUID, teacher_id: VALID_UUID }, // Same contact, different teacher
       ];
 
       const contactTeachers = shares.reduce((acc, share) => {

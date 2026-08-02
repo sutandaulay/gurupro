@@ -107,6 +107,7 @@ describe('insertPenilaianSikap', () => {
     vi.mocked(getWaliKelasForKelas).mockResolvedValueOnce({
       waliKelasMemberId: 'wali-lain',
     } as any)
+    mockQuery.mockResolvedValueOnce({ rows: [] })
 
     await expect(insertPenilaianSikap(validInput, 'bukan-wali')).rejects.toThrow(
       'Hanya wali kelas aktif'
@@ -115,6 +116,7 @@ describe('insertPenilaianSikap', () => {
 
   it('melempar error jika tidak ada wali kelas untuk kelas ini', async () => {
     vi.mocked(getWaliKelasForKelas).mockResolvedValueOnce(null)
+    mockQuery.mockResolvedValueOnce({ rows: [] })
 
     await expect(insertPenilaianSikap(validInput, 'wali-1')).rejects.toThrow(
       'Hanya wali kelas aktif'
@@ -189,12 +191,14 @@ describe('updatePenilaianSikap', () => {
 
 describe('getPenilaianSikap', () => {
   it('mengembalikan data dengan filter siswaId', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     await getPenilaianSikap({ siswaId: 's-1' })
     expect(mockQuery.mock.calls[0][0]).toContain('ps.siswa_id = $1')
   })
 
   it('mengembalikan data dengan filter varian', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     await getPenilaianSikap({ varian: 'profil_pelajar_pancasila' })
     expect(mockQuery.mock.calls[0][0]).toContain('ps.varian = $1')
@@ -264,12 +268,14 @@ describe('updateEkstrakurikuler', () => {
 
 describe('getEkstrakurikuler', () => {
   it('mengembalikan ekskul berdasarkan kelas', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     await getEkstrakurikuler({ kelasId: 'k-1' })
     expect(mockQuery.mock.calls[0][0]).toContain('e.kelas_id = $1')
   })
 
   it('mengembalikan ekskul berdasarkan pembina', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     await getEkstrakurikuler({ pembinaMemberId: 'p-1' })
     expect(mockQuery.mock.calls[0][0]).toContain('e.pembina_member_id = $1')
@@ -278,6 +284,7 @@ describe('getEkstrakurikuler', () => {
 
 describe('getEkskulByPembina', () => {
   it('memanggil getEkstrakurikuler dengan pembinaMemberId', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     const result = await getEkskulByPembina('pembina-1')
     expect(result).toEqual([])
@@ -383,6 +390,7 @@ describe('upsertCatatanWaliKelas', () => {
     vi.mocked(getWaliKelasForKelas).mockResolvedValueOnce({
       waliKelasMemberId: 'wali-asli',
     } as any)
+    mockQuery.mockResolvedValueOnce({ rows: [] })
 
     await expect(
       upsertCatatanWaliKelas(validInput, 'bukan-wali')
@@ -421,6 +429,7 @@ describe('upsertCatatanWaliKelas', () => {
 
 describe('getCatatanWaliKelas', () => {
   it('mengembalikan catatan dengan filter', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     await getCatatanWaliKelas({ siswaId: 's-1', kelasId: 'k-1' })
     expect(mockQuery.mock.calls[0][0]).toContain('cwk.siswa_id = $1')
@@ -454,6 +463,7 @@ describe('getRaportSikapEkskulData', () => {
   it('mengembalikan data lengkap untuk raport', async () => {
     mockQuery
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ count: '0' }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
 

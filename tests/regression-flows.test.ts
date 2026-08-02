@@ -113,7 +113,7 @@ async function dbCleanup() {
   await query("DELETE FROM in_app_notifications WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'test-regression-%')");
   await query("DELETE FROM skp_indikator WHERE skp_id IN (SELECT id FROM skp_tahunan WHERE guru_id IN (SELECT id FROM users WHERE email LIKE 'test-regression-%'))");
   await query("DELETE FROM skp_tahunan WHERE guru_id IN (SELECT id FROM users WHERE email LIKE 'test-regression-%')");
-  await query("DELETE FROM teacher_journals WHERE teacher_id IN (SELECT id FROM users WHERE email LIKE 'test-regression-%')");
+  await query("DELETE FROM teacher_journals WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'test-regression-%')");
   await query("DELETE FROM guru_administrasi WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'test-regression-%')");
   await query("DELETE FROM payload.institution_members_role WHERE parent_id IN (SELECT id FROM payload.institution_members WHERE app_user_id IN (SELECT id::varchar FROM users WHERE email LIKE 'test-regression-%'))");
   await query("DELETE FROM payload.institution_members_assigned_mapel WHERE _parent_id IN (SELECT id FROM payload.institution_members WHERE app_user_id IN (SELECT id::varchar FROM users WHERE email LIKE 'test-regression-%'))");
@@ -236,7 +236,7 @@ describe("Phase 0 - Regression Tests", () => {
     it("3. Top-up token pribadi menambah saldo dan tidak berinteraksi dengan institusi", async () => {
       // Setup User
       const userRes = await query(
-        `INSERT INTO users (email, whatsapp, nama_lengkap, token_limit, addon_token_balance)
+        `INSERT INTO users (email, whatsapp, nama_lengkap, quota_poin_total, addon_poin)
          VALUES ($1, $2, $3, 5, 0)
          RETURNING *`,
         ["test-regression-guru-topup@example.com", "08999111224", "Guru Topup Test"]
@@ -252,16 +252,16 @@ describe("Phase 0 - Regression Tests", () => {
       expect(nextAddon).toBe(20);
 
       // Verifikasi di DB
-      const dbCheck = await query("SELECT token_limit, addon_token_balance FROM users WHERE id = $1", [user.id]);
-      expect(dbCheck.rows[0].token_limit).toBe(15);
-      expect(dbCheck.rows[0].addon_token_balance).toBe(20);
+      const dbCheck = await query("SELECT quota_poin_total, addon_poin FROM users WHERE id = $1", [user.id]);
+      expect(dbCheck.rows[0].quota_poin_total).toBe(15);
+      expect(dbCheck.rows[0].addon_poin).toBe(20);
     });
 
     it("4. Masa aktif subscription individual dihitung dengan benar", () => {
       const activeEnd = new Date(Date.now() + 86400000 * 5).toISOString(); // Aktif 5 hari lagi
       const accessActive = evaluateTokenAccess({
         role: "guru",
-        tokenLimit: 10,
+        totalPoinAvailable: 10,
         subscriptionEnd: activeEnd,
       });
       expect(accessActive.allowed).toBe(true);
@@ -428,7 +428,8 @@ describe("Phase 0 - Regression Tests", () => {
       const adminGetRes = await adminGet(adminReq as any);
       const adminDocs = await adminGetRes.json();
       // Dokumen pribadi tetap muncul di response list
-      expect(adminDocs.some((d: any) => d.judul_dokumen === "Dokumen Pribadi 1")).toBe(true);
+      expect(Array.isArray(adminDocs.data)).toBe(true);
+      expect(adminDocs.data.some((d: any) => d.judul_dokumen === "Dokumen Pribadi 1")).toBe(true);
 
       // ----------------------------------------------------
       // STEP E: Guru Keluar (Leave) Institusi -> Jadi Read-Only

@@ -90,6 +90,7 @@ describe('activateTransaction', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [user] })
+    mockQuery.mockResolvedValueOnce({ rows: [user] })
 
     const result = await activateTransaction(tx.id)
 
@@ -99,7 +100,7 @@ describe('activateTransaction', () => {
       (c: any) => typeof c[0] === 'string' && c[0].includes('quota_poin_total')
     )
     expect(updateCalls.length).toBe(1)
-    expect(updateCalls[0][1][0]).toBe(1)
+    expect(updateCalls[0][1][0]).toBe(500)
     expect(updateCalls[0][1][1]).toBe('three_month')
 
     expect(vi.mocked(sendEventNotification)).toHaveBeenCalledWith(
@@ -122,6 +123,7 @@ describe('activateTransaction', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [user] })
+    mockQuery.mockResolvedValueOnce({ rows: [user] })
 
     const result = await activateTransaction(tx.id)
     expect(result.success).toBe(true)
@@ -130,7 +132,7 @@ describe('activateTransaction', () => {
       (c: any) => typeof c[0] === 'string' && c[0].includes('quota_poin_total')
     )
     expect(updateCalls.length).toBe(1)
-    expect(updateCalls[0][1][0]).toBe(2)
+    expect(updateCalls[0][1][0]).toBe(2500)
     expect(updateCalls[0][1][1]).toBe('one_year')
   })
 
@@ -147,6 +149,7 @@ describe('activateTransaction', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [user] })
+    mockQuery.mockResolvedValueOnce({ rows: [user] })
 
     const result = await activateTransaction(tx.id)
     expect(result.success).toBe(true)
@@ -155,7 +158,7 @@ describe('activateTransaction', () => {
       (c: any) => typeof c[0] === 'string' && c[0].includes('quota_poin_total')
     )
     expect(updateCalls.length).toBe(1)
-    expect(updateCalls[0][1][0]).toBe(1)
+    expect(updateCalls[0][1][0]).toBe(1100)
     expect(updateCalls[0][1][1]).toBe('six_month')
   })
 
@@ -171,6 +174,7 @@ describe('activateTransaction', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
+    mockQuery.mockResolvedValueOnce({ rows: [user] })
     mockQuery.mockResolvedValueOnce({ rows: [user] })
 
     await activateTransaction(tx.id)
@@ -196,6 +200,7 @@ describe('activateTransaction', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [user] })
+    mockQuery.mockResolvedValueOnce({ rows: [user] })
 
     await activateTransaction(tx.id)
 
@@ -218,6 +223,7 @@ describe('activateTransaction', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
+    mockQuery.mockResolvedValueOnce({ rows: [user] })
     mockQuery.mockResolvedValueOnce({ rows: [user] })
 
     await activateTransaction(tx.id)
@@ -244,6 +250,7 @@ describe('processSuccessPayment', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [user] })
+    mockQuery.mockResolvedValueOnce({ rows: [user] })
 
     const result = await processSuccessPayment('ext-001', 'XENDIT-VA', 120000)
     expect(result.success).toBe(true)
@@ -262,6 +269,7 @@ describe('processSuccessPayment', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
+    mockQuery.mockResolvedValueOnce({ rows: [user] })
     mockQuery.mockResolvedValueOnce({ rows: [user] })
 
     const result = await processSuccessPayment(tx.id, 'MOCK', 120000, true)
@@ -299,6 +307,7 @@ describe('processSuccessPayment', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
+    mockQuery.mockResolvedValueOnce({ rows: [user] })
     mockQuery.mockResolvedValueOnce({ rows: [user] })
 
     await processSuccessPayment('ext-001', 'XENDIT-VA', 120000)
@@ -340,6 +349,7 @@ describe('processSuccessPayment', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [user] })
+    mockQuery.mockResolvedValueOnce({ rows: [user] })
 
     const result = await processSuccessPayment('ext-001', 'CC', 400000)
     expect(result.success).toBe(true)
@@ -348,6 +358,6 @@ describe('processSuccessPayment', () => {
       (c: any) => typeof c[0] === 'string' && c[0].includes('quota_poin_total')
     )
     expect(updateCalls.length).toBe(1)
-    expect(updateCalls[0][1][0]).toBe(2)
+    expect(updateCalls[0][1][0]).toBe(2500)
   })
 })
