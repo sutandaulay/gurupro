@@ -9,10 +9,11 @@ import AdminManager from "@/components/admin/AdminManager";
 import SchoolRegistrationsManager from "@/components/admin/SchoolRegistrationsManager";
 import InstitutionsManager from "@/components/admin/InstitutionsManager";
 import NotificationBell from "@/components/admin/NotificationBell";
+import LibraryAdmin from "@/components/admin/LibraryAdmin";
 import { ToastProvider, useToast } from "@/components/admin/ToastNotification";
 
 function AdminPageContent() {
-  const [activeTab, setActiveTab] = useState<"users" | "transactions" | "cms" | "registrations" | "institutions" | "referrals" | "admins" | "settings" | "notifications">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "transactions" | "cms" | "registrations" | "institutions" | "referrals" | "admins" | "settings" | "notifications" | "library">("users");
   
   // Data States
   const [users, setUsers] = useState<any[]>([]);
@@ -77,6 +78,7 @@ function AdminPageContent() {
   const [editingUserId, setEditingUserId] = useState<any>(null);
   const [editUsername, setEditUsername] = useState<string>("");
   const [editTokenLimit, setEditTokenLimit] = useState<number>(0);
+  const [editAddonPoin, setEditAddonPoin] = useState<number>(0);
   const [editRole, setEditRole] = useState<string>("guru");
   const [editSubStart, setEditSubStart] = useState<string>("");
   const [editSubEnd, setEditSubEnd] = useState<string>("");
@@ -351,7 +353,8 @@ function AdminPageContent() {
   const startEditUser = (user: any) => {
     setEditingUserId(user.id);
     setEditUsername(user.username || "");
-    setEditTokenLimit(user.token_limit || 0);
+    setEditTokenLimit(user.quota_poin_total || 0);
+    setEditAddonPoin(user.addon_poin || 0);
     setEditRole(user.role || "guru");
     setEditSubStatus(user.status_langganan || "free");
     setEditIsActive(user.is_active !== false);
@@ -381,7 +384,8 @@ function AdminPageContent() {
         body: JSON.stringify({ 
           userId, 
           username: editUsername || null,
-          token_limit: editTokenLimit, 
+          quota_poin_total: editTokenLimit,
+          addon_poin: editAddonPoin, 
           role: editRole,
           subscription_start: editSubStart || null,
           subscription_end: editSubEnd || null,
@@ -1012,6 +1016,15 @@ function AdminPageContent() {
             >
               🔔 Kirim Notifikasi
             </button>
+
+            <button
+              onClick={() => setActiveTab("library")}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
+                activeTab === "library" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              📚 Perpustakaan Digital
+            </button>
           </div>
 
           {/* Search Inputs */}
@@ -1072,6 +1085,7 @@ function AdminPageContent() {
                       <th className="px-5 py-3.5">Masa Berlangganan</th>
                       <th className="px-5 py-3.5 text-center">Peran</th>
                       <th className="px-5 py-3.5 text-right">Kuota Poin</th>
+                      <th className="px-5 py-3.5 text-right">Poin Ekstra</th>
                       <th className="px-5 py-3.5 text-center">Kelola</th>
                     </tr>
                   </thead>
@@ -1212,12 +1226,19 @@ function AdminPageContent() {
                           <td className="px-5 py-4 text-right">
                             {isEditing ? (
                               <div className="flex flex-col gap-1 items-end">
-                                <label className="text-[9px] text-slate-400 font-bold uppercase">Poin</label>
+                                <label className="text-[9px] text-slate-400 font-bold uppercase">Kuota Poin</label>
                                 <input
                                   type="number"
                                   value={editTokenLimit}
                                   onChange={(e) => setEditTokenLimit(parseInt(e.target.value) || 0)}
                                   className="px-2 py-0.5 border border-slate-200 rounded text-right text-[10px] font-bold outline-none w-20 bg-white"
+                                />
+                                <label className="text-[9px] text-slate-400 font-bold uppercase mt-1">Ekstra</label>
+                                <input
+                                  type="number"
+                                  value={editAddonPoin}
+                                  onChange={(e) => setEditAddonPoin(parseInt(e.target.value) || 0)}
+                                  className="px-2 py-0.5 border border-slate-200 rounded text-right text-[10px] font-bold outline-none w-16 bg-white"
                                 />
                                 <label className="text-[9px] text-slate-400 font-bold uppercase mt-1">Reset Sandi</label>
                                 <input
@@ -1229,7 +1250,26 @@ function AdminPageContent() {
                                 />
                               </div>
                             ) : (
-                              <span className="font-bold text-slate-800 text-xs">{user.token_limit || 0} Poin</span>
+                              <span className="font-bold text-slate-800 text-xs">
+                                {(user.quota_poin_total || 0).toLocaleString("id-ID")} Poin
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            {isEditing ? (
+                              <div className="flex flex-col gap-1 items-end">
+                                <label className="text-[9px] text-slate-400 font-bold uppercase">Ekstra</label>
+                                <input
+                                  type="number"
+                                  value={editAddonPoin}
+                                  onChange={(e) => setEditAddonPoin(parseInt(e.target.value) || 0)}
+                                  className="px-2 py-0.5 border border-slate-200 rounded text-right text-[10px] font-bold outline-none w-16 bg-white"
+                                />
+                              </div>
+                            ) : (
+                              <span className="font-bold text-blue-700 text-xs">
+                                {(user.addon_poin || 0).toLocaleString("id-ID")}
+                              </span>
                             )}
                           </td>
                           <td className="px-5 py-4 text-center">
@@ -1616,6 +1656,8 @@ function AdminPageContent() {
                 )}
               </div>
             </div>
+          ) : activeTab === "library" ? (
+            <LibraryAdmin />
           ) : (
             <div className="p-6 space-y-8 animate-fadeIn">
               <div className="border-b border-slate-100 pb-4">

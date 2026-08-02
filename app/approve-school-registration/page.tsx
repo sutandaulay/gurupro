@@ -1,10 +1,18 @@
 'use client'
 import { apiFetch } from "@/lib/api-client";
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function ApproveSchoolRegistrationPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">Memuat...</div>}>
+      <ApproveSchoolRegistrationInner />
+    </Suspense>
+  )
+}
+
+function ApproveSchoolRegistrationInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')

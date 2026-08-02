@@ -5,11 +5,8 @@ import { db, query } from '@/lib/db';
 import { 
   attendanceLogs, 
   attendanceSummary,
-  institutions as institutionsTable,
-  teacherInstitutionAssignments,
-  formatInstitution
 } from '@/lib/schemas/attendance';
-import { eq, and, desc, isNull } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { subMinutes } from 'date-fns';
 
@@ -61,6 +58,7 @@ export async function POST(req: Request) {
     let schoolId = validatedData.schoolId;
     let institutionLocation: { latitude: number; longitude: number } = { latitude: -6.2088, longitude: 106.8456 };
     let attendanceSettings: any = { classSessionRadiusMeters: 150 };
+    let assignment: { id: string; teacherId: string; institutionId: number } | null = null;
 
     if (schoolId) {
       // Mode sekolah mandiri
@@ -83,19 +81,35 @@ export async function POST(req: Request) {
         classSessionRadiusMeters: school.attendance_radius_meters || 150,
       };
       institutionIdNum = parseInt(school.id, 10);
+      assignment = {
+        id: uuidv4(),
+        teacherId: userId,
+        institutionId: institutionIdNum,
+      };
     } else if (parsedInstId > 0) {
-      // Mode institusi terinstansi
-      const [assignment] = await db.select()
-        .from(teacherInstitutionAssignments)
-        .where(and(
-          eq(teacherInstitutionAssignments.teacherId, userId),
-          eq(teacherInstitutionAssignments.institutionId, parsedInstId),
-          eq(teacherInstitutionAssignments.status, 'aktif')
-        ));
-      
-      if (!assignment) {
-        return NextResponse.json({ error: 'Assignment tidak ditemukan atau tidak aktif' }, { status: 404 });
+      // Mode institusi terinstansi — cari membership di payload.institution_members
+      const memberResult = await query(`
+        SELECT 
+          im.id,
+          im.institution_id as "institutionId"
+        FROM payload.institution_members im
+        LEFT JOIN payload.institution_members_role imr ON imr.parent_id = im.id
+        WHERE im.app_user_id = $1 
+          AND im.institution_id = $2
+          AND im.status = 'active'
+        LIMIT 1
+      `, [userId, parsedInstId]);
+
+      const memberRow = memberResult.rows[0];
+      if (!memberRow) {
+        return NextResponse.json({ error: 'Anda tidak terdaftar sebagai anggota institusi ini' }, { status: 404 });
       }
+
+      assignment = {
+        id: uuidv4(),
+        teacherId: userId,
+        institutionId: parseInt(memberRow.institutionId, 10),
+      };
 
       // Dapatkan setting institusi
       const instResult = await query(`
@@ -124,6 +138,10 @@ export async function POST(req: Request) {
     } else {
       return NextResponse.json({ error: 'institutionId atau schoolId wajib diisi' }, { status: 400 });
     }
+
+    if (!assignment) {
+      return NextResponse.json({ error: 'Assignment tidak valid' }, { status: 400 });
+    }
     
     const distance = calculateDistance(
       validatedData.latitude,
@@ -151,11 +169,19 @@ export async function POST(req: Request) {
         eq(attendanceLogs.subjectId, validatedData.subjectId)
       ));
 
-    // Check if there's an open session (classSessionId not marked as closed)
-    // We mark a session as closed by setting classSessionId to the end log ID
+    // Check if there's an open session (no matching end log exists)
+    const endLogs = await db.select({ classSessionId: attendanceLogs.classSessionId })
+      .from(attendanceLogs)
+      .where(and(
+        eq(attendanceLogs.teacherId, userId),
+        eq(attendanceLogs.type, 'mengajar_selesai'),
+        eq(attendanceLogs.subjectId, validatedData.subjectId)
+      ));
+
+    const closedSessionIds = new Set(endLogs.map(log => log.classSessionId));
+
     const openSession = activeSessions.find(session => {
-      // If classSessionId is not set or is different from expected closed format, it's open
-      return !session.classSessionId || !session.classSessionId.startsWith('closed_');
+      return !session.classSessionId || !closedSessionIds.has(session.classSessionId);
     });
 
     if (openSession) {
@@ -187,7 +213,7 @@ export async function POST(req: Request) {
     const [attendanceLog] = await db.insert(attendanceLogs).values({
       id: sessionUuid,
       teacherId: userId,
-      institutionId: parseInt(validatedData.institutionId, 10),
+      institutionId: assignment.institutionId,
       assignmentId: assignment.id,
       type: 'mengajar_mulai',
       classSessionId: validatedData.classSessionId || validatedData.sessionId, // ID sesi kelas
@@ -210,7 +236,7 @@ export async function POST(req: Request) {
     // Update atau buat summary harian
     await updateDailyAttendanceSummary(
       userId, 
-      parseInt(validatedData.institutionId, 10), 
+      assignment.institutionId, 
       validatedData.subjectId
     );
 
@@ -320,9 +346,12 @@ async function updateDailyAttendanceSummary(teacherId: string, institutionId: nu
 
   if (existingSummary) {
     // Update summary yang ada dengan informasi sesi mengajar
-    const updatedTeachingMinutesBySubject = existingSummary.teachingMinutesBySubject 
-      ? { ...JSON.parse(existingSummary.teachingMinutesBySubject as string), [subjectId]: 0 } 
-      : { [subjectId]: 0 };
+    const currentTeachingMinutesBySubject = existingSummary.teachingMinutesBySubject 
+      ? (typeof existingSummary.teachingMinutesBySubject === 'string'
+        ? JSON.parse(existingSummary.teachingMinutesBySubject)
+        : existingSummary.teachingMinutesBySubject)
+      : {};
+    const updatedTeachingMinutesBySubject = { ...currentTeachingMinutesBySubject, [subjectId]: 0 };
     
     await db.update(attendanceSummary)
       .set({

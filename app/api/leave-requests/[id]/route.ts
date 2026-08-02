@@ -7,7 +7,6 @@ import {
   leaveRequests, 
   attendanceSummary,
   institutions as institutionsTable,
-  institutionMembers
 } from '@/lib/schemas/attendance';
 import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
@@ -45,11 +44,13 @@ export async function PATCH(
 
     // Cek akses berdasarkan institusi
     // User hanya bisa mengakses izin di institusi yang mereka miliki akses
-    const userInstitutionMembers = await db.select().from(institutionMembers)
-      .where(and(
-        eq(institutionMembers.userId, session.user.id),
-        eq(institutionMembers.institutionId, existingRequest.institutionId)
-      ));
+    const membersResult = await query(`
+      SELECT im.*, imr.value as "role"
+      FROM payload.institution_members im
+      LEFT JOIN payload.institution_members_role imr ON imr.parent_id = im.id
+      WHERE im.app_user_id = $1 AND im.institution_id = $2
+    `, [session.user.id, existingRequest.institutionId]);
+    const userInstitutionMembers = membersResult.rows;
 
     if (userInstitutionMembers.length === 0 && session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden: Anda tidak memiliki akses ke institusi ini' }, { status: 403 });
@@ -216,11 +217,13 @@ export async function GET(
 
     // Cek akses: admin bisa lihat semua, user hanya bisa lihat di institusi yang mereka miliki akses
     if (session.user.role !== 'admin') {
-      const userInstitutionMembers = await db.select().from(institutionMembers)
-        .where(and(
-          eq(institutionMembers.userId, session.user.id),
-          eq(institutionMembers.institutionId, leaveRequest.institutionId)
-        ));
+      const membersResult2 = await query(`
+        SELECT im.*, imr.value as "role"
+        FROM payload.institution_members im
+        LEFT JOIN payload.institution_members_role imr ON imr.parent_id = im.id
+        WHERE im.app_user_id = $1 AND im.institution_id = $2
+      `, [session.user.id, leaveRequest.institutionId]);
+      const userInstitutionMembers = membersResult2.rows;
 
       if (userInstitutionMembers.length === 0) {
         return NextResponse.json({ error: 'Forbidden: Anda tidak memiliki akses ke institusi ini' }, { status: 403 });

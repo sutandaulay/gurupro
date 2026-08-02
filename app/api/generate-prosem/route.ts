@@ -1,6 +1,6 @@
 import { generateAIContentWithUsage } from "@/lib/ai";
 import { query } from "@/lib/db";
-import { getUserPoinAccess, logFailedPoinUsage } from "@/src/services/poin-service";
+import { getUserPoinAccess } from "@/src/services/poin-service";
 import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
@@ -157,6 +157,9 @@ Hasilkan seluruh dokumen PROSEM tersebut langsung dalam format Markdown dengan t
     let aiResult: Awaited<ReturnType<typeof generateAIContentWithUsage>> | null = null;
     try {
       aiResult = await generateAIContentWithUsage(prompt, undefined, false);
+      if (!aiResult?.text) {
+        throw new Error("AI mengembalikan respons kosong");
+      }
       const cleanMarkdown = aiResult.text.trim();
       const docTitle = `Program Semester (Prosem) - ${mapel} ${kelas || ''} ${semesterLabel} ${tahun_ajaran || ''}`;
 
@@ -184,9 +187,10 @@ Hasilkan seluruh dokumen PROSEM tersebut langsung dalam format Markdown dengan t
       parsed.pdf_url = pdfUrl;
       parsed.docx_url = docxUrl;
 
-    } catch (aiError: any) {
+    } catch (aiError: unknown) {
       console.error("Prosem AI generation failed:", aiError);
-      return NextResponse.json({ error: `Gagal generate Prosem: ${aiError.message}` }, { status: 502 });
+      const aiMsg = aiError instanceof Error ? aiError.message : String(aiError ?? "Unknown error");
+      return NextResponse.json({ error: `Gagal generate Prosem: ${aiMsg}` }, { status: 502 });
     }
 
     // Save
@@ -217,20 +221,20 @@ Hasilkan seluruh dokumen PROSEM tersebut langsung dalam format Markdown dengan t
       console.error("Failed to save prosem:", dbErr);
     }
 
-    // Deduct Poin based on actual usage
-    if (user.role !== "admin") {
+    // Deduct Poin only if AI was used and succeeded
+    if (user.role !== "admin" && aiResult?.usage) {
       try {
-          await deductPoinFromAIResult({ success: true, usage: aiResult?.usage || null }, userId, "generate-prosem", {});
-
-          console.log(`[Generate Prosem] Poin deducted`);
+        await deductPoinFromAIResult({ success: true, usage: aiResult.usage }, userId, "generate-prosem", {});
+        console.log(`[Generate Prosem] Poin deducted`);
       } catch (poinError) {
         console.error("[Generate Prosem] Poin deduction failed:", poinError);
       }
     }
 
     return NextResponse.json(parsed);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Prosem Generation Error:", error);
-    return NextResponse.json({ error: error.message || "Gagal generate Prosem" }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error ?? "Unknown error");
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

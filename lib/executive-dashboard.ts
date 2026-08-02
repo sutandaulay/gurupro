@@ -15,6 +15,7 @@ export interface ExecDashboard {
   completionRateSelesaiMengajar: number; // persen guru yang sudah submit jurnal minggu ini
   progressPerMapel: { mapel: string; progress: number; total: number; persen: number }[];
   topGuru: { nama: string; sesi: number }[];
+  latestLaporanMengajar: { id: string; tanggal: string; guru_nama: string; kelas: string; mapel: string; status: string }[];
 }
 
 function awalMingguIni(now = new Date()): { start: Date; end: Date } {
@@ -115,6 +116,29 @@ export async function buildExecDashboard(institutionId: number, now = new Date()
     .sort((a, b) => b.sesi - a.sesi)
     .slice(0, 5);
 
+  // Latest 5 teaching reports
+  const latestRes = await query(
+    `SELECT tj.id, tj.tanggal, u.nama_lengkap as guru_nama,
+            c.nama_kelas as kelas, s.nama_mapel as mapel, tj.status
+     FROM teacher_journals tj
+     JOIN institution_members im ON im.user_id = tj.teacher_id AND im.status = 'active'
+     JOIN users u ON u.id = tj.teacher_id
+     JOIN classes c ON c.id = tj.class_id
+     JOIN subjects s ON s.id = tj.subject_id
+     WHERE im.institution_id = $1
+     ORDER BY tj.tanggal DESC
+     LIMIT 5`,
+    [institutionId]
+  );
+  const latestLaporanMengajar = latestRes.rows.map((r: any) => ({
+    id: r.id,
+    tanggal: r.tanggal?.toISOString().split('T')[0] || '',
+    guru_nama: r.guru_nama || 'Guru',
+    kelas: r.kelas || '-',
+    mapel: r.mapel || '-',
+    status: r.status || '-',
+  }));
+
   return {
     institutionId,
     weekStart: startStr,
@@ -126,5 +150,6 @@ export async function buildExecDashboard(institutionId: number, now = new Date()
     completionRateSelesaiMengajar,
     progressPerMapel,
     topGuru,
+    latestLaporanMengajar,
   };
 }

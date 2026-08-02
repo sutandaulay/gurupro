@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query, logAudit } from '@/lib/db';
 import { cookies } from 'next/headers';
-import { hitungNilaiAkhirMapel } from '@/lib/raport/agregatorNilai';
+
 
 export async function POST(req: Request) {
   try {
@@ -54,41 +54,89 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Nilai mapel tidak ditemukan' }, { status: 404 });
     }
 
+    // Batch #1: ambil semua assessments + student_grades untuk SEMUA mapel
+    const allMapelIds = nilaiMapelRes.rows.map(r => r.mapel_id);
+    const wherePeriode = raport.periode ? `AND a.periode = $4` : '';
+    const paramsPeriode = raport.periode
+      ? [raport.siswa_id, raport.kelas_id, allMapelIds, raport.periode]
+      : [raport.siswa_id, raport.kelas_id, allMapelIds];
+
+    const assessmentsRes = allMapelIds.length > 0 ? await query(
+      `SELECT a.id, a.subject_id, a.nama_asesmen,
+              COALESCE(a.is_akhir_semester, false) as is_akhir_semester,
+              a.kkm,
+              sg.nilai_akhir as nilai
+       FROM assessments a
+       LEFT JOIN student_grades sg ON sg.assessment_id = a.id AND sg.student_id = $1
+       WHERE a.class_id = $2
+         AND a.subject_id = ANY($3::uuid[])
+         AND a.tipe_asesmen IN ('sumatif', 'Sumatif')
+       ${wherePeriode}
+       ORDER BY a.subject_id, a.created_at ASC`,
+      paramsPeriode
+    ) : { rows: [] };
+
+    const asesmenByMapel = new Map();
+    for (const row of assessmentsRes.rows) {
+      const list = asesmenByMapel.get(row.subject_id);
+      if (list) { list.push(row); } else { asesmenByMapel.set(row.subject_id, [row]); }
+    }
+
     const results: any[] = [];
     let updatedCount = 0;
     let errorCount = 0;
 
     for (const row of nilaiMapelRes.rows) {
-      const hasil = await hitungNilaiAkhirMapel(
-        raport.kelas_id,
-        row.mapel_id,
-        raport.siswa_id,
-        raport.periode
-      );
+      const rowsAsesmen = asesmenByMapel.get(row.mapel_id) || [];
 
-      if (hasil.status === 'lengkap' && hasil.nilaiAkhir !== null) {
+      if (rowsAsesmen.length === 0) {
+        errorCount++;
+        results.push({ mapel_id: row.mapel_id, nama_mapel: row.nama_mapel, status: 'belum_lengkap' });
+        continue;
+      }
+
+      const materiRows = rowsAsesmen.filter(r => !r.is_akhir_semester);
+      const asRow = rowsAsesmen.find(r => r.is_akhir_semester);
+      const kkm = asRow?.kkm ?? rowsAsesmen[0]?.kkm ?? null;
+
+      if (!asRow || asRow.nilai === null) {
+        const rataMateri = materiRows.length > 0 && materiRows.every((r: any) => r.nilai !== null)
+          ? Math.round(materiRows.reduce((sum: number, r: any) => sum + Number(r.nilai), 0) / materiRows.length * 10) / 10
+          : null;
+        errorCount++;
+        results.push({ mapel_id: row.mapel_id, nama_mapel: row.nama_mapel, status: 'belum_lengkap', detail: { rataRataSumatifMateri: rataMateri, nilaiAkhirSemester: null, countMateri: materiRows.length } });
+        continue;
+      }
+
+      const validMateri = materiRows.filter(r => r.nilai !== null);
+
+      if (validMateri.length !== materiRows.length && validMateri.length === 0) {
+        errorCount++;
+        results.push({ mapel_id: row.mapel_id, nama_mapel: row.nama_mapel, status: 'belum_lengkap', detail: { rataRataSumatifMateri: null, nilaiAkhirSemester: Number(asRow.nilai), countMateri: materiRows.length } });
+        continue;
+      }
+
+      let nilaiAkhir: number | null = null;
+
+      if (validMateri.length > 0) {
+        const rataS = validMateri.reduce((sum: number, r: any) => sum + Number(r.nilai), 0) / validMateri.length;
+        nilaiAkhir = Math.round(((rataS + Number(asRow.nilai)) / 2) * 10) / 10;
+      } else {
+        nilaiAkhir = Math.round(Number(asRow.nilai) * 10) / 10;
+      }
+
+      if (nilaiAkhir !== null) {
         await query(
           `UPDATE data_raport_nilai_mapel
            SET nilai_akhir = $1, kkm = $2, updated_at = now()
            WHERE id = $3`,
-          [hasil.nilaiAkhir, hasil.kkm, row.nilai_mapel_id]
+          [nilaiAkhir, kkm, row.nilai_mapel_id]
         );
         updatedCount++;
-        results.push({
-          mapel_id: row.mapel_id,
-          nama_mapel: row.nama_mapel,
-          nilai_akhir: hasil.nilaiAkhir,
-          kkm: hasil.kkm,
-          status: 'updated',
-        });
+        results.push({ mapel_id: row.mapel_id, nama_mapel: row.nama_mapel, nilai_akhir: nilaiAkhir, kkm, status: 'updated' });
       } else {
         errorCount++;
-        results.push({
-          mapel_id: row.mapel_id,
-          nama_mapel: row.nama_mapel,
-          status: 'belum_lengkap',
-          detail: hasil.detail,
-        });
+        results.push({ mapel_id: row.mapel_id, nama_mapel: row.nama_mapel, status: 'belum_lengkap', detail: 'Gagal hitung nilai akhir' });
       }
     }
 

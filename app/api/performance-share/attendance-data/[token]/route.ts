@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getPayload } from '@/lib/payload';
 import { COLLECTIONS } from '@/collections/config';
-import { db } from '@/lib/db';
+import { db, query } from '@/lib/db';
 import { 
   attendanceSummary,
   institutions as institutionsTable,
-  institutionMembers,
-  teacherInstitutionAssignments
 } from '@/lib/schemas/attendance';
 import { eq, and, gte, lte, inArray } from 'drizzle-orm';
 import { parseISO, startOfWeek, endOfWeek, format, eachDayOfInterval } from 'date-fns';
@@ -59,15 +57,12 @@ export async function GET(
     // atau kita harus menentukan institusi berdasarkan konteks sharing
 
     // Untuk sementara, kita ambil semua institusi aktif tempat guru mengajar
-    const teacherAssignments = await db.select({
-      institutionId: teacherInstitutionAssignments.institutionId,
-      assignmentId: teacherInstitutionAssignments.id,
-    })
-    .from(teacherInstitutionAssignments)
-    .where(and(
-      eq(teacherInstitutionAssignments.teacherId, teacherId),
-      eq(teacherInstitutionAssignments.status, 'aktif')
-    ));
+    const assignmentsResult = await query(`
+      SELECT institution_id as "institutionId"
+      FROM payload.institution_members
+      WHERE app_user_id = $1 AND status = 'active'
+    `, [teacherId]);
+    const teacherAssignments = assignmentsResult.rows;
 
     // Ambil rentang minggu ini
     const now = new Date();

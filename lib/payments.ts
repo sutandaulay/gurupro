@@ -6,10 +6,11 @@ import { sendEventNotification } from "./notifications";
  */
 async function getPlanDetails(planKey: string) {
   // Try to find by id (UUID) or package_name (legacy key)
+  // Cast $1 to text for LOWER() comparison to avoid UUID type conflict
   const res = await query(
     `SELECT id, package_name, tokens, duration_days, price
      FROM pricing_plans
-     WHERE (id = $1 OR LOWER(package_name) = LOWER($1))
+     WHERE (id = $1 OR LOWER(package_name) = LOWER($1::text))
        AND is_active = true
      LIMIT 1`,
     [planKey]
@@ -64,8 +65,8 @@ export async function activateTransaction(transactionId: string): Promise<{ succ
   }
 
   const tokensToAdd = Number(plan.tokens || 0);
-  // Konversi token legacy -> Poin (pakai rasio default awal 2000, ceil min 1)
-  const poinToAdd = Math.max(1, Math.ceil((Number(plan.poin) || tokensToAdd) / 2000));
+  // plan.tokens = jumlah Poin yang admin masukkan di CMS Landing Page > Paket
+  const poinToAdd = Math.max(1, tokensToAdd);
   const durationDays = Number(plan.duration_days || 30);
   const planName = plan.package_name || plan.id;
   const newPlanKey = plan.id; // Use the actual pricing_plans ID as the status_langganan
@@ -104,6 +105,46 @@ export async function activateTransaction(transactionId: string): Promise<{ succ
      VALUES ($1, $2, $3, $4)`,
     [userId, "Aktivasi Paket", `Aktivasi paket ${planName} (+${tokensToAdd} Poin) secara otomatis`, "127.0.0.1"]
   );
+
+  // Referral reward: jika referee BAYAR langganan, referrer dapat cashback + Poin
+  // Cek: referee harus punya referred_by, dan BELUM ada record referral sebelumnya
+  if (poinToAdd > 0) {
+    const refereeRes = await query("SELECT referred_by FROM users WHERE id = $1", [userId]);
+    const referredBy = refereeRes.rows[0]?.referred_by;
+    if (referredBy) {
+      const existingRef = await query(
+        "SELECT id FROM referrals WHERE referrer_id = $1 AND referee_id = $2",
+        [referredBy, userId]
+      );
+      if (existingRef.rows.length === 0) {
+      // Tiered reward: 6 bulan (180 hari) / 1 tahun (365 hari) → +20 Poin + Rp10.000 cashback
+      // 3 bulan (90 hari) → +20 Poin only, NO cashback
+      const cashbackAmount = durationDays >= 180 ? 10000 : 0;
+      const cashbackDesc = durationDays >= 180 ? "+20 Poin & Rp10.000 cashback" : "+20 Poin";
+      await query(
+        `INSERT INTO referrals (referrer_id, referee_id, reward_tokens, cashback_amount)
+         VALUES ($1, $2, 20, $3)`,
+        [referredBy, userId, cashbackAmount]
+      );
+      await query(
+        `UPDATE users SET quota_poin_total = GREATEST(0, COALESCE(quota_poin_total, 0)) + 20${cashbackAmount > 0 ? ", cashback_balance = cashback_balance + 10000" : ""} WHERE id = $1`,
+        [referredBy]
+      );
+      await query(
+        `INSERT INTO audit_trails (user_id, aksi, deskripsi, ip_address)
+         VALUES ($1, $2, $3, $4)`,
+        [referredBy, "Referral Bonus", `Referral berhasil (referee bayar: ${planName}, ${durationDays} hari) - ${cashbackDesc}`, "127.0.0.1"]
+      );
+      try {
+        await query(
+          `INSERT INTO in_app_notifications (user_id, title, body, type, reference_type, reference_id, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+          [referredBy, "Bonus Referral! 🎉", `Referral berhasil! Teman Anda (${planName}) telah bayar. Anda mendapat ${cashbackDesc}!`, "success", "referral_bonus", userId]
+        );
+      } catch { /* notification non-critical */ }
+      }
+    }
+  }
 
   // Send notification
   const userRes = await query("SELECT email, whatsapp, nama_lengkap FROM users WHERE id = $1", [userId]);

@@ -9,6 +9,7 @@
 
 import { query } from '@/lib/db';
 import { getWaliKelasForKelas, getActiveTahunAjaran, getCurrentSemester } from '@/lib/wali-kelas';
+import type { PaginationParams } from '@/lib/pagination';
 import {
   PenilaianSikapCreate,
   PenilaianSikapUpdate,
@@ -98,8 +99,20 @@ export async function insertPenilaianSikap(
 
   // RBAC: Validate actor is active homeroom teacher for this class
   const waliKelas = await getWaliKelasForKelas(input.kelasId, tahunAjar, semesterEnum);
-  if (!waliKelas || waliKelas.waliKelasMemberId !== actorMemberId) {
-    throw new Error('Hanya wali kelas aktif kelas ini yang bisa mengisi sikap siswa');
+  const isWaliKelasValid = waliKelas && waliKelas.waliKelasMemberId === actorMemberId;
+  if (!isWaliKelasValid) {
+    // Fallback: check classes.wali_kelas_user_id (legacy system from Master Data checkbox)
+    const fallback = await query(
+      `SELECT 1 FROM classes c
+       WHERE c.id = $1 AND c.wali_kelas_user_id = (
+         SELECT im.app_user_id FROM institution_members im WHERE im.id = $2
+       )
+       LIMIT 1`,
+      [input.kelasId, actorMemberId]
+    );
+    if (fallback.rows.length === 0) {
+      throw new Error('Hanya wali kelas aktif kelas ini yang bisa mengisi sikap siswa');
+    }
   }
 
   // Validate siswa belongs to this kelas
@@ -181,8 +194,9 @@ export async function updatePenilaianSikap(
  * Get penilaian sikap with filters
  */
 export async function getPenilaianSikap(
-  filters: PenilaianSikapQuery
-): Promise<PenilaianSikapResponse[]> {
+  filters: PenilaianSikapQuery,
+  pagination?: PaginationParams
+): Promise<{ data: PenilaianSikapResponse[]; total: number }> {
   const conditions: string[] = [];
   const params: any[] = [];
   let idx = 1;
@@ -209,16 +223,31 @@ export async function getPenilaianSikap(
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const countResult = await query(
+    `SELECT COUNT(*) FROM penilaian_sikap ps
+     LEFT JOIN students s ON s.id = ps.siswa_id
+     ${where}`,
+    params
+  );
+  const total = parseInt(countResult.rows[0].count, 10);
+
+  let limitOffset = '';
+  if (pagination) {
+    const off = (pagination.page - 1) * pagination.limit;
+    limitOffset = ` LIMIT ${pagination.limit} OFFSET ${off}`;
+  }
+
   const result = await query(
     `SELECT ps.*, s.nama_siswa
      FROM penilaian_sikap ps
      LEFT JOIN students s ON s.id = ps.siswa_id
      ${where}
-     ORDER BY ps.created_at DESC`,
+     ORDER BY ps.created_at DESC${limitOffset}`,
     params
   );
 
-  return result.rows.map(mapPenilaianSikapRowToResponse);
+  return { data: result.rows.map(mapPenilaianSikapRowToResponse), total };
 }
 
 /**
@@ -323,8 +352,9 @@ export async function updateEkstrakurikuler(
  * Get ekstrakurikuler with filters
  */
 export async function getEkstrakurikuler(
-  filters: EkstrakurikulerQuery
-): Promise<EkstrakurikulerResponse[]> {
+  filters: EkstrakurikulerQuery,
+  pagination?: PaginationParams
+): Promise<{ data: EkstrakurikulerResponse[]; total: number }> {
   const conditions: string[] = [];
   const params: any[] = [];
   let idx = 1;
@@ -343,23 +373,39 @@ export async function getEkstrakurikuler(
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const countResult = await query(
+    `SELECT COUNT(*) FROM ekstrakurikuler e
+     LEFT JOIN classes c ON c.id = e.kelas_id
+     ${where}`,
+    params
+  );
+  const total = parseInt(countResult.rows[0].count, 10);
+
+  let limitOffset = '';
+  if (pagination) {
+    const off = (pagination.page - 1) * pagination.limit;
+    limitOffset = ` LIMIT ${pagination.limit} OFFSET ${off}`;
+  }
+
   const result = await query(
     `SELECT e.*, c.nama_kelas, c.school_id
      FROM ekstrakurikuler e
      LEFT JOIN classes c ON c.id = e.kelas_id
      ${where}
-     ORDER BY e.nama_ekskul ASC`,
+     ORDER BY e.nama_ekskul ASC${limitOffset}`,
     params
   );
 
-  return result.rows.map(mapEkstrakurikulerRowToResponse);
+  return { data: result.rows.map(mapEkstrakurikulerRowToResponse), total };
 }
 
 /**
  * Get ekskul by pembina (for pembina's dashboard)
  */
 export async function getEkskulByPembina(pembinaMemberId: string): Promise<EkstrakurikulerResponse[]> {
-  return getEkstrakurikuler({ pembinaMemberId });
+  const result = await getEkstrakurikuler({ pembinaMemberId });
+  return result.data;
 }
 
 function mapEkstrakurikulerRowToResponse(row: any): EkstrakurikulerResponse & { namaKelas?: string } {
@@ -468,8 +514,9 @@ export async function updatePenilaianEkstrakurikuler(
  * Get penilaian ekstrakurikuler with filters
  */
 export async function getPenilaianEkstrakurikuler(
-  filters: PenilaianEkstrakurikulerQuery
-): Promise<PenilaianEkstrakurikulerResponse[]> {
+  filters: PenilaianEkstrakurikulerQuery,
+  pagination?: PaginationParams
+): Promise<{ data: PenilaianEkstrakurikulerResponse[]; total: number }> {
   const conditions: string[] = [];
   const params: any[] = [];
   let idx = 1;
@@ -492,17 +539,33 @@ export async function getPenilaianEkstrakurikuler(
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const countResult = await query(
+    `SELECT COUNT(*) FROM penilaian_ekstrakurikuler pe
+     LEFT JOIN students s ON s.id = pe.siswa_id
+     LEFT JOIN ekstrakurikuler e ON e.id = pe.ekstrakurikuler_id
+     ${where}`,
+    params
+  );
+  const total = parseInt(countResult.rows[0].count, 10);
+
+  let limitOffset = '';
+  if (pagination) {
+    const off = (pagination.page - 1) * pagination.limit;
+    limitOffset = ` LIMIT ${pagination.limit} OFFSET ${off}`;
+  }
+
   const result = await query(
     `SELECT pe.*, s.nama_siswa, e.nama_ekskul
      FROM penilaian_ekstrakurikuler pe
      LEFT JOIN students s ON s.id = pe.siswa_id
      LEFT JOIN ekstrakurikuler e ON e.id = pe.ekstrakurikuler_id
      ${where}
-     ORDER BY pe.created_at DESC`,
+     ORDER BY pe.created_at DESC${limitOffset}`,
     params
   );
 
-  return result.rows.map(mapPenilaianEkstrakurikulerRowToResponse);
+  return { data: result.rows.map(mapPenilaianEkstrakurikulerRowToResponse), total };
 }
 
 /**
@@ -512,7 +575,8 @@ export async function getEkskulForRaport(
   siswaId: string,
   periode: string
 ): Promise<PenilaianEkstrakurikulerResponse[]> {
-  return getPenilaianEkstrakurikuler({ siswaId, periode });
+  const result = await getPenilaianEkstrakurikuler({ siswaId, periode });
+  return result.data;
 }
 
 function mapPenilaianEkstrakurikulerRowToResponse(
@@ -552,8 +616,20 @@ export async function upsertCatatanWaliKelas(
 
   // RBAC: Validate actor is active homeroom teacher for this class
   const waliKelas = await getWaliKelasForKelas(input.kelasId, tahunAjar, semesterEnum);
-  if (!waliKelas || waliKelas.waliKelasMemberId !== actorMemberId) {
-    throw new Error('Hanya wali kelas aktif kelas ini yang bisa menulis catatan');
+  const isWaliKelasValid = waliKelas && waliKelas.waliKelasMemberId === actorMemberId;
+  if (!isWaliKelasValid) {
+    // Fallback: check classes.wali_kelas_user_id (legacy system from Master Data checkbox)
+    const fallback = await query(
+      `SELECT 1 FROM classes c
+       WHERE c.id = $1 AND c.wali_kelas_user_id = (
+         SELECT im.app_user_id FROM institution_members im WHERE im.id = $2
+       )
+       LIMIT 1`,
+      [input.kelasId, actorMemberId]
+    );
+    if (fallback.rows.length === 0) {
+      throw new Error('Hanya wali kelas aktif kelas ini yang bisa menulis catatan');
+    }
   }
 
   // Validate siswa belongs to this kelas
@@ -583,8 +659,9 @@ export async function upsertCatatanWaliKelas(
  * Get catatan wali kelas with filters
  */
 export async function getCatatanWaliKelas(
-  filters: CatatanWaliKelasQuery
-): Promise<CatatanWaliKelasResponse[]> {
+  filters: CatatanWaliKelasQuery,
+  pagination?: PaginationParams
+): Promise<{ data: CatatanWaliKelasResponse[]; total: number }> {
   const conditions: string[] = [];
   const params: any[] = [];
   let idx = 1;
@@ -607,16 +684,31 @@ export async function getCatatanWaliKelas(
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const countResult = await query(
+    `SELECT COUNT(*) FROM catatan_wali_kelas cwk
+     LEFT JOIN students s ON s.id = cwk.siswa_id
+     ${where}`,
+    params
+  );
+  const total = parseInt(countResult.rows[0].count, 10);
+
+  let limitOffset = '';
+  if (pagination) {
+    const off = (pagination.page - 1) * pagination.limit;
+    limitOffset = ` LIMIT ${pagination.limit} OFFSET ${off}`;
+  }
+
   const result = await query(
     `SELECT cwk.*, s.nama_siswa
      FROM catatan_wali_kelas cwk
      LEFT JOIN students s ON s.id = cwk.siswa_id
      ${where}
-     ORDER BY cwk.updated_at DESC`,
+     ORDER BY cwk.updated_at DESC${limitOffset}`,
     params
   );
 
-  return result.rows.map(mapCatatanWaliKelasRowToResponse);
+  return { data: result.rows.map(mapCatatanWaliKelasRowToResponse), total };
 }
 
 /**

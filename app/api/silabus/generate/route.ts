@@ -195,13 +195,12 @@ export async function POST(req: Request) {
       console.error('Failed to save Silabus:', dbErr);
     }
 
-    // Deduct Poin based on actual usage (skip for admins)
-    if (currentUser.role !== 'admin') {
+    // Deduct Poin only if AI was used and succeeded (skip for admins)
+    if (currentUser.role !== 'admin' && aiResult?.usage) {
       try {
-          await deductPoinFromAIResult({ success: true, usage: aiResult?.usage || null }, userId, 'generate-silabus', {});
-
-          console.log(`[Generate Silabus] Poin deducted`);
-        } catch (poinError: any) {
+        await deductPoinFromAIResult({ success: true, usage: aiResult.usage }, userId, 'generate-silabus', {});
+        console.log(`[Generate Silabus] Poin deducted`);
+      } catch (poinError: any) {
         console.error('[Silabus] Poin deduction failed:', poinError);
       }
     }

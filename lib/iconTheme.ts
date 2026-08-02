@@ -119,7 +119,7 @@ export const iconMap: Record<string, { icon: any; category: MenuCategory }> = {
   "Buku Nilai": { icon: BookOpen, category: "academic" },
   "Laporan": { icon: FileBarChart, category: "reports" },
   "Raport": { icon: ClipboardList, category: "raport" },
-  "Laporan Harian": { icon: FileText, category: "reports" },
+  "Laporan Harian & Mengajar": { icon: FileText, category: "reports" },
   "Laporan Kinerja": { icon: FileBarChart, category: "reports" },
   "Evidence": { icon: FolderOpen, category: "reports" },
   "Status Raport": { icon: ClipboardList, category: "raport" },

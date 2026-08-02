@@ -40,7 +40,7 @@ const STEP_RESULTS = [
     icon: IconUsers,
     color: 'emerald',
     getMessage: (result: SelesaiMengajarResult) =>
-      `${result.absensi_summary.hadir} siswa hadir`,
+      `${result.absensi_summary?.hadir ?? 0} siswa hadir`,
   },
   {
     key: 'atp',

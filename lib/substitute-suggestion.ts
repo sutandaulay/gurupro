@@ -21,8 +21,8 @@ export async function suggestSubstitutes(
     // Guru lain di institusi yang status aktif & punya role 'guru', bukan pengaju izin
     const res = await query(
       `SELECT DISTINCT u.id, u.nama_lengkap, u.whatsapp
-       FROM institution_members im
-       JOIN institution_members_role imr ON imr.parent_id = im.id
+       FROM payload.institution_members im
+       JOIN payload.institution_members_role imr ON imr.parent_id = im.id
        JOIN users u ON u.id = im.app_user_id
        WHERE im.institution_id = $1
          AND im.status = 'active'
@@ -46,9 +46,12 @@ export async function suggestSubstitutes(
 
       // Mapel yang diampu (dari assignment, jika ada)
       const mapelRes = await query(
-        `SELECT subject_ids FROM teacher_institution_assignments
-         WHERE teacher_id = $1 AND institution_id = $2 AND status = 'aktif' LIMIT 1`,
-        [row.id, institutionId]
+        `SELECT tia.subject_ids
+         FROM payload.teacher_institution_assignments tia
+         JOIN payload.institution_members im ON im.user_id = tia.teacher_id_id AND im.institution_id = tia.institution_id_id
+         WHERE im.app_user_id = $1 AND im.status = 'active' AND tia.status = 'aktif'
+         LIMIT 1`,
+        [row.id]
       );
       const subjectIds = mapelRes.rows[0]?.subject_ids;
       let mapel: string[] = [];

@@ -48,8 +48,8 @@ export async function POST(req: Request) {
     let institutionId: number | null = null;
     try {
       const instRes = await query(
-        `SELECT institution_id FROM teacher_institution_assignments
-         WHERE teacher_id = $1 AND status = 'aktif' LIMIT 1`,
+        `SELECT institution_id FROM payload.institution_members
+         WHERE app_user_id = $1 AND status = 'active' LIMIT 1`,
         [session.id]
       );
       institutionId = instRes.rows[0]?.institution_id ?? null;

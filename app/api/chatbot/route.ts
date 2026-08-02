@@ -96,14 +96,15 @@ Asisten:`;
         );
 
           console.log(`[Chatbot] Poin deducted`);
-      } catch (poinError: any) {
+      } catch (poinError: unknown) {
         console.error("[Chatbot] Poin deduction failed:", poinError);
       }
     }
 
     return NextResponse.json({ reply: cleanReply });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Chatbot API error:", error);
-    return NextResponse.json({ error: error.message || "Failed to process chat" }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error ?? "Unknown error");
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

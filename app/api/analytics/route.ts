@@ -64,7 +64,7 @@ export async function GET(req: Request) {
     const recentActivity = await query(
       `SELECT tj.id, u.nama_lengkap as nama_guru, c.nama_kelas, sub.nama_mapel, tj.tanggal, tj.status, tj.materi_pembelajaran
        FROM teacher_journals tj
-       JOIN users u ON tj.teacher_id = u.id
+       JOIN users u ON tj.user_id = u.id
        JOIN classes c ON tj.class_id = c.id
        JOIN subjects sub ON tj.subject_id = sub.id
        WHERE tj.school_id = $1

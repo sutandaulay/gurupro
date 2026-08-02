@@ -72,8 +72,8 @@ async function getGracePeriodDaysForUser(statusLangganan: string): Promise<numbe
  * Reset monthly tokens for all active subscribers
  *
  * Rules:
- * - Only resets mainTokenBalance (token_limit)
- * - Does NOT touch addonTokenBalance
+ * - Only resets quota_poin (main Poin)
+ * - Does NOT touch addon_poin
  * - Uses mainTokenResetDate per-user for accurate monthly cycles
  * - Reads monthlyTokenQuota from user's tier (pricing_plans)
  */
@@ -89,8 +89,8 @@ export async function resetMonthlyTokens(): Promise<{ processed: number; errors:
         u.id as user_id,
         u.status_langganan,
         u.main_token_reset_date,
-        u.token_limit as current_main_balance,
-        u.addon_token_balance,
+        u.quota_poin_total as current_main_balance,
+        u.addon_poin,
         u.subscription_start,
         u.subscription_end,
         u.is_active,
@@ -119,7 +119,7 @@ export async function resetMonthlyTokens(): Promise<{ processed: number; errors:
           continue;
         }
 
-        // Get quota from pricing_plans
+        // Get quota from pricing_plans (kolom tokens = jumlah Poin admin)
         let quota = 0;
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -150,22 +150,26 @@ export async function resetMonthlyTokens(): Promise<{ processed: number; errors:
         const nextResetDate = new Date();
         nextResetDate.setDate(nextResetDate.getDate() + 30);
 
-        // Update user's main token balance to full quota
-        // NOTE: addon_token_balance is NOT touched - it carries over
+        // Update user's main Poin quota to full quota (reset used counter too)
+        // NOTE: addon_poin is NOT touched - it carries over
+        // NOTE: token_accumulated di-reset agar siklus akumulasi baru dimulai
         await query(
           `UPDATE users
-           SET token_limit = $1,
-               main_token_reset_date = $2
+           SET quota_poin_total = $1,
+               quota_poin_used = 0,
+               main_token_reset_date = $2,
+               token_accumulated = 0,
+               token_accumulated_month = CURRENT_DATE
            WHERE id = $3`,
           [quota, nextResetDate, userId]
         );
 
         console.log(
-          `[CRON] Reset tokens for user ${userId}: ${user.current_main_balance} → ${quota} (addon preserved: ${user.addon_token_balance}, next reset: ${nextResetDate.toISOString().split('T')[0]})`
+          `[CRON] Reset Poin for user ${userId}: ${user.current_main_balance} → ${quota} (addon preserved: ${user.addon_poin}, next reset: ${nextResetDate.toISOString().split('T')[0]})`
         );
         result.processed++;
       } catch (err: any) {
-        console.error(`[CRON] Failed to reset tokens for user ${user.user_id}:`, err.message);
+        console.error(`[CRON] Failed to reset Poin for user ${user.user_id}:`, err.message);
         result.errors++;
       }
     }
@@ -174,7 +178,7 @@ export async function resetMonthlyTokens(): Promise<{ processed: number; errors:
     throw err;
   }
 
-  console.log(`[CRON] Monthly token reset completed: ${result.processed} processed, ${result.errors} errors`);
+  console.log(`[CRON] Monthly Poin reset completed: ${result.processed} processed, ${result.errors} errors`);
   return result;
 }
 
@@ -361,7 +365,7 @@ export async function enforceGracePeriods(): Promise<{ graceEntered: number; loc
         u.id as user_id,
         u.subscription_status,
         u.grace_period_ends_at,
-        u.addon_token_balance
+        u.addon_poin
       FROM users u
       WHERE u.subscription_status = 'grace_period'
         AND u.grace_period_ends_at IS NOT NULL
@@ -372,7 +376,7 @@ export async function enforceGracePeriods(): Promise<{ graceEntered: number; loc
 
     for (const user of lockRes.rows) {
       try {
-        // Lock user — addon tokens are PRESERVED (user can use them after renewing)
+        // Lock user — addon poin are PRESERVED (user can use them after renewing)
         await query(
           `UPDATE users
            SET subscription_status = 'locked',
@@ -382,7 +386,7 @@ export async function enforceGracePeriods(): Promise<{ graceEntered: number; loc
         );
 
         console.log(
-          `[CRON] User ${user.user_id} LOCKED - addon tokens preserved (${user.addon_token_balance})`
+          `[CRON] User ${user.user_id} LOCKED - addon poin preserved (${user.addon_poin})`
         );
         result.locked++;
       } catch (err: any) {

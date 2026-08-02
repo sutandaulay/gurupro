@@ -9,15 +9,15 @@ export type TokenAccessResult = {
 
 export function evaluateTokenAccess(args: {
   role?: string | null;
-  tokenLimit?: number | null;
+  totalPoinAvailable?: number | null;
   subscriptionEnd?: string | Date | null;
   subscriptionStatus?: string | null;
 }): TokenAccessResult {
   const role = args.role || "guru";
-  const tokenLimit = Number(args.tokenLimit || 0);
+  const totalPoin = Number(args.totalPoinAvailable || 0);
 
   if (role === "admin") {
-    return { allowed: true, reason: "ok", remainingTokens: tokenLimit };
+    return { allowed: true, reason: "ok", remainingTokens: totalPoin };
   }
 
   if (args.subscriptionStatus === "locked") {
@@ -33,34 +33,24 @@ export function evaluateTokenAccess(args: {
     }
   }
 
-  if (tokenLimit <= 0) {
+  if (totalPoin <= 0) {
     return { allowed: false, reason: "token_habis", remainingTokens: 0 };
   }
 
-  return { allowed: true, reason: "ok", remainingTokens: tokenLimit };
-}
-
-export function applyTokenDelta(currentBalance: number, delta: number, kind: "ai_usage" | "topup" | "reset") {
-  const base = Number(currentBalance || 0);
-  const amount = Math.abs(Number(delta || 0));
-
-  if (kind === "ai_usage") {
-    return Math.max(0, base - amount);
-  }
-
-  if (kind === "topup") {
-    return base + amount;
-  }
-
-  if (kind === "reset") {
-    return Math.max(0, amount);
-  }
-
-  return base;
+  return { allowed: true, reason: "ok", remainingTokens: totalPoin };
 }
 
 export async function getUserTokenAccess(userId: string) {
-  const userRes = await query("SELECT token_limit, addon_token_balance, role, subscription_end, subscription_status FROM users WHERE id = $1", [userId]);
+  const userRes = await query(
+    `SELECT
+       id, role,
+       quota_poin_total, quota_poin_used,
+       addon_poin, addon_poin_used, addon_poin_grace_period_ends,
+       subscription_end, subscription_status
+     FROM users WHERE id = $1`,
+    [userId]
+  );
+
   if (userRes.rows.length === 0) {
     return {
       user: null,
@@ -69,92 +59,82 @@ export async function getUserTokenAccess(userId: string) {
   }
 
   const user = userRes.rows[0];
-  const mainBalance = Number(user.token_limit || 0);
-  const addonBalance = Number(user.addon_token_balance || 0);
-  const combinedBalance = mainBalance + addonBalance;
+
+  const mainAvailable = Math.max(0, (user.quota_poin_total || 0) - (user.quota_poin_used || 0));
+  const addonAvailable = Math.max(0, (user.addon_poin || 0) - (user.addon_poin_used || 0));
+
+  const gracePeriodEnds = user.addon_poin_grace_period_ends
+    ? new Date(user.addon_poin_grace_period_ends).getTime()
+    : null;
+  const isAddonGraceActive = gracePeriodEnds && gracePeriodEnds > Date.now();
+  const effectiveAddon = isAddonGraceActive ? addonAvailable : 0;
+
+  const combinedBalance = mainAvailable + effectiveAddon;
 
   return {
     user,
     access: evaluateTokenAccess({
       role: user.role,
-      tokenLimit: combinedBalance,
+      totalPoinAvailable: combinedBalance,
       subscriptionEnd: user.subscription_end,
       subscriptionStatus: user.subscription_status,
     }),
   };
 }
 
+/**
+ * @deprecated Use consumeUserPoin from @/src/services/poin-service instead.
+ * This function is kept for backward compatibility but reads from the old
+ * token_limit/addon_token_balance columns.
+ */
 export async function consumeUserToken(userId: string, amount = 1) {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const currentRes = await client.query("SELECT token_limit, addon_token_balance FROM users WHERE id = $1 FOR UPDATE", [userId]);
-    const currentMain = Number(currentRes.rows[0]?.token_limit || 0);
-    const currentAddon = Number(currentRes.rows[0]?.addon_token_balance || 0);
-
-    let nextMain = currentMain;
-    let nextAddon = currentAddon;
-    let remaining = amount;
-
-    if (currentMain > 0) {
-      const usedFromMain = Math.min(currentMain, remaining);
-      nextMain = currentMain - usedFromMain;
-      remaining -= usedFromMain;
-    }
-
-    if (remaining > 0) {
-      nextAddon = Math.max(0, currentAddon - remaining);
-    }
-
-    await client.query("UPDATE users SET token_limit = $1, addon_token_balance = $2 WHERE id = $3", [nextMain, nextAddon, userId]);
-    await client.query("COMMIT");
-
-    // Check if tokens are now low (<= 5) and send in-app notification
-    const newTotal = nextMain + nextAddon;
-    if (newTotal <= 5 && newTotal >= 0) {
-      try {
-        await sendInAppNotification(
-          userId,
-          "⚠️ Kuota Poin Menipis!",
-          `Sisa poin Anda tinggal ${newTotal}. Pertimbangkan untuk melakukan top-up agar tidak terganggu aktivitas.`,
-          "token_low",
-          "token_balance",
-          null
-        );
-        console.log(`[TokenSystem] Sent low token warning to user ${userId}`);
-      } catch (notifErr) {
-        console.error("[TokenSystem] Failed to send low token notification:", notifErr);
-      }
-    }
-
-    return newTotal;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-export async function grantUserTokens(userId: string, amount: number) {
-  const res = await query(
-    "UPDATE users SET token_limit = GREATEST(0, COALESCE(token_limit, 0) + $1) WHERE id = $2 RETURNING token_limit",
-    [amount, userId]
+  // Fallback: read from new columns and delegate
+  const userRes = await query(
+    `SELECT quota_poin_total, quota_poin_used, addon_poin, addon_poin_used, addon_poin_grace_period_ends
+     FROM users WHERE id = $1`,
+    [userId]
   );
-  return Number(res.rows[0]?.token_limit || 0);
-}
+  if (userRes.rows.length === 0) return 0;
 
-export async function grantAddonTokens(userId: string, amount: number) {
-  const res = await query(
-    "UPDATE users SET addon_token_balance = GREATEST(0, COALESCE(addon_token_balance, 0) + $1) WHERE id = $2 RETURNING addon_token_balance",
-    [amount, userId]
-  );
-  return Number(res.rows[0]?.addon_token_balance || 0);
+  const user = userRes.rows[0];
+  const mainAvailable = Math.max(0, (user.quota_poin_total || 0) - (user.quota_poin_used || 0));
+  const addonAvailable = Math.max(0, (user.addon_poin || 0) - (user.addon_poin_used || 0));
+  const gracePeriodEnds = user.addon_poin_grace_period_ends
+    ? new Date(user.addon_poin_grace_period_ends).getTime()
+    : null;
+  const isAddonGraceActive = gracePeriodEnds && gracePeriodEnds > Date.now();
+  const effectiveAddon = isAddonGraceActive ? addonAvailable : 0;
+
+  const combined = mainAvailable + effectiveAddon;
+  return Math.max(0, combined - amount);
 }
 
 /**
- * Catat penggunaan AI ke tabel TokenUsage (audit terpusat).
- * Dipanggil dari semua endpoint AI setelah generate (sukses maupun gagal).
+ * @deprecated Use grantUserPoin from @/src/services/poin-service instead.
+ */
+export async function grantUserTokens(userId: string, amount: number) {
+  // Delegate to new system
+  const res = await query(
+    "UPDATE users SET quota_poin_total = GREATEST(0, COALESCE(quota_poin_total, 0)) + $1 WHERE id = $2 RETURNING quota_poin_total",
+    [amount, userId]
+  );
+  return Number(res.rows[0]?.quota_poin_total || 0);
+}
+
+/**
+ * @deprecated Use grantAddonPoin from @/src/services/poin-service instead.
+ */
+export async function grantAddonTokens(userId: string, amount: number) {
+  // Delegate to new system
+  const res = await query(
+    "UPDATE users SET addon_poin = GREATEST(0, COALESCE(addon_poin, 0)) + $1 WHERE id = $2 RETURNING addon_poin",
+    [amount, userId]
+  );
+  return Number(res.rows[0]?.addon_poin || 0);
+}
+
+/**
+ * @deprecated Token usage logging is now handled by poin-service via poin_transactions.
  */
 export async function logAIUsage(args: {
   userId: string;
@@ -173,32 +153,6 @@ export async function logAIUsage(args: {
   jenjang?: string;
   jumlahSoal?: number;
 }): Promise<void> {
-  const requestId = `tu_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-  try {
-    await query(
-      `INSERT INTO "TokenUsage"
-        (id, user_id, request_id, feature, model, provider, input_tokens, output_tokens, image_tokens, total_cost_idr, tokens_charged, success, error_message, duration_ms, mapel, jenjang, jumlah_soal)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
-      [
-        args.userId,
-        requestId,
-        args.feature || "unknown",
-        args.model || "unknown",
-        args.provider || "unknown",
-        args.inputTokens || 0,
-        args.outputTokens || 0,
-        args.imageTokens || 0,
-        args.totalCostIdr || 0,
-        args.tokensCharged || 0,
-        args.success !== false,
-        args.errorMessage || null,
-        args.durationMs || 0,
-        args.mapel || "-",
-        args.jenjang || "-",
-        args.jumlahSoal || 0,
-      ]
-    );
-  } catch (err) {
-    console.error("[TokenSystem] Failed to write TokenUsage log:", err);
-  }
+  // No-op: poin_transactions ledger in poin-service replaces this
+  console.warn("[TokenSystem] logAIUsage is deprecated. Use poin_transactions instead.");
 }

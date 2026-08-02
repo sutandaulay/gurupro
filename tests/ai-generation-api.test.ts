@@ -240,21 +240,21 @@ describe('AI Generation API Tests', () => {
         mataPelajaran: 'Matematika',
         topik: 'Bilangan Bulat',
         jumlahSoal: 10,
-        soal: [
-          {
-            nomor: 1,
-            tipe: 'pilihan_ganda',
-            teks: 'Hasil dari (-5) + 3 adalah...',
-            pilihan: ['-8', '-2', '2', '8'],
-            jawabanBenar: 1,
-            pembahasn: 'Penjelasan...',
-            tingkatKesulitan: 'sedang',
-          },
-        ],
+        soal: Array.from({ length: 10 }, (_, i) => ({
+          nomor: i + 1,
+          tipe: 'pilihan_ganda',
+          teks: `Soal nomor ${i + 1}`,
+          pilihan: ['-8', '-2', '2', '8'],
+          jawabanBenar: 1,
+          pembahasn: 'Penjelasan...',
+          tingkatKesulitan: i % 3 === 0 ? 'mudah' : i % 3 === 1 ? 'sedang' : 'sulit',
+        })),
       };
 
       expect(soalOutput).toHaveProperty('soal');
       expect(soalOutput.soal.length).toBe(soalOutput.jumlahSoal);
+      expect(soalOutput.soal[0].nomor).toBe(1);
+      expect(soalOutput.soal[9].nomor).toBe(10);
     });
 
     it('should include pembahasn for each soal', () => {

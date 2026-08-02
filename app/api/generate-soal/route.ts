@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("gurupro_session")?.value;
     if (!sessionCookie) {
-      return NextResponse.json({ error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
+      return NextResponse.json({ reason: "session_expired", error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
     }
     const session = JSON.parse(sessionCookie);
     const userId = session.id;
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     // Ambil data user
     const poinState = await getUserPoinAccess(userId);
     if (!poinState.user) {
-      return NextResponse.json({ error: "Pengguna tidak ditemukan." }, { status: 404 });
+      return NextResponse.json({ reason: "user_not_found", error: "Pengguna tidak ditemukan." }, { status: 404 });
     }
     const user = poinState.user;
 
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       const message = poinState.access.reason === "subscription_expired"
         ? "Masa aktif langganan akun Anda telah habis! Silakan lakukan perpanjangan langganan terlebih dahulu."
         : "Poin GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan di Landing Page.";
-      return NextResponse.json({ error: message }, { status: 403 });
+      return NextResponse.json({ reason: poinState.access.reason, error: message }, { status: 403 });
     }
 
     const kurikulumName = body.kurikulum === 'merdeka' ? 'Kurikulum Merdeka' : body.kurikulum === 'k13' ? 'Kurikulum 2013 (K13)' : body.kurikulum === 'kbc' ? 'Kurikulum Berbasis Kompetensi (KBC)' : 'Kurikulum Hybrid';
@@ -225,33 +225,33 @@ CATATAN: AI TIDAK SELALU PATUH BATASAN KARAKTER. LAKUKAN TRUNCATE DI LAYER VALID
       parsed.soal = enforceSoalLimits(parsed.soal);
 
       console.log("[Generate Soal] Successfully generated and validated", parsed.soal.length, "questions");
-    } catch (aiError: any) {
+    } catch (aiError: unknown) {
+      const aiMsg = aiError instanceof Error ? aiError.message : String(aiError ?? "Unknown error");
       console.error("Generate Soal AI generation failed:", aiError);
-      // Log failed usage
-      await logFailedPoinUsage(userId, 0, "generate-soal", aiError.message, {
+      await logFailedPoinUsage(userId, 0, "generate-soal", aiMsg, {
         mapel: body.mapel,
         jenjang: body.jenjang,
       });
-      return NextResponse.json({ error: `Gagal memproses AI: ${aiError.message || aiError}` }, { status: 502 });
+      return NextResponse.json({ reason: "ai_error", error: `Gagal memproses AI: ${aiMsg}` }, { status: 502 });
     }
 
-    // Deduct Poin based on actual usage (non-admin)
-    if (user.role !== "admin") {
+    // Deduct Poin only if AI was used and succeeded (non-admin)
+    if (user.role !== "admin" && aiResult?.usage) {
       try {
         await consumeUserPoinFromUsage(userId, aiResult.usage, "generate-soal", {
           mapel: body.mapel,
           jenjang: body.jenjang,
           jumlahSoal: parsed.soal?.length || 0,
         });
-      } catch (poinError: any) {
+      } catch (poinError: unknown) {
         console.error("[Generate Soal] Poin deduction failed:", poinError);
-        // Jangan fail request jika Poin deduction gagal - generation sudah sukses
       }
     }
 
     return NextResponse.json(parsed);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error ?? "Unknown error");
     console.error("API error:", error);
-    return NextResponse.json({ error: error.message || "Gagal membuat soal" }, { status: 500 });
+    return NextResponse.json({ reason: "server_error", error: msg || "Gagal membuat soal" }, { status: 500 });
   }
 }

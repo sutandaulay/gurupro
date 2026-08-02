@@ -5,15 +5,14 @@
 
 import { PrismaClient } from '@prisma/client';
 import type { SelesaiMengajarInput, AbsensiResult } from './types';
+import { parseLocalDate } from '@/lib/utils';
 
 const prisma = new PrismaClient();
 
 export async function saveAbsensiSummary(
   data: SelesaiMengajarInput,
-  studentIds: string[] = []
 ): Promise<AbsensiResult> {
-  const today = new Date(data.tanggal);
-  today.setHours(0, 0, 0, 0);
+  const today = parseLocalDate(data.tanggal);
 
   const results = {
     saved: false,
@@ -21,64 +20,80 @@ export async function saveAbsensiSummary(
   };
 
   try {
-    // If we have individual student IDs, save per-student attendance
-    if (studentIds.length > 0) {
-      const attendanceRecords = studentIds.map((studentId) => {
-        const status = 'Hadir';
-        // Determine status based on counts (simplified - in real app would map to specific students)
-        // For summary-based approach, we just track counts
-        return {
-          id: `${studentId}-${data.tanggal}`,
-          schedule_id: data.schedule_id || '',
-          student_id: studentId,
-          tanggal: today,
-          status,
-          catatan: null,
-        };
-      });
+    // Save per-student attendance for ALL statuses
+    const attendanceList = data.student_attendance?.length
+      ? data.student_attendance
+      : (data.student_ids || []).map((studentId) => ({ studentId, status: 'Hadir', catatan: '' }));
 
-      // Upsert all records
-      for (const record of attendanceRecords) {
-        await prisma.student_attendance.upsert({
-          where: { id: record.id },
-          update: { status: record.status },
-          create: record,
+    if (attendanceList.length > 0) {
+      for (const record of attendanceList) {
+        const existingRecord = await prisma.student_attendance.findFirst({
+          where: {
+            student_id: record.studentId,
+            tanggal: today,
+            schedule_id: data.schedule_id || undefined,
+          },
         });
+
+        if (existingRecord) {
+          await prisma.student_attendance.update({
+            where: { id: existingRecord.id },
+            data: { status: record.status, catatan: record.catatan || null },
+          });
+        } else {
+          await prisma.student_attendance.create({
+            data: {
+              schedule_id: data.schedule_id || '',
+              student_id: record.studentId,
+              tanggal: today,
+              status: record.status,
+              catatan: record.catatan || null,
+            },
+          });
+        }
       }
-      results.count = attendanceRecords.length;
+      results.count = attendanceList.length;
     }
 
-    // Also save summary to teaching session for reference
-    const sessionId = `${data.guru_id}-${data.tanggal}`;
-    await prisma.teaching_sessions.upsert({
-      where: { id: sessionId },
-      update: {
-        attendance_data: JSON.stringify({
-          hadir: data.jumlah_hadir,
-          izin: data.jumlah_izin,
-          sakit: data.jumlah_sakit,
-          alpha: data.jumlah_alpha,
-          total: studentIds.length || data.jumlah_hadir + data.jumlah_izin + data.jumlah_sakit + data.jumlah_alpha,
-        }),
-        attendance_completed: true,
-      },
-      create: {
-        id: sessionId,
+    // Save summary to teaching session and mark it completed
+    const attendanceSummary = {
+      hadir: data.jumlah_hadir,
+      izin: data.jumlah_izin,
+      sakit: data.jumlah_sakit,
+      alpha: data.jumlah_alpha,
+      total: data.student_ids.length || data.jumlah_hadir + data.jumlah_izin + data.jumlah_sakit + data.jumlah_alpha,
+    };
+
+    const existingSession = await prisma.teaching_sessions.findFirst({
+      where: {
         user_id: data.guru_id,
-        schedule_id: data.schedule_id || null,
-        class_id: data.kelas_id,
-        subject_id: data.mapel_id,
         session_date: today,
-        status: 'pending',
-        attendance_completed: true,
-        attendance_data: JSON.stringify({
-          hadir: data.jumlah_hadir,
-          izin: data.jumlah_izin,
-          sakit: data.jumlah_sakit,
-          alpha: data.jumlah_alpha,
-        }),
+        ...(data.schedule_id ? { schedule_id: data.schedule_id } : {}),
       },
     });
+
+    const sessionData = {
+      user_id: data.guru_id,
+      schedule_id: data.schedule_id || null,
+      class_id: data.kelas_id,
+      subject_id: data.mapel_id,
+      session_date: today,
+      status: 'completed',
+      attendance_completed: true,
+      attendance_data: JSON.stringify(attendanceSummary),
+      completed_at: new Date(),
+    };
+
+    if (existingSession) {
+      await prisma.teaching_sessions.update({
+        where: { id: existingSession.id },
+        data: sessionData,
+      });
+    } else {
+      await prisma.teaching_sessions.create({
+        data: sessionData,
+      });
+    }
 
     results.saved = true;
     return results;

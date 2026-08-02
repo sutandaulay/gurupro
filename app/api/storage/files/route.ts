@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { requireSession } from '@/lib/session'
 import { uploadToR2WithKey, deleteFromR2 } from '@/lib/r2'
+import { parsePagination, wrapResponse } from '@/lib/pagination'
 
 const MAX_SIZE = 2 * 1024 * 1024
 
@@ -11,22 +12,34 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const folderId = searchParams.get('folder_id')
 
-    let sql = `SELECT * FROM user_files WHERE user_id = $1`
+    let whereClause = 'user_id = $1'
     const params: (string | null)[] = [session.id]
     let paramIndex = 2
 
     if (folderId === 'null' || folderId === '') {
-      sql += ` AND folder_id IS NULL`
+      whereClause += ` AND folder_id IS NULL`
     } else if (folderId) {
-      sql += ` AND folder_id = $${paramIndex}`
+      whereClause += ` AND folder_id = $${paramIndex}`
       params.push(folderId)
       paramIndex++
     }
 
-    sql += ` ORDER BY created_at DESC`
+    const countResult = await query(
+      `SELECT COUNT(*) FROM user_files WHERE ${whereClause}`,
+      params
+    )
+    const total = parseInt(countResult.rows[0].count, 10)
 
-    const result = await query(sql, params)
-    return NextResponse.json(result.rows)
+    const pagination = parsePagination(searchParams)
+    const off = (pagination.page - 1) * pagination.limit
+
+    const result = await query(
+      `SELECT * FROM user_files WHERE ${whereClause}
+       ORDER BY created_at DESC
+       LIMIT ${pagination.limit} OFFSET ${off}`,
+      params
+    )
+    return NextResponse.json(wrapResponse(result.rows, total, pagination))
   } catch (err: any) {
     if (err.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

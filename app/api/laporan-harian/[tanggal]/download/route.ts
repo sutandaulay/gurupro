@@ -65,7 +65,7 @@ export async function GET(
 
     const journals = await prisma.teacher_journals.findMany({
       where: {
-        teacher_id: user.id,
+        user_id: user.id,
         ...(sekolahId ? { school_id: sekolahId } : {}),
         tanggal: { gte: startDate, lte: endDate },
       },
@@ -77,7 +77,17 @@ export async function GET(
       orderBy: { created_at: 'asc' },
     });
 
-    const html = generateDocHtml(user, guru, sekolah, tanggal, journals);
+    const sessions = await prisma.teaching_sessions.findMany({
+      where: {
+        user_id: user.id,
+        session_date: { gte: startDate, lte: endDate },
+      },
+      select: { attendance_data: true },
+    });
+
+    const attendance = aggregateAttendance(sessions);
+
+    const html = generateDocHtml(user, guru, sekolah, tanggal, journals, attendance);
 
     return new Response(html, {
       headers: {
@@ -96,7 +106,8 @@ function generateDocHtml(
   guru: { nama_lengkap: string | null } | null,
   sekolah: { nama_sekolah: string | null; nama_kepala_sekolah: string | null; nip_kepala_sekolah: string | null } | null,
   tanggal: string,
-  journals: any[]
+  journals: any[],
+  attendance: { hadir: number; izin: number; sakit: number; alpha: number; total: number }
 ): string {
   const date = new Date(tanggal);
   const hari = date.toLocaleDateString('id-ID', { weekday: 'long' });
@@ -149,6 +160,11 @@ function generateDocHtml(
     .entry h3 { border-bottom: 1px solid #ccc; padding-bottom: 4px; }
     .identitas-box { margin-bottom: 20px; padding: 12px; border: 1px solid #000; page-break-inside: avoid; }
     .identitas-box h3 { margin-top: 0; text-align: center; }
+    .attendance-box { margin-bottom: 20px; padding: 12px; border: 1px solid #000; page-break-inside: avoid; }
+    .attendance-box h3 { margin-top: 0; text-align: center; }
+    .attendance-table { width: 100%; border-collapse: collapse; margin: 8px 0 4px; }
+    .attendance-table th, .attendance-table td { border: 1px solid #000; padding: 6px 10px; text-align: center; font-size: 12pt; }
+    .attendance-table th { font-weight: bold; }
     .footer { margin-top: 40px; text-align: center; font-size: 10pt; }
     .signature { margin-top: 30px; }
     .signature-table { width: 100%; margin-top: 20px; }
@@ -171,6 +187,22 @@ function generateDocHtml(
       <tr><td>Nama</td><td>: ${escapeHtml(guru?.nama_lengkap || user.nama_lengkap || '-')}</td></tr>
       <tr><td>Sekolah</td><td>: ${escapeHtml(sekolah?.nama_sekolah || '-')}</td></tr>
       <tr><td>Total Sesi Mengajar</td><td>: ${journals.length} sesi</td></tr>
+    </table>
+  </div>
+
+  <div class="attendance-box">
+    <h3>Rekapitulasi Kehadiran Siswa</h3>
+    <table class="attendance-table">
+      <tr>
+        <th>Hadir</th><th>Izin</th><th>Sakit</th><th>Alpha</th><th>Total</th>
+      </tr>
+      <tr>
+        <td>${attendance.hadir}</td>
+        <td>${attendance.izin}</td>
+        <td>${attendance.sakit}</td>
+        <td>${attendance.alpha}</td>
+        <td>${attendance.total}</td>
+      </tr>
     </table>
   </div>
 
@@ -210,4 +242,60 @@ function escapeHtml(str: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function normalizeAttendance(data: unknown): { hadir: number; izin: number; sakit: number; alpha: number; total: number } {
+  const empty = { hadir: 0, izin: 0, sakit: 0, alpha: 0, total: 0 };
+  if (!data) return empty;
+
+  let parsed: any = data;
+  if (typeof data === 'string') {
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      return empty;
+    }
+  }
+
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'hadir' in parsed) {
+    return {
+      hadir: Number(parsed.hadir) || 0,
+      izin: Number(parsed.izin) || 0,
+      sakit: Number(parsed.sakit) || 0,
+      alpha: Number(parsed.alpha) || 0,
+      total: Number(parsed.total) || 0,
+    };
+  }
+
+  if (Array.isArray(parsed)) {
+    const result = { ...empty };
+    for (const rec of parsed) {
+      const status = String(rec?.status || '');
+      if (status === 'Hadir' || status === 'H') result.hadir++;
+      else if (status === 'Izin' || status === 'I') result.izin++;
+      else if (status === 'Sakit' || status === 'S') result.sakit++;
+      else if (status === 'Alpha' || status === 'A') result.alpha++;
+    }
+    result.total = parsed.length;
+    return result;
+  }
+
+  return empty;
+}
+
+function aggregateAttendance(
+  sessions: { attendance_data: unknown }[]
+): { hadir: number; izin: number; sakit: number; alpha: number; total: number } {
+  return sessions.reduce(
+    (acc, s) => {
+      const n = normalizeAttendance(s.attendance_data);
+      acc.hadir += n.hadir;
+      acc.izin += n.izin;
+      acc.sakit += n.sakit;
+      acc.alpha += n.alpha;
+      acc.total += n.total;
+      return acc;
+    },
+    { hadir: 0, izin: 0, sakit: 0, alpha: 0, total: 0 }
+  );
 }

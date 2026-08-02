@@ -1,75 +1,55 @@
 "use client";
-import { apiFetch } from "@/lib/api-client";
-
 import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { useProfileStore, useTeacherStore } from "@/lib/stores";
+import { useProfileStore } from "@/lib/stores";
 
 export default function SessionSync() {
-  const { data: session, status } = useSession();
-  const synced = useRef(false);
-  const cachedUserId = useProfileStore(s => s.cachedUserId);
+  const { status } = useSession();
+  const initialized = useRef(false);
 
   useEffect(() => {
-    if (synced.current) return;
+    if (initialized.current) return;
     if (status !== "authenticated") return;
 
-    async function syncAndProcess() {
-      try {
-        // 1. Sync NextAuth session → gurupro_session cookie
-        const syncRes = await apiFetch("/api/auth/sync-session", { method: "POST" });
-        if (!syncRes.ok) {
-          console.error("[SessionSync] Failed to sync session");
-          return;
-        }
-        synced.current = true;
+    initialized.current = true;
 
-        // 2. Check if session changed - if so, refresh profile
-        if (cachedUserId) {
-          try {
-            const sessionDataRes = await apiFetch("/api/auth/active-context", {
-              credentials: 'include'
-            });
-
-            if (sessionDataRes.ok) {
-              const sessionData = await sessionDataRes.json();
-              const currentUserId = sessionData.userId;
-
-              // If user ID changed, clear cached data
-              if (currentUserId && cachedUserId && String(currentUserId) !== String(cachedUserId)) {
-                console.log('[SessionSync] Session changed - clearing caches');
-                useProfileStore.getState().clearProfile();
-                useTeacherStore.getState().resetContext();
-              }
-            }
-          } catch {
-            // Non-critical, ignore
+    // Step 1: Sync session cookie (must complete first)
+    fetch("/api/auth/sync-session", {
+      method: "POST",
+      credentials: "include",
+    })
+      .then(() => {
+        // Step 2: After cookie is set, fetch profile in parallel with role flags
+        Promise.allSettled([
+          useProfileStore.getState().fetchProfile(),
+          // Role flags for sidebar
+          fetch("/api/user/role-flags", { credentials: "include" }),
+        ]).then(([profileResult, roleResult]) => {
+          if (profileResult.status === "rejected") {
+            console.error("[SessionSync] Profile fetch failed:", profileResult.reason);
           }
-        }
+        });
+      })
+      .catch((err) => {
+        console.error("[SessionSync] sync-session failed:", err);
+        // Still try to fetch profile even if sync fails (profile API has its own auth)
+        useProfileStore.getState().fetchProfile().catch((e) => {
+          console.error("[SessionSync] Profile fetch also failed:", e);
+        });
+      });
 
-        // 3. Process referral code from localStorage (for Google OAuth users).
-        const refCode = localStorage.getItem("referral_code");
-        if (refCode) {
-          try {
-            await apiFetch("/api/auth/referral/process", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ referral_code: refCode }),
-            });
-          } catch {
-            // Non-critical
-          }
-          localStorage.removeItem("referral_code");
-        }
-      } catch (err) {
-        console.error("[SessionSync] Error:", err);
-      }
+    // 3. Process referral code if exists (non-blocking, independent)
+    const refCode = localStorage.getItem("referral_code");
+    if (refCode) {
+      localStorage.removeItem("referral_code");
+      fetch("/api/auth/referral/process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ referral_code: refCode }),
+      }).catch(() => {});
     }
-
-    syncAndProcess();
-  }, [status, cachedUserId]);
+  }, [status]);
 
   return null;
 }
-
-

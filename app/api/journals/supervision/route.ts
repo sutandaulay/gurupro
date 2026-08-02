@@ -26,7 +26,7 @@ export async function GET() {
        FROM teacher_journals tj
        JOIN classes c ON tj.class_id = c.id
        JOIN subjects sb ON tj.subject_id = sb.id
-       JOIN users u ON tj.teacher_id = u.id
+       JOIN users u ON tj.user_id = u.id
        WHERE tj.supervisor_id = $1
        ORDER BY tj.tanggal DESC, tj.created_at DESC`,
       [userId]

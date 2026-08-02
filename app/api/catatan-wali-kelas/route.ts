@@ -11,6 +11,7 @@ import {
   CatatanWaliKelasUpdateSchema,
   CatatanWaliKelasQuerySchema,
 } from '@/lib/schemas/sikap-ekskul';
+import { parsePagination, wrapResponse } from '@/lib/pagination';
 
 /**
  * GET /api/catatan-wali-kelas
@@ -27,9 +28,10 @@ export async function GET(req: Request) {
     };
 
     const validated = CatatanWaliKelasQuerySchema.parse(filters);
-    const result = await getCatatanWaliKelas(validated);
+    const pagination = parsePagination(searchParams);
+    const { data, total } = await getCatatanWaliKelas(validated, pagination);
 
-    return NextResponse.json({ data: result });
+    return NextResponse.json(wrapResponse(data, total, pagination));
   } catch (error: any) {
     console.error('GET /api/catatan-wali-kelas error:', error);
     return NextResponse.json({ error: error.message }, { status: 400 });

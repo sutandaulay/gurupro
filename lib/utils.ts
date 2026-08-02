@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
- 
+
 /**
  * Utility functions
  */
@@ -10,14 +10,63 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// Local date as YYYY-MM-DD (uses local timezone, NOT UTC)
+export function toLocalDateString(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// Parse YYYY-MM-DD into a Date at LOCAL midnight (avoids UTC shift)
+export function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
+// Get user timezone from localStorage (client) or fallback
+export function getUserTimezone(): string {
+  if (typeof window === 'undefined') return 'Asia/Jakarta'; // SSR fallback
+  try {
+    const prefs = JSON.parse(localStorage.getItem('gurupro_user_preferences') || '{}');
+    return prefs.zonaWaktu || 'Asia/Jakarta';
+  } catch { return 'Asia/Jakarta'; }
+}
+
 // Format date to Indonesian locale
-export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions): string {
+export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions, timeZone?: string): string {
   const d = typeof date === 'string' ? new Date(date) : date
-  return d.toLocaleDateString('id-ID', options || {
+  const tz = timeZone || getUserTimezone();
+  return d.toLocaleDateString('id-ID', { timeZone: tz, ...(options || {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-  })
+  })})
+}
+
+// Format datetime with timezone
+export function formatDateTime(date: string | Date, timeZone?: string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  const tz = timeZone || getUserTimezone();
+  return d.toLocaleString('id-ID', {
+    timeZone: tz,
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+// Format time only
+export function formatTime(date: string | Date, timeZone?: string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  const tz = timeZone || getUserTimezone();
+  return d.toLocaleString('id-ID', {
+    timeZone: tz,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 // Format currency to IDR

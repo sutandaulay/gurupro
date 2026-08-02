@@ -37,8 +37,8 @@ interface TokenAlertUser {
   email: string;
   whatsapp: string | null;
   nama_lengkap: string | null;
-  token_limit: number;
-  addon_token_balance: number;
+  quota_poin_available: number;
+  addon_poin_available: number;
   status_langganan: string | null;
   last_token_warning_sent: string | null;
 }
@@ -59,14 +59,20 @@ async function checkAndSendTokenAlerts(): Promise<{ sent: number; skipped: numbe
         email,
         whatsapp,
         nama_lengkap,
-        COALESCE(token_limit, 0) as token_limit,
-        COALESCE(addon_token_balance, 0) as addon_token_balance,
+        GREATEST(0, COALESCE(quota_poin_total, 0) - COALESCE(quota_poin_used, 0)) as quota_poin_available,
+        GREATEST(0, COALESCE(addon_poin, 0) - COALESCE(addon_poin_used, 0)) as addon_poin_available,
         status_langganan,
         last_token_warning_sent
       FROM users
       WHERE is_active = true
         AND (status_langganan IS NOT NULL AND status_langganan != 'free')
-        AND (token_limit <= 10 OR (token_limit <= 5 AND addon_token_balance <= 0))
+        AND (
+          GREATEST(0, COALESCE(quota_poin_total, 0) - COALESCE(quota_poin_used, 0)) <= 10
+          OR (
+            GREATEST(0, COALESCE(quota_poin_total, 0) - COALESCE(quota_poin_used, 0)) <= 5
+            AND GREATEST(0, COALESCE(addon_poin, 0) - COALESCE(addon_poin_used, 0)) <= 0
+          )
+        )
         AND (
           last_token_warning_sent IS NULL
           OR last_token_warning_sent != $1
@@ -77,7 +83,7 @@ async function checkAndSendTokenAlerts(): Promise<{ sent: number; skipped: numbe
 
     for (const user of usersRes.rows as TokenAlertUser[]) {
       try {
-        const totalTokens = user.token_limit + user.addon_token_balance;
+        const totalTokens = user.quota_poin_available + user.addon_poin_available;
         const userName = user.nama_lengkap || "Guru";
 
         // Determine severity

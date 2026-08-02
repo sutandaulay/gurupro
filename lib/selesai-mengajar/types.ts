@@ -16,6 +16,8 @@ export interface SelesaiMengajarInput {
   jumlah_izin: number;
   jumlah_sakit: number;
   jumlah_alpha: number;
+  student_ids: string[]; // IDs of students present (for per-student attendance records)
+  student_attendance?: { studentId: string; status: string; catatan?: string }[];
   catatan_tambahan?: string;
   rpp_id?: string;
   school_id?: string;
@@ -58,6 +60,7 @@ export interface JurnalResult {
   id: string;
   materi_pembelajaran: string;
   refleksi: string;
+  ai_generated?: boolean;
 }
 
 export interface AbsensiResult {
@@ -81,6 +84,7 @@ export interface NextMateriResult {
   sub_materi: string;
   perlu_remedial: boolean;
   catatan_persiapan: string;
+  ai_generated?: boolean;
 }
 
 export interface SelesaiMengajarResult {

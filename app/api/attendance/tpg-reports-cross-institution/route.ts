@@ -6,7 +6,6 @@ import { db } from "@/lib/db";
 import {
   attendanceSummary,
   institutions as institutionsTable,
-  teacherInstitutionAssignments,
 } from "@/lib/schemas/attendance";
 import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
 import { startOfWeek, endOfWeek, format } from "date-fns";
@@ -30,15 +29,12 @@ async function computeCrossInstitution(
   periodType: string
 ) {
   // Guru mengajar di banyak institusi
-  const assignments = await db
-    .select({ institutionId: teacherInstitutionAssignments.institutionId })
-    .from(teacherInstitutionAssignments)
-    .where(
-      and(
-        eq(teacherInstitutionAssignments.teacherId, teacherId),
-        eq(teacherInstitutionAssignments.status, "aktif")
-      )
-    );
+  const assignmentsResult = await pgQuery(`
+    SELECT institution_id as "institutionId"
+    FROM payload.institution_members
+    WHERE app_user_id = $1 AND status = 'active'
+  `, [teacherId]);
+  const assignments = assignmentsResult.rows;
 
   if (assignments.length === 0) {
     return {

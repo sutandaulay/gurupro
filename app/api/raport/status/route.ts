@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { query, logAudit } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { requireSchoolAccess } from '@/lib/school-access';
+import { parsePagination, offset, wrapResponse } from '@/lib/pagination';
+import { ubahStatus } from '@/lib/raport/repository';
+import type { StatusRaport, RoleChangedBy } from '@/lib/raport/repository';
 
 function isValidUUID(str: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -13,12 +16,13 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get('school_id');
     const kelasId = searchParams.get('kelas_id');
-
-    if (schoolId) await requireSchoolAccess(schoolId)
     const siswaId = searchParams.get('siswa_id');
     const status = searchParams.get('status');
     const periode = searchParams.get('periode');
     const includeHistory = searchParams.get('include_history') === 'true';
+    const pag = parsePagination(searchParams);
+
+    if (schoolId) await requireSchoolAccess(schoolId)
 
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('gurupro_session')?.value;
@@ -33,7 +37,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Session tidak valid' }, { status: 401 });
     }
 
-    // Check if tables exist
     const tableCheck = await query(`
       SELECT
         EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'data_raport') as raport_exists,
@@ -51,18 +54,7 @@ export async function GET(req: Request) {
       }, { status: 500 });
     }
 
-    let sql = `
-      SELECT dr.id, dr.siswa_id, dr.nisn, dr.nis_lokal, dr.kelas_id, dr.periode,
-             dr.jenis_laporan, dr.status, dr.sikap_id, dr.catatan_wali_kelas,
-             dr.presensi_snapshot, dr.created_at, dr.updated_at,
-             s.nama_siswa, c.nama_kelas,
-             tr.nama_template, tr.mode_nilai_akademik
-      FROM data_raport dr
-      JOIN students s ON s.id = dr.siswa_id
-      JOIN classes c ON c.id = dr.kelas_id
-      JOIN template_raport tr ON tr.id = dr.template_raport_id
-      WHERE 1=1
-    `;
+    const whereClauses: string[] = [];
     const params: any[] = [];
     let paramIdx = 1;
 
@@ -70,36 +62,59 @@ export async function GET(req: Request) {
       if (!isValidUUID(kelasId)) {
         return NextResponse.json({ error: 'kelas_id harus UUID yang valid' }, { status: 400 });
       }
-      sql += ` AND dr.kelas_id = $${paramIdx++}`;
+      whereClauses.push(`dr.kelas_id = $${paramIdx++}`);
       params.push(kelasId);
     }
     if (siswaId) {
       if (!isValidUUID(siswaId)) {
         return NextResponse.json({ error: 'siswa_id harus UUID yang valid' }, { status: 400 });
       }
-      sql += ` AND dr.siswa_id = $${paramIdx++}`;
+      whereClauses.push(`dr.siswa_id = $${paramIdx++}`);
       params.push(siswaId);
     }
     if (status) {
-      sql += ` AND dr.status = $${paramIdx++}`;
+      whereClauses.push(`dr.status = $${paramIdx++}`);
       params.push(status);
     }
     if (periode) {
-      sql += ` AND dr.periode = $${paramIdx++}`;
+      whereClauses.push(`dr.periode = $${paramIdx++}`);
       params.push(periode);
     }
 
-    sql += ' ORDER BY c.nama_kelas, s.nama_siswa ASC';
+    const whereSQL = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
 
-    const res = await query(sql, params);
+    const countRes = await query(
+      `SELECT COUNT(*)::int as total
+       FROM data_raport dr
+       JOIN students s ON s.id = dr.siswa_id
+       JOIN classes c ON c.id = dr.kelas_id
+       JOIN template_raport tr ON tr.id = dr.template_raport_id
+       ${whereSQL}`,
+      params
+    );
+    const total = countRes.rows[0].total;
+
+    const res = await query(
+      `SELECT dr.id, dr.siswa_id, dr.nisn, dr.nis_lokal, dr.kelas_id, dr.periode,
+              dr.jenis_laporan, dr.status, dr.sikap_id, dr.catatan_wali_kelas,
+              dr.presensi_snapshot, dr.created_at, dr.updated_at,
+              s.nama_siswa, c.nama_kelas,
+              tr.nama_template, tr.mode_nilai_akademik
+       FROM data_raport dr
+       JOIN students s ON s.id = dr.siswa_id
+       JOIN classes c ON c.id = dr.kelas_id
+       JOIN template_raport tr ON tr.id = dr.template_raport_id
+       ${whereSQL}
+       ORDER BY c.nama_kelas, s.nama_siswa ASC
+       LIMIT $${paramIdx++} OFFSET $${paramIdx++}`,
+      [...params, pag.limit, offset(pag)]
+    );
 
     let results = res.rows;
 
-    // If include_history is requested, fetch status history for each raport
     if (includeHistory && results.length > 0) {
       const raportIds = results.map(r => r.id);
 
-      // Check if history table exists
       const historyTableCheck = await query(`
         SELECT EXISTS (
           SELECT FROM information_schema.tables
@@ -140,7 +155,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json(results);
+    return NextResponse.json(wrapResponse(results, total, pag));
   } catch (error: any) {
     console.error('GET raport status error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

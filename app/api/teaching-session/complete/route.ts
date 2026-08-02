@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
 import { generateJournal, generateReflection, estimateCost } from '@/lib/ai/generators';
-import { getUserPoinAccess, logFailedPoinUsage } from '@/src/services/poin-service';
+import { getUserPoinAccess } from '@/src/services/poin-service';
 import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
 
 const prisma = new PrismaClient();
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
           // Save journal to database
           const journal = await prisma.teacher_journals.create({
             data: {
-              teacher_id: userId,
+              user_id: userId,
               school_id: school_id,
               schedule_id: schedule_id,
               class_id: class_id,
@@ -283,13 +283,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Deduct Poin after successful AI generation (non-admin)
-    // Merge journal + reflection usage for total Poin deduction
-    if (userDb?.role !== 'admin' && (results.journal || results.reflection)) {
+    // Deduct Poin only if AI was actually used (results have usage data)
+    const journalUsage = (results.journal as any)?.usage || null;
+    const reflectionUsage = (results.reflection as any)?.usage || null;
+    if (userDb?.role !== 'admin' && (journalUsage || reflectionUsage)) {
       try {
-        const journalUsage = (results.journal as any)?.usage || null;
-        const reflectionUsage = (results.reflection as any)?.usage || null;
-
         // Deduct journal usage
         if (journalUsage) {
           await deductPoinFromAIResult(

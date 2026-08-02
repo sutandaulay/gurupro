@@ -11,18 +11,12 @@
 
 /**
  * Rasio konversi DEFAULT dari token mentah ke Poin.
- * NILAI INI HANYA FALLBACK — nilai sebenarnya diambil dari
+ * NILAI INI HANYA FALLBACK - nilai sebenarnya diambil dari
  * setting admin dashboard `tokens_per_poin` (system_settings),
  * di-cache di memory, dan di-invalidate saat admin mengubahnya.
  * JANGAN hardcode rasio di banyak tempat.
  */
 export const DEFAULT_TOKENS_PER_POIN = 2000;
-
-/**
- * Minimum Poin yang terpotong per pemakaian AI
- * Mesmo jika hasil hitung < 1 Poin, tetap potong 1 Poin
- */
-export const MIN_POIN_PER_USAGE = 1;
 
 /**
  * Rasio cached token (untuk context caching Gemini)
@@ -49,18 +43,18 @@ export const GEMINI_PRICING = {
 /**
  * Konversi total token mentah ke Poin
  * - Menggunakan Math.ceil untuk pembulatan ke atas
- * - Minimum 1 Poin per pemakaian meskipun hasil hitung < 1
+ * - Mengembalikan 0 jika total token < tokensPerPoin (untuk akumulasi)
  *
  * @param totalTokens - Total token dari AIUsageResult (input + output)
  * @param tokensPerPoin - Rasio dari cache setting admin (DEFAULT_TOKENS_PER_POIN sebagai fallback)
- * @returns Jumlah Poin yang perlu dipotong
+ * @returns Jumlah Poin yang perlu dipotong (0 jika belum mencapai threshold)
  */
 export function convertTokensToPoin(totalTokens: number, tokensPerPoin: number = DEFAULT_TOKENS_PER_POIN): number {
   const ratio = Number(tokensPerPoin) > 0 ? Number(tokensPerPoin) : DEFAULT_TOKENS_PER_POIN;
   if (!totalTokens || totalTokens <= 0) {
-    return MIN_POIN_PER_USAGE;
+    return 0;
   }
-  return Math.max(MIN_POIN_PER_USAGE, Math.ceil(totalTokens / ratio));
+  return Math.ceil(totalTokens / ratio);
 }
 
 /**

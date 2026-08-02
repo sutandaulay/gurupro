@@ -111,11 +111,15 @@ export default function TeachingAttendancePage() {
           const [endHour, endMinute] = slot.endTime.split(':').map(Number);
           endTime.setHours(endHour, endMinute, 0, 0);
           
-          let status: 'upcoming' | 'ongoing' | 'completed' | 'missed' = 'upcoming';
-          if (now >= startTime && now < endTime) {
-            status = 'ongoing';
-          } else if (now >= endTime) {
-            status = 'missed';
+          // Gunakan status dari server bila sesi sudah mulai/selesai,
+          // fallback ke perhitungan waktu hanya bila status 'upcoming'/'missed'
+          let status: 'upcoming' | 'ongoing' | 'completed' | 'missed' = slot.status || 'upcoming';
+          if (status !== 'ongoing' && status !== 'completed') {
+            if (now >= startTime && now < endTime) {
+              status = 'ongoing';
+            } else if (now >= endTime) {
+              status = 'missed';
+            }
           }
           
           // Tambahkan informasi institusi atau sekolah

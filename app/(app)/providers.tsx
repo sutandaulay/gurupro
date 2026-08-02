@@ -1,10 +1,30 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, Component, ReactNode } from "react";
 import { SessionProvider } from "next-auth/react";
 import { ToastProvider } from "@/app/components/ui/toast";
 import PendingInvitationModal from "@/components/auth/PendingInvitationModal";
 import ReferralModal from "@/components/auth/ReferralModal";
+
+// Error boundary to prevent auth errors from crashing the entire app
+class AuthErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, { hasError: boolean }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error('[AuthErrorBoundary] Caught auth error:', error?.message || error);
+  }
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || null;
+    }
+    return this.props.children;
+  }
+}
 
 // Buat context untuk menyimpan data session dan sekolah
 interface GlobalContextType {
@@ -61,6 +81,33 @@ export default function Providers({
     } else if (hasReferral) {
       setShowReferralModal(true);
     }
+
+    // Apply saved theme on mount
+    try {
+      const savedPref = localStorage.getItem("gurupro_user_preferences");
+      if (savedPref) {
+        const parsed = JSON.parse(savedPref);
+        if (parsed.tema) {
+          const root = document.documentElement;
+          root.classList.remove("dark", "light");
+          if (parsed.tema === "dark") {
+            root.classList.add("dark");
+            document.body.classList.add("dark");
+          } else if (parsed.tema === "light") {
+            root.classList.add("light");
+            document.body.classList.remove("dark");
+          } else {
+            const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+            if (isSystemDark) { root.classList.add("dark"); document.body.classList.add("dark"); }
+            else { root.classList.add("light"); document.body.classList.remove("dark"); }
+          }
+        }
+      } else {
+        // Default: apply system preference
+        const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (isSystemDark) { document.documentElement.classList.add("dark"); document.body.classList.add("dark"); }
+      }
+    } catch { /* ignore */ }
   }, []);
 
   return (
@@ -70,8 +117,9 @@ export default function Providers({
       setSessionData,
       setSchoolData
     }}>
-      <SessionProvider>
-        <ToastProvider>
+      <AuthErrorBoundary>
+        <SessionProvider>
+          <ToastProvider>
           {children}
           {/* Only show one modal at a time */}
           {showInvitationModal && (
@@ -96,8 +144,9 @@ export default function Providers({
               }}
             />
           )}
-        </ToastProvider>
-      </SessionProvider>
+          </ToastProvider>
+        </SessionProvider>
+      </AuthErrorBoundary>
     </GlobalContext.Provider>
   );
 }

@@ -9,12 +9,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { PrismaClient } from '@prisma/client';
+import { query } from '@/lib/db';
 import { generateAndSaveJurnal } from '@/lib/selesai-mengajar/generate-jurnal';
 import { saveAbsensiSummary } from '@/lib/selesai-mengajar/save-absensi';
 import { updateProgressATP } from '@/lib/selesai-mengajar/update-atp';
 import { updateLessonMemory } from '@/lib/selesai-mengajar/update-memory';
 import { generateNextMateri } from '@/lib/selesai-mengajar/generate-next-materi';
-import { getUserPoinAccess, consumeUserPoinFromUsage, logFailedPoinUsage } from '@/src/services/poin-service';
+import { getUserPoinAccess, consumeUserPoinFromUsage } from '@/src/services/poin-service';
+import { sendTeachingReportNotification } from '@/lib/notifications';
 import type { SelesaiMengajarInput, ProgressEvent, SelesaiMengajarResult } from '@/lib/selesai-mengajar/types';
 
 const prisma = new PrismaClient();
@@ -24,14 +26,14 @@ const prisma = new PrismaClient();
  */
 async function getSchoolIdForUser(userId: string): Promise<string | null> {
   const school = await prisma.schools.findFirst({
-    where: { userId },
+    where: { user_id: userId },
   });
   if (school) return school.id;
 
   const userClass = await prisma.classes.findFirst({
-    where: { schools: { userId } },
+    where: { schools: { user_id: userId } },
   });
-  if (userClass) return userClass.schoolId;
+  if (userClass) return userClass.school_id;
   return null;
 }
 
@@ -76,11 +78,11 @@ export async function POST(request: NextRequest) {
 
     const userDb = await prisma.users.findUnique({
       where: { id: user.id },
-      select: { role: true, statusLangganan: true, subscriptionEnd: true },
+      select: { role: true, status_langganan: true, subscription_end: true },
     });
 
-    const isPro = userDb?.statusLangganan && userDb.statusLangganan !== 'free';
-    const isExpired = isPro && userDb.subscriptionEnd && new Date(userDb.subscriptionEnd).getTime() < Date.now();
+    const isPro = userDb?.status_langganan && userDb.status_langganan !== 'free';
+    const isExpired = isPro && userDb.subscription_end && new Date(userDb.subscription_end).getTime() < Date.now();
 
     if (isExpired && userDb?.role !== 'admin') {
       return NextResponse.json({ error: 'expired' }, { status: 403 });
@@ -129,20 +131,7 @@ export async function POST(request: NextRequest) {
             message: 'Memulai proses administrasi...',
           });
 
-          // Konsumsi Poin untuk seluruh pipeline selesai-mengajar (non-admin)
-          // usage=null -> fallback estimasi (min 1 Poin per pipeline)
-          if (userDb?.role !== 'admin') {
-            try {
-              await consumeUserPoinFromUsage(guruId, null, "selesai-mengajar", {
-                mapel: body.mapel || '-',
-                jenjang: body.jenjang || '-',
-              });
-            } catch (poinErr) {
-              console.error('[Selesai Mengajar] Poin deduction failed:', poinErr);
-            }
-          }
-
-          // Prepare input with school_id
+          // PARALLEL TASKS
           const inputData: SelesaiMengajarInput = {
             ...body,
             guru_id: guruId,
@@ -302,10 +291,44 @@ export async function POST(request: NextRequest) {
             errors,
           };
 
+          // Deduct Poin hanya jika AI digunakan (jurnal AI generated)
+          // Cek apakah jurnal berhasil dibuat dengan AI (bukan skip/error)
+          const jurnalGenerated = jurnalResult.status === 'fulfilled' && jurnalResult.value?.ai_generated === true;
+          const nextMateriGenerated = nextMateriResult.status === 'fulfilled' && nextMateriResult.value?.ai_generated === true;
+          const aiUsed = jurnalGenerated || nextMateriGenerated;
+
+          if (aiUsed && userDb?.role !== 'admin') {
+            try {
+              // Estimasi token berdasarkan jenis AI yang digunakan
+              const inputTokens = jurnalGenerated && nextMateriGenerated ? 1500 : 800;
+              const outputTokens = jurnalGenerated && nextMateriGenerated ? 3000 : 1500;
+              const estimatedUsage = { inputTokens, outputTokens };
+              await consumeUserPoinFromUsage(guruId, estimatedUsage as any, "selesai-mengajar", {
+                mapel: body.mapel_nama || '-',
+                jenjang: body.jenjang || '-',
+              });
+              console.log(`[Selesai Mengajar] Poin deducted (AI used: jurnal=${jurnalGenerated}, nextMateri=${nextMateriGenerated})`);
+            } catch (poinErr) {
+              console.error('[Selesai Mengajar] Poin deduction failed:', poinErr);
+            }
+          }
+
           // Revalidate caches
           revalidatePath('/dashboard');
           revalidatePath('/api/timeline');
           revalidatePath('/api/teaching-session');
+
+          // Tutup sesi mengajar sekolah yang masih aktif (dimulai via presensi guru)
+          if (inputData.school_id) {
+            query(
+              `UPDATE school_teaching_sessions
+               SET status = 'completed', ended_at = COALESCE(ended_at, NOW())
+               WHERE user_id = $1 AND school_id = $2 AND status = 'active'`,
+              [guruId, inputData.school_id]
+            ).catch((closeErr) => {
+              console.error('[Selesai Mengajar] Failed to close school teaching session:', closeErr);
+            });
+          }
 
           // Send complete event
           sendEvent(controller, {
@@ -313,6 +336,30 @@ export async function POST(request: NextRequest) {
             status: 'done',
             message: 'Semua administrasi selesai! 🎉',
             data: finalResult,
+          });
+
+          // Resolve institution_id and send notification to kepsek — fire and forget
+          const notifPayload = {
+            guruId: guruId,
+            guruNama: guruName,
+            kelas: body.kelas_nama || '-',
+            mapel: body.mapel_nama || '-',
+            tanggal: body.tanggal,
+            kehadiran: `${body.jumlah_hadir} hadir / ${body.jumlah_izin} izin / ${body.jumlah_sakit} sakit / ${body.jumlah_alpha} alpha`,
+            reportUrl: `${process.env.NEXT_PUBLIC_APP_URL || ''}/dashboard/laporan-mengajar`,
+          };
+
+          query(
+            `SELECT institution_id FROM payload.institution_members
+             WHERE app_user_id = $1 AND status = 'active'
+             LIMIT 1`,
+            [guruId]
+          ).then(membership => {
+            if (membership?.rows?.[0]) {
+              sendTeachingReportNotification({ ...notifPayload, institutionId: membership.rows[0].institution_id }).catch(() => {});
+            }
+          }).catch((notifErr) => {
+            console.error('[Selesai Mengajar] Failed to resolve institution membership:', notifErr);
           });
 
           controller.close();
@@ -363,19 +410,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
 
-      let userDb: { role: string; statusLangganan?: string | null; subscriptionEnd?: Date | null } | null = null;
+      let userDb: { role: string; status_langganan?: string | null; subscription_end?: Date | null } | null = null;
       try {
         userDb = await prisma.users.findUnique({
           where: { id: user.id },
-          select: { role: true, statusLangganan: true, subscriptionEnd: true },
+          select: { role: true, status_langganan: true, subscription_end: true },
         });
       } catch (userError) {
         console.error('[selesai-mengajar] Error fetching user:', userError);
         return NextResponse.json({ schedules: [], allSchedules: [] });
       }
 
-      const isPro = userDb?.statusLangganan && userDb.statusLangganan !== 'free';
-      const isExpired = isPro && userDb?.subscriptionEnd && new Date(userDb.subscriptionEnd).getTime() < Date.now();
+      const isPro = userDb?.status_langganan && userDb.status_langganan !== 'free';
+      const isExpired = isPro && userDb?.subscription_end && new Date(userDb.subscription_end).getTime() < Date.now();
 
       if (isExpired && userDb?.role !== 'admin') {
         return NextResponse.json({ error: 'expired' }, { status: 403 });
@@ -385,11 +432,11 @@ export async function POST(request: NextRequest) {
       let allSchedules: any[] = [];
 
       try {
-        let userSchools: { id: string; namaSekolah: string | null }[] = [];
+        let userSchools: { id: string; nama_sekolah: string | null }[] = [];
         try {
           userSchools = await prisma.schools.findMany({
-            where: { userId: user.id },
-            select: { id: true, namaSekolah: true },
+            where: { user_id: user.id },
+            select: { id: true, nama_sekolah: true },
           });
         } catch (schoolError) {
           console.error('[selesai-mengajar] Error fetching schools:', schoolError);
@@ -399,10 +446,10 @@ export async function POST(request: NextRequest) {
         if (allSchoolIds.length === 0) {
           try {
             const userClasses = await prisma.classes.findMany({
-              where: { schools: { userId: user.id } },
-              select: { schoolId: true },
+              where: { schools: { user_id: user.id } },
+              select: { school_id: true },
             });
-            const uniqueSchoolIds = Array.from(new Set(userClasses.map((c) => c.schoolId).filter(Boolean)));
+            const uniqueSchoolIds = Array.from(new Set(userClasses.map((c) => c.school_id).filter(Boolean)));
             allSchoolIds = uniqueSchoolIds;
           } catch (classError) {
             console.error('[selesai-mengajar] Error fetching classes:', classError);
@@ -413,7 +460,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ schedules: [], allSchedules: [] });
         }
 
-        const schoolMap = new Map(userSchools.map((s) => [s.id, s.namaSekolah]));
+        const schoolMap = new Map(userSchools.map((s) => [s.id, s.nama_sekolah]));
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -425,37 +472,37 @@ export async function POST(request: NextRequest) {
         try {
           todaySchedules = await prisma.schedules.findMany({
             where: {
-              schoolId: { in: allSchoolIds },
+              school_id: { in: allSchoolIds },
               hari: hariIni,
             },
             include: {
-              classes: { select: { namaKelas: true } },
-              subjects: { select: { namaMapel: true } },
-              schools: { select: { namaSekolah: true } },
+              classes: { select: { nama_kelas: true } },
+              subjects: { select: { nama_mapel: true } },
+              schools: { select: { nama_sekolah: true } },
             },
-            orderBy: [{ schoolId: 'asc' }, { jamMulai: 'asc' }],
+            orderBy: [{ school_id: 'asc' }, { jam_mulai: 'asc' }],
           });
         } catch (scheduleError) {
           console.error('[selesai-mengajar] Error fetching schedules:', scheduleError);
           return NextResponse.json({ schedules: [], allSchedules: [] });
         }
 
-        let completedSessions: { scheduleId: string; journalGenerated: boolean }[] = [];
+        let completedSessions: { schedule_id: string; journal_generated: boolean | null }[] = [];
         try {
-          completedSessions = await prisma.teachingSessions.findMany({
+          completedSessions = await prisma.teaching_sessions.findMany({
             where: {
-              userId: user.id,
-              sessionDate: today,
+              user_id: user.id,
+              session_date: today,
               status: 'completed',
             },
-            select: { scheduleId: true, journalGenerated: true },
+            select: { schedule_id: true, journal_generated: true },
           });
         } catch (sessionError) {
           console.error('[selesai-mengajar] Error fetching teaching sessions:', sessionError);
         }
 
         const completedMap = new Map(
-          completedSessions.map((s) => [s.scheduleId, s.journalGenerated])
+          completedSessions.map((s) => [s.schedule_id, true])
         );
 
         const safeString = (val: string | null | undefined, fallback = '') => (val && String(val).trim()) ? String(val).trim() : fallback;
@@ -464,26 +511,26 @@ export async function POST(request: NextRequest) {
           .filter((s) => !completedMap.get(s.id))
           .map((s) => ({
             id: s.id,
-            class_id: s.classId,
-            subject_id: s.subjectId,
-            school_id: s.schoolId,
-            school_name: safeString(s.schools?.namaSekolah || schoolMap.get(s.schoolId)),
+            class_id: s.class_id,
+            subject_id: s.subject_id,
+            school_id: s.school_id,
+            school_name: safeString(s.schools?.namaSekolah || schoolMap.get(s.school_id)),
             class_name: safeString(s.classes?.namaKelas),
             subject_name: safeString(s.subjects?.namaMapel),
-            jam_mulai: s.jamMulai,
-            jam_selesai: s.jamSelesai,
+            jam_mulai: s.jam_mulai,
+            jam_selesai: s.jam_selesai,
           }));
 
         allSchedules = todaySchedules.map((s) => ({
           id: s.id,
-          class_id: s.classId,
-          subject_id: s.subjectId,
-          school_id: s.schoolId,
-          school_name: safeString(s.schools?.namaSekolah || schoolMap.get(s.schoolId)),
+          class_id: s.class_id,
+          subject_id: s.subject_id,
+          school_id: s.school_id,
+          school_name: safeString(s.schools?.namaSekolah || schoolMap.get(s.school_id)),
           class_name: safeString(s.classes?.namaKelas),
           subject_name: safeString(s.subjects?.namaMapel),
-          jam_mulai: s.jamMulai,
-          jam_selesai: s.jamSelesai,
+          jam_mulai: s.jam_mulai,
+          jam_selesai: s.jam_selesai,
           isCompleted: completedMap.get(s.id) || false,
         }));
       } catch (processingError) {

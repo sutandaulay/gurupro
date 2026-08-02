@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": {
+    "crons": [
+      {
+        "path": "/api/cron/voice-briefing",
+        "schedule": "*/1 * * * *"
+      }
+    ]
+  }
+}

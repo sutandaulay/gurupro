@@ -165,13 +165,14 @@ Hasilkan seluruh dokumen PROTA tersebut langsung dalam format Markdown dengan ta
       parsed.pdf_url = pdfUrl;
       parsed.docx_url = docxUrl;
 
-    } catch (aiError: any) {
+    } catch (aiError: unknown) {
       console.error("Prota AI generation failed:", aiError);
+      const aiMsg = aiError instanceof Error ? aiError.message : String(aiError ?? "Unknown error");
 
       // Log failed usage
-      await logFailedPoinUsage(userId, 0, "generate-prota", aiError.message);
+      await logFailedPoinUsage(userId, 0, "generate-prota", aiMsg);
 
-      return NextResponse.json({ error: `Gagal generate Prota: ${aiError.message}` }, { status: 502 });
+      return NextResponse.json({ error: `Gagal generate Prota: ${aiMsg}` }, { status: 502 });
     }
 
     // Save to guru_administrasi
@@ -206,14 +207,15 @@ Hasilkan seluruh dokumen PROTA tersebut langsung dalam format Markdown dengan ta
           await deductPoinFromAIResult({ success: true, usage: aiResult?.usage || null }, userId, "generate-prota", {});
 
           console.log(`[Generate PROTA] Poin deducted`);
-        } catch (poinError: any) {
+        } catch (poinError: unknown) {
         console.error("[Generate Prota] Poin deduction failed:", poinError);
       }
     }
 
     return NextResponse.json(parsed);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Prota Generation Error:", error);
-    return NextResponse.json({ error: error.message || "Gagal generate Prota" }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error ?? "Unknown error");
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

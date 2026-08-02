@@ -5,9 +5,6 @@ import { db, query } from '@/lib/db';
 import { 
   attendanceLogs, 
   attendanceSummary,
-  institutions as institutionsTable,
-  teacherInstitutionAssignments,
-  formatInstitution
 } from '@/lib/schemas/attendance';
 import { eq, and, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
@@ -85,9 +82,19 @@ export async function POST(req: Request) {
       .where(and(...queryConditions))
       .limit(10);
 
-    // Filter to find an open session (not marked as closed)
+    // Filter to find an open session (no matching end log exists)
+    let endLogsForMatch: any[] = [];
+    try {
+      endLogsForMatch = await db.select({ classSessionId: attendanceLogs.classSessionId })
+        .from(attendanceLogs)
+        .where(and(
+          eq(attendanceLogs.teacherId, userId),
+          eq(attendanceLogs.type, 'mengajar_selesai')
+        ));
+    } catch {}
+    const closedSessionIds = new Set(endLogsForMatch.map(log => log.classSessionId));
     startLog = possibleLogs.find(log => {
-      return !log.classSessionId || !String(log.classSessionId).startsWith('closed_');
+      return !log.classSessionId || !closedSessionIds.has(log.classSessionId);
     });
 
     // Fallback to first log if none found open
@@ -122,9 +129,20 @@ export async function POST(req: Request) {
     }
 
     const rawInstitution = instResult.rows[0];
-    const institution = formatInstitution(rawInstitution)!;
-    const institutionLocation = institution.location;
-    const attendanceSettings = institution.attendanceSettings;
+
+    const institutionLocation = {
+      latitude: rawInstitution.locationLatitude ? parseFloat(rawInstitution.locationLatitude) : -6.2088,
+      longitude: rawInstitution.locationLongitude ? parseFloat(rawInstitution.locationLongitude) : 106.8456,
+    };
+
+    const attendanceSettings = {
+      attendanceRadiusMeters: rawInstitution.attendanceRadiusMeters ? parseFloat(rawInstitution.attendanceRadiusMeters) : 100,
+      classSessionRadiusMeters: rawInstitution.classSessionRadiusMeters ? parseFloat(rawInstitution.classSessionRadiusMeters) : 150,
+      lateToleranceMinutes: rawInstitution.lateToleranceMinutes ?? 15,
+      duplicateCheckMinutes: rawInstitution.duplicateCheckMinutes ?? 5,
+      qrCodeEnabled: !!rawInstitution.qrCodeEnabled,
+      qrCodeToken: rawInstitution.qrCodeToken ?? null,
+    };
     
     const distance = calculateDistance(
       validatedData.latitude,
@@ -172,7 +190,7 @@ export async function POST(req: Request) {
       institutionId: startLog.institutionId,
       assignmentId: startLog.assignmentId,
       type: 'mengajar_selesai',
-      classSessionId: `closed_${startLog.classSessionId}`, // Mark as closed
+      classSessionId: startLog.classSessionId,
       subjectId: validatedData.subjectId || startLog.subjectId,
       timestamp: endTime,
       latitude: validatedData.latitude,
@@ -188,13 +206,6 @@ export async function POST(req: Request) {
       status: status,
       flagReasons: flagReasons.length > 0 ? flagReasons : null,
     }).returning();
-
-    // Update log sesi mulai untuk menandai bahwa sesi telah ditutup
-    await db.update(attendanceLogs)
-      .set({
-        classSessionId: `closed_${startLog.id}`, // Mark as closed with prefix
-      })
-      .where(eq(attendanceLogs.id, startLog.id));
 
     // Update summary harian dengan durasi sesi
     await updateDailyAttendanceSummary(
@@ -317,7 +328,9 @@ async function updateDailyAttendanceSummary(
   if (existingSummary) {
     // Update summary yang ada dengan informasi sesi mengajar
     const currentTeachingMinutesBySubject = existingSummary.teachingMinutesBySubject 
-      ? JSON.parse(existingSummary.teachingMinutesBySubject as string) 
+      ? (typeof existingSummary.teachingMinutesBySubject === 'string'
+        ? JSON.parse(existingSummary.teachingMinutesBySubject)
+        : existingSummary.teachingMinutesBySubject)
       : {};
     
     const updatedTeachingMinutesBySubject = {

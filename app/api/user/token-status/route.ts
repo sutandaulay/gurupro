@@ -8,6 +8,7 @@
 import { query } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { getTokensPerPoin } from "@/src/config/ratio-cache";
 
 export async function GET() {
   try {
@@ -31,13 +32,16 @@ export async function GET() {
         nama_lengkap,
         role,
         status_langganan,
-        token_limit,
-        addon_token_balance,
-        main_token_reset_date,
+        quota_poin_total,
+        quota_poin_used,
+        addon_poin,
+        addon_poin_used,
+        addon_poin_grace_period_ends,
         subscription_start,
         subscription_end,
         subscription_status,
-        grace_period_ends_at
+        grace_period_ends_at,
+        token_accumulated
       FROM users
       WHERE id = $1`,
       [userId]
@@ -52,10 +56,22 @@ export async function GET() {
 
     const user = userRes.rows[0];
 
-    // Calculate remaining tokens
-    const mainTokens = Number(user.token_limit || 0);
-    const addonTokens = Number(user.addon_token_balance || 0);
-    const totalTokens = mainTokens + addonTokens;
+    // Hitung Poin yang tersedia dari sistem baru
+    const mainTotal = user.quota_poin_total || 0;
+    const mainUsed = user.quota_poin_used || 0;
+    const mainAvailable = Math.max(0, mainTotal - mainUsed);
+
+    const addonTotal = user.addon_poin || 0;
+    const addonUsed = user.addon_poin_used || 0;
+
+    // Cek grace period addon
+    const gracePeriodEnds = user.addon_poin_grace_period_ends
+      ? new Date(user.addon_poin_grace_period_ends).getTime()
+      : null;
+    const isAddonGraceActive = gracePeriodEnds && gracePeriodEnds > Date.now();
+    const addonAvailable = isAddonGraceActive ? Math.max(0, addonTotal - addonUsed) : 0;
+
+    const totalAvailable = mainAvailable + addonAvailable;
 
     // Check subscription status
     const now = new Date();
@@ -64,11 +80,11 @@ export async function GET() {
       : null;
     const isExpired = subscriptionEnd ? subscriptionEnd.getTime() < now.getTime() : false;
 
-    const gracePeriodEnds = user.grace_period_ends_at
+    const gracePeriodEndsAt = user.grace_period_ends_at
       ? new Date(user.grace_period_ends_at)
       : null;
     const isGracePeriodExpired =
-      gracePeriodEnds && gracePeriodEnds.getTime() < now.getTime();
+      gracePeriodEndsAt && gracePeriodEndsAt.getTime() < now.getTime();
 
     // Determine actual status
     let effectiveStatus = user.subscription_status || "active";
@@ -81,6 +97,8 @@ export async function GET() {
       effectiveStatus = "locked";
     }
 
+    const tokensPerPoin = await getTokensPerPoin();
+
     return NextResponse.json({
       id: user.id,
       email: user.email,
@@ -89,24 +107,36 @@ export async function GET() {
       status_langganan: user.status_langganan,
       subscription_status: effectiveStatus,
       subscription_end: user.subscription_end,
-      grace_period_ends_at: gracePeriodEnds
-        ? gracePeriodEnds.toISOString()
+      grace_period_ends_at: gracePeriodEndsAt
+        ? gracePeriodEndsAt.toISOString()
         : null,
 
-      // Token info
-      token_limit: mainTokens,
-      addon_token_balance: addonTokens,
-      total_token_balance: totalTokens,
-      main_token_reset_date: user.main_token_reset_date,
+      // Poin info (sistem baru)
+      quota_poin_total: mainTotal,
+      quota_poin_used: mainUsed,
+      quota_poin_available: mainAvailable,
+      addon_poin_total: addonTotal,
+      addon_poin_used: addonUsed,
+      addon_poin_available: addonAvailable,
+
+      // Token accumulation info
+      token_accumulated: user.token_accumulated || 0,
+      tokens_per_poin: tokensPerPoin,
+      tokens_until_next_poin: tokensPerPoin - (user.token_accumulated || 0),
+
+      // Backward compat
+      token_limit: mainAvailable + addonAvailable,
+      addon_token_balance: addonAvailable,
+      total_token_balance: totalAvailable,
 
       // Computed
-      hasAccess: totalTokens > 0 && effectiveStatus !== "locked",
+      hasAccess: totalAvailable > 0 && effectiveStatus !== "locked",
       reason:
         effectiveStatus === "locked"
           ? "Akun terkunci"
           : isExpired
           ? "Langganan berakhir"
-          : totalTokens <= 0
+          : totalAvailable <= 0
           ? "Poin habis"
           : "active",
     });

@@ -2,7 +2,7 @@ import { query } from "@/lib/db";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { getPaymentGatewayConfig } from "@/lib/settings";
-import { grantUserTokens } from "@/lib/token-system";
+import { grantUserPoin } from "@/src/services/poin-service";
 import { cookies } from "next/headers";
 
 function isUUID(str: string): boolean {
@@ -208,7 +208,7 @@ export async function POST(req: Request) {
         ["free", currentStart, newEnd, userId]
       );
 
-      await grantUserTokens(userId, tokens);
+      await grantUserPoin(userId, tokens);
 
       await query(
         `INSERT INTO transactions (id, user_id, external_id, amount, status, created_at, notes, plan_id)

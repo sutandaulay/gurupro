@@ -228,22 +228,21 @@ async function processPaymentSuccess(transactionId: string) {
     newSubscriptionEnd.setDate(newSubscriptionEnd.getDate() + durationDays);
   }
 
-  // Update user subscription (accumulate tokens - consistent with lib/payments.ts:activateTransaction)
+  // Update user subscription (accumulate poin - consistent with lib/payments.ts:activateTransaction)
   await query(
     `UPDATE users SET
        status_langganan = $1,
        subscription_status = 'active',
        subscription_end = $2,
        grace_period_ends_at = NULL,
-       token_limit = COALESCE(token_limit, 0) + $3,
-       main_token_reset_date = $4,
+       quota_poin_total = GREATEST(0, COALESCE(quota_poin_total, 0)) + $3,
+       quota_poin_used = 0,
        last_expiry_warning_sent = NULL
-     WHERE id = $5`,
+     WHERE id = $4`,
     [
       planId || "free",
       newSubscriptionEnd,
       tokens,
-      newSubscriptionEnd,
       userId,
     ]
   );

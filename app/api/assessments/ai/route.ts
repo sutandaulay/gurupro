@@ -92,13 +92,14 @@ Harap berikan respons dalam JSON dengan format persis seperti ini:
       if (!parsed) {
         throw new Error("AI generation failed");
       }
-    } catch (aiError: any) {
+    } catch (aiError: unknown) {
       console.error("Assessment AI generation failed:", aiError);
+      const aiMsg = aiError instanceof Error ? aiError.message : String(aiError ?? "Unknown error");
 
       // Log failed usage
-      await logFailedPoinUsage(userId, 0, "assessments-ai", aiError.message);
+      await logFailedPoinUsage(userId, 0, "assessments-ai", aiMsg);
 
-      return NextResponse.json({ error: `Gagal memproses AI: ${aiError.message || aiError}` }, { status: 502 });
+      return NextResponse.json({ error: `Gagal memproses AI: ${aiMsg}` }, { status: 502 });
     }
 
     // 3. Deduct Poin based on actual usage
@@ -112,14 +113,15 @@ Harap berikan respons dalam JSON dengan format persis seperti ini:
         );
 
           console.log(`[Assessments AI] Poin deducted`);
-        } catch (poinError: any) {
+        } catch (poinError: unknown) {
         console.error("[Assessments AI] Poin deduction failed:", poinError);
       }
     }
 
     return NextResponse.json(parsed);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Assessment AI helper error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error ?? "Unknown error");
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

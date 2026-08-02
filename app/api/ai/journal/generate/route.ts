@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
 
       const journal = await prisma.teacher_journals.create({
         data: {
-          teacher_id: userId,
+          user_id: userId,
           school_id: school_id,
           schedule_id: schedule_id || null,
           class_id: class_id,

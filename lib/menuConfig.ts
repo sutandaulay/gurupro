@@ -45,7 +45,7 @@ import {
 export type MenuItem = {
   label: string;
   href?: string;
-  submenu?: { label: string; href: string }[];
+  submenu?: { label: string; href: string; desc?: string }[];
 };
 
 export type Category = 
@@ -142,11 +142,11 @@ export const masterMenus: MenuItem[] = [
   {
     label: "Presensi",
     submenu: [
-      { label: "Presensi Saya", href: "/attendance" },
-      { label: "Presensi Mengajar", href: "/attendance/teaching" },
-      { label: "Pengajuan Izin", href: "/attendance/leave" },
-      { label: "Laporan Presensi", href: "/reports/attendance" },
-      { label: "Rekap TPG", href: "/reports/tpg" },
+      { label: "Presensi Saya", href: "/dashboard/attendance" },
+      { label: "Presensi Mengajar", href: "/dashboard/attendance/teaching" },
+      { label: "Pengajuan Izin", href: "/dashboard/attendance/leave" },
+      { label: "Laporan Presensi", href: "/dashboard/reports/attendance" },
+      { label: "Rekap TPG", href: "/dashboard/reports/tpg" },
     ],
   },
   {
@@ -190,7 +190,7 @@ export const masterMenus: MenuItem[] = [
   {
     label: "Laporan",
     submenu: [
-      { label: "Laporan Harian", href: "/dashboard/laporan-harian" },
+      { label: "Laporan Harian & Mengajar", href: "/dashboard/laporan-harian", desc: "Rekap harian resmi + arsip jurnal mengajar" },
       { label: "Laporan Kinerja", href: "/dashboard/laporan-kinerja" },
       { label: "Evidence", href: "/dashboard/evidence" },
     ],
@@ -211,6 +211,10 @@ export const masterMenus: MenuItem[] = [
       { label: "Buat Baru", href: "/dashboard/pengembangan-diri/tambah" },
       { label: "Sertifikat", href: "/dashboard/pengembangan-diri?tab=documents" },
     ],
+  },
+  {
+    label: "Perpustakaan",
+    href: "/dashboard/perpustakaan",
   },
   {
     label: "Wali Kelas",
@@ -313,6 +317,7 @@ export function getLucideIcon(label: string): any {
     "Raport": ClipboardList,
     "Laporan Harian": FileText,
     "Laporan Kinerja": FileBarChart,
+    "Laporan Mengajar": ClipboardList,
     "Evidence": FolderOpen,
     "Status Raport": ClipboardList,
     "Review Nilai Raport": FileSearch,
@@ -344,6 +349,7 @@ export function getLucideIcon(label: string): any {
     "Brankas": Archive,
     "Pengaturan": Settings,
     "Billing": CreditCard,
+    "Perpustakaan": BookOpen,
   };
   return map[label] || null;
 }

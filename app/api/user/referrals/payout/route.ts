@@ -97,9 +97,9 @@ export async function POST(req: Request) {
 
       const costAmount = tokensToReward * exchangeRate;
 
-      // Process instantly
+      // Process instantly - grant to main quota
       await query(
-        "UPDATE users SET cashback_balance = cashback_balance - $1, token_limit = token_limit + $2 WHERE id = $3",
+        "UPDATE users SET cashback_balance = cashback_balance - $1, quota_poin_total = GREATEST(0, COALESCE(quota_poin_total, 0)) + $2 WHERE id = $3",
         [costAmount, tokensToReward, userId]
       );
 

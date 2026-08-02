@@ -13,6 +13,7 @@ import {
   PenilaianSikapUpdateSchema,
   PenilaianSikapQuerySchema,
 } from '@/lib/schemas/sikap-ekskul';
+import { parsePagination, wrapResponse } from '@/lib/pagination';
 
 /**
  * GET /api/penilaian-sikap
@@ -30,9 +31,10 @@ export async function GET(req: Request) {
     };
 
     const validated = PenilaianSikapQuerySchema.parse(filters);
-    const result = await getPenilaianSikap(validated);
+    const pagination = parsePagination(searchParams);
+    const { data, total } = await getPenilaianSikap(validated, pagination);
 
-    return NextResponse.json({ data: result });
+    return NextResponse.json(wrapResponse(data, total, pagination));
   } catch (error: any) {
     console.error('GET /api/penilaian-sikap error:', error);
     return NextResponse.json({ error: error.message }, { status: 400 });

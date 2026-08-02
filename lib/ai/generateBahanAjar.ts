@@ -8,6 +8,7 @@
 
 import { generateAIContent } from "./generators";
 import { consumeUserPoinFromUsage } from "@/src/services/poin-service";
+import { adaptGeminiUsage } from "@/src/lib/ai-usage-result";
 import {
   buildSlidePrompt,
   buildLkpdPrompt,
@@ -319,8 +320,9 @@ async function deductAndTrack(
   }
 ): Promise<void> {
   try {
-    // Konsumsi Poin dari estimasi token (fallback: usage=null -> min 1 Poin)
-    await consumeUserPoinFromUsage(userId, null, "bahan-ajar", {
+    // Konsumsi Poin dari estimasi token
+    const estimatedUsage = { inputTokens: Math.ceil(actualTokens * 0.3), outputTokens: Math.ceil(actualTokens * 0.7) };
+    await consumeUserPoinFromUsage(userId, estimatedUsage as any, "bahan-ajar", {
       jenjang: "-",
     });
     console.log(`[BahanAjar] Poin deducted (estimasi ${actualTokens} token) for user ${userId}`, {

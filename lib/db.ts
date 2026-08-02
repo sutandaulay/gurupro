@@ -1,18 +1,39 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 
+// Required database environment variables
+const REQUIRED_DB_ENV_VARS = [
+  'DB_USER',
+  'DB_PASSWORD',
+  'DB_HOST',
+  'DB_NAME',
+  'DB_PORT',
+] as const;
+
+const missingDbEnvVars = REQUIRED_DB_ENV_VARS.filter((key) => !process.env[key]);
+
+if (missingDbEnvVars.length > 0) {
+  throw new Error(
+    `Application startup aborted: missing required database environment variables: ${missingDbEnvVars.join(', ')}. ` +
+    `Please configure them in your .env file before starting the app.`
+  );
+}
+
 // Global singleton untuk database pool - persist across module reloads
 const globalForPool = globalThis as unknown as {
   pool: Pool | undefined;
 };
 
 export const pool = globalForPool.pool ?? new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'gurupro_db',
-  password: 'nus4nt4r4',
-  port: 5432,
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: parseInt(process.env.DB_PORT, 10),
   options: '-c search_path=public,payload',
+  max: 50,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
 });
 
 if (process.env.NODE_ENV !== 'production') {
@@ -46,7 +67,8 @@ export const queryWithTimeout = async (text: string, params?: any[], timeoutMs: 
   }
 };
 
-export const query = (text: string, params?: any[]) => {
+export const query = async (text: string, params?: any[]) => {
+  await ensureDbInitialized();
   return pool.query(text, params);
 };
 
@@ -135,6 +157,9 @@ const initDb = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    // Tambah kolom check_in_time / check_out_time jika belum ada
+    await pool.query(`ALTER TABLE teacher_attendance ADD COLUMN IF NOT EXISTS check_in_time TIMESTAMP`);
+    await pool.query(`ALTER TABLE teacher_attendance ADD COLUMN IF NOT EXISTS check_out_time TIMESTAMP`);
 
     // 7. Tabel Student Attendance (Presensi Siswa per Jam Pelajaran)
     await pool.query(`
@@ -549,6 +574,13 @@ const initDb = async () => {
             email_subject: "Refund Pembayaran GuruPRO",
             email_body: "<div style=\"font-family: sans-serif; padding: 20px;\"><h2 style=\"color: #ef4444;\">Refund Pembayaran</h2><p>Halo Ibu/Bapak <strong>{nama_lengkap}</strong>,</p><p>Mohon maaf, pengajuan refund untuk pembayaran paket <strong>{plan_name}</strong> telah diproses oleh Admin.</p><p><strong>Detail Refund:</strong></p><ul style=\"background: #fee2e2; padding: 15px; border-radius: 8px; list-style: none;\"><li><strong>Jumlah Refund:</strong> Rp {refund_amount}</li><li><strong>Poin Dipotong:</strong> {refund_tokens} Poin</li><li><strong>Alasan:</strong> {reason}</li></ul><p>Poin Anda telah dikurangi sesuai jumlah yang tertera di atas. Jika ada pertanyaan, silakan hubungi Admin.</p></div>",
             wa_message: "Halo Ibu/Bapak *{nama_lengkap}*,\n\nInformasi penting. Refund untuk paket *{plan_name}* telah diproses oleh Admin.\n\n📋 *Detail Refund:*\n• Jumlah: *Rp {refund_amount}*\n• Poin Dipotong: *{refund_tokens} Poin*\n• Alasan: {reason}\n\nPoin Anda telah dikurangi. Hubungi Admin jika ada pertanyaan. Terima kasih."
+          },
+          teaching_report_completed: {
+            email_enabled: true,
+            wa_enabled: true,
+            email_subject: "Laporan Mengajar Baru - {guru_nama}",
+            email_body: "<div style=\"font-family: sans-serif; padding: 20px;\"><h2 style=\"color: #4f46e5;\">Laporan Mengajar Baru</h2><p>Yth. <strong>{kepala_nama}</strong>,</p><p>Guru <strong>{guru_nama}</strong> telah menyelesaikan administrasi mengajar pada:</p><ul style=\"background: #f3f4f6; padding: 15px; border-radius: 8px; list-style: none;\"><li><strong>Tanggal:</strong> {tanggal}</li><li><strong>Kelas:</strong> {kelas}</li><li><strong>Mapel:</strong> {mapel}</li><li><strong>Kehadiran:</strong> {kehadiran}</li></ul><p><a href=\"{report_url}\" style=\"background: #4f46e5; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none;\">Lihat Laporan</a></p></div>",
+            wa_message: "📋 *Laporan Mengajar Baru*\n\nYth. {kepala_nama},\n\nGuru *{guru_nama}* telah menyelesaikan administrasi mengajar:\n\n📅 Tanggal: *{tanggal}*\n🏫 Kelas: *{kelas}*\n📚 Mapel: *{mapel}*\n👥 Kehadiran: *{kehadiran}*\n\n🔗 {report_url}"
           }
         })]
       );
@@ -985,7 +1017,7 @@ const initDb = async () => {
           SELECT imr.value INTO v_role
       FROM institution_members im
       JOIN institution_members_role imr ON imr.parent_id = im.id
-      WHERE im.app_user_id = p_member_id
+      WHERE im.app_user_id::uuid = p_member_id
         AND imr.value = 'guru'
           LIMIT 1;
           RETURN v_role IS NOT NULL;
@@ -1272,7 +1304,7 @@ const initDb = async () => {
       await pool.query('CREATE INDEX IF NOT EXISTS idx_schedules_lookup ON schedules(school_id, class_id, subject_id)');
       await pool.query('CREATE INDEX IF NOT EXISTS idx_students_class_id ON students(class_id)');
       await pool.query('CREATE INDEX IF NOT EXISTS idx_student_attendance_lookup ON student_attendance(schedule_id, student_id, tanggal)');
-      await pool.query('CREATE INDEX IF NOT EXISTS idx_teacher_journals_lookup ON teacher_journals(school_id, class_id, subject_id, teacher_id)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_teacher_journals_lookup ON teacher_journals(school_id, class_id, subject_id, user_id)');
       await pool.query('CREATE INDEX IF NOT EXISTS idx_assessments_lookup ON assessments(school_id, class_id, subject_id)');
       await pool.query('CREATE INDEX IF NOT EXISTS idx_student_grades_lookup ON student_grades(assessment_id, student_id)');
     } catch (err) {
@@ -1367,6 +1399,8 @@ const initDb = async () => {
     // Tidak mengubah teacher_journals/student_grades/guru_administrasi yang sudah berjalan.
     try {
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS weekly_recap_enabled BOOLEAN NOT NULL DEFAULT TRUE');
+
+      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT \'Asia/Jakarta\'');
 
       await pool.query(`
         CREATE TABLE IF NOT EXISTS weekly_recaps (
@@ -1490,6 +1524,57 @@ const initDb = async () => {
       console.error('Failed to create well_being tables:', err);
     }
 
+    // 36i. Voice Briefing Guru — Schema preferensi notifikasi suara & jadwal tambahan
+    // Kolom gender untuk sapaan otomatis (L/P). Kolom start_time/end_time bertipe TIME
+    // agar query cron bisa hitung selisih jam dengan presisi. Keduanya additive.
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(10)`);
+      await pool.query(`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS start_time TIME`);
+      await pool.query(`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS end_time TIME`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS notification_preferences (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          voice_briefing_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+          voice_name_preference TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (user_id)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_notification_preferences_user ON notification_preferences (user_id)`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          subscription JSONB NOT NULL,
+          endpoint TEXT NOT NULL,
+          p256dh TEXT,
+          auth TEXT,
+          user_agent TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (user_id, endpoint)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions (user_id)`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS voice_briefing_logs (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          schedule_id UUID NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+          sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (user_id, schedule_id)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_voice_briefing_logs_user ON voice_briefing_logs (user_id, sent_at)`);
+    } catch (err) {
+      console.error('Failed to create voice briefing schema:', err);
+    }
+
     // 36. Conditional Foreign Key for guru_administrasi (Audit Fix)
     try {
       const checkInstTable = await pool.query(
@@ -1505,6 +1590,132 @@ const initDb = async () => {
     } catch { /* constraint might already exist */ }
 
     console.log("SaaS Academic & TAMS tables checked/initialized successfully");
+
+    // 37. Perpustakaan Digital — library tables
+    // Enum types (PostgreSQL native enums)
+    try {
+      await pool.query(`DO $$ BEGIN CREATE TYPE library_item_type AS ENUM ('pdf', 'audiobook'); EXCEPTION WHEN duplicate_object THEN null; END $$`);
+      await pool.query(`DO $$ BEGIN CREATE TYPE library_item_status AS ENUM ('draft', 'published', 'archived'); EXCEPTION WHEN duplicate_object THEN null; END $$`);
+      await pool.query(`DO $$ BEGIN CREATE TYPE progress_status AS ENUM ('belum_dimulai', 'sedang_berjalan', 'selesai'); EXCEPTION WHEN duplicate_object THEN null; END $$`);
+      await pool.query(`DO $$ BEGIN CREATE TYPE poin_source_type AS ENUM ('gemini_usage', 'library_reward', 'manual_adjustment'); EXCEPTION WHEN duplicate_object THEN null; END $$`);
+    } catch { /* enum might already exist */ }
+
+    try {
+      // library_categories
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS library_categories (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name VARCHAR(100) NOT NULL,
+          slug VARCHAR(100) NOT NULL UNIQUE,
+          icon VARCHAR(50),
+          display_order INTEGER DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        )
+      `);
+
+      // library_items
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS library_items (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          category_id UUID NOT NULL REFERENCES library_categories(id) ON DELETE RESTRICT,
+          type library_item_type NOT NULL,
+          title VARCHAR(255) NOT NULL,
+          author VARCHAR(150),
+          synopsis TEXT,
+          cover_image_key TEXT NOT NULL,
+          file_key TEXT NOT NULL,
+          page_count INTEGER,
+          duration_seconds INTEGER,
+          status library_item_status DEFAULT 'draft' NOT NULL,
+          created_by UUID NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_library_items_category ON library_items (category_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_library_items_status ON library_items (status)`);
+
+      // teacher_library_progress
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS teacher_library_progress (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          teacher_id UUID NOT NULL,
+          item_id UUID NOT NULL REFERENCES library_items(id) ON DELETE CASCADE,
+          progress_percent REAL DEFAULT 0 NOT NULL,
+          last_position_seconds INTEGER DEFAULT 0,
+          last_page INTEGER DEFAULT 0,
+          status progress_status DEFAULT 'belum_dimulai' NOT NULL,
+          active_reading_seconds INTEGER DEFAULT 0,
+          completed_at TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          UNIQUE (teacher_id, item_id)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_teacher_library_progress_teacher ON teacher_library_progress (teacher_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_teacher_library_progress_status ON teacher_library_progress (teacher_id, status)`);
+
+      // Clean up orphan progress records (item deleted but FK still exists due to RESTRICT issue)
+      await pool.query(`DELETE FROM teacher_library_progress WHERE item_id NOT IN (SELECT id FROM library_items)`);
+
+      // teacher_library_score (agregat bulanan)
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS teacher_library_score (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          teacher_id UUID NOT NULL,
+          period_month VARCHAR(7) NOT NULL,
+          total_items_completed INTEGER DEFAULT 0 NOT NULL,
+          total_minutes_engaged INTEGER DEFAULT 0 NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          UNIQUE (teacher_id, period_month)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_teacher_library_score_teacher ON teacher_library_score (teacher_id)`);
+
+      // poin_ledger (rewards terpisah dari sistem Poin AI)
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS poin_ledger (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          teacher_id UUID NOT NULL,
+          amount INTEGER NOT NULL,
+          source_type poin_source_type NOT NULL,
+          reference_id UUID,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_poin_ledger_teacher ON poin_ledger (teacher_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_poin_ledger_source ON poin_ledger (teacher_id, source_type)`);
+
+      // Trigger for auto-updating updated_at on library_items
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_library_items_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN NEW.updated_at = now(); RETURN NEW; END; $$ LANGUAGE plpgsql
+      `);
+      await pool.query(`DROP TRIGGER IF EXISTS update_library_items_updated_at ON library_items`);
+      await pool.query(`CREATE TRIGGER update_library_items_updated_at BEFORE UPDATE ON library_items FOR EACH ROW EXECUTE FUNCTION update_library_items_updated_at()`);
+
+      // Trigger for auto-updating updated_at on teacher_library_progress
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_teacher_library_progress_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN NEW.updated_at = now(); RETURN NEW; END; $$ LANGUAGE plpgsql
+      `);
+      await pool.query(`DROP TRIGGER IF EXISTS update_teacher_library_progress_updated_at ON teacher_library_progress`);
+      await pool.query(`CREATE TRIGGER update_teacher_library_progress_updated_at BEFORE UPDATE ON teacher_library_progress FOR EACH ROW EXECUTE FUNCTION update_teacher_library_progress_updated_at()`);
+
+      // Trigger for auto-updating updated_at on teacher_library_score
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_teacher_library_score_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN NEW.updated_at = now(); RETURN NEW; END; $$ LANGUAGE plpgsql
+      `);
+      await pool.query(`DROP TRIGGER IF EXISTS update_teacher_library_score_updated_at ON teacher_library_score`);
+      await pool.query(`CREATE TRIGGER update_teacher_library_score_updated_at BEFORE UPDATE ON teacher_library_score FOR EACH ROW EXECUTE FUNCTION update_teacher_library_score_updated_at()`);
+
+      console.log("Library tables checked/initialized successfully");
+    } catch (err) {
+      console.error("Failed to initialize library tables:", err);
+    }
   } catch (err) {
     console.error("Failed to initialize SaaS Academic & TAMS tables:", err);
   }

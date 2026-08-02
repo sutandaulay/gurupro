@@ -144,21 +144,22 @@ export default function StoragePage() {
 
       const schoolQuery = selectedSchoolId ? `?school_id=${selectedSchoolId}` : '';
 
+      const journalsQuery = selectedSchoolId ? `?school_id=${selectedSchoolId}&limit=100` : '?limit=100';
       const [docsRes, journalsRes, assessmentsRes, fileSayaRes, laporanKinerjaRes, raportRes] = await Promise.all([
-        apiFetch(`/api/administrasi${schoolQuery}`).then(r => r.ok ? r.json() : []),
-        apiFetch(`/api/journals${schoolQuery}`).then(r => r.ok ? r.json() : []),
-        apiFetch(`/api/assessments${schoolQuery}`).then(r => r.ok ? r.json() : []),
-        apiFetch(`/api/dokumen-bukti?${params.toString()}`).then(r => r.ok ? r.json() : []),
-        apiFetch(`/api/laporan-kinerja${schoolQuery}`).then(r => r.ok ? r.json() : []),
-        apiFetch(`/api/raport${schoolQuery}`).then(r => r.ok ? r.json() : [])
+        apiFetch(`/api/administrasi${schoolQuery}`).then(r => r.ok ? r.json() : { data: [] }),
+        apiFetch(`/api/journals${journalsQuery}`).then(r => r.ok ? r.json() : { data: [] }),
+        apiFetch(`/api/assessments${schoolQuery}`).then(r => r.ok ? r.json() : { data: [] }),
+        apiFetch(`/api/dokumen-bukti?${params.toString()}`).then(r => r.ok ? r.json() : { data: [] }),
+        apiFetch(`/api/laporan-kinerja${schoolQuery}`).then(r => r.ok ? r.json() : { data: [] }),
+        apiFetch(`/api/raport${schoolQuery}`).then(r => r.ok ? r.json() : { data: [] })
       ]);
 
-      const docs = Array.isArray(docsRes) ? docsRes : [];
-      const journals = Array.isArray(journalsRes) ? journalsRes : [];
-      const assessments = Array.isArray(assessmentsRes) ? assessmentsRes : [];
-      const fileSaya = Array.isArray(fileSayaRes) ? fileSayaRes : [];
-      const laporanKinerja = Array.isArray(laporanKinerjaRes) ? laporanKinerjaRes : [];
-      const raport = Array.isArray(raportRes) ? raportRes : [];
+      const docs = Array.isArray(docsRes) ? docsRes : (docsRes?.data ?? []);
+      const journals = Array.isArray(journalsRes) ? journalsRes : (journalsRes?.data ?? []);
+      const assessments = Array.isArray(assessmentsRes) ? assessmentsRes : (assessmentsRes?.data ?? []);
+      const fileSaya = Array.isArray(fileSayaRes) ? fileSayaRes : (fileSayaRes?.data ?? []);
+      const laporanKinerja = Array.isArray(laporanKinerjaRes) ? laporanKinerjaRes : (laporanKinerjaRes?.data ?? []);
+      const raport = Array.isArray(raportRes) ? raportRes : (raportRes?.data ?? []);
 
       setVirtualCounts({
         system_silabus: docs.filter((d: any) => d.tipe_dokumen === "silabus").length,
@@ -238,7 +239,7 @@ export default function StoragePage() {
         } else if (folderId === "system_soal") {
           url = "/api/administrasi?tipe=soal";
         } else if (folderId === "system_jurnal") {
-          url = "/api/journals";
+          url = "/api/journals?limit=100";
         } else if (folderId === "system_nilai") {
           url = "/api/assessments";
         } else if (folderId === "system_file_saya") {
@@ -263,7 +264,7 @@ export default function StoragePage() {
         const res = await apiFetch(url);
         if (res.ok) {
           const rawData = await res.json();
-          const items = Array.isArray(rawData) ? rawData : [];
+          const items = Array.isArray(rawData) ? rawData : (rawData?.data ?? []);
           const filtered = items.filter(filterFn);
 
           const mapped: FileItem[] = filtered.map((item: any) => {
@@ -401,7 +402,7 @@ export default function StoragePage() {
         }
         if (filesRes.ok) {
           const fiData = await filesRes.json();
-          setFiles(fiData);
+          setFiles(fiData?.data ?? (Array.isArray(fiData) ? fiData : []));
         }
       }
     } catch {

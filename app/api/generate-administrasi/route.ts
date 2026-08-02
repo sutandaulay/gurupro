@@ -758,9 +758,10 @@ Hasilkan seluruh dokumen Laporan Evaluasi Pelaksanaan LKPD tersebut langsung dal
       parsed.pdf_url = pdfUrl;
       parsed.docx_url = docxUrl;
 
-    } catch (aiError: any) {
+    } catch (aiError: unknown) {
       console.error("Administrasi AI generation failed:", aiError);
-      return NextResponse.json({ error: `Gagal memproses AI: ${aiError.message || aiError}` }, { status: 502 });
+      const aiMsg = aiError instanceof Error ? aiError.message : String(aiError ?? "Unknown error");
+      return NextResponse.json({ error: `Gagal memproses AI: ${aiMsg}` }, { status: 502 });
     }
 
     // 3. Save document with FK context (best effort - non-blocking)
@@ -824,8 +825,9 @@ Hasilkan seluruh dokumen Laporan Evaluasi Pelaksanaan LKPD tersebut langsung dal
     }
 
     return NextResponse.json(parsed);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("AI Admin Generation Error:", error);
-    return NextResponse.json({ error: error.message || "Gagal membuat dokumen AI" }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error ?? "Unknown error");
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

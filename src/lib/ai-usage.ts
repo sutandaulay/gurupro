@@ -9,7 +9,6 @@ import {
   calculateEffectiveTokens,
   convertTokensToPoin,
   DEFAULT_TOKENS_PER_POIN,
-  MIN_POIN_PER_USAGE,
 } from '@/src/config/billing';
 
 import { getTokensPerPoin } from '@/src/config/ratio-cache';
@@ -85,20 +84,33 @@ export async function extractGeminiUsage(geminiResponse: any): Promise<PoinCalcu
  * Downstream (route AI) CUKUP panggil ini — tidak perlu lagi
  * membaca struktur response provider tertentu.
  *
+ * GUARD: Jika result null, gagal, atau tidak ada usage data,
+ * langsung return no-op. Ini mencegah bug di caller baru yang lupa cek.
+ *
  * @param result - Response dari generateAIContent ({ success, data, usage })
  * @param userId - User ID
  * @param feature - Nama fitur AI
  * @param opts - Opsi tambahan (mapel, jenjang, jumlahSoal)
- * @returns PoinDeductionResult (atau {success:false} bila generation gagal)
+ * @returns PoinDeductionResult (atau no-op bila generation gagal/tidak ada usage)
  */
 export async function deductPoinFromAIResult(
   result: { success?: boolean; usage?: AIUsageResult | null } | null,
   userId: string,
   feature: string,
   opts?: { mapel?: string; jenjang?: string; jumlahSoal?: number }
-): Promise<PoinDeductionResult> {
-  if (!result || !result.success) {
-    return { success: false, poinDeducted: 0, remainingPoin: 0, rawTokens: 0, source: 'main' };
+): Promise<PoinDeductionResult & { ratioUsed: number; tokenAccumulated: number; tokensUntilNextPoin: number }> {
+  // GUARD: No result, failed, or no usage = no Poin deduction. Early return.
+  if (!result || !result.success || !result.usage) {
+    return {
+      success: false,
+      poinDeducted: 0,
+      remainingPoin: 0,
+      rawTokens: 0,
+      source: 'main' as const,
+      ratioUsed: 2000,
+      tokenAccumulated: 0,
+      tokensUntilNextPoin: 2000,
+    };
   }
   return consumeUserPoinFromUsage(userId, result.usage || null, feature, {
     mapel: opts?.mapel,

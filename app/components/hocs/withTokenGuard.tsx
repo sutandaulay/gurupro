@@ -69,9 +69,11 @@ export function withTokenGuard<P extends object>(
 
           const data = await res.json();
 
-          const hasTokens =
-            (data.token_limit || 0) + (data.addon_token_balance || 0) >=
-            requiredTokens;
+          const totalPoin =
+            (data.quota_poin_available ?? data.token_limit ?? 0) +
+            (data.addon_poin_available ?? data.addon_token_balance ?? 0);
+
+          const hasTokens = totalPoin >= requiredTokens;
           const isExpired =
             data.subscription_end &&
             new Date(data.subscription_end).getTime() < Date.now();
@@ -99,7 +101,7 @@ export function withTokenGuard<P extends object>(
             isLoading: false,
             hasAccess,
             reason,
-            remainingTokens: (data.token_limit || 0) + (data.addon_token_balance || 0),
+            remainingTokens: totalPoin,
           });
         } catch (error: any) {
           setTokenStatus({

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getKontakByLinkToken, getDataRaportForKelas, getNilaiMapelForRaport, isOtpVerified } from '@/lib/raport/kontak-eksternal-repository';
+import { getKontakByLinkToken, getDataRaportForKelas, isOtpVerified } from '@/lib/raport/kontak-eksternal-repository';
 import { getPenilaianEkstrakurikuler } from '@/lib/sikap-ekskul';
 
 export async function POST(request: NextRequest) {
@@ -28,22 +28,33 @@ export async function POST(request: NextRequest) {
     }
 
     if (contentType === 'raport') {
-      // Get raport data
+      // Get raport data — 1 query, filter di JS
+      const allRaports = await getDataRaportForKelas(kontak.kelas_id);
       const raportsToExport = dataRaportIds && dataRaportIds.length > 0
-        ? (await Promise.all(
-            dataRaportIds.map(async (id: string) => {
-              const allRaports = await getDataRaportForKelas(kontak.kelas_id);
-              return allRaports.find((r: any) => r.id === id);
-            })
-          )).filter(Boolean)
-        : await getDataRaportForKelas(kontak.kelas_id);
+        ? allRaports.filter((r: any) => dataRaportIds.includes(r.id))
+        : allRaports;
 
-      const allNilai = await Promise.all(
-        raportsToExport.map(async (siswa: any) => {
-          const nilaiMapel = await getNilaiMapelForRaport(siswa.id);
-          return { siswa, nilaiMapel };
-        })
-      );
+      // Get nilai for all siswa — 1 query batch
+      const raportIds = raportsToExport.map(s => s.id);
+      const allNilaiRes = raportIds.length > 0 ? await query(
+        `SELECT dnrm.*, sb.nama_mapel
+         FROM data_raport_nilai_mapel dnrm
+         LEFT JOIN subjects sb ON sb.id = dnrm.mapel_id
+         WHERE dnrm.data_raport_id = ANY($1::uuid[])
+         ORDER BY dnrm.data_raport_id, sb.nama_mapel ASC`,
+        [raportIds]
+      ) : { rows: [] };
+
+      const nilaiByRaportId = new Map();
+      for (const row of allNilaiRes.rows) {
+        const list = nilaiByRaportId.get(row.data_raport_id);
+        if (list) { list.push(row); } else { nilaiByRaportId.set(row.data_raport_id, [row]); }
+      }
+
+      const allNilai = raportsToExport.map(siswa => ({
+        siswa,
+        nilaiMapel: nilaiByRaportId.get(siswa.id) || [],
+      }));
 
       // Format data for PDF
       const pdfData = allNilai.map(({ siswa, nilaiMapel }) => ({

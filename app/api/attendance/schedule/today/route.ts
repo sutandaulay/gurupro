@@ -54,7 +54,7 @@ export async function GET() {
 
     // 3. Fetch teaching session logs for today from both attendance_logs and teacher_attendance
     const logsResult = await pgQuery(
-      `SELECT id, type, class_session_id, timestamp, institution_id, school_id
+      `SELECT id, type, class_session_id, timestamp, institution_id, NULL as school_id
        FROM attendance_logs
        WHERE teacher_id = $1 AND timestamp >= CURRENT_DATE AND timestamp < CURRENT_DATE + 1
        UNION ALL
@@ -62,10 +62,20 @@ export async function GET() {
        FROM teacher_attendance
        WHERE user_id = $1 AND tanggal = CURRENT_DATE AND catatan LIKE 'Presensi%mengajar%'
        ORDER BY timestamp ASC`,
-      [userId, userId]
+      [userId]
     );
 
     const logs = logsResult.rows;
+
+    // 3b. Fetch school_teaching_sessions for today (mulai via Selesai Mengajar / school attendance)
+    const schoolSessionsResult = await pgQuery(
+      `SELECT id, school_id, subject_id, class_id, started_at, ended_at, status
+       FROM school_teaching_sessions
+       WHERE user_id = $1 AND started_at >= CURRENT_DATE AND started_at < CURRENT_DATE + 1`,
+      [userId]
+    );
+
+    const schoolSessions = schoolSessionsResult.rows;
 
     const now = new Date();
     const currentHour = now.getHours().toString().padStart(2, '0');
@@ -76,22 +86,35 @@ export async function GET() {
       const startLog = logs.find((l: any) => l.class_session_id === row.id && l.type === 'mengajar_mulai');
       const endLog = logs.find((l: any) => l.class_session_id === row.id && l.type === 'mengajar_selesai');
 
+      // Match school teaching session by school_id + subject_id + class_id
+      const schoolSession = schoolSessions.find(
+        (s: any) =>
+          String(s.school_id) === String(row.school_id) &&
+          s.subject_id &&
+          String(s.subject_id) === String(row.subject_id) &&
+          s.class_id &&
+          String(s.class_id) === String(row.class_id)
+      );
+      const schoolStarted = schoolSession && schoolSession.status === 'active';
+      const schoolEnded = schoolSession && schoolSession.status === 'completed';
+
       let status: 'upcoming' | 'ongoing' | 'completed' | 'missed' = 'upcoming';
       let teachingSession: any = null;
 
-      if (startLog) {
-        if (endLog) {
+      if (startLog || schoolStarted) {
+        const startTime = schoolSession?.started_at || startLog?.timestamp;
+        if (endLog || schoolEnded) {
           status = 'completed';
           teachingSession = {
-            id: startLog.id,
-            startTime: startLog.timestamp,
-            endTime: endLog.timestamp
+            id: schoolSession?.id || startLog.id,
+            startTime,
+            endTime: schoolSession?.ended_at || endLog?.timestamp,
           };
         } else {
           status = 'ongoing';
           teachingSession = {
-            id: startLog.id,
-            startTime: startLog.timestamp
+            id: schoolSession?.id || startLog.id,
+            startTime,
           };
         }
       } else {

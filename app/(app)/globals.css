@@ -15,6 +15,69 @@
   --color-background: #ffffff;
   --color-foreground: #0f172a;
   --color-muted: #64748b;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
+  --color-muted-foreground: #64748b;
+  --color-amber-850: #92400e;
+  --color-amber-650: #d97706;
+  --color-emerald-850: #065f46;
+  --color-emerald-650: #059669;
+  --color-purple-850: #6b21a8;
+  --color-purple-650: #9333ea;
+  --color-cyan-850: #155e75;
+  --color-cyan-650: #0891b2;
+  --color-rose-850: #9f1239;
+  --color-rose-650: #e11d48;
+}
+
+.dark {
+  --color-background: #0f172a;
+  --color-foreground: #f8fafc;
+  --color-muted: #94a3b8;
+  --color-card: #1e293b;
+  --color-card-foreground: #f8fafc;
+  --color-muted-foreground: #94a3b8;
+  --color-amber-850: #fcd34d;
+  --color-amber-650: #fbbf24;
+  --color-emerald-850: #6ee7b7;
+  --color-emerald-650: #34d399;
+  --color-purple-850: #c4b5fd;
+  --color-purple-650: #a78bfa;
+  --color-cyan-850: #67e8f9;
+  --color-cyan-650: #22d3ee;
+  --color-rose-850: #fda4af;
+  --color-rose-650: #fb7185;
+
+  /* Darken light background colors so hover/focus/active states stay visible */
+  --color-gray-50: #1e293b;
+  --color-gray-100: #334155;
+  --color-gray-200: #334155;
+  --color-slate-50: #0f172a;
+  --color-slate-100: #1e293b;
+  --color-slate-200: #334155;
+  --color-neutral-50: #0f172a;
+  --color-neutral-100: #1e293b;
+  --color-neutral-200: #334155;
+  --color-violet-50: #1e293b;
+  --color-violet-100: #2e1065;
+  --color-indigo-50: #1e293b;
+  --color-indigo-100: #172554;
+  --color-blue-50: #1e293b;
+  --color-blue-100: #1e3a5f;
+  --color-emerald-50: #1e293b;
+  --color-emerald-100: #022c22;
+  --color-amber-50: #1e293b;
+  --color-amber-100: #451a03;
+  --color-red-50: #1e293b;
+  --color-red-100: #450a0a;
+  --color-rose-50: #1e293b;
+  --color-rose-100: #4c0519;
+  --color-purple-50: #1e293b;
+  --color-purple-100: #1e0322;
+  --color-cyan-50: #1e293b;
+  --color-cyan-100: #042f4a;
+  --color-primary-50: #1e293b;
+  --color-primary-100: #2e1065;
 }
 
 @theme {
@@ -164,7 +227,15 @@
   * {
     box-sizing: border-box;
   }
-  
+
+  html {
+    color-scheme: light;
+  }
+
+  .dark html {
+    color-scheme: dark;
+  }
+
   body {
     font-family: var(--font-sans);
     color: var(--color-foreground);
@@ -194,19 +265,33 @@
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
     border: 1px solid var(--color-neutral-100);
   }
+
+  .dark .mobile-card {
+    background: var(--color-neutral-800);
+    border-color: var(--color-neutral-700);
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+  }
   
   .mobile-card-header {
     padding: 1rem 1.5rem;
     border-bottom: 1px solid var(--color-neutral-100);
   }
-  
+
+  .dark .mobile-card-header {
+    border-color: var(--color-neutral-700);
+  }
+
   .mobile-card-body {
     padding: 1.5rem;
   }
-  
+
   .mobile-card-footer {
     padding: 1rem 1.5rem;
     border-top: 1px solid var(--color-neutral-100);
+  }
+
+  .dark .mobile-card-footer {
+    border-color: var(--color-neutral-700);
   }
   
   /* Mobile List Styles */
@@ -590,6 +675,168 @@
   padding: 0;
 }
 
+/* ── Dark Mode ── */
+.dark {
+  --color-background: #0f172a;
+  --color-foreground: #f8fafc;
+  --color-muted: #64748b;
+
+  /* Override base styles */
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.dark body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+/* ── Global Utility Overrides for Dark Mode ── */
+/* These apply to ALL pages that don't have explicit dark: variants.
+   Pages with explicit dark: Tailwind classes still work because
+   both use the same :where() specificity — last declaration wins. */
+
+:where(.dark) .bg-white { background-color: #1e293b !important; }
+:where(.dark) .bg-neutral-50 { background-color: #0f172a !important; }
+:where(.dark) .bg-gray-50 { background-color: #0f172a !important; }
+:where(.dark) .bg-slate-50 { background-color: #1e293b !important; }
+:where(.dark) .bg-gray-100,
+:where(.dark) .bg-neutral-100 { background-color: #1e293b !important; }
+:where(.dark) .bg-slate-100 { background-color: #1e293b !important; }
+:where(.dark) .bg-gray-200,
+:where(.dark) .bg-neutral-200 { background-color: #1e293b !important; }
+:where(.dark) .bg-slate-200 { background-color: #1e293b !important; }
+:where(.dark) .bg-muted { background-color: #334155 !important; }
+:where(.dark) .bg-background { background-color: #0f172a !important; }
+:where(.dark) .bg-card { background-color: #1e293b !important; }
+
+/* Light tint backgrounds → solid dark so text is visible */
+:where(.dark) .bg-indigo-50,
+:where(.dark) .bg-indigo-100 { background-color: #1e293b !important; }
+:where(.dark) .bg-violet-50,
+:where(.dark) .bg-violet-100 { background-color: #1e293b !important; }
+:where(.dark) .bg-amber-50,
+:where(.dark) .bg-amber-100 { background-color: #1e293b !important; }
+:where(.dark) .bg-emerald-50,
+:where(.dark) .bg-emerald-100 { background-color: #1e293b !important; }
+:where(.dark) .bg-red-50,
+:where(.dark) .bg-red-100 { background-color: #1e293b !important; }
+:where(.dark) .bg-rose-50,
+:where(.dark) .bg-rose-100 { background-color: #1e293b !important; }
+:where(.dark) .bg-blue-50,
+:where(.dark) .bg-blue-100 { background-color: #1e293b !important; }
+:where(.dark) .bg-green-50,
+:where(.dark) .bg-green-100 { background-color: #1e293b !important; }
+:where(.dark) .bg-purple-50,
+:where(.dark) .bg-purple-100 { background-color: #1e293b !important; }
+:where(.dark) .bg-primary-50 { background-color: #1e293b !important; }
+:where(.dark) .bg-primary-600 { background-color: #4c1d95 !important; }
+
+/* Dark mode hover states — keep visible on dark backgrounds */
+:where(.dark) .hover\:bg-white:hover { background-color: #334155 !important; }
+:where(.dark) .hover\:bg-white\/10:hover { background-color: rgba(51, 65, 85, 0.1) !important; }
+:where(.dark) .hover\:bg-white\/20:hover { background-color: rgba(51, 65, 85, 0.2) !important; }
+:where(.dark) .hover\:bg-white\/30:hover { background-color: rgba(51, 65, 85, 0.3) !important; }
+:where(.dark) .hover\:bg-white\/60:hover { background-color: rgba(51, 65, 85, 0.6) !important; }
+
+:where(.dark) .text-gray-900,
+:where(.dark) .text-gray-800,
+:where(.dark) .text-gray-700,
+:where(.dark) .text-gray-600,
+:where(.dark) .text-gray-500,
+:where(.dark) .text-gray-400,
+:where(.dark) .text-gray-300,
+:where(.dark) .text-gray-200,
+:where(.dark) .text-slate-900,
+:where(.dark) .text-slate-800,
+:where(.dark) .text-slate-700,
+:where(.dark) .text-slate-600,
+:where(.dark) .text-slate-500,
+:where(.dark) .text-slate-400,
+:where(.dark) .text-slate-300,
+:where(.dark) .text-slate-200,
+:where(.dark) .text-slate-100,
+:where(.dark) .text-gray-100,
+:where(.dark) .text-neutral-900,
+:where(.dark) .text-neutral-800,
+:where(.dark) .text-neutral-700,
+:where(.dark) .text-neutral-600,
+:where(.dark) .text-neutral-500,
+:where(.dark) .text-neutral-400,
+:where(.dark) .text-neutral-300,
+:where(.dark) .text-neutral-200,
+:where(.dark) .text-neutral-100,
+:where(.dark) .text-muted,
+:where(.dark) .text-muted-foreground,
+:where(.dark) .text-foreground,
+:where(.dark) .text-card-foreground,
+:where(.dark) .text-black,
+:where(.dark) .text-primary,
+:where(.dark) .text-primary-600,
+:where(.dark) .text-primary-300 { color: #f8fafc !important; }
+
+:where(.dark) .text-error-600,
+:where(.dark) .text-error-700,
+:where(.dark) .text-error-500 { color: #fca5a5 !important; }
+
+:where(.dark) .text-success-600,
+:where(.dark) .text-success-700,
+:where(.dark) .text-success-500 { color: #86efac !important; }
+
+/* Colored accent text — make them bright enough on dark bg */
+:where(.dark) .text-indigo-600,
+:where(.dark) .text-indigo-700,
+:where(.dark) .text-indigo-500,
+:where(.dark) .text-indigo-400 { color: #a5b4fc !important; }
+
+:where(.dark) .text-violet-600,
+:where(.dark) .text-violet-700,
+:where(.dark) .text-violet-500 { color: #c4b5fd !important; }
+
+:where(.dark) .text-emerald-600,
+:where(.dark) .text-emerald-700,
+:where(.dark) .text-emerald-800 { color: #6ee7b7 !important; }
+
+:where(.dark) .text-amber-600,
+:where(.dark) .text-amber-700,
+:where(.dark) .text-amber-800 { color: #fcd34d !important; }
+
+:where(.dark) .text-blue-600,
+:where(.dark) .text-blue-700 { color: #93c5fd !important; }
+
+:where(.dark) .text-red-600,
+:where(.dark) .text-red-700,
+:where(.dark) .text-red-500 { color: #fca5a5 !important; }
+
+:where(.dark) .text-rose-500,
+:where(.dark) .text-rose-600,
+:where(.dark) .text-rose-700 { color: #fda4af !important; }
+
+:where(.dark) .text-green-600,
+:where(.dark) .text-green-700 { color: #86efac !important; }
+
+:where(.dark) .border-gray-100,
+:where(.dark) .border-neutral-100 { border-color: #334155 !important; }
+:where(.dark) .border-gray-200,
+:where(.dark) .border-neutral-200 { border-color: #475569 !important; }
+:where(.dark) .border-slate-100 { border-color: #334155 !important; }
+:where(.dark) .border-slate-200 { border-color: #475569 !important; }
+
+:where(.dark) .divide-gray-100 > * + *,
+:where(.dark) .divide-neutral-100 > * + * { border-color: #334155 !important; }
+:where(.dark) .divide-gray-200 > * + *,
+:where(.dark) .divide-neutral-200 > * + * { border-color: #475569 !important; }
+
+/* Light tint borders → darker in dark mode */
+:where(.dark) .border-indigo-100,
+:where(.dark) .border-violet-100,
+:where(.dark) .border-amber-100,
+:where(.dark) .border-emerald-100,
+:where(.dark) .border-red-100,
+:where(.dark) .border-rose-100,
+:where(.dark) .border-blue-100,
+:where(.dark) .border-green-100 { border-color: #334155 !important; }
+
 /* ── Mobile Specific Styles ── */
 @layer utilities {
   /* Full height excluding navbar */
@@ -625,4 +872,21 @@
   .safe-right {
     padding-right: env(safe-area-inset-right);
   }
+}
+
+/* ── Pulse Glow for Teaching Reminder ── */
+@keyframes pulse-glow-amber {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); border-color: #f59e0b; }
+  50% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); border-color: #fbbf24; }
+}
+@keyframes pulse-glow-orange {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4); border-color: #f97316; }
+  50% { box-shadow: 0 0 0 6px rgba(249, 115, 22, 0); border-color: #fb923c; }
+}
+
+@utility animate-pulse-glow-amber {
+  animation: pulse-glow-amber 1.5s ease-in-out infinite;
+}
+@utility animate-pulse-glow-orange {
+  animation: pulse-glow-orange 1.5s ease-in-out infinite;
 }

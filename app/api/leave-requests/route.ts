@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { leaveRequests, attendanceSummary, schools, teacherInstitutionAssignments } from '@/lib/schemas/attendance';
+import { leaveRequests, attendanceSummary, schools } from '@/lib/schemas/attendance';
 import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { parseISO, eachDayOfInterval, isWithinInterval } from 'date-fns';
@@ -93,13 +93,12 @@ export async function POST(req: Request) {
         teacherSchoolId = schoolResult[0].id;
       } else {
         // Cek institution assignment sebagai fallback
-        const assignmentResult = await db.select({ institutionId: teacherInstitutionAssignments.institutionId })
-          .from(teacherInstitutionAssignments)
-          .where(and(
-            eq(teacherInstitutionAssignments.teacherId, session.user.id),
-            eq(teacherInstitutionAssignments.status, 'aktif')
-          ))
-          .limit(1);
+        const assignmentResult = await query(`
+          SELECT institution_id as "institutionId"
+          FROM payload.institution_members
+          WHERE app_user_id = $1 AND status = 'active'
+          LIMIT 1
+        `, [session.user.id]);
         
         if (assignmentResult.length > 0) {
           teacherInstitutionId = assignmentResult[0].institutionId;

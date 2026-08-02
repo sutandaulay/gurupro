@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { getSession, getContextFilters } from "@/lib/session";
+import { parsePagination, wrapResponse } from "@/lib/pagination";
 
 export async function GET(req: Request) {
   try {
@@ -21,40 +22,42 @@ export async function GET(req: Request) {
 
     const schoolId = searchParams.get("school_id");
 
-    let res;
+    let whereClause: string;
+    let queryParams: any[];
     if (tipe) {
       if (schoolId) {
-        res = await query(
-          `SELECT * FROM guru_administrasi 
-           WHERE user_id = $1 AND tipe_dokumen = $2 AND school_id = $3
-           ORDER BY created_at DESC`,
-          [userId, tipe, schoolId]
-        );
+        whereClause = `user_id = $1 AND tipe_dokumen = $2 AND school_id = $3`;
+        queryParams = [userId, tipe, schoolId];
       } else {
-        res = await query(
-          `SELECT * FROM guru_administrasi 
-           WHERE user_id = $1 AND tipe_dokumen = $2 
-           ORDER BY created_at DESC`,
-          [userId, tipe]
-        );
+        whereClause = `user_id = $1 AND tipe_dokumen = $2`;
+        queryParams = [userId, tipe];
       }
     } else {
       if (schoolId) {
-        res = await query(
-          `SELECT * FROM guru_administrasi 
-           WHERE user_id = $1 AND school_id = $2
-           ORDER BY created_at DESC`,
-          [userId, schoolId]
-        );
+        whereClause = `user_id = $1 AND school_id = $2`;
+        queryParams = [userId, schoolId];
       } else {
-        res = await query(
-          `SELECT * FROM guru_administrasi 
-           WHERE user_id = $1 
-           ORDER BY created_at DESC`,
-          [userId]
-        );
+        whereClause = `user_id = $1`;
+        queryParams = [userId];
       }
     }
+
+    const countResult = await query(
+      `SELECT COUNT(*) FROM guru_administrasi WHERE ${whereClause}`,
+      queryParams
+    );
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    const pagination = parsePagination(searchParams);
+    const off = (pagination.page - 1) * pagination.limit;
+
+    const res = await query(
+      `SELECT * FROM guru_administrasi 
+       WHERE ${whereClause}
+       ORDER BY created_at DESC
+       LIMIT ${pagination.limit} OFFSET ${off}`,
+      queryParams
+    );
 
     let rows = res.rows;
 
@@ -72,7 +75,7 @@ export async function GET(req: Request) {
       });
     }
 
-    return NextResponse.json(rows);
+    return NextResponse.json(wrapResponse(rows, total, pagination));
   } catch (error: any) {
     console.error("Administrasi GET API error:", error);
     return NextResponse.json({ error: error.message || "Gagal mengambil data" }, { status: 500 });

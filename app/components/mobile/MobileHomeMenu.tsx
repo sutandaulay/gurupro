@@ -12,11 +12,10 @@ import { getLucideIcon, masterMenus, resolveCategory } from "@/lib/menuConfig";
 export type MenuItem = {
   label: string;
   href?: string;
-  submenu?: { label: string; href: string }[];
+  submenu?: { label: string; href: string; desc?: string }[];
 };
 
-function getGreeting() {
-  const hour = new Date().getHours();
+function getGreeting(hour: number) {
   if (hour < 12) return "Selamat pagi";
   if (hour < 15) return "Selamat siang";
   if (hour < 19) return "Selamat sore";
@@ -63,6 +62,13 @@ export default function MobileHomeMenu({ currentModule, onNavigate }: MobileHome
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [roleFlags, setRoleFlags] = useState<{ isWaliKelas: boolean; isPembinaEkskul: boolean } | null>(null);
+  const [greeting, setGreeting] = useState("Selamat pagi");
+  const [currentDate, setCurrentDate] = useState("");
+
+  useEffect(() => {
+    setGreeting(getGreeting(new Date().getHours()));
+    setCurrentDate(formatIndonesianDate(new Date()));
+  }, []);
 
   const displayName = useMemo(() => {
     if (!profile) return "Guru";
@@ -155,7 +161,7 @@ export default function MobileHomeMenu({ currentModule, onNavigate }: MobileHome
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs sm:text-sm text-slate-500 font-medium">{getGreeting()},</p>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">{greeting},</p>
           <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">{displayName}</h2>
           <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5 text-[11px] sm:text-xs text-slate-500">
             {roleText && <span className="truncate">{roleText}</span>}
@@ -165,7 +171,7 @@ export default function MobileHomeMenu({ currentModule, onNavigate }: MobileHome
         </div>
         <div className="text-right">
           <p className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider">
-            {formatIndonesianDate(new Date())}
+            {currentDate}
           </p>
         </div>
       </div>
@@ -183,7 +189,7 @@ export default function MobileHomeMenu({ currentModule, onNavigate }: MobileHome
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 0 0114 0z"
+              d="M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"
             />
           </svg>
         </div>

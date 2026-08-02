@@ -57,14 +57,10 @@ export default function PenilaianEkstrakurikulerForm({
             if (found) {
               setEkskul(found);
               // Get students in the same class
-              apiFetch(`/api/students?class_id=${found.kelasId}`)
+              apiFetch(`/api/students?class_id=${found.kelasId}&limit=100`)
                 .then((res) => res.json())
                 .then((data) => {
-                  if (data.data) {
-                    setSiswaList(data.data);
-                  } else if (Array.isArray(data)) {
-                    setSiswaList(data);
-                  }
+                  setSiswaList(data?.data ?? []);
                 })
                 .catch(console.error);
             }
@@ -73,14 +69,10 @@ export default function PenilaianEkstrakurikulerForm({
         .catch(console.error);
     } else if (ekskul && ekskul.kelasId) {
       // Get students if ekskul is passed as prop
-      apiFetch(`/api/students?class_id=${ekskul.kelasId}`)
+      apiFetch(`/api/students?class_id=${ekskul.kelasId}&limit=100`)
         .then((res) => res.json())
         .then((data) => {
-          if (data.data) {
-            setSiswaList(data.data);
-          } else if (Array.isArray(data)) {
-            setSiswaList(data);
-          }
+          setSiswaList(data?.data ?? []);
         })
         .catch(console.error);
     }

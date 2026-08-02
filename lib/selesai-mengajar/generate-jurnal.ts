@@ -8,6 +8,7 @@ import { generateAIContent } from '@/lib/ai/generators';
 import type { SelesaiMengajarInput, JurnalResult } from './types';
 import { uploadToR2 } from '@/lib/r2';
 import { generatePdfBuffer, generateDocBuffer } from '@/lib/doc-compiler';
+import { parseLocalDate } from '@/lib/utils';
 
 const prisma = new PrismaClient();
 
@@ -75,11 +76,31 @@ Buat dalam Bahasa Indonesia yang formal dan sesuai standar administrasi guru.
     tindak_lanjut: '',
   });
 
-  if (!result.success || !result.data) {
-    throw new Error(result.error || 'Gagal generate jurnal');
+  // Fallback bila AI gagal — tetap simpan jurnal agar laporan mengajar muncul
+  let jurnalContent: JurnalContent;
+  if (result.success && result.data) {
+    const raw = result.data as any;
+    jurnalContent = {
+      materi_pembelajaran: typeof raw?.materi_pembelajaran === 'string' ? raw.materi_pembelajaran : (data.topik_diajarkan || 'Materi tidak tersedia'),
+      tujuan_pembelajaran: Array.isArray(raw?.tujuan_pembelajaran) ? raw.tujuan_pembelajaran : [],
+      aktivitas_pembelajaran: typeof raw?.aktivitas_pembelajaran === 'string' ? raw.aktivitas_pembelajaran : '-',
+      media_pembelajaran: typeof raw?.media_pembelajaran === 'string' ? raw.media_pembelajaran : '-',
+      asesmen_pembelajaran: typeof raw?.asesmen_pembelajaran === 'string' ? raw.asesmen_pembelajaran : '-',
+      refleksi_guru: typeof raw?.refleksi_guru === 'string' ? raw.refleksi_guru : '-',
+      tindak_lanjut: typeof raw?.tindak_lanjut === 'string' ? raw.tindak_lanjut : '-',
+    };
+  } else {
+    console.error('Jurnal AI generation failed, using fallback:', result.error);
+    jurnalContent = {
+      materi_pembelajaran: data.topik_diajarkan || 'Materi tidak tersedia',
+      tujuan_pembelajaran: [],
+      aktivitas_pembelajaran: '-',
+      media_pembelajaran: '-',
+      asesmen_pembelajaran: '-',
+      refleksi_guru: '-',
+      tindak_lanjut: '-',
+    };
   }
-
-  const jurnalContent = result.data;
 
   let pdfUrl: string | null = null;
   let docxUrl: string | null = null;
@@ -147,16 +168,27 @@ ${jurnalContent.tindak_lanjut || "-"}
   }
 
   // Save to database
-  const today = new Date(data.tanggal);
-  today.setHours(0, 0, 0, 0);
+  const today = parseLocalDate(data.tanggal);
+
+  // Resolve school_id — wajib UUID di tabel teacher_journals
+  let resolvedSchoolId: string | null = data.school_id || null;
+  if (!resolvedSchoolId) {
+    const school = await prisma.schools.findFirst({
+      where: { user_id: data.guru_id },
+      select: { id: true },
+    });
+    resolvedSchoolId = school?.id || null;
+  }
 
   const jurnal = await prisma.teacher_journals.create({
     data: {
-      teacher_id: data.guru_id,
-      school_id: data.school_id || '',
+      user_id: data.guru_id,
+      school_id: resolvedSchoolId || '',
       class_id: data.kelas_id,
       subject_id: data.mapel_id,
       tanggal: today,
+      kelas: data.kelas_nama || '',
+      mapel: data.mapel_nama || '',
       materi_pembelajaran: jurnalContent.materi_pembelajaran,
       tujuan_pembelajaran: jurnalContent.tujuan_pembelajaran.join('\n'),
       aktivitas_pembelajaran: jurnalContent.aktivitas_pembelajaran,
@@ -178,5 +210,6 @@ ${jurnalContent.tindak_lanjut || "-"}
     id: jurnal.id,
     materi_pembelajaran: jurnalContent.materi_pembelajaran,
     refleksi: jurnalContent.refleksi_guru,
+    ai_generated: result.success && !!result.data,
   };
 }

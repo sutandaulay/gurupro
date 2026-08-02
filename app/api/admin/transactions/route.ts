@@ -530,7 +530,7 @@ export async function POST(req: Request) {
       const planRes = await query(
         `SELECT id, package_name, tokens, duration_days, price
          FROM pricing_plans
-         WHERE (id = $1 OR LOWER(package_name) = LOWER($1)) AND is_active = true
+         WHERE (id = $1 OR LOWER(package_name) = LOWER($1::text)) AND is_active = true
          LIMIT 1`,
         [planKey]
       );
@@ -551,19 +551,18 @@ export async function POST(req: Request) {
 
       // Ambil data user saat ini untuk audit trail
       const userBeforeRes = await query(
-        "SELECT token_limit, status_langganan, subscription_end FROM users WHERE id = $1",
+        "SELECT quota_poin_total, status_langganan, subscription_end FROM users WHERE id = $1",
         [userId]
       );
-      const userBefore = userBeforeRes.rows[0];
 
       // Update transaction status to REFUNDED
       await query("UPDATE transactions SET status = $1, updated_at = NOW() WHERE id = $2", ["REFUNDED", transactionId]);
 
-      // Deduct tokens from user and downgrade subscription status to refunded if it was activated
+      // Deduct poin from user and downgrade subscription status to refunded if it was activated
       if (transaction.status === "ACTIVATED") {
         await query(
           `UPDATE users
-           SET token_limit = GREATEST(0, COALESCE(token_limit, 0) - $1),
+           SET quota_poin_total = GREATEST(0, COALESCE(quota_poin_total, 0) - $1),
                status_langganan = 'free',
                subscription_status = 'refunded',
                subscription_end = NOW(),
@@ -575,13 +574,18 @@ export async function POST(req: Request) {
       }
 
       // Audit trail untuk refund
+      const userAfterRes = await query(
+        "SELECT quota_poin_total, status_langganan FROM users WHERE id = $1",
+        [userId]
+      );
+      const userAfter = userAfterRes.rows[0];
       await query(
         `INSERT INTO audit_trails (user_id, aksi, deskripsi, ip_address)
          VALUES ($1, $2, $3, $4)`,
         [
           userId,
           "Refund Transaksi",
-          `Refund transaksi ${transactionId} (${planKey}) - Potong ${tokensToDeduct} token dari ${userBefore?.token_limit || 0} → ${Math.max(0, (userBefore?.token_limit || 0) - tokensToDeduct)}. Status: ${userBefore?.status_langganan || 'unknown'} → free. Admin: manual refund.`,
+          `Refund transaksi ${transactionId} (${planKey}) - Potong ${tokensToDeduct} poin dari ${userAfter?.quota_poin_total || 0} → ${Math.max(0, (userAfter?.quota_poin_total || 0) - tokensToDeduct)}. Status: ${userAfter?.status_langganan || 'unknown'} → refunded. Admin: manual refund.`,
           "admin_panel"
         ]
       );

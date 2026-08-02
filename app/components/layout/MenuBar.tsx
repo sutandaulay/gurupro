@@ -10,6 +10,7 @@ import { getLucideIcon, resolveCategory } from "@/lib/menuConfig";
 type SubItem = {
   label: string;
   href: string;
+  desc?: string;
 };
 
 type MenuItem = {
@@ -73,7 +74,7 @@ const menuItems: MenuItem[] = [
   {
     label: "Laporan",
     submenu: [
-      { label: "Laporan Harian", href: "/dashboard/laporan-harian" },
+      { label: "Laporan Harian & Mengajar", href: "/dashboard/laporan-harian", desc: "Rekap harian resmi + arsip jurnal mengajar" },
       {
         label: "Laporan Kinerja",
         href: "/dashboard/laporan-kinerja",
@@ -103,6 +104,10 @@ const menuItems: MenuItem[] = [
       { label: "Buat Baru", href: "/dashboard/pengembangan-diri/tambah" },
       { label: "Sertifikat", href: "/dashboard/pengembangan-diri" },
     ],
+  },
+  {
+    label: "Perpustakaan",
+    href: "/perpustakaan",
   },
   {
     label: "Wali Kelas",
@@ -316,14 +321,19 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                           key={s.label}
                           href={s.href}
                           onClick={(e) => { e.preventDefault(); router.push(s.href); }}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer whitespace-nowrap ${
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer whitespace-nowrap ${
                             sActive
                               ? "bg-violet-50 text-violet-700"
                               : "text-gray-700 hover:bg-gray-50"
                           }`}
                         >
                           {SubIcon && <AppIcon label={s.label} size={28} iconSize={14} category={resolveCategory(s.label)} active={sActive} icon={<SubIcon />} />}
-                          <span className="truncate">{s.label}</span>
+                          <span>
+                            <span className="block truncate">{s.label}</span>
+                            {s.desc && (
+                              <span className="block text-[10px] font-normal text-gray-400 truncate max-w-[200px]">{s.desc}</span>
+                            )}
+                          </span>
                         </a>
                       );
                     })}

@@ -105,6 +105,7 @@ export interface NotificationTemplates {
   payout_rejected: NotificationTemplate;
   payment_success: NotificationTemplate;
   refund: NotificationTemplate;
+  teaching_report_completed: NotificationTemplate;
 }
 
 export async function getPaymentGatewayConfig(): Promise<PaymentGatewayConfig> {
@@ -175,6 +176,13 @@ export async function getNotificationTemplates(): Promise<NotificationTemplates>
       email_enabled: true,
       wa_enabled: true,
       email_subject: "Pembayaran Langganan GuruPRO Berhasil",
+      email_body: "",
+      wa_message: ""
+    },
+    teaching_report_completed: {
+      email_enabled: true,
+      wa_enabled: true,
+      email_subject: "Laporan Mengajar Baru - {guru_nama}",
       email_body: "",
       wa_message: ""
     }
@@ -360,7 +368,8 @@ const defaultNotificationTemplates: NotificationTemplates = {
   payout_approved: { email_enabled: true, wa_enabled: true, email_subject: "Pencairan Cashback GuruPRO Berhasil!", email_body: "", wa_message: "" },
   payout_rejected: { email_enabled: true, wa_enabled: true, email_subject: "Pencairan Cashback GuruPRO Ditolak", email_body: "", wa_message: "" },
   payment_success: { email_enabled: true, wa_enabled: true, email_subject: "Pembayaran Langganan GuruPRO Berhasil", email_body: "", wa_message: "" },
-  refund: { email_enabled: true, wa_enabled: true, email_subject: "Refund Pembayaran GuruPRO", email_body: "", wa_message: "" }
+  refund: { email_enabled: true, wa_enabled: true, email_subject: "Refund Pembayaran GuruPRO", email_body: "", wa_message: "" },
+  teaching_report_completed: { email_enabled: true, wa_enabled: true, email_subject: "Laporan Mengajar Baru - {guru_nama}", email_body: "", wa_message: "" }
 };
 
 const defaultAIConfig: AIConfig = {

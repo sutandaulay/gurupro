@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { uploadToR2 } from '@/lib/r2'
+import { parsePagination, wrapResponse } from '@/lib/pagination'
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 const MAX_SIZE = 5 * 1024 * 1024 // 5MB
@@ -27,26 +28,39 @@ export async function GET(req: Request) {
     const tahunAjaranId = searchParams.get('tahun_ajaran_id')
     const semester = searchParams.get('semester')
 
-    let sql = `SELECT * FROM dokumen_bukti WHERE guru_id = $1`
+    let whereClause = 'guru_id = $1'
     const params: (string | null)[] = [guruId]
     let paramIndex = 2
 
     if (tahunAjaranId) {
-      sql += ` AND (tahun_ajaran_id = $${paramIndex} OR tahun_ajaran_id IS NULL)`
+      whereClause += ` AND (tahun_ajaran_id = $${paramIndex} OR tahun_ajaran_id IS NULL)`
       params.push(tahunAjaranId)
       paramIndex++
     }
 
     if (semester) {
-      sql += ` AND (semester = $${paramIndex} OR semester IS NULL)`
+      whereClause += ` AND (semester = $${paramIndex} OR semester IS NULL)`
       params.push(semester)
       paramIndex++
     }
 
-    sql += ` ORDER BY tanggal_dokumen DESC`
+    const countResult = await query(
+      `SELECT COUNT(*) FROM dokumen_bukti WHERE ${whereClause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].count, 10);
 
-    const result = await query(sql, params)
-    return NextResponse.json(result.rows)
+    const pagination = parsePagination(searchParams);
+    const off = (pagination.page - 1) * pagination.limit;
+
+    const result = await query(
+      `SELECT * FROM dokumen_bukti WHERE ${whereClause}
+       ORDER BY tanggal_dokumen DESC
+       LIMIT ${pagination.limit} OFFSET ${off}`,
+      params
+    )
+
+    return NextResponse.json(wrapResponse(result.rows, total, pagination))
   } catch (err) {
     console.error('GET /api/dokumen-bukti error:', err)
     return NextResponse.json({ error: 'Failed to fetch documents' }, { status: 500 })

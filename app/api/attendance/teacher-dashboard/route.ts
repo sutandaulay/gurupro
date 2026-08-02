@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSession } from '@/lib/session';
-import { db } from '@/lib/db';
+import { db, query } from '@/lib/db';
 import {
-  teacherInstitutionAssignments,
-  institutions,
   attendanceLogs,
   attendanceSummary,
 } from '@/lib/schemas/attendance';
 import { eq, and, desc, gte, lte } from 'drizzle-orm';
-import { query } from '@/lib/db';
+import { v4 as uuidv4 } from 'uuid';
 
 // ==========================================
 // TEACHER ATTENDANCE DASHBOARD API
@@ -41,43 +39,86 @@ export async function GET(req: NextRequest) {
     const todayKey = dayNames[today.getDay()];
 
     // ==========================================
-    // 1. Get all institution assignments for this teacher from payload schema
+    // 1. Get all institution memberships for this teacher
+    //    Primary source: payload.institution_members (has actual data)
+    //    Falls back to payload.teacher_institution_assignments for scheduling data
     // ==========================================
-    // First, find the teacher email from public.users
-    const userResult = await query("SELECT email FROM users WHERE id = $1", [teacherId]);
-    if (userResult.rows.length === 0) {
-      return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 404 });
-    }
-    const email = userResult.rows[0].email;
-
-    // Next, get the cms_users ID
-    const cmsUserResult = await query("SELECT id FROM payload.cms_users WHERE email = $1", [email]);
     let assignments: any[] = [];
-    
-    if (cmsUserResult.rows.length > 0) {
-      const cmsUserId = cmsUserResult.rows[0].id;
 
-      // Query assignments from payload schema
-      const assignmentsResult = await query(`
-        SELECT 
-          tia.id,
-          tia.institution_id_id as "institutionId",
-          i.name as "institutionName",
-          i.location_latitude as "locationLatitude",
-          i.location_longitude as "locationLongitude",
-          i.attendance_settings_attendance_radius_meters as "attendanceRadiusMeters",
-          i.attendance_settings_qr_code_enabled as "qrCodeEnabled",
-          tia.subject_ids as "subjectIds",
-          tia.weekly_schedule as "weeklySchedule",
-          tia.status,
-          tia.start_date as "startDate",
-          tia.end_date as "endDate"
-        FROM payload.teacher_institution_assignments tia
-        LEFT JOIN payload.institutions i ON tia.institution_id_id = i.id
-        WHERE tia.teacher_id_id = $1 AND tia.status = 'aktif'
-      `, [cmsUserId]);
-      
-      assignments = assignmentsResult.rows || [];
+    const membersResult = await query(`
+      SELECT 
+        im.id,
+        im.institution_id as "institutionId",
+        i.name as "institutionName",
+        i.location_latitude as "locationLatitude",
+        i.location_longitude as "locationLongitude",
+        i.attendance_settings_attendance_radius_meters as "attendanceRadiusMeters",
+        i.attendance_settings_qr_code_enabled as "qrCodeEnabled",
+        tia.subject_ids as "subjectIds",
+        tia.weekly_schedule as "weeklySchedule",
+        im.status,
+        imr.value as "role",
+        tia.start_date as "startDate",
+        tia.end_date as "endDate",
+        tia.id as "tiaId"
+      FROM payload.institution_members im
+      JOIN payload.institutions i ON im.institution_id = i.id
+      LEFT JOIN payload.institution_members_role imr ON imr.parent_id = im.id
+      LEFT JOIN payload.teacher_institution_assignments tia 
+        ON tia.institution_id_id = im.institution_id 
+        AND tia.teacher_id_id = im.user_id
+        AND tia.status = 'aktif'
+      WHERE im.app_user_id = $1 
+        AND im.status = 'active'
+      ORDER BY i.name
+    `, [teacherId]);
+
+    assignments = (membersResult.rows || []).map((row: any) => ({
+      ...row,
+      id: uuidv4(),
+    }));
+
+    // Fallback: try via cms_users email if no results via app_user_id
+    if (assignments.length === 0) {
+      const userResult = await query("SELECT email FROM users WHERE id = $1", [teacherId]);
+      if (userResult.rows.length > 0) {
+        const email = userResult.rows[0].email;
+        const cmsUserResult = await query("SELECT id FROM payload.cms_users WHERE email = $1", [email]);
+        if (cmsUserResult.rows.length > 0) {
+          const cmsUserId = cmsUserResult.rows[0].id;
+          const fallbackResult = await query(`
+            SELECT 
+              im.id,
+              im.institution_id as "institutionId",
+              i.name as "institutionName",
+              i.location_latitude as "locationLatitude",
+              i.location_longitude as "locationLongitude",
+              i.attendance_settings_attendance_radius_meters as "attendanceRadiusMeters",
+              i.attendance_settings_qr_code_enabled as "qrCodeEnabled",
+              tia.subject_ids as "subjectIds",
+              tia.weekly_schedule as "weeklySchedule",
+              im.status,
+              imr.value as "role",
+              tia.start_date as "startDate",
+              tia.end_date as "endDate",
+              tia.id as "tiaId"
+            FROM payload.institution_members im
+            JOIN payload.institutions i ON im.institution_id = i.id
+            LEFT JOIN payload.institution_members_role imr ON imr.parent_id = im.id
+            LEFT JOIN payload.teacher_institution_assignments tia 
+              ON tia.institution_id_id = im.institution_id 
+              AND tia.teacher_id_id = im.user_id
+              AND tia.status = 'aktif'
+            WHERE im.user_id = $1 
+              AND im.status = 'active'
+            ORDER BY i.name
+          `, [cmsUserId]);
+          assignments = (fallbackResult.rows || []).map((row: any) => ({
+            ...row,
+            id: uuidv4(),
+          }));
+        }
+      }
     }
 
     // ==========================================
@@ -263,6 +304,19 @@ export async function GET(req: NextRequest) {
     `, [teacherId, startOfDay.toISOString().split('T')[0]]);
 
     // ==========================================
+    // 5b. Get today's attendance summary
+    // ==========================================
+    const todaySummary = await db
+      .select()
+      .from(attendanceSummary)
+      .where(
+        and(
+          eq(attendanceSummary.teacherId, teacherId),
+          eq(attendanceSummary.date, startOfDay)
+        )
+      );
+
+    // ==========================================
     // 6. Build response
     // ==========================================
     const enrichedAssignments = assignmentsWithSubjects.map((assignment: any) => {
@@ -313,7 +367,7 @@ export async function GET(req: NextRequest) {
         date: today.toISOString(),
         dayName: todayKey,
         assignments: enrichedAssignments,
-        schoolAssignments: allAssignments.filter((a: any) => a.isSchoolAssignment),
+        schoolAssignments: allAssignments.filter((a: any) => a.isSchool),
         dutyAssignmentsToday: dutyAssignmentsToday.rows || [],
         attendanceByInstitution,
         todaySummary,

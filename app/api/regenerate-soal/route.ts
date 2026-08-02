@@ -1,7 +1,7 @@
 import { generateAIContentWithUsage } from "@/lib/ai";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { getUserPoinAccess, logFailedPoinUsage } from "@/src/services/poin-service";
+import { getUserPoinAccess } from "@/src/services/poin-service";
 import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
 
 export async function POST(req: Request) {
@@ -165,27 +165,29 @@ Balas HANYA dalam format JSON (tanpa markdown):
 
       const cleanText = text.replace(/```json|```/g, "").trim();
       parsed = JSON.parse(cleanText);
-    } catch (aiError: any) {
+    } catch (aiError: unknown) {
+      const aiMsg = aiError instanceof Error ? aiError.message : String(aiError ?? "Unknown error");
       console.error("Regenerate Soal AI generation failed:", aiError);
 
-      // Log failed usage
-      await logFailedPoinUsage(userId, 0, "regenerate-soal", aiError.message);
+      await logFailedPoinUsage(userId, 0, "regenerate-soal", aiMsg);
 
-      return NextResponse.json({ error: `Gagal memproses AI: ${aiError.message || aiError}` }, { status: 502 });
+      return NextResponse.json({ error: `Gagal memproses AI: ${aiMsg}` }, { status: 502 });
     }
 
-    // Deduct Poin based on actual usage
-    try {
-      await deductPoinFromAIResult({ success: true, usage: aiResult?.usage || null }, userId, "regenerate-soal", {});
-
-      console.log(`[Regenerate Soal] Poin deducted`);
-    } catch (poinError: any) {
-      console.error("[Regenerate Soal] Poin deduction failed:", poinError);
+    // Deduct Poin only if AI was used and succeeded
+    if (aiResult?.usage) {
+      try {
+        await deductPoinFromAIResult({ success: true, usage: aiResult.usage }, userId, "regenerate-soal", {});
+        console.log(`[Regenerate Soal] Poin deducted`);
+      } catch (poinError: unknown) {
+        console.error("[Regenerate Soal] Poin deduction failed:", poinError);
+      }
     }
 
     return NextResponse.json(parsed);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error ?? "Unknown error");
     console.error("Regenerate API error:", error);
-    return NextResponse.json({ error: error.message || "Gagal membuat soal pengganti" }, { status: 500 });
+    return NextResponse.json({ error: msg || "Gagal membuat soal pengganti" }, { status: 500 });
   }
 }

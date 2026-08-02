@@ -1,623 +1,779 @@
 'use client';
-import { apiFetch } from "@/lib/api-client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { apiFetch } from "@/lib/api-client";
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTeacherStore } from "@/lib/stores";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar as CalendarIcon, Download, Filter, Search, TrendingUp } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfYear, endOfYear } from 'date-fns';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import EmptyState from '@/app/components/ui/empty-state';
+import {
+  Calendar as CalendarIcon,
+  Download,
+  Filter,
+  Clock,
+  AlertTriangle,
+  UserCheck,
+  BookOpen,
+  Search,
+  Loader2,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  Building2,
+  GraduationCap,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+} from 'lucide-react';
+import { format, startOfMonth, endOfMonth, subDays, startOfWeek, endOfWeek, startOfDay, endOfDay } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { toast } from 'sonner';
-import { useSession } from 'next-auth/react';
 
 interface AttendanceReport {
   id: string;
   teacherId: string;
   teacherName: string;
-  institutionId: string;
+  institutionId: string | number | null;
   institutionName: string;
   date: string;
-  checkInTime?: string;
-  checkOutTime?: string;
-  attendanceStatus: 'hadir' | 'sakit' | 'izin' | 'cuti' | 'alpa' | 'telat';
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+  attendanceStatus: string;
   teachingMinutesTotal: number;
   teachingSessionsCompleted: number;
   scheduledSessions: number;
   lateMinutes: number;
-  teachingMinutesBySubject: Record<string, number>;
+  isSchoolBased?: boolean;
+  verification?: {
+    faceMatchScore?: number | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    accuracy?: number | null;
+    livenessPassed?: boolean;
+    catatan?: string | null;
+  } | null;
 }
 
-interface Subject {
+interface FilterOption {
   id: string;
   name: string;
 }
 
-interface Institution {
-  id: string;
-  name: string;
+interface Summary {
+  totalDays: number;
+  attendanceRate: number;
+  totalTeachingMinutes: number;
+  totalTeachingSessions: number;
+  scheduledSessions: number;
+  lateCount: number;
+  totalLateMinutes: number;
 }
 
-interface Teacher {
-  id: string;
-  name: string;
+interface PaginationInfo {
+  currentPage: number;
+  totalPages: number;
+  totalRecords: number;
+  limit: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
 }
 
-interface ReportFilters {
-  period: 'daily' | 'weekly' | 'monthly';
-  startDate: Date;
-  endDate: Date;
-  teacherId?: string;
-  institutionId?: string;
-  subjectId?: string;
-  classId?: string;
+interface DatePreset {
+  label: string;
+  getValue: () => { startDate: Date; endDate: Date };
+}
+
+const DATE_PRESETS: DatePreset[] = [
+  {
+    label: 'Hari Ini',
+    getValue: () => ({ startDate: startOfDay(new Date()), endDate: endOfDay(new Date()) }),
+  },
+  {
+    label: '7 Hari Terakhir',
+    getValue: () => ({ startDate: startOfDay(subDays(new Date(), 6)), endDate: endOfDay(new Date()) }),
+  },
+  {
+    label: '30 Hari Terakhir',
+    getValue: () => ({ startDate: startOfDay(subDays(new Date(), 29)), endDate: endOfDay(new Date()) }),
+  },
+  {
+    label: 'Minggu Ini',
+    getValue: () => ({ startDate: startOfWeek(new Date(), { weekStartsOn: 1 }), endDate: endOfWeek(new Date(), { weekStartsOn: 1 }) }),
+  },
+  {
+    label: 'Bulan Ini',
+    getValue: () => ({ startDate: startOfMonth(new Date()), endDate: endOfMonth(new Date()) }),
+  },
+];
+
+const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string; dotColor: string }> = {
+  hadir:    { label: 'Hadir',    color: 'text-emerald-700',    bgColor: 'bg-emerald-50 border-emerald-200',    dotColor: 'bg-emerald-500' },
+  telat:    { label: 'Telat',    color: 'text-amber-700',      bgColor: 'bg-amber-50 border-amber-200',       dotColor: 'bg-amber-500' },
+  sakit:    { label: 'Sakit',    color: 'text-sky-700',        bgColor: 'bg-sky-50 border-sky-200',           dotColor: 'bg-sky-500' },
+  izin:     { label: 'Izin',     color: 'text-blue-700',       bgColor: 'bg-blue-50 border-blue-200',          dotColor: 'bg-blue-500' },
+  cuti:     { label: 'Cuti',     color: 'text-indigo-700',     bgColor: 'bg-indigo-50 border-indigo-200',      dotColor: 'bg-indigo-500' },
+  alpa:     { label: 'Alpa',     color: 'text-rose-700',       bgColor: 'bg-rose-50 border-rose-200',          dotColor: 'bg-rose-500' },
+};
+
+function formatTeachingTime(minutes: number) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h > 0 ? `${h}j ${m}m` : `${m}m`;
+}
+
+function getStatusBadge(status: string) {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.alpa;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${cfg.bgColor} ${cfg.color}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dotColor}`} />
+      {cfg.label}
+    </span>
+  );
+}
+
+function TrendIndicator({ value, suffix = '' }: { value: number; suffix?: string }) {
+  if (value > 0) return <span className="text-emerald-600 text-xs font-medium flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />+{value}{suffix}</span>;
+  if (value < 0) return <span className="text-rose-600 text-xs font-medium flex items-center gap-0.5"><TrendingDown className="w-3 h-3" />{value}{suffix}</span>;
+  return <span className="text-slate-400 text-xs flex items-center gap-0.5"><Minus className="w-3 h-3" />0{suffix}</span>;
+}
+
+function AttendanceReportRows({
+  reports,
+  currentPage,
+  expandedRow,
+  onToggle,
+}: {
+  reports: AttendanceReport[];
+  currentPage: number;
+  expandedRow: string | null;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <>
+      {reports.map((report, idx) => {
+        const dateObj = report.date ? new Date(report.date) : null;
+        const checkIn = report.checkInTime ? new Date(report.checkInTime) : null;
+        const checkOut = report.checkOutTime ? new Date(report.checkOutTime) : null;
+        const isExpanded = expandedRow === report.id;
+
+        return (
+          <AttendanceReportRow
+            key={report.id}
+            report={report}
+            idx={idx}
+            dateObj={dateObj}
+            checkIn={checkIn}
+            checkOut={checkOut}
+            isExpanded={isExpanded}
+            currentPage={currentPage}
+            onToggle={() => onToggle(report.id)}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function AttendanceReportRow({
+  report,
+  idx,
+  dateObj,
+  checkIn,
+  checkOut,
+  isExpanded,
+  currentPage,
+  onToggle,
+}: {
+  report: AttendanceReport;
+  idx: number;
+  dateObj: Date | null;
+  checkIn: Date | null;
+  checkOut: Date | null;
+  isExpanded: boolean;
+  currentPage: number;
+  onToggle: () => void;
+}) {
+  return (
+    <>
+      <TableRow
+        className={`cursor-pointer hover:bg-slate-50 transition-colors ${isExpanded ? 'bg-slate-50' : ''}`}
+        onClick={onToggle}
+      >
+        <TableCell className="text-xs text-muted-foreground py-2">
+          {(currentPage - 1) * 15 + idx + 1}
+        </TableCell>
+        <TableCell className="py-2">
+          <p className="text-sm font-medium">{report.teacherName}</p>
+        </TableCell>
+        <TableCell className="py-2">
+          <div className="flex items-center gap-1.5">
+            {report.isSchoolBased ? (
+              <GraduationCap className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
+            ) : (
+              <Building2 className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+            )}
+            <span className="text-xs">{report.institutionName}</span>
+          </div>
+        </TableCell>
+        <TableCell className="py-2">
+          <span className="text-xs">
+            {dateObj ? format(dateObj, 'EEE, d MMM', { locale: id }) : '-'}
+          </span>
+        </TableCell>
+        <TableCell className="py-2">
+          <span className="text-xs">{checkIn ? format(checkIn, 'HH:mm') : '-'}</span>
+        </TableCell>
+        <TableCell className="py-2">
+          <span className="text-xs">{checkOut ? format(checkOut, 'HH:mm') : '-'}</span>
+        </TableCell>
+        <TableCell className="py-2">
+          {getStatusBadge(report.attendanceStatus)}
+        </TableCell>
+        <TableCell className="py-2 text-right">
+          <span className="text-xs font-medium">
+            {report.teachingMinutesTotal > 0 ? formatTeachingTime(report.teachingMinutesTotal) : '-'}
+          </span>
+        </TableCell>
+        <TableCell className="py-2 text-right">
+          <span className="text-xs">
+            {report.teachingSessionsCompleted > 0
+              ? `${report.teachingSessionsCompleted}${report.scheduledSessions > 0 ? `/${report.scheduledSessions}` : ''}`
+              : '-'}
+          </span>
+        </TableCell>
+        <TableCell className="py-2">
+          <ChevronRight className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+        </TableCell>
+      </TableRow>
+      {isExpanded && (
+        <TableRow className="bg-slate-50/50 hover:bg-slate-50">
+          <TableCell colSpan={10} className="p-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div>
+                <p className="text-muted-foreground text-[10px] uppercase tracking-wide">Telat</p>
+                <p className="font-medium mt-0.5">{report.lateMinutes > 0 ? `${report.lateMinutes} menit` : '-'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-[10px] uppercase tracking-wide">Verifikasi</p>
+                <p className="font-medium mt-0.5">
+                  {report.verification?.livenessPassed !== undefined
+                    ? report.verification.livenessPassed ? 'Liveness ✓' : 'Liveness ✗'
+                    : '-'}
+                </p>
+              </div>
+              {report.verification?.faceMatchScore && (
+                <div>
+                  <p className="text-muted-foreground text-[10px] uppercase tracking-wide">Face Match</p>
+                  <p className="font-medium mt-0.5">{report.verification.faceMatchScore}%</p>
+                </div>
+              )}
+              {report.verification?.catatan && (
+                <div className="col-span-2 sm:col-span-4">
+                  <p className="text-muted-foreground text-[10px] uppercase tracking-wide">Catatan</p>
+                  <p className="mt-0.5">{report.verification.catatan}</p>
+                </div>
+              )}
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
 }
 
 export default function AttendanceReportsPage() {
-  const { data: session } = useSession();
+  const { activeSchoolId } = useTeacherStore();
   const [reports, setReports] = useState<AttendanceReport[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [institutions, setInstitutions] = useState<Institution[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [filters, setFilters] = useState<ReportFilters>({
-    period: 'monthly',
+  const [institutions, setInstitutions] = useState<FilterOption[]>([]);
+  const [teachers, setTeachers] = useState<FilterOption[]>([]);
+  const [filters, setFilters] = useState({
+    period: 'monthly' as string,
     startDate: startOfMonth(new Date()),
     endDate: endOfMonth(new Date()),
+    teacherId: '' as string,
+    institutionId: '' as string,
+    search: '' as string,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [metrics, setMetrics] = useState({
+  const [exporting, setExporting] = useState(false);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [summary, setSummary] = useState<Summary>({
     totalDays: 0,
     attendanceRate: 0,
     totalTeachingMinutes: 0,
     totalTeachingSessions: 0,
-    scheduledVsCompleted: { scheduled: 0, completed: 0 },
+    scheduledSessions: 0,
     lateCount: 0,
+    totalLateMinutes: 0,
   });
 
-  // Simulasi pengambilan data dari API
-  useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        setLoading(true);
-        
-        // Simulasi API call untuk mendapatkan laporan presensi
-        // Dalam implementasi nyata, ini akan memanggil API endpoint
-        const response = await apiFetch('/api/attendance/reports', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          // Dalam implementasi nyata, parameter akan dikirim sebagai query params
-        });
-        
-        // Karena ini hanya simulasi, kita buat data dummy
-        const dummyData: AttendanceReport[] = [
-          {
-            id: 'report-1',
-            teacherId: 'teacher-1',
-            teacherName: 'Ahmad Fauzi',
-            institutionId: 'inst-1',
-            institutionName: 'SDN Cempaka Putih 01',
-            date: '2024-06-01',
-            checkInTime: '07:30:00',
-            checkOutTime: '15:00:00',
-            attendanceStatus: 'hadir',
-            teachingMinutesTotal: 240,
-            teachingSessionsCompleted: 4,
-            scheduledSessions: 4,
-            lateMinutes: 0,
-            teachingMinutesBySubject: { 'math': 120, 'science': 120 },
-          },
-          {
-            id: 'report-2',
-            teacherId: 'teacher-1',
-            teacherName: 'Ahmad Fauzi',
-            institutionId: 'inst-1',
-            institutionName: 'SDN Cempaka Putih 01',
-            date: '2024-06-02',
-            checkInTime: '07:45:00',
-            checkOutTime: '14:45:00',
-            attendanceStatus: 'telat',
-            teachingMinutesTotal: 210,
-            teachingSessionsCompleted: 3,
-            scheduledSessions: 4,
-            lateMinutes: 15,
-            teachingMinutesBySubject: { 'math': 90, 'science': 120 },
-          },
-          {
-            id: 'report-3',
-            teacherId: 'teacher-2',
-            teacherName: 'Siti Nurhaliza',
-            institutionId: 'inst-1',
-            institutionName: 'SDN Cempaka Putih 01',
-            date: '2024-06-01',
-            checkInTime: '07:30:00',
-            checkOutTime: '15:30:00',
-            attendanceStatus: 'hadir',
-            teachingMinutesTotal: 300,
-            teachingSessionsCompleted: 5,
-            scheduledSessions: 5,
-            lateMinutes: 0,
-            teachingMinutesBySubject: { 'indonesia': 150, 'social': 150 },
-          },
-        ];
-        
-        setReports(dummyData);
-        
-        // Hitung metrics
-        const totalDays = dummyData.length;
-        const presentDays = dummyData.filter(r => r.attendanceStatus === 'hadir' || r.attendanceStatus === 'telat').length;
-        const attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
-        
-        const totalTeachingMinutes = dummyData.reduce((sum, r) => sum + r.teachingMinutesTotal, 0);
-        const totalTeachingSessions = dummyData.reduce((sum, r) => sum + r.teachingSessionsCompleted, 0);
-        const scheduledSessions = dummyData.reduce((sum, r) => sum + r.scheduledSessions, 0);
-        const lateCount = dummyData.filter(r => r.attendanceStatus === 'telat').length;
-        
-        setMetrics({
-          totalDays,
-          attendanceRate,
-          totalTeachingMinutes,
-          totalTeachingSessions,
-          scheduledVsCompleted: { scheduled: scheduledSessions, completed: totalTeachingSessions },
-          lateCount,
-        });
-      } catch (err: any) {
-        console.error('Error fetching reports:', err);
-        setError(err.message || 'Gagal mengambil data laporan');
-        toast.error('Gagal mengambil data laporan');
-      } finally {
-        setLoading(false);
+  const fetchReports = useCallback(async (page = 1) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const params = new URLSearchParams();
+      params.set('period', filters.period);
+      params.set('startDate', format(filters.startDate, 'yyyy-MM-dd'));
+      params.set('endDate', format(filters.endDate, 'yyyy-MM-dd'));
+      params.set('page', page.toString());
+      params.set('limit', '15');
+      if (activeSchoolId) params.set('schoolId', activeSchoolId);
+      if (filters.teacherId && filters.teacherId !== 'all') params.set('teacherId', filters.teacherId);
+      if (filters.institutionId && filters.institutionId !== 'all') params.set('institutionId', filters.institutionId);
+      if (filters.search) params.set('search', filters.search);
+
+      const res = await apiFetch(`/api/attendance/reports?${params.toString()}`, { cache: 'no-store' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Gagal mengambil data' }));
+        throw new Error(err.error || 'Gagal mengambil data laporan');
       }
-    };
 
-    fetchReports();
-  }, []);
+      const json = await res.json();
+      const data: AttendanceReport[] = json.data || [];
+      setReports(data);
 
-  // Simulasi data untuk dropdown
+      if (json.summary) setSummary(json.summary);
+      if (json.pagination) setPagination(json.pagination);
+      setCurrentPage(page);
+
+      const uniqueInstitutions = Array.from(
+        new Map(data.map((r) => [String(r.institutionId), { id: String(r.institutionId) || '', name: r.institutionName }])).values()
+      ).filter((i) => i.id && i.name);
+      const uniqueTeachers = Array.from(
+        new Map(data.map((r) => [r.teacherId, { id: r.teacherId, name: r.teacherName }])).values()
+      );
+      setInstitutions(uniqueInstitutions);
+      setTeachers(uniqueTeachers);
+    } catch (err: any) {
+      console.error('Error fetching reports:', err);
+      setError(err.message || 'Gagal mengambil data laporan');
+      toast.error(err.message || 'Gagal mengambil data laporan');
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
+
   useEffect(() => {
-    // Dalam implementasi nyata, ini akan diambil dari API
-    setSubjects([
-      { id: 'math', name: 'Matematika' },
-      { id: 'science', name: 'Ilmu Pengetahuan Alam' },
-      { id: 'indonesia', name: 'Bahasa Indonesia' },
-      { id: 'social', name: 'Ilmu Pengetahuan Sosial' },
-    ]);
-    
-    setInstitutions([
-      { id: 'inst-1', name: 'SDN Cempaka Putih 01' },
-      { id: 'inst-2', name: 'SMPN 1 Jakarta' },
-      { id: 'inst-3', name: 'SMAN 1 Depok' },
-    ]);
-    
-    setTeachers([
-      { id: 'teacher-1', name: 'Ahmad Fauzi' },
-      { id: 'teacher-2', name: 'Siti Nurhaliza' },
-      { id: 'teacher-3', name: 'Budi Santoso' },
-    ]);
-  }, []);
+    fetchReports(1);
+  }, [fetchReports]);
 
-  const handleFilterChange = (field: keyof ReportFilters, value: any) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      const params = new URLSearchParams();
+      params.set('period', filters.period);
+      params.set('startDate', format(filters.startDate, 'yyyy-MM-dd'));
+      params.set('endDate', format(filters.endDate, 'yyyy-MM-dd'));
+      if (activeSchoolId) params.set('schoolId', activeSchoolId);
+      if (filters.teacherId && filters.teacherId !== 'all') params.set('teacherId', filters.teacherId);
+      if (filters.institutionId && filters.institutionId !== 'all') params.set('institutionId', filters.institutionId);
+      if (filters.search) params.set('search', filters.search);
 
-  const handleApplyFilters = () => {
-    // Dalam implementasi nyata, ini akan memanggil API dengan filter yang baru
-    console.log('Applying filters:', filters);
-    toast.success('Filter diterapkan');
-  };
+      const res = await apiFetch(`/api/attendance/reports/export?${params.toString()}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Gagal export' }));
+        throw new Error(err.error || 'Gagal mengexport laporan');
+      }
 
-  const handleExport = () => {
-    // Dalam implementasi nyata, ini akan mengunduh laporan dalam format Excel/PDF
-    toast.success('Ekspor laporan dimulai...');
-  };
-
-  const getPeriodDates = (period: 'daily' | 'weekly' | 'monthly') => {
-    const today = new Date();
-    switch (period) {
-      case 'daily':
-        return { startDate: today, endDate: today };
-      case 'weekly':
-        return { 
-          startDate: startOfWeek(today, { weekStartsOn: 1 }), 
-          endDate: endOfWeek(today, { weekStartsOn: 1 }) 
-        };
-      case 'monthly':
-        return { 
-          startDate: startOfMonth(today), 
-          endDate: endOfMonth(today) 
-        };
-      default:
-        return { startDate: today, endDate: today };
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `laporan-presensi-${format(filters.startDate, 'yyyy-MM-dd')}-${format(filters.endDate, 'yyyy-MM-dd')}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Laporan berhasil diekspor');
+    } catch (err: any) {
+      console.error('Export error:', err);
+      toast.error(err.message || 'Gagal mengexport laporan');
+    } finally {
+      setExporting(false);
     }
   };
 
-  const handlePeriodChange = (period: 'daily' | 'weekly' | 'monthly') => {
-    const { startDate, endDate } = getPeriodDates(period);
-    setFilters(prev => ({
-      ...prev,
-      period,
-      startDate,
-      endDate
-    }));
+  const resetFilters = () => {
+    setFilters({
+      period: 'monthly',
+      startDate: startOfMonth(new Date()),
+      endDate: endOfMonth(new Date()),
+      teacherId: '',
+      institutionId: '',
+      search: '',
+    });
   };
 
-  // Data untuk grafik tren kehadiran
-  const chartData = [
-    { date: 'Jun 1', attendance: 95, teachingMinutes: 240 },
-    { date: 'Jun 2', attendance: 90, teachingMinutes: 210 },
-    { date: 'Jun 3', attendance: 100, teachingMinutes: 300 },
-    { date: 'Jun 4', attendance: 85, teachingMinutes: 180 },
-    { date: 'Jun 5', attendance: 98, teachingMinutes: 280 },
-    { date: 'Jun 6', attendance: 100, teachingMinutes: 320 },
-    { date: 'Jun 7', attendance: 92, teachingMinutes: 260 },
-  ];
+  const applyPreset = (preset: DatePreset) => {
+    const { startDate, endDate } = preset.getValue();
+    setFilters({ ...filters, startDate, endDate, period: 'custom' });
+  };
 
-  if (loading) {
-    return (
-      <div className="container mx-auto py-10 px-4 max-w-7xl flex justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
-          <p>Memuat laporan presensi...</p>
+  const chartData = useMemo(() => {
+    const map = new Map<string, { date: string; count: number; minutes: number; hadir: number; alpa: number; telat: number }>();
+    reports.forEach((r) => {
+      const d = r.date ? new Date(r.date) : null;
+      const label = d ? format(d, 'dd MMM') : r.date;
+      const existing = map.get(label) || { date: label, count: 0, minutes: 0, hadir: 0, alpa: 0, telat: 0 };
+      existing.count++;
+      existing.minutes += r.teachingMinutesTotal || 0;
+      if (r.attendanceStatus === 'hadir') existing.hadir++;
+      else if (r.attendanceStatus === 'telat') existing.telat++;
+      else if (r.attendanceStatus === 'alpa') existing.alpa++;
+      map.set(label, existing);
+    });
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [reports]);
+
+  const attendanceRateColor = summary.attendanceRate >= 90
+    ? 'text-emerald-600'
+    : summary.attendanceRate >= 75
+    ? 'text-amber-600'
+    : 'text-rose-600';
+
+  return (
+    <div className="container mx-auto py-6 px-4 space-y-6 max-w-7xl">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Laporan Presensi & Jam Mengajar</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {format(filters.startDate, 'd MMM yyyy', { locale: id })} — {format(filters.endDate, 'd MMM yyyy', { locale: id })}
+          </p>
         </div>
+        <Button onClick={handleExport} disabled={exporting || loading || reports.length === 0} size="sm">
+          {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+          {exporting ? 'Mengexport...' : 'Ekspor Excel'}
+        </Button>
       </div>
-    );
-  }
 
-  if (error) {
-    return (
-      <div className="container mx-auto py-10 px-4 max-w-7xl">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-6 w-6" />
-              Laporan Presensi
-            </CardTitle>
-            <CardDescription>
-              Gagal memuat data laporan
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-destructive">{error}</p>
+      {/* Metrics */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="pt-4 pb-3 px-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Tingkat Kehadiran</p>
+                <p className={`text-2xl font-bold mt-1 ${attendanceRateColor}`}>{summary.attendanceRate}%</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{summary.totalDays} hari dalam periode</p>
+              </div>
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                summary.attendanceRate >= 90 ? 'bg-emerald-100' :
+                summary.attendanceRate >= 75 ? 'bg-amber-100' : 'bg-rose-100'
+              }`}>
+                <UserCheck className={`w-5 h-5 ${
+                  summary.attendanceRate >= 90 ? 'text-emerald-600' :
+                  summary.attendanceRate >= 75 ? 'text-amber-600' : 'text-rose-600'
+                }`} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-sm">
+          <CardContent className="pt-4 pb-3 px-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Total Jam Mengajar</p>
+                <p className="text-2xl font-bold mt-1">{formatTeachingTime(summary.totalTeachingMinutes)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{summary.totalTeachingSessions} sesi mengajar</p>
+              </div>
+              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-sm">
+          <CardContent className="pt-4 pb-3 px-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Sesi Selesai</p>
+                <p className="text-2xl font-bold mt-1">{summary.totalTeachingSessions}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {summary.scheduledSessions > 0 ? `dari ${summary.scheduledSessions} terjadwal` : 'tanpa target'}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                <BookOpen className="w-5 h-5 text-indigo-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-sm">
+          <CardContent className="pt-4 pb-3 px-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Keterlambatan</p>
+                <p className="text-2xl font-bold mt-1">{summary.lateCount}×</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  total {summary.totalLateMinutes} menit
+                </p>
+              </div>
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                summary.lateCount > 5 ? 'bg-rose-100' : 'bg-amber-100'
+              }`}>
+                <AlertTriangle className={`w-5 h-5 ${summary.lateCount > 5 ? 'text-rose-600' : 'text-amber-600'}`} />
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
-    );
-  }
 
-  return (
-    <div className="container mx-auto py-10 px-4 max-w-7xl">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-6 w-6" />
-                Laporan Presensi
-              </CardTitle>
-              <CardDescription>
-                Laporan kehadiran dan jam mengajar guru
-              </CardDescription>
+      {/* Filters */}
+      <Card className="border shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            Filter Laporan
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Date presets */}
+          <div className="flex flex-wrap gap-2">
+            {DATE_PRESETS.map((preset) => (
+              <Button
+                key={preset.label}
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => applyPreset(preset)}
+              >
+                {preset.label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="lg:col-span-2">
+              <DateRangePicker
+                dateRange={{ from: filters.startDate, to: filters.endDate }}
+                onDateRangeChange={(range) => {
+                  if (range?.from && range?.to) {
+                    setFilters({ ...filters, startDate: range.from, endDate: range.to, period: 'custom' });
+                  }
+                }}
+              />
             </div>
-            
-            <Button onClick={handleExport} className="flex items-center gap-2">
-              <Download className="h-4 w-4" />
-              Ekspor Laporan
+
+            <div>
+              <Label className="text-xs mb-1.5 block">Institusi / Sekolah</Label>
+              <Select
+                value={filters.institutionId || 'all'}
+                onValueChange={(val) => setFilters({ ...filters, institutionId: val === 'all' ? '' : val })}
+              >
+                <SelectTrigger className="bg-white h-9 text-sm"><SelectValue placeholder="Semua" /></SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="all">Semua Institusi</SelectItem>
+                  {institutions.map((inst) => (
+                    <SelectItem key={inst.id} value={inst.id}>{inst.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs mb-1.5 block">Guru</Label>
+              <Select
+                value={filters.teacherId || 'all'}
+                onValueChange={(val) => setFilters({ ...filters, teacherId: val === 'all' ? '' : val })}
+              >
+                <SelectTrigger className="bg-white h-9 text-sm"><SelectValue placeholder="Semua" /></SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="all">Semua Guru</SelectItem>
+                  {teachers.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs mb-1.5 block">Cari</Label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Nama..."
+                  className="h-9 pl-8 text-sm"
+                  value={filters.search}
+                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && fetchReports(1)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetFilters}
+              className="h-7 text-xs gap-1 text-muted-foreground"
+            >
+              <RotateCcw className="h-3 w-3" />Reset
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Chart */}
+      <Card className="border shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Distribusi Kehadiran</CardTitle>
         </CardHeader>
-        
         <CardContent>
-          {/* Filter Section */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                Filter Laporan
-              </CardTitle>
-              <CardDescription>
-                Atur periode dan parameter laporan
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <Label>Periode</Label>
-                  <Select 
-                    value={filters.period} 
-                    onValueChange={(value: 'daily' | 'weekly' | 'monthly') => handlePeriodChange(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">Harian</SelectItem>
-                      <SelectItem value="weekly">Mingguan</SelectItem>
-                      <SelectItem value="monthly">Bulanan</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label>Periode Kustom</Label>
-                  <DateRangePicker 
-                    dateRange={{ from: filters.startDate, to: filters.endDate }} 
-                    onDateRangeChange={(range) => {
-                      if (range) {
-                        setFilters(prev => ({
-                          ...prev,
-                          startDate: range.from || new Date(),
-                          endDate: range.to || new Date()
-                        }));
-                      }
-                    }}
-                  />
-                </div>
-                
-                {session?.user?.role !== 'teacher' && (
-                  <div>
-                    <Label>Guru</Label>
-                    <Select 
-                      value={filters.teacherId} 
-                      onValueChange={(value) => handleFilterChange('teacherId', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Semua Guru" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teachers.map(teacher => (
-                          <SelectItem key={teacher.id} value={teacher.id}>{teacher.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                
-                <div>
-                  <Label>Institusi</Label>
-                  <Select 
-                    value={filters.institutionId} 
-                    onValueChange={(value) => handleFilterChange('institutionId', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Semua Institusi" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {institutions.map(inst => (
-                        <SelectItem key={inst.id} value={inst.id}>{inst.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label>Mata Pelajaran</Label>
-                  <Select 
-                    value={filters.subjectId} 
-                    onValueChange={(value) => handleFilterChange('subjectId', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Semua Mapel" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {subjects.map(subject => (
-                        <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="md:col-span-2 lg:col-span-4 flex justify-end pt-6">
-                  <Button onClick={handleApplyFilters}>
-                    Terapkan Filter
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          {/* Metrics Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Total Hari</CardDescription>
-                <CardTitle className="text-2xl">{metrics.totalDays}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-muted-foreground">
-                  Periode: {format(filters.startDate, 'dd MMM', { locale: id })} - {format(filters.endDate, 'dd MMM yyyy', { locale: id })}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Tingkat Kehadiran</CardDescription>
-                <CardTitle className="text-2xl">{metrics.attendanceRate}%</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-muted-foreground">
-                  {metrics.totalDays > 0 ? Math.round(metrics.attendanceRate) : 0}% hadir/telat
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Total Jam Mengajar</CardDescription>
-                <CardTitle className="text-2xl">{Math.round(metrics.totalTeachingMinutes / 60)} jam</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-muted-foreground">
-                  {metrics.totalTeachingMinutes} menit
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Sesi Selesai</CardDescription>
-                <CardTitle className="text-2xl">{metrics.totalTeachingSessions}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-muted-foreground">
-                  {metrics.scheduledVsCompleted.completed}/{metrics.scheduledVsCompleted.scheduled} sesi
-                </div>
-              </CardContent>
-            </Card>
+          {loading ? (
+            <Skeleton className="h-[200px] w-full" />
+          ) : reports.length === 0 ? (
+            <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
+              Tidak ada data
+            </div>
+          ) : (
+            <ResponsiveContainer height={200} width="100%">
+              <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-slate-100" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                  formatter={(value, name) => {
+                    const labels: Record<string, string> = { hadir: 'Hadir', telat: 'Telat', alpa: 'Alpa', count: 'Total' };
+                    return [value, labels[String(name)] || name];
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="hadir" stackId="a" fill="#10b981" name="Hadir" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="telat" stackId="a" fill="#f59e0b" name="Telat" />
+                <Bar dataKey="alpa" stackId="a" fill="#f87171" name="Alpa" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card className="border shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm">
+              Rincian ({reports.length} data{pagination && pagination.totalRecords > reports.length ? ` dari ${pagination.totalRecords}` : ''})
+            </CardTitle>
           </div>
-          
-          {/* Charts */}
-          <Tabs defaultValue="trends" className="mb-6">
-            <TabsList>
-              <TabsTrigger value="trends">Tren Kehadiran</TabsTrigger>
-              <TabsTrigger value="subjects">Breakdown Per Mapel</TabsTrigger>
-            </TabsList>
-            <TabsContent value="trends">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Tren Kehadiran Mingguan</CardTitle>
-                  <CardDescription>
-                    Persentase kehadiran dan jam mengajar per hari
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis yAxisId="left" />
-                      <YAxis yAxisId="right" orientation="right" />
-                      <Tooltip />
-                      <Legend />
-                      <Line 
-                        yAxisId="left"
-                        type="monotone" 
-                        dataKey="attendance" 
-                        stroke="#8884d8" 
-                        name="Kehadiran (%)" 
-                        strokeWidth={2}
-                      />
-                      <Line 
-                        yAxisId="right"
-                        type="monotone" 
-                        dataKey="teachingMinutes" 
-                        stroke="#82ca9d" 
-                        name="Jam Mengajar (mnt)" 
-                        strokeWidth={2}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="subjects">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Distribusi Jam Mengajar Per Mata Pelajaran</CardTitle>
-                  <CardDescription>
-                    Total jam mengajar dibagi berdasarkan mata pelajaran
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={[
-                      { name: 'Matematika', minutes: 480 },
-                      { name: 'IPA', minutes: 360 },
-                      { name: 'Bahasa Indonesia', minutes: 420 },
-                      { name: 'IPS', minutes: 300 },
-                    ]}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="minutes" fill="#8884d8" name="Menit Mengajar" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-          
-          {/* Reports Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Rincian Laporan</CardTitle>
-              <CardDescription>
-                Detail kehadiran dan jam mengajar per hari
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-4 space-y-2">
+              {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : error ? (
+            <div className="p-8 text-center">
+              <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">{error}</p>
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => fetchReports(currentPage)}>
+                Coba Lagi
+              </Button>
+            </div>
+          ) : reports.length === 0 ? (
+            <EmptyState
+              icon="IconCalendarOff"
+              title="Belum ada data presensi"
+              description="Rekapan presensi untuk periode ini masih kosong."
+            />
+          ) : (
+            <>
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Guru</TableHead>
-                      <TableHead>Institusi</TableHead>
-                      <TableHead>Tanggal</TableHead>
-                      <TableHead>Kehadiran</TableHead>
-                      <TableHead>Jam Mengajar</TableHead>
-                      <TableHead>Sesi</TableHead>
-                      <TableHead>Telat (mnt)</TableHead>
+                    <TableRow className="bg-slate-50/50">
+                      <TableHead className="w-8 text-xs">No</TableHead>
+                      <TableHead className="text-xs">Nama Guru</TableHead>
+                      <TableHead className="text-xs">Sekolah</TableHead>
+                      <TableHead className="text-xs">Tanggal</TableHead>
+                      <TableHead className="text-xs">Masuk</TableHead>
+                      <TableHead className="text-xs">Pulang</TableHead>
+                      <TableHead className="text-xs">Status</TableHead>
+                      <TableHead className="text-xs text-right">Jam Mengajar</TableHead>
+                      <TableHead className="text-xs text-right">Sesi</TableHead>
+                      <TableHead className="text-xs w-8"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {reports.length > 0 ? (
-                      reports.map((report) => (
-                        <TableRow key={report.id}>
-                          <TableCell className="font-medium">{report.teacherName}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{report.institutionName}</Badge>
-                          </TableCell>
-                          <TableCell>{format(new Date(report.date), 'dd MMM yyyy', { locale: id })}</TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={
-                                report.attendanceStatus === 'hadir' ? 'default' :
-                                report.attendanceStatus === 'telat' ? 'secondary' :
-                                report.attendanceStatus === 'sakit' ? 'destructive' :
-                                report.attendanceStatus === 'izin' ? 'outline' :
-                                'destructive'
-                              }
-                            >
-                              {report.attendanceStatus === 'hadir' && 'Hadir'}
-                              {report.attendanceStatus === 'telat' && 'Telat'}
-                              {report.attendanceStatus === 'sakit' && 'Sakit'}
-                              {report.attendanceStatus === 'izin' && 'Izin'}
-                              {report.attendanceStatus === 'cuti' && 'Cuti'}
-                              {report.attendanceStatus === 'alpa' && 'Alpa'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{report.teachingMinutesTotal} menit</TableCell>
-                          <TableCell>{report.teachingSessionsCompleted}/{report.scheduledSessions}</TableCell>
-                          <TableCell>{report.lateMinutes} menit</TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                          Tidak ada data laporan untuk periode ini
-                        </TableCell>
-                      </TableRow>
-                    )}
+                    <AttendanceReportRows
+                      reports={reports}
+                      currentPage={currentPage}
+                      expandedRow={expandedRow}
+                      onToggle={(id) => setExpandedRow(expandedRow === id ? null : id)}
+                    />
                   </TableBody>
                 </Table>
               </div>
-            </CardContent>
-          </Card>
+
+              {/* Pagination */}
+              {pagination && pagination.totalPages > 1 && (
+                <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Halaman {pagination.currentPage} dari {pagination.totalPages} ({pagination.totalRecords} data)
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={() => fetchReports(pagination.currentPage - 1)}
+                      disabled={!pagination.hasPrevPage || loading}
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </Button>
+                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                      let page = i + 1;
+                      if (pagination.totalPages > 5 && pagination.currentPage > 3) {
+                        page = pagination.currentPage - 2 + i;
+                      }
+                      if (pagination.totalPages > 5 && pagination.currentPage > pagination.totalPages - 2) {
+                        page = pagination.totalPages - 4 + i;
+                      }
+                      if (page < 1 || page > pagination.totalPages) return null;
+                      return (
+                        <Button
+                          key={page}
+                          variant={page === pagination.currentPage ? 'default' : 'outline'}
+                          size="sm"
+                          className="h-7 w-7 p-0 text-xs"
+                          onClick={() => fetchReports(page)}
+                          disabled={loading}
+                        >
+                          {page}
+                        </Button>
+                      );
+                    })}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={() => fetchReports(pagination.currentPage + 1)}
+                      disabled={!pagination.hasNextPage || loading}
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

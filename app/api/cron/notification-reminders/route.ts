@@ -277,13 +277,16 @@ async function checkAndSendTokenAlerts(): Promise<{ sent: number; skipped: numbe
     const usersRes = await query(`
       SELECT
         id, email, whatsapp, nama_lengkap,
-        COALESCE(token_limit, 0) as token_limit,
-        COALESCE(addon_token_balance, 0) as addon_token_balance,
+        GREATEST(0, COALESCE(quota_poin_total, 0) - COALESCE(quota_poin_used, 0)) as quota_poin_available,
+        CASE WHEN addon_poin_grace_period_ends > NOW() THEN GREATEST(0, COALESCE(addon_poin, 0) - COALESCE(addon_poin_used, 0)) ELSE 0 END as addon_poin_available,
         status_langganan, last_token_warning_sent
       FROM users
       WHERE is_active = true
         AND (status_langganan IS NOT NULL AND status_langganan != 'free')
-        AND (token_limit <= 10 OR (token_limit <= 5 AND addon_token_balance <= 0))
+        AND (
+          GREATEST(0, COALESCE(quota_poin_total, 0) - COALESCE(quota_poin_used, 0)) +
+          CASE WHEN addon_poin_grace_period_ends > NOW() THEN GREATEST(0, COALESCE(addon_poin, 0) - COALESCE(addon_poin_used, 0)) ELSE 0 END
+        ) <= 10
         AND (
           last_token_warning_sent IS NULL
           OR last_token_warning_sent != $1
@@ -292,15 +295,15 @@ async function checkAndSendTokenAlerts(): Promise<{ sent: number; skipped: numbe
 
     for (const user of usersRes.rows) {
       try {
-        const totalTokens = Number(user.token_limit) + Number(user.addon_token_balance);
+        const totalPoin = Number(user.quota_poin_available) + Number(user.addon_poin_available);
         const userName = user.nama_lengkap || "Guru";
-        const isCritical = totalTokens <= 5;
+        const isCritical = totalPoin <= 5;
 
         const waMessage = `[GuruPRO] ⚠️ Peringatan Token Hampir Habis!
 
 Yth. *${userName}*,
 
-Kuota token AI Anda hampir habis! Sisa token Anda saat ini: *${totalTokens} token*.
+Kuota token AI Anda hampir habis! Sisa token Anda saat ini: *${totalPoin} token*.
 
 ${isCritical ? '⚠️ KUOTA SANGAT TERBATAS - Segera lakukan top-up!' : ''}
 
@@ -317,7 +320,7 @@ Pesan otomatis dari Sistem GuruPRO`;
         await sendInAppNotification(
           user.id,
           isCritical ? "⚠️ Kuota Poin Sangat Terbatas!" : "⚠️ Kuota Poin Menipis",
-          `Sisa poin Anda: ${totalTokens}. ${isCritical ? 'Segera top-up untuk melanjutkan aktivitas.' : 'Pertimbangkan untuk top-up.'}`,
+          `Sisa poin Anda: ${totalPoin}. ${isCritical ? 'Segera top-up untuk melanjutkan aktivitas.' : 'Pertimbangkan untuk top-up.'}`,
           isCritical ? "token_critical" : "token_low",
           "token_balance",
           null

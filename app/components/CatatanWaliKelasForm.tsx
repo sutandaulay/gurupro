@@ -33,15 +33,10 @@ export default function CatatanWaliKelasForm({
 
   useEffect(() => {
     if (kelasId) {
-      apiFetch(`/api/students?class_id=${kelasId}`)
+      apiFetch(`/api/students?class_id=${kelasId}&limit=100`)
         .then((res) => res.json())
         .then((data) => {
-          if (data.data) {
-            setSiswaList(data.data);
-          } else if (Array.isArray(data)) {
-            // API returns array directly
-            setSiswaList(data);
-          }
+          setSiswaList(data?.data ?? []);
         })
         .catch(console.error);
     }

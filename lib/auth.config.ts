@@ -15,6 +15,11 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account }) {
       console.log("[Auth] signIn callback:", { provider: account?.provider, email: user?.email });
+
+      // If user object has no id, we can't proceed reliably
+      // Let NextAuth create the session anyway; jwt/session callbacks handle the rest
+      if (!user) return true;
+
       if (account?.provider === "google" && user.email) {
         try {
           const existing = await query(
@@ -23,20 +28,18 @@ export const authOptions: NextAuthOptions = {
           );
           console.log("[Auth] Existing user check:", { found: existing.rows.length });
 
-          // Determine display name: prefer user.name, fallback to email prefix
           const displayName = user.name?.trim()
             || (user.email && user.email.split("@")[0])
             || "GuruPRO User";
 
           if (existing.rows.length === 0) {
-            // Generate self referral code for new Google users
             const selfRefCode = "GPRO-" + Math.random().toString(36).substring(2, 7).toUpperCase();
 
             const result = await query(
               `INSERT INTO users (
                  email, nama_lengkap, role, is_active, created_at,
                  email_verified, phone_verified,
-                 referral_code, token_limit,
+                 referral_code, quota_poin_total,
                  subscription_start, subscription_end, status_langganan,
                  account_type
                )
@@ -46,23 +49,29 @@ export const authOptions: NextAuthOptions = {
                RETURNING id`,
               [user.email.toLowerCase(), displayName, selfRefCode, DEFAULT_TOKEN_ALLOCATION]
             );
-            user.id = result.rows[0].id;
+
+            // Ensure user.id is set before returning
+            if (result.rows[0]?.id) {
+              user.id = result.rows[0].id;
+            }
             console.log("[Auth] New Google user created:", { id: user.id, tokens: DEFAULT_TOKEN_ALLOCATION });
 
-            // Create audit trail for new Google user
             await query(
               `INSERT INTO audit_trails (user_id, aksi, deskripsi, ip_address)
                VALUES ($1, $2, $3, $4)`,
               [user.id, 'Registrasi Google OAuth', 'Akun baru dibuat via Google Sign-In', 'system']
             );
           } else {
-            user.id = existing.rows[0].id;
+            // Ensure user.id is set for existing users too
+            if (!user.id && existing.rows[0]?.id) {
+              user.id = existing.rows[0].id;
+            }
             console.log("[Auth] Existing user:", { id: user.id });
           }
-          return true;
         } catch (err) {
-          console.error("[Auth] signIn error:", err);
-          return true; // Allow sign in anyway, don't block
+          console.error("[Auth] signIn DB error:", err);
+          // Still allow sign-in; user.id may already be set by NextAuth from OAuth token
+          // or jwt callback will use token.sub as fallback
         }
       }
       return true;
@@ -73,10 +82,15 @@ export const authOptions: NextAuthOptions = {
       try {
         const target = new URL(url, baseUrl);
         const checkoutPlan = target.searchParams.get("checkout");
-        if (checkoutPlan) {
+        const refCode = target.searchParams.get("ref");
+        if (checkoutPlan || refCode) {
           // Land the user on the billing page with the plan preselected.
           // Preserve the referral param so it can still be processed.
+          const params = new URLSearchParams();
+          if (checkoutPlan) params.set("checkout", checkoutPlan);
+          if (refCode) params.set("ref", refCode);
           target.pathname = "/dashboard/billing";
+          target.search = params.toString();
           return target.toString();
         }
       } catch {
@@ -88,14 +102,27 @@ export const authOptions: NextAuthOptions = {
       return baseUrl;
     },
     async jwt({ token, account, user }) {
-      if (account && user) {
+      // Always set token.id — prefer from user object, fallback to token.sub
+      if (user?.id) {
         token.id = user.id;
+      } else if (account && token.sub) {
+        // For OAuth flows, map token.sub (the user id) to token.id
+        // This ensures session callback always has access to user id
+        token.id = token.sub;
+      } else if (token.sub) {
+        token.id = token.sub;
       }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
+      // Safely assign user id from token — never crash if token.id is missing
+      if (session.user && token.id) {
+        session.user.id = String(token.id);
+      }
+      // Forward the Google profile photo URL to the session so client-side
+      // components (TopBar, Sidebar) can display it without needing a DB upload.
+      if (session.user && token.picture) {
+        session.user.image = token.picture;
       }
       return session;
     },

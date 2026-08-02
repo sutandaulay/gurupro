@@ -6,10 +6,9 @@ import { db } from '@/lib/db';
 import { 
   attendanceSummary,
   institutions as institutionsTable,
-  institutionMembers,
-  teacherInstitutionAssignments,
   schools,
-  schoolTeachingSessions
+  schoolTeachingSessions,
+  teacherAttendance,
 } from '@/lib/schemas/attendance';
 import { eq, and, gte, lte, inArray, sql } from 'drizzle-orm';
 import { parseISO, startOfWeek, endOfWeek, format, eachDayOfInterval, differenceInMinutes } from 'date-fns';
@@ -44,16 +43,19 @@ export async function GET(req: Request) {
 
     // Jika bukan admin dan ingin melihat laporan guru lain, pastikan guru tersebut berada di institusi yang sama
     if (targetTeacherId !== session.user.id && (session.user.role || '') !== 'admin') {
-      const userInstitutionMembers = await db.select({ institutionId: institutionMembers.institutionId })
-        .from(institutionMembers)
-        .where(eq(institutionMembers.userId, session.user.id));
+      const membersResult = await query(`
+        SELECT institution_id as "institutionId"
+        FROM payload.institution_members
+        WHERE app_user_id = $1 AND status = 'active'
+      `, [session.user.id]);
+      const userInstitutionMembers = membersResult.rows;
 
-      const teacherAssignments = await db.select({ institutionId: teacherInstitutionAssignments.institutionId })
-        .from(teacherInstitutionAssignments)
-        .where(and(
-          eq(teacherInstitutionAssignments.teacherId, targetTeacherId),
-          eq(teacherInstitutionAssignments.status, 'aktif')
-        ));
+      const assignmentsResult = await query(`
+        SELECT institution_id as "institutionId"
+        FROM payload.institution_members
+        WHERE app_user_id = $1 AND status = 'active'
+      `, [targetTeacherId]);
+      const teacherAssignments = assignmentsResult.rows;
 
       // Pastikan guru yang dituju berada di salah satu institusi tempat pengguna saat ini bertugas
       const hasAccess = teacherAssignments.some(assignment => 
@@ -84,15 +86,12 @@ export async function GET(req: Request) {
     }
 
     // Ambil institusi aktif tempat guru mengajar
-    const teacherAssignments = await db.select({
-      institutionId: teacherInstitutionAssignments.institutionId,
-      assignmentId: teacherInstitutionAssignments.id,
-    })
-    .from(teacherInstitutionAssignments)
-    .where(and(
-      eq(teacherInstitutionAssignments.teacherId, targetTeacherId),
-      eq(teacherInstitutionAssignments.status, 'aktif')
-    ));
+    const assignmentsResult2 = await query(`
+      SELECT institution_id as "institutionId", id as "assignmentId"
+      FROM payload.institution_members
+      WHERE app_user_id = $1 AND status = 'active'
+    `, [targetTeacherId]);
+    const teacherAssignments = assignmentsResult2.rows;
 
     // Cek apakah guru memiliki sekolah mandiri
     const ownedSchools = await db.select({ id: schools.id, namaSekolah: schools.namaSekolah })

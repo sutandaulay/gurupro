@@ -11,11 +11,9 @@ import {
   IconClipboardCheck,
   IconChartBar,
   IconMessage,
-  IconBook,
-  IconFileDescription,
+  IconLoader2,
 } from "@tabler/icons-react";
-import SelesaiMengajarModal from "./SelesaiMengajarModal";
-import { SelesaiMengajarFAB, SelesaiMengajarModal as NewSelesaiMengajarModal } from "@/components/selesai-mengajar";
+import { SelesaiMengajarModal } from "@/components/selesai-mengajar";
 
 interface ScheduleInfo {
   id: string;
@@ -26,13 +24,7 @@ interface ScheduleInfo {
   subject_name: string;
   jam_mulai: string;
   jam_selesai: string;
-}
-
-interface AttendanceRecord {
-  student_id: string;
-  student_name: string;
-  status: string;
-  catatan?: string;
+  school_name?: string;
 }
 
 interface TaskItem {
@@ -44,13 +36,74 @@ interface TaskItem {
   priority: string;
 }
 
-// Helper to switch module on dashboard
 function switchToModule(module: string) {
-  if (typeof window !== 'undefined') {
-    // Use custom event to trigger module switch
-    window.dispatchEvent(new CustomEvent('switchModule', { detail: { module } }));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("switchModule", { detail: { module } })
+    );
   }
 }
+
+function isJamMengajar(
+  schedules: ScheduleInfo[],
+  currentTime: Date,
+  marginMinutes: number = 30
+): boolean {
+  if (!schedules.length) return false;
+  const currentMinutes =
+    currentTime.getHours() * 60 + currentTime.getMinutes();
+  for (const schedule of schedules) {
+    const [startHour, startMin] = schedule.jam_mulai.split(":").map(Number);
+    const [endHour, endMin] = schedule.jam_selesai.split(":").map(Number);
+    const startMinutes = startHour * 60 + startMin - marginMinutes;
+    const endMinutes = endHour * 60 + endMin + marginMinutes;
+    if (currentMinutes >= startMinutes && currentMinutes <= endMinutes)
+      return true;
+  }
+  return false;
+}
+
+function getFabState(
+  schedules: ScheduleInfo[],
+  todaySession: any
+): "completed" | "in_progress" | "available" {
+  if (todaySession?.status === "completed") return "completed";
+  if (!schedules.length) return "available";
+
+  if (typeof window !== "undefined") {
+    const inProgress = schedules.some(
+      (s) => sessionStorage.getItem(`teaching_session_${s.id}`) === "active"
+    );
+    if (inProgress) return "in_progress";
+  }
+
+  return "available";
+}
+
+function getCurrentSchedule(schedules: ScheduleInfo[]): ScheduleInfo | null {
+  const now = new Date();
+  return schedules.find((s) => isJamMengajar([s], now, 30)) || schedules[0] || null;
+}
+
+const FAB_LABEL = {
+  completed: "Administration Selesai",
+  in_progress: "Lanjutkan",
+  available: "Mulai Mengajar",
+} as const;
+
+const FAB_COLOR = {
+  completed: "from-emerald-500 to-green-600",
+  in_progress: "from-amber-500 to-orange-500",
+  available: "from-violet-500 to-purple-600",
+} as const;
+
+const FAB_SUBTITLE = {
+  completed: "Tap untuk detail",
+  in_progress: (s: ScheduleInfo) =>
+    `${s.class_name} - ${s.jam_mulai}`,
+  available: (s: ScheduleInfo) =>
+    `${s.class_name} - ${s.jam_mulai}`,
+} as const;
 
 export default function FloatingActionButton() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -58,8 +111,12 @@ export default function FloatingActionButton() {
   const [todaySession, setTodaySession] = useState<any>(null);
   const [pendingTasks, setPendingTasks] = useState<TaskItem[]>([]);
   const [todaySchedules, setTodaySchedules] = useState<ScheduleInfo[]>([]);
-  const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
-  const [selectedSchedule, setSelectedSchedule] = useState<ScheduleInfo | null>(null);
+  const [fabState, setFabState] = useState<
+    "completed" | "in_progress" | "available"
+  >("available");
+  const [currentSchedule, setCurrentSchedule] =
+    useState<ScheduleInfo | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   const fetchTodayData = async () => {
     try {
@@ -69,8 +126,9 @@ export default function FloatingActionButton() {
         setTodaySession(data.session);
         setPendingTasks(data.pendingTasks || []);
 
-        // Transform schedules data
-        const schedules: ScheduleInfo[] = (data.todaySchedules || []).map((s: any) => ({
+        const schedules: ScheduleInfo[] = (
+          data.todaySchedules || []
+        ).map((s: any) => ({
           id: s.id,
           class_id: s.class_id,
           subject_id: s.subject_id,
@@ -79,35 +137,45 @@ export default function FloatingActionButton() {
           subject_name: s.subjects?.nama_mapel || "",
           jam_mulai: s.jam_mulai,
           jam_selesai: s.jam_selesai,
+          school_name: s.school?.nama || "",
         }));
         setTodaySchedules(schedules);
+
+        const state = getFabState(schedules, data.session);
+        setFabState(state);
+        setCurrentSchedule(getCurrentSchedule(schedules));
       }
     } catch (error) {
       console.error("Failed to fetch today's data:", error);
     }
   };
 
-  // Fetch today's session and tasks
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
     fetchTodayData();
+    const interval = setInterval(fetchTodayData, 60000);
+
+    const handleOpenFromCard = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setSelectedSchedule(detail.schedule || null);
+      setIsModalOpen(true);
+    };
+    window.addEventListener("openSelesaiMengajar", handleOpenFromCard);
+    const handleSessionDone = () => fetchTodayData();
+    window.addEventListener("selesaiMengajarDone", handleSessionDone);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("openSelesaiMengajar", handleOpenFromCard);
+      window.removeEventListener("selesaiMengajarDone", handleSessionDone);
+    };
   }, []);
 
-  // Check if teaching session is already completed
-  const isCompleted = todaySession?.status === "completed";
   const journalGenerated = todaySession?.journal_generated;
-
-  // Calculate pending items
   const pendingCount = pendingTasks.length;
   const hasUncompletedJournal = !journalGenerated;
 
-  // Get current time to check if within teaching hours
-  const now = new Date();
-  const currentHour = now.getHours();
-  const isTeachingHours = currentHour >= 7 && currentHour <= 17;
-
   const handleOpenModal = () => {
-    // If there's only one schedule, select it automatically
     if (todaySchedules.length === 1) {
       setSelectedSchedule(todaySchedules[0]);
     }
@@ -115,17 +183,34 @@ export default function FloatingActionButton() {
     setIsExpanded(false);
   };
 
-  const handleComplete = (result: any) => {
-    setTodaySession(result.session);
-    fetchTodayData(); // Refresh data
+  const handleComplete = () => {
+    fetchTodayData();
   };
+
+  // Standalone modal state
+  const [selectedSchedule, setSelectedSchedule] = useState<ScheduleInfo | null>(null);
+
+  // Only show FAB during teaching hours
+  const now = new Date();
+  const inJam = isJamMengajar(todaySchedules, now, 30);
+  const showFab = mounted && (inJam || fabState !== "available");
+
+  const fabLabel = FAB_LABEL[fabState];
+  const fabColor = FAB_COLOR[fabState];
+  const fabSubtitle =
+    fabState === "completed"
+      ? FAB_SUBTITLE.completed
+      : currentSchedule
+      ? typeof FAB_SUBTITLE[fabState] === "function"
+        ? (FAB_SUBTITLE[fabState] as (s: ScheduleInfo) => string)(currentSchedule)
+        : FAB_SUBTITLE[fabState]
+      : "Waktu mengajar aktif";
 
   return (
     <>
       {/* Expanded Panel */}
       {isExpanded && (
         <>
-          {/* Backdrop */}
           <div
             className="fixed inset-0 z-40 bg-black/20"
             onClick={() => setIsExpanded(false)}
@@ -137,9 +222,7 @@ export default function FloatingActionButton() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <IconSparkles className="text-white" size={18} />
-                  <span className="font-bold text-white text-sm">
-                    AI Assistant
-                  </span>
+                  <span className="font-bold text-white text-sm">AI Assistant</span>
                 </div>
                 <button
                   onClick={() => setIsExpanded(false)}
@@ -151,21 +234,20 @@ export default function FloatingActionButton() {
             </div>
 
             <div className="p-4 space-y-3">
-              {/* Quick Actions */}
               <div className="space-y-2">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   Aksi Cepat
                 </p>
 
-                {/* Selesaikan Mengajar - Opens new modal */}
+                {/* Selesaikan Mengajar */}
                 <button
                   onClick={() => {
                     setIsModalOpen(true);
                     setIsExpanded(false);
                   }}
-                  disabled={isCompleted}
+                  disabled={fabState === "completed"}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left ${
-                    isCompleted
+                    fabState === "completed"
                       ? "bg-emerald-50 text-emerald-600"
                       : "bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700"
                   }`}
@@ -173,10 +255,10 @@ export default function FloatingActionButton() {
                   <IconCheck size={18} />
                   <div className="flex-1">
                     <div className="font-semibold text-sm">
-                      {isCompleted ? "Selesai" : "Selesaikan Mengajar"}
+                      {fabState === "completed" ? "Selesai" : "Selesaikan Mengajar"}
                     </div>
                     <div className="text-[10px] opacity-80">
-                      {isCompleted
+                      {fabState === "completed"
                         ? "Administrasi hari ini lengkap"
                         : "AI bantu lengkapi administrasi"}
                     </div>
@@ -185,7 +267,7 @@ export default function FloatingActionButton() {
                 </button>
 
                 <button
-                  onClick={() => switchToModule('jurnal')}
+                  onClick={() => switchToModule("jurnal")}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-all"
                 >
                   <IconClipboardCheck size={18} className="text-slate-500" />
@@ -194,16 +276,14 @@ export default function FloatingActionButton() {
                       Jurnal Saya
                     </div>
                     <div className="text-[10px] text-slate-500">
-                      {hasUncompletedJournal
-                        ? "Belum dibuat hari ini"
-                        : "Sudah dibuat"}
+                      {hasUncompletedJournal ? "Belum dibuat hari ini" : "Sudah dibuat"}
                     </div>
                   </div>
                   <IconChevronRight size={16} className="text-slate-400" />
                 </button>
 
                 <button
-                  onClick={() => switchToModule('nilai')}
+                  onClick={() => switchToModule("nilai")}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-all"
                 >
                   <IconChartBar size={18} className="text-slate-500" />
@@ -219,7 +299,7 @@ export default function FloatingActionButton() {
                 </button>
 
                 <button
-                  onClick={() => { window.location.href = '/dashboard/chat'; }}
+                  onClick={() => { window.location.href = "/dashboard/chat"; }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-all"
                 >
                   <IconMessage size={18} className="text-slate-500" />
@@ -235,7 +315,6 @@ export default function FloatingActionButton() {
                 </button>
               </div>
 
-              {/* Pending Tasks */}
               {pendingCount > 0 && (
                 <div className="pt-2 border-t border-slate-100">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
@@ -263,7 +342,6 @@ export default function FloatingActionButton() {
                 </div>
               )}
 
-              {/* Today Schedule */}
               {todaySchedules.length > 0 && (
                 <div className="pt-2 border-t border-slate-100">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
@@ -290,75 +368,52 @@ export default function FloatingActionButton() {
         </>
       )}
 
-      {/* Main FAB */}
+      {/* Main FAB - Smart labels merged */}
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => {
+          if (isExpanded) {
+            setIsExpanded(false);
+          } else if (fabState === "available" || fabState === "in_progress") {
+            // Open modal directly
+            handleOpenModal();
+          } else {
+            setIsExpanded(true);
+          }
+        }}
         className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl transition-all duration-300 group ${
-          isCompleted
+          fabState === "completed"
             ? "bg-gradient-to-r from-emerald-500 to-green-600"
-            : isExpanded
-            ? "bg-slate-100 text-slate-700"
-            : "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700"
+            : fabState === "in_progress"
+            ? "bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse"
+            : "bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700"
         }`}
       >
-        {isCompleted ? (
-          <>
-            <div className="relative">
-              <IconCheck size={24} className="text-white" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full flex items-center justify-center">
-                <span className="text-emerald-500 text-[8px]">✓</span>
-              </span>
-            </div>
-            <div className="text-left">
-              <div className="font-bold text-white text-sm">
-                administration Selesai
-              </div>
-              <div className="text-[10px] text-white/80">
-                Tap untuk aksi lain
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="relative">
-              <IconSparkles size={24} className="text-white" />
-              {!isExpanded && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
-              )}
-            </div>
-            {isExpanded ? (
-              <IconX size={20} className="text-slate-500" />
-            ) : (
-              <div className="text-left">
-                <div className="font-bold text-white text-sm">
-                  Selesaikan Mengajar
-                </div>
-                <div className="text-[10px] text-white/80">
-                  AI bantu lengkapi administrasi
-                </div>
-              </div>
-            )}
-          </>
-        )}
+        <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+          {fabState === "completed" ? (
+            <IconCheck size={22} className="text-white" />
+          ) : fabState === "in_progress" ? (
+            <IconLoader2 size={22} className="text-white animate-spin" />
+          ) : (
+            <IconSparkles size={22} className="text-white" />
+          )}
+        </div>
+        <div className="text-left">
+          <div className="font-bold text-white text-sm leading-tight">
+            {fabLabel}
+          </div>
+          <div className="text-[10px] text-white/80 leading-tight">
+            {fabSubtitle}
+          </div>
+        </div>
       </button>
 
-      {/* Old Modal - keep for backward compatibility */}
+      {/* Selesai Mengajar Modal */}
       <SelesaiMengajarModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        schedule={selectedSchedule || undefined}
-        attendanceData={attendanceData}
+        preselectedSchedule={selectedSchedule || undefined}
         onComplete={handleComplete}
       />
-
-      {/* New Selesai Mengajar Modal - with SSE streaming */}
-      <NewSelesaiMengajarModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
-
-      {/* New Selesai Mengajar FAB - Appears during teaching hours */}
-      <SelesaiMengajarFAB />
 
       <style jsx>{`
         @keyframes slide-up {

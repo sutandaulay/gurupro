@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { query, logAudit } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { requireSchoolAccess } from '@/lib/school-access';
+import { parsePagination, offset, wrapResponse } from '@/lib/pagination';
 
 export async function GET(req: Request) {
   try {
@@ -11,44 +12,56 @@ export async function GET(req: Request) {
     const kelasId = searchParams.get('kelas_id');
     const periode = searchParams.get('periode');
     const status = searchParams.get('status');
+    const pag = parsePagination(searchParams);
 
     if (schoolId) await requireSchoolAccess(schoolId)
 
-    let sql = `
-      SELECT dr.*,
-             s.nama_siswa, s.nisn, s.nis_lokal,
-             c.nama_kelas,
-             tr.nama_template, tr.mode_nilai_akademik
-      FROM data_raport dr
-      JOIN students s ON s.id = dr.siswa_id
-      JOIN classes c ON c.id = dr.kelas_id
-      JOIN template_raport tr ON tr.id = dr.template_raport_id
-      WHERE 1=1
-    `;
+    const whereClauses: string[] = [];
     const params: any[] = [];
     let paramIdx = 1;
 
     if (siswaId) {
-      sql += ` AND dr.siswa_id = $${paramIdx++}`;
+      whereClauses.push(`dr.siswa_id = $${paramIdx++}`);
       params.push(siswaId);
     }
     if (kelasId) {
-      sql += ` AND dr.kelas_id = $${paramIdx++}`;
+      whereClauses.push(`dr.kelas_id = $${paramIdx++}`);
       params.push(kelasId);
     }
     if (periode) {
-      sql += ` AND dr.periode = $${paramIdx++}`;
+      whereClauses.push(`dr.periode = $${paramIdx++}`);
       params.push(periode);
     }
     if (status) {
-      sql += ` AND dr.status = $${paramIdx++}`;
+      whereClauses.push(`dr.status = $${paramIdx++}`);
       params.push(status);
     }
 
-    sql += ' ORDER BY dr.created_at DESC';
+    const whereSQL = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
 
-    const res = await query(sql, params);
-    return NextResponse.json(res.rows);
+    const countRes = await query(
+      `SELECT COUNT(*)::int as total
+       FROM data_raport dr
+       ${whereSQL}`,
+      params
+    );
+    const total = countRes.rows[0].total;
+
+    const res = await query(
+      `SELECT dr.*,
+              s.nama_siswa, s.nisn, s.nis_lokal,
+              c.nama_kelas,
+              tr.nama_template, tr.mode_nilai_akademik
+       FROM data_raport dr
+       JOIN students s ON s.id = dr.siswa_id
+       JOIN classes c ON c.id = dr.kelas_id
+       JOIN template_raport tr ON tr.id = dr.template_raport_id
+       ${whereSQL}
+       ORDER BY dr.created_at DESC
+       LIMIT $${paramIdx++} OFFSET $${paramIdx++}`,
+      [...params, pag.limit, offset(pag)]
+    );
+    return NextResponse.json(wrapResponse(res.rows, total, pag));
   } catch (error: any) {
     console.error('GET data_raport error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

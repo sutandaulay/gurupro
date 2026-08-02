@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { uploadBase64ToR2 } from "@/lib/r2";
 import { getContextFilters } from "@/lib/session";
 import { requireSchoolAccess } from "@/lib/school-access";
+import { parsePagination, offset, wrapResponse } from "@/lib/pagination";
 
 async function getUserId() {
   const cookieStore = await cookies();
@@ -36,6 +37,7 @@ export async function GET(req: Request) {
     const filters = await getContextFilters(userId);
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get("school_id");
+    const pag = parsePagination(searchParams);
 
     if (!schoolId) {
       return NextResponse.json({ error: "school_id wajib diisi" }, { status: 400 });
@@ -49,51 +51,55 @@ export async function GET(req: Request) {
     }
     const isOwner = schoolOwnerRes.rows[0].user_id === userId;
 
+    const baseWhere = isOwner
+      ? "tj.school_id = $1"
+      : "tj.school_id = $1 AND (tj.user_id = $2 OR tj.supervisor_id = $2)";
+    const countParams = isOwner ? [schoolId] : [schoolId, userId];
+
+    const countRes = await query(
+      `SELECT COUNT(*)::int as total
+       FROM teacher_journals tj
+       WHERE ${baseWhere}`,
+      countParams
+    );
+    const total = countRes.rows[0].total;
+
+    const selectSQL = `SELECT tj.*, c.nama_kelas, sb.nama_mapel, u.nama_lengkap as nama_guru, us.nama_lengkap as nama_supervisor,
+              (SELECT JSON_BUILD_OBJECT('catatan', js.catatan_supervisi, 'rekomendasi', js.rekomendasi, 'status', js.status_persetujuan, 'created_at', js.created_at) 
+               FROM journal_supervisions js 
+               WHERE js.journal_id = tj.id 
+               ORDER BY js.created_at DESC LIMIT 1) as ulasan,
+              COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Sakit'), 0) as sakit_count,
+              COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Izin'), 0) as izin_count,
+              COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Alfa'), 0) as alfa_count,
+              COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Hadir'), 0) as hadir_count
+       FROM teacher_journals tj
+       JOIN classes c ON tj.class_id = c.id
+       JOIN subjects sb ON tj.subject_id = sb.id
+       JOIN users u ON tj.user_id = u.id
+       LEFT JOIN users us ON tj.supervisor_id = us.id`;
+
     let journals;
     if (isOwner) {
       journals = await query(
-        `SELECT tj.*, c.nama_kelas, sb.nama_mapel, u.nama_lengkap as nama_guru, us.nama_lengkap as nama_supervisor,
-                (SELECT JSON_BUILD_OBJECT('catatan', js.catatan_supervisi, 'rekomendasi', js.rekomendasi, 'status', js.status_persetujuan, 'created_at', js.created_at) 
-                 FROM journal_supervisions js 
-                 WHERE js.journal_id = tj.id 
-                 ORDER BY js.created_at DESC LIMIT 1) as ulasan,
-                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Sakit'), 0) as sakit_count,
-                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Izin'), 0) as izin_count,
-                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Alfa'), 0) as alfa_count,
-                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Hadir'), 0) as hadir_count
-         FROM teacher_journals tj
-         JOIN classes c ON tj.class_id = c.id
-         JOIN subjects sb ON tj.subject_id = sb.id
-         JOIN users u ON tj.teacher_id = u.id
-         LEFT JOIN users us ON tj.supervisor_id = us.id
+        `${selectSQL}
          WHERE tj.school_id = $1
-         ORDER BY tj.tanggal DESC, tj.created_at DESC`,
-        [schoolId]
+         ORDER BY tj.tanggal DESC, tj.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [schoolId, pag.limit, offset(pag)]
       );
     } else {
       journals = await query(
-        `SELECT tj.*, c.nama_kelas, sb.nama_mapel, u.nama_lengkap as nama_guru, us.nama_lengkap as nama_supervisor,
-                (SELECT JSON_BUILD_OBJECT('catatan', js.catatan_supervisi, 'rekomendasi', js.rekomendasi, 'status', js.status_persetujuan, 'created_at', js.created_at) 
-                 FROM journal_supervisions js 
-                 WHERE js.journal_id = tj.id 
-                 ORDER BY js.created_at DESC LIMIT 1) as ulasan,
-                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Sakit'), 0) as sakit_count,
-                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Izin'), 0) as izin_count,
-                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Alfa'), 0) as alfa_count,
-                COALESCE((SELECT COUNT(*)::integer FROM student_attendance sa WHERE sa.schedule_id = tj.schedule_id AND sa.tanggal = tj.tanggal AND sa.status = 'Hadir'), 0) as hadir_count
-         FROM teacher_journals tj
-         JOIN classes c ON tj.class_id = c.id
-         JOIN subjects sb ON tj.subject_id = sb.id
-         JOIN users u ON tj.teacher_id = u.id
-         LEFT JOIN users us ON tj.supervisor_id = us.id
-         WHERE tj.school_id = $1 AND (tj.teacher_id = $2 OR tj.supervisor_id = $2)
-         ORDER BY tj.tanggal DESC, tj.created_at DESC`,
-        [schoolId, userId]
+        `${selectSQL}
+         WHERE tj.school_id = $1 AND (tj.user_id = $2 OR tj.supervisor_id = $2)
+         ORDER BY tj.tanggal DESC, tj.created_at DESC
+         LIMIT $3 OFFSET $4`,
+        [schoolId, userId, pag.limit, offset(pag)]
       );
     }
 
     const result = await applyContextFilter(journals.rows, filters);
-    return NextResponse.json(result);
+    return NextResponse.json(wrapResponse(result, total, pag));
   } catch (error: any) {
     console.error("Journals GET error:", error);
     const status = error.message === "Unauthorized" ? 401 : 500;
@@ -154,11 +160,11 @@ export async function POST(req: Request) {
 
     if (id) {
       // Verify journal belongs to teacher
-      const check = await query("SELECT teacher_id FROM teacher_journals WHERE id = $1", [id]);
+      const check = await query("SELECT user_id FROM teacher_journals WHERE id = $1", [id]);
       if (check.rows.length === 0) {
         return NextResponse.json({ error: "Jurnal tidak ditemukan" }, { status: 404 });
       }
-      if (check.rows[0].teacher_id !== userId) {
+      if (check.rows[0].user_id !== userId) {
         return NextResponse.json({ error: "Forbidden: Hanya pembuat jurnal yang dapat mengubah data" }, { status: 403 });
       }
 
@@ -242,7 +248,7 @@ export async function DELETE(req: Request) {
     }
 
     const check = await query(
-      `SELECT tj.teacher_id FROM teacher_journals tj
+      `SELECT tj.user_id FROM teacher_journals tj
        JOIN schools s ON tj.school_id = s.id
        LEFT JOIN user_school_assignments usa ON usa."schoolId" = s.id AND usa."userId" = $2
        WHERE tj.id = $1 AND (s.user_id = $2 OR usa."userId" = $2)`,
@@ -252,7 +258,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Jurnal tidak ditemukan atau bukan milik Anda" }, { status: 404 });
     }
 
-    if (check.rows[0].teacher_id !== userId) {
+    if (check.rows[0].user_id !== userId) {
       return NextResponse.json({ error: "Forbidden: Hanya pembuat jurnal yang dapat menghapus" }, { status: 403 });
     }
 

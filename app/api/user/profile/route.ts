@@ -2,16 +2,19 @@ import { query } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getActivePricingPlans } from "@/lib/settings";
+import { getTokensPerPoin } from "@/src/config/ratio-cache";
 import { getUserAccountMode, getUserActiveMemberships } from "@/lib/institution-members";
 import { SessionData, getSession, setDefaultSessionCookie } from "@/lib/session";
 
-// Fungsi helper untuk sinkronisasi dari NextAuth jika diperlukan
-async function syncFromNextAuth(): Promise<boolean> {
+const PROFILE_SELECT = `id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan,
+  quota_poin_total, quota_poin_used, addon_poin, addon_poin_used, token_accumulated, referral_code, cashback_balance,
+  bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at,
+  photo_url, notification_tone, morning_briefing_enabled, weekly_recap_enabled, gender`;
+
+async function syncFromNextAuth(): Promise<{ synced: boolean; oauthImage?: string | null }> {
   try {
-    // Dinamically import next-auth untuk menghindari error jika tidak tersedia
     const { getServerSession } = await import("next-auth");
     const { authOptions } = await import("@/lib/auth.config");
-    
     const nextAuthSession = await getServerSession(authOptions);
     if (nextAuthSession?.user?.email) {
       const userRes = await query(
@@ -24,197 +27,165 @@ async function syncFromNextAuth(): Promise<boolean> {
           id: user.id,
           role: user.role || "guru",
         });
-        return true;
+        return { synced: true, oauthImage: nextAuthSession.user.image || null };
       }
     }
   } catch (error) {
     console.warn("NextAuth not available or error occurred:", error);
-    // Jika next-auth tidak tersedia atau error, abaikan dan kembalikan false
   }
-  return false;
+  return { synced: false };
+}
+
+async function getOAuthImage(): Promise<string | null> {
+  try {
+    const { getServerSession } = await import("next-auth");
+    const { authOptions } = await import("@/lib/auth.config");
+    const nextAuthSession = await getServerSession(authOptions);
+    return nextAuthSession?.user?.image || null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchProfileData(userId: string, oauthImage: string | null) {
+  const userRes = await query(
+    `SELECT ${PROFILE_SELECT} FROM users WHERE id = $1`,
+    [userId]
+  );
+
+  if (userRes.rows.length === 0) {
+    return null;
+  }
+
+  const user = userRes.rows[0];
+  const pricingPlans = await getActivePricingPlans();
+  const tokensPerPoin = await getTokensPerPoin();
+
+  const [memberships, accountMode] = await Promise.allSettled([
+    getUserActiveMemberships(userId),
+    getUserAccountMode(userId),
+  ]).then(results => [
+    results[0].status === 'fulfilled' ? results[0].value : [],
+    results[1].status === 'fulfilled' ? results[1].value : 'personal',
+  ]);
+
+  let activeSchool = null;
+  try {
+    const cookieStore = await cookies();
+    const schoolId = cookieStore.get("gurupro_school_selected")?.value;
+    if (schoolId) {
+      const schoolRes = await query(
+        "SELECT id, nama_sekolah, npsn, alamat_sekolah FROM schools WHERE id = $1",
+        [schoolId]
+      );
+      if (schoolRes.rows.length > 0) {
+        activeSchool = schoolRes.rows[0];
+      }
+    }
+  } catch (e) {
+    console.warn("Could not fetch active school:", e);
+  }
+
+  const mainPoinTotal = user.quota_poin_total || 0;
+  const mainPoinUsed = user.quota_poin_used || 0;
+  const mainPoinAvailable = Math.max(0, mainPoinTotal - mainPoinUsed);
+  const addonPoinTotal = user.addon_poin || 0;
+  const addonPoinUsed = user.addon_poin_used || 0;
+  const addonPoinAvailable = Math.max(0, addonPoinTotal - addonPoinUsed);
+
+  let voiceBriefingPrefs: any = { voice_briefing_enabled: false, voice_name_preference: "" };
+  try {
+    const vpRes = await query(
+      `SELECT voice_briefing_enabled, voice_name_preference FROM notification_preferences WHERE user_id = $1`,
+      [userId]
+    );
+    if (vpRes.rows.length > 0) {
+      voiceBriefingPrefs = vpRes.rows[0];
+    }
+  } catch {
+    // table may not exist yet
+  }
+
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    whatsapp: user.whatsapp,
+    nama_lengkap: user.nama_lengkap,
+    nama_sekolah: user.nama_sekolah,
+    role: user.role,
+    status_langganan: user.status_langganan,
+    referral_code: user.referral_code,
+    cashback_balance: user.cashback_balance || 0,
+    timezone: user.timezone || 'Asia/Jakarta',
+    quota_poin_total: mainPoinTotal,
+    quota_poin_used: mainPoinUsed,
+    quota_poin_available: mainPoinAvailable,
+    addon_poin_total: addonPoinTotal,
+    addon_poin_used: addonPoinUsed,
+    addon_poin_available: addonPoinAvailable,
+    token_limit: mainPoinAvailable + addonPoinAvailable,
+    token_accumulated: user.token_accumulated || 0,
+    tokens_per_poin: tokensPerPoin || 2000,
+    bank_name: user.bank_name,
+    bank_account_number: user.bank_account_number,
+    bank_account_name: user.bank_account_name,
+    subscription_start: user.subscription_start,
+    subscription_end: user.subscription_end,
+    created_at: user.created_at,
+    photo_url: user.photo_url || oauthImage || null,
+    notification_tone: user.notification_tone || "hangat",
+    morning_briefing_enabled: user.morning_briefing_enabled !== false,
+    weekly_recap_enabled: user.weekly_recap_enabled !== false,
+    gender: user.gender || null,
+    voice_briefing_enabled: voiceBriefingPrefs.voice_briefing_enabled === true,
+    voice_name_preference: voiceBriefingPrefs.voice_name_preference || "",
+    activeSchool,
+    memberships,
+    accountMode,
+    pricingConfig: pricingPlans,
+    pricingPlans,
+  };
 }
 
 export async function GET() {
   try {
-    // Gunakan fungsi getSession dari session.ts sebagai gantinya
     const session = await getSession();
-    
+
     if (!session?.id) {
-      // Coba sinkronisasi dari NextAuth jika session tidak ditemukan
-      const synced = await syncFromNextAuth();
+      const { synced, oauthImage } = await syncFromNextAuth();
       if (!synced) {
         return NextResponse.json({ error: "Sesi tidak aktif. Silakan login." }, { status: 401 });
       }
-      
-      // Coba ambil session lagi setelah sinkronisasi
+
       const newSession = await getSession();
       if (!newSession?.id) {
         return NextResponse.json({ error: "Sesi tidak aktif. Silakan login." }, { status: 401 });
       }
-      
-      // Gunakan session yang baru
-      const userId = newSession.id;
 
-      const userRes = await query(
-      `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, addon_token_balance,
-                 bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at, photo_url, notification_tone
-          FROM users WHERE id = $1`,
-        [userId]
-      );
-
-      // Jika user tidak ditemukan
-      if (userRes.rows.length === 0) {
+      const profileData = await fetchProfileData(newSession.id, oauthImage);
+      if (!profileData) {
         return NextResponse.json({ error: "Sesi tidak aktif. Silakan login." }, { status: 401 });
       }
-
-      const user = userRes.rows[0];
-      const [pricingConfig, pricingPlans] = await Promise.all([
-        getActivePricingPlans(),
-        getActivePricingPlans(),
-      ]);
-
-      // Tambahkan informasi membership dan akun
-      const [memberships, accountMode] = await Promise.allSettled([
-        getUserActiveMemberships(userId),
-        getUserAccountMode(userId),
-      ]).then(results => [
-        results[0].status === 'fulfilled' ? results[0].value : [],
-        results[1].status === 'fulfilled' ? results[1].value : 'personal',
-      ]);
-
-      // Ambil sekolah aktif dari session
-      let activeSchool = null;
-      try {
-        const cookieStore = await cookies();
-        const schoolId = cookieStore.get("gurupro_school_selected")?.value;
-        if (schoolId) {
-          const schoolRes = await query(
-            "SELECT id, nama_sekolah, npsn, alamat_sekolah FROM schools WHERE id = $1",
-            [schoolId]
-          );
-          if (schoolRes.rows.length > 0) {
-            activeSchool = schoolRes.rows[0];
-          }
-        }
-      } catch (e) {
-        console.warn("Could not fetch active school:", e);
-      }
-
-      // Gabungkan data profil pengguna
-      const profileData = {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        whatsapp: user.whatsapp,
-        nama_lengkap: user.nama_lengkap,
-        nama_sekolah: user.nama_sekolah,
-        role: user.role,
-        status_langganan: user.status_langganan,
-        token_limit: user.token_limit || 0,
-        addon_token_balance: user.addon_token_balance || 0,
-        bank_name: user.bank_name,
-        bank_account_number: user.bank_account_number,
-        bank_account_name: user.bank_account_name,
-        subscription_start: user.subscription_start,
-        subscription_end: user.subscription_end,
-        created_at: user.created_at,
-        photo_url: user.photo_url,
-      notification_tone: user.notification_tone || "hangat",
-      morning_briefing_enabled: user.morning_briefing_enabled !== false,
-        morning_briefing_enabled: user.morning_briefing_enabled !== false,
-        weekly_recap_enabled: user.weekly_recap_enabled !== false,
-        activeSchool: activeSchool,
-        memberships: memberships,
-        accountMode: accountMode,
-        pricingConfig: pricingConfig,
-        pricingPlans: pricingPlans,
-      };
 
       return NextResponse.json(profileData);
     }
 
-    // Jika session ditemukan langsung dari getSession()
-    const userId = session.id;
+    const oauthImage = await getOAuthImage();
 
-    const userRes = await query(
-      `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, addon_token_balance,
-                bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at, photo_url, notification_tone
-        FROM users WHERE id = $1`,
-      [userId]
-    );
-
-    // Jika user tidak ditemukan
-    if (userRes.rows.length === 0) {
+    const profileData = await fetchProfileData(session.id, oauthImage);
+    if (!profileData) {
       return NextResponse.json({ error: "Sesi tidak aktif. Silakan login." }, { status: 401 });
     }
-
-    const user = userRes.rows[0];
-    const [pricingConfig, pricingPlans] = await Promise.all([
-      getActivePricingPlans(),
-      getActivePricingPlans(),
-    ]);
-
-    // Tambahkan informasi membership dan akun
-    const [memberships, accountMode] = await Promise.allSettled([
-      getUserActiveMemberships(userId),
-      getUserAccountMode(userId),
-    ]).then(results => [
-      results[0].status === 'fulfilled' ? results[0].value : [],
-      results[1].status === 'fulfilled' ? results[1].value : 'personal',
-    ]);
-
-    // Ambil sekolah aktif dari session
-    let activeSchool = null;
-    try {
-      const cookieStore = await cookies();
-      const schoolId = cookieStore.get("gurupro_school_selected")?.value;
-      if (schoolId) {
-        const schoolRes = await query(
-          "SELECT id, nama_sekolah, npsn, alamat_sekolah FROM schools WHERE id = $1",
-          [schoolId]
-        );
-        if (schoolRes.rows.length > 0) {
-          activeSchool = schoolRes.rows[0];
-        }
-      }
-    } catch (e) {
-      console.warn("Could not fetch active school:", e);
-    }
-
-    // Gabungkan data profil pengguna
-    const profileData = {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      whatsapp: user.whatsapp,
-      nama_lengkap: user.nama_lengkap,
-      nama_sekolah: user.nama_sekolah,
-      role: user.role,
-      status_langganan: user.status_langganan,
-      token_limit: user.token_limit || 0,
-      addon_token_balance: user.addon_token_balance || 0,
-      bank_name: user.bank_name,
-      bank_account_number: user.bank_account_number,
-      bank_account_name: user.bank_account_name,
-      subscription_start: user.subscription_start,
-      subscription_end: user.subscription_end,
-      created_at: user.created_at,
-      photo_url: user.photo_url,
-      notification_tone: user.notification_tone || "hangat",
-      activeSchool: activeSchool,
-      memberships: memberships,
-      accountMode: accountMode,
-      pricingConfig: pricingConfig,
-      pricingPlans: pricingPlans,
-    };
 
     return NextResponse.json(profileData);
   } catch (error: any) {
     console.error("Error getting user profile:", error);
-    return NextResponse.json(
-      { error: error?.message || "Gagal memuat profil." },
-      { status: 500 }
-    );
+    const message =
+      error?.message?.includes("timeout")
+        ? "Koneksi database timeout. Silakan coba lagi."
+        : error?.message || "Gagal memuat profil.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -245,7 +216,7 @@ export async function PUT(req: Request) {
 
       // Get user with hashed password
       const userRes = await query(
-        "SELECT id, password FROM users WHERE id = $1",
+        "SELECT id, password_hash FROM users WHERE id = $1",
         [userId]
       );
 
@@ -257,7 +228,7 @@ export async function PUT(req: Request) {
 
       // Verify current password
       const bcrypt = await import("bcrypt");
-      const isValid = await bcrypt.compare(current_password, user.password);
+      const isValid = await bcrypt.compare(current_password, user.password_hash);
 
       if (!isValid) {
         return NextResponse.json({ error: "Password saat ini salah" }, { status: 400 });
@@ -268,7 +239,7 @@ export async function PUT(req: Request) {
 
       // Update password
       await query(
-        "UPDATE users SET password = $1 WHERE id = $2",
+        "UPDATE users SET password_hash = $1 WHERE id = $2",
         [hashedPassword, userId]
       );
 
@@ -276,7 +247,7 @@ export async function PUT(req: Request) {
     }
 
     // Handle profile update
-    const { nama_lengkap, username, bank_name, bank_account_number, bank_account_name, whatsapp, nip, notification_tone, morning_briefing_enabled, weekly_recap_enabled } = profileData;
+    const { nama_lengkap, username, bank_name, bank_account_number, bank_account_name, whatsapp, nip, notification_tone, morning_briefing_enabled, weekly_recap_enabled, timezone } = profileData;
 
     if (!nama_lengkap) {
       return NextResponse.json({ error: "Nama lengkap wajib diisi." }, { status: 400 });
@@ -365,6 +336,12 @@ export async function PUT(req: Request) {
       idx++;
     }
 
+    if (timezone !== undefined) {
+      sets.push(`timezone = $${idx}`);
+      values.push(timezone || 'Asia/Jakarta');
+      idx++;
+    }
+
     values.push(userId);
     await query(
       `UPDATE users SET ${sets.join(", ")} WHERE id = $${idx}`,
@@ -385,25 +362,34 @@ export async function PUT(req: Request) {
     });
 
     const updatedUser = await query(
-      `SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan, token_limit, addon_token_balance,
-               bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at, photo_url, notification_tone
-        FROM users WHERE id = $1`,
+      `SELECT ${PROFILE_SELECT} FROM users WHERE id = $1`,
       [userId]
     );
 
-    const [pricingConfig, pricingPlans] = await Promise.all([
-      getActivePricingPlans(),
-      getActivePricingPlans(),
-    ]);
+    const pricingPlans = await getActivePricingPlans();
+
+    const updated = updatedUser.rows[0];
+    const mainAvail = Math.max(0, (updated.quota_poin_total || 0) - (updated.quota_poin_used || 0));
+    const addonAvail = Math.max(0, (updated.addon_poin || 0) - (updated.addon_poin_used || 0));
+
     return NextResponse.json({
       message: "Profil berhasil diperbarui!",
-      user: updatedUser.rows[0],
-      pricingConfig,
+      user: {
+        ...updated,
+        quota_poin_available: mainAvail,
+        addon_poin_available: addonAvail,
+        token_limit: mainAvail + addonAvail,
+      },
+      pricingConfig: pricingPlans,
       pricingPlans,
     });
   } catch (error: any) {
     console.error("Profile PUT API error:", error);
-    return NextResponse.json({ error: error.message || "Gagal memperbarui profil." }, { status: 500 });
+    const message =
+      error?.message?.includes("timeout")
+        ? "Koneksi database timeout. Silakan coba lagi."
+        : error?.message || "Gagal memperbarui profil.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

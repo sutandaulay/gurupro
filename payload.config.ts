@@ -28,16 +28,36 @@ import DocumentAccessGrants from "./collections/DocumentAccessGrants";
 import OtpVerifications from "./collections/OtpVerifications";
 import Invitations from "./collections/Invitations";
 // Import koleksi presensi baru
-import { 
-  TeacherInstitutionAssignments, 
-  AttendanceDevices, 
-  AttendanceLogs, 
-  AttendanceSummary, 
-  LeaveRequests 
+import {
+  TeacherInstitutionAssignments,
+  AttendanceDevices,
+  AttendanceLogs,
+  AttendanceSummary,
+  LeaveRequests
 } from "./collections/Attendance";
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
+
+const REQUIRED_PAYLOAD_DB_ENV_VARS = [
+  'DB_USER',
+  'DB_PASSWORD',
+  'DB_HOST',
+  'DB_NAME',
+  'DB_PORT',
+] as const;
+
+const hasDirectUrl = !!process.env.DATABASE_URL;
+const hasComponentVars = REQUIRED_PAYLOAD_DB_ENV_VARS.every((key) => !!process.env[key]);
+
+if (!hasDirectUrl && !hasComponentVars) {
+  const missing = REQUIRED_PAYLOAD_DB_ENV_VARS.filter((key) => !process.env[key]);
+  throw new Error(
+    `Payload CMS startup aborted: database configuration is incomplete. ` +
+    `Set DATABASE_URL, or provide all required variables: ${missing.join(', ')}. ` +
+    `Please configure them in your .env before starting the app.`
+  );
+}
 
 export default buildConfig({
     admin: {
@@ -101,7 +121,7 @@ export default buildConfig({
     pool: {
       connectionString:
         process.env.DATABASE_URL ||
-        "postgresql://postgres:nus4nt4r4@localhost:5432/gurupro_db",
+        `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`,
     },
     // Disable automatic schema push at runtime. Auto-push triggers an
     // interactive prompt when schema drift is detected, which hangs `next dev`

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getContextFilters } from "@/lib/session";
 import { requireSchoolAccess } from "@/lib/school-access";
+import { parsePagination, wrapResponse } from "@/lib/pagination";
 
 export async function GET(req: Request) {
   try {
@@ -18,30 +19,37 @@ export async function GET(req: Request) {
     const { userId } = await requireSchoolAccess(schoolId)
     const filters = await getContextFilters(userId);
 
-    let res;
-    if (!classId || !subjectId) {
-      res = await query(
-        `SELECT a.*, c.nama_kelas, sb.nama_mapel, s.nama_sekolah
-         FROM assessments a
-         JOIN classes c ON a.class_id = c.id
-         JOIN subjects sb ON a.subject_id = sb.id
-         JOIN schools s ON a.school_id = s.id
-         WHERE a.school_id = $1
-         ORDER BY a.created_at DESC`,
-        [schoolId]
-      );
-    } else {
-      res = await query(
-        `SELECT a.*, c.nama_kelas, sb.nama_mapel, s.nama_sekolah
-         FROM assessments a
-         JOIN classes c ON a.class_id = c.id
-         JOIN subjects sb ON a.subject_id = sb.id
-         JOIN schools s ON a.school_id = s.id
-         WHERE a.school_id = $1 AND a.class_id = $2 AND a.subject_id = $3
-         ORDER BY a.created_at DESC`,
-        [schoolId, classId, subjectId]
-      );
-    }
+    const whereClause = !classId || !subjectId
+      ? `WHERE a.school_id = $1`
+      : `WHERE a.school_id = $1 AND a.class_id = $2 AND a.subject_id = $3`;
+    const queryParams = !classId || !subjectId
+      ? [schoolId]
+      : [schoolId, classId, subjectId];
+
+    const countResult = await query(
+      `SELECT COUNT(*) FROM assessments a
+       JOIN classes c ON a.class_id = c.id
+       JOIN subjects sb ON a.subject_id = sb.id
+       JOIN schools s ON a.school_id = s.id
+       ${whereClause}`,
+      queryParams
+    );
+    let total = parseInt(countResult.rows[0].count, 10);
+
+    const pagination = parsePagination(searchParams);
+    const off = (pagination.page - 1) * pagination.limit;
+
+    const res = await query(
+      `SELECT a.*, c.nama_kelas, sb.nama_mapel, s.nama_sekolah
+       FROM assessments a
+       JOIN classes c ON a.class_id = c.id
+       JOIN subjects sb ON a.subject_id = sb.id
+       JOIN schools s ON a.school_id = s.id
+       ${whereClause}
+       ORDER BY a.created_at DESC
+       LIMIT ${pagination.limit} OFFSET ${off}`,
+      queryParams
+    );
 
     let rows = res.rows;
     if (filters.assignedMapel.length > 0 || filters.assignedKelas.length > 0) {
@@ -58,7 +66,7 @@ export async function GET(req: Request) {
       });
     }
 
-    return NextResponse.json(rows);
+    return NextResponse.json(wrapResponse(rows, total, pagination));
   } catch (error: any) {
     const status = error.message === "Forbidden" ? 403 : error.message === "Unauthorized" ? 401 : 500;
     console.error("Assessments GET error:", error);

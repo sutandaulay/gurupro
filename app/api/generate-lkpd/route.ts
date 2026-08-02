@@ -233,14 +233,15 @@ Keluarkan HANYA JSON valid tanpa markdown fence atau teks pembuka.
       parsed = lkpdOutputSchema.parse(JSON.parse(cleanText));
 
       console.log("[Generate LKPD] Successfully generated LKPD with", parsed.aktivitas.length, "activities");
-    } catch (aiError: any) {
+    } catch (aiError: unknown) {
       console.error("LKPD AI generation failed:", aiError);
+      const aiMsg = aiError instanceof Error ? aiError.message : String(aiError ?? "Unknown error");
 
       // Log failed usage
-      await logFailedPoinUsage(userId, 0, "generate-lkpd", aiError.message);
+      await logFailedPoinUsage(userId, 0, "generate-lkpd", aiMsg);
 
       return NextResponse.json(
-        { error: `Gagal memproses AI: ${aiError.message || aiError}` },
+        { error: `Gagal memproses AI: ${aiMsg}` },
         { status: 502 }
       );
     }
@@ -292,18 +293,17 @@ Keluarkan HANYA JSON valid tanpa markdown fence atau teks pembuka.
       console.error("Failed to save LKPD:", dbErr);
     }
 
-    // Deduct Poin based on actual usage
-    if (user.role !== "admin") {
+    // Deduct Poin only if AI was used and succeeded
+    if (user.role !== "admin" && aiResult?.usage) {
       try {
         await deductPoinFromAIResult(
-          { success: true, usage: aiResult?.usage || null },
+          { success: true, usage: aiResult.usage },
           userId,
           "generate-lkpd",
           {}
         );
-
-          console.log(`[Generate LKPD] Poin deducted`);
-        } catch (poinError: any) {
+        console.log(`[Generate LKPD] Poin deducted`);
+      } catch (poinError: unknown) {
         console.error("[Generate LKPD] Poin deduction failed:", poinError);
       }
     }
@@ -314,10 +314,11 @@ Keluarkan HANYA JSON valid tanpa markdown fence atau teks pembuka.
       docx_url: docxUrl,
       modulAjarRef: modulAjarRef,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("LKPD Generation Error:", error);
+    const msg = error instanceof Error ? error.message : String(error ?? "Unknown error");
     return NextResponse.json(
-      { error: error.message || "Gagal generate LKPD" },
+      { error: msg },
       { status: 500 }
     );
   }

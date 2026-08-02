@@ -182,14 +182,15 @@ export async function POST(req: Request) {
           ]
         )
 
-        // Deduct Poin based on actual usage
-        try {
-          // Estimate based on prompt length
-          await deductPoinFromAIResult(null, guruId, 'ai-laporan-kinerja', {})
-
-          console.log(`[AI Laporan Kinerja] Poin deducted (estimasi fallback)`)
-        } catch (poinError: any) {
-          console.error('[AI Laporan Kinerja] Poin deduction failed:', poinError)
+        // Deduct Poin only if generation succeeded and content was saved
+        if (insertResult?.rows?.[0]?.id) {
+          try {
+            const estimatedUsage = { inputTokens: 2000, outputTokens: 3000, cachedTokens: 0, provider: 'gemini', model: 'gemini-2.5-flash-lite' };
+            await deductPoinFromAIResult({ success: true, usage: estimatedUsage }, guruId, 'ai-laporan-kinerja', {})
+            console.log(`[AI Laporan Kinerja] Poin deducted`)
+          } catch (poinError: any) {
+            console.error('[AI Laporan Kinerja] Poin deduction failed:', poinError)
+          }
         }
 
         send({ step: 'complete', laporan_id: insertResult.rows[0].id })

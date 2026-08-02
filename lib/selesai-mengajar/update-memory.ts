@@ -5,6 +5,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import type { SelesaiMengajarInput, MemoryResult } from './types';
+import { parseLocalDate } from '@/lib/utils';
 
 const prisma = new PrismaClient();
 
@@ -12,8 +13,7 @@ export async function updateLessonMemory(
   data: SelesaiMengajarInput
 ): Promise<MemoryResult | null> {
   try {
-    const today = new Date(data.tanggal);
-    today.setHours(0, 0, 0, 0);
+    const today = parseLocalDate(data.tanggal);
 
     // Upsert lesson memory for this guru + schedule combination
     const memory = await prisma.lesson_memories.upsert({

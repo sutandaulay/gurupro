@@ -16,6 +16,9 @@ const s3Client = isR2Configured
         accessKeyId: accessKeyId!,
         secretAccessKey: secretAccessKey!,
       },
+      // Prevent AWS SDK v3 from adding `x-amz-checksum-mode=ENABLED` (unsupported by R2)
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
     })
   : null;
 

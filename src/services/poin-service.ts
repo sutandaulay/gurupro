@@ -144,10 +144,10 @@ export async function getUserPoinAccess(userId: string): Promise<{
 
 /**
  * Konsumsi Poin dari user dengan transaction + row-level lock
- *
- * Urutan pengurangan:
- * 1. Kuota utama (bulanan) dulu
- * 2. Kuota add-on jika kuota utama tidak cukup
+ * Menggunakan sistem AKUMULASI TOKEN:
+ * - Setiap generate → token diakumulasi
+ * - Poin dipotong hanya saat akumulasi >= tokensPerPoin
+ * - Sisa akumulasi di-reset modulo tokensPerPoin
  *
  * @param userId - User ID
  * @param rawTokens - Total token mentah dari Gemini usage_metadata
@@ -166,11 +166,8 @@ export async function consumeUserPoin(
     jenjang?: string;
     jumlahSoal?: number;
   }
-): Promise<PoinDeductionResult> {
-  // Rasio diambil dari cache setting admin (bukan hardcoded)
+): Promise<PoinDeductionResult & { tokenAccumulated: number; tokensUntilNextPoin: number }> {
   const tokensPerPoin = await getTokensPerPoin();
-  const poinNeeded = convertTokensToPoin(rawTokens, tokensPerPoin);
-  const ratioUsed = tokensPerPoin; // disimpan per-transaksi (audit integrity)
 
   const client = await pool.connect();
   try {
@@ -181,7 +178,8 @@ export async function consumeUserPoin(
       `SELECT
          id, role,
          quota_poin_total, quota_poin_used,
-         addon_poin, addon_poin_used, addon_poin_grace_period_ends
+         addon_poin, addon_poin_used, addon_poin_grace_period_ends,
+         token_accumulated
        FROM users WHERE id = $1 FOR UPDATE`,
       [userId]
     );
@@ -202,6 +200,8 @@ export async function consumeUserPoin(
         remainingPoin: Infinity,
         rawTokens,
         source: 'main',
+        tokenAccumulated: 0,
+        tokensUntilNextPoin: tokensPerPoin,
       };
     }
 
@@ -216,38 +216,55 @@ export async function consumeUserPoin(
     const isAddonGraceActive = gracePeriodEnds && gracePeriodEnds > Date.now();
 
     const totalAvailable = mainAvailable + (isAddonGraceActive ? addonAvailable : 0);
+    const currentAccumulated = user.token_accumulated || 0;
 
-    // 3. Cek apakah Poin cukup
-    if (totalAvailable < poinNeeded) {
-      await client.query('ROLLBACK');
-      return {
-        success: false,
-        poinDeducted: 0,
-        remainingPoin: totalAvailable,
-        rawTokens,
-        source: 'main',
-      };
-    }
+    // 3. Tambah rawTokens ke akumulasi
+    const newAccumulated = currentAccumulated + rawTokens;
 
-    // 4. Hitung pengurangan dari masing-masing sumber
-    let usedFromMain = Math.min(mainAvailable, poinNeeded);
-    let remainingToUse = poinNeeded - usedFromMain;
+    // 4. Hitung berapa Poin yang perlu dipotong
+    const poinNeeded = Math.floor(newAccumulated / tokensPerPoin);
+    const remainder = newAccumulated % tokensPerPoin;
+
+    // 5. Tentukan status dan action
+    let poinDeducted = 0;
+    let usedFromMain = 0;
     let usedFromAddon = 0;
+    let success = true;
+    let finalAccumulated = newAccumulated;
 
-    if (remainingToUse > 0 && (isAddonGraceActive || gracePeriodEnds === null)) {
-      usedFromAddon = Math.min(addonAvailable, remainingToUse);
+    if (poinNeeded > 0) {
+      // Threshold tercapai — potong Poin
+      if (totalAvailable < poinNeeded) {
+        // Poin tidak cukup — potong semua yang ada, akumulasi hangus
+        poinDeducted = totalAvailable;
+        usedFromMain = Math.min(mainAvailable, totalAvailable);
+        usedFromAddon = totalAvailable - usedFromMain;
+        finalAccumulated = 0; // akumulasi hangus karena Poin habis
+        success = false;
+      } else {
+        // Poin cukup — potong sesuai akumulasi
+        poinDeducted = poinNeeded;
+        usedFromMain = Math.min(mainAvailable, poinNeeded);
+        usedFromAddon = poinNeeded - usedFromMain;
+        finalAccumulated = remainder; // reset sisa modulo
+      }
+    } else {
+      // Belum mencapai threshold — tidak potong Poin, cuma akumulasi
+      poinDeducted = 0;
+      finalAccumulated = newAccumulated;
     }
 
-    // 5. Update database
+    // 6. Update database
     await client.query(
       `UPDATE users SET
          quota_poin_used = COALESCE(quota_poin_used, 0) + $1,
-         addon_poin_used = COALESCE(addon_poin_used, 0) + $2
-       WHERE id = $3`,
-      [usedFromMain, usedFromAddon, userId]
+         addon_poin_used = COALESCE(addon_poin_used, 0) + $2,
+         token_accumulated = $3
+       WHERE id = $4`,
+      [usedFromMain, usedFromAddon, finalAccumulated, userId]
     );
 
-    // 6. Log ke ledger
+    // 7. Log ke ledger
     const transactionId = `ptx_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const source = usedFromMain > 0 ? 'main' : 'addon';
 
@@ -262,36 +279,39 @@ export async function consumeUserPoin(
         userId,
         feature,
         rawTokens,
-        poinNeeded,
+        poinDeducted,
         source,
         options?.model || 'gemini-2.5-flash-lite',
         options?.provider || 'gemini',
         options?.mapel || '-',
         options?.jenjang || '-',
         options?.jumlahSoal || 0,
-        true,
-        ratioUsed,
-        0, // cachedTokens - hanya dihitung di consumeUserPoinFromUsage
+        success,
+        tokensPerPoin,
+        0,
       ]
     );
 
     await client.query('COMMIT');
 
-    const remainingPoin = totalAvailable - poinNeeded;
+    const remainingPoin = totalAvailable - poinDeducted;
+    const tokensUntilNextPoin = tokensPerPoin - finalAccumulated;
 
-    // 7. Check jika Poin menipis (<= 5) dan kirim notifikasi
-    if (remainingPoin <= 5 && remainingPoin >= 0) {
+    // 8. Check jika Poin menipis (<= 5) dan kirim notifikasi
+    if (remainingPoin <= 5 && remainingPoin >= 0 && poinDeducted > 0) {
       sendLowPoinWarning(userId, remainingPoin).catch(err =>
         console.error('[PoinService] Failed to send low poin warning:', err)
       );
     }
 
     return {
-      success: true,
-      poinDeducted: poinNeeded,
+      success,
+      poinDeducted,
       remainingPoin,
       rawTokens,
-      source,
+      source: usedFromMain > 0 ? 'main' : (usedFromAddon > 0 ? 'addon' : 'main'),
+      tokenAccumulated: finalAccumulated,
+      tokensUntilNextPoin: Math.max(0, tokensUntilNextPoin),
     };
 
   } catch (error: any) {
@@ -308,11 +328,19 @@ export async function consumeUserPoin(
  *
  * Total token = inputTokens + outputTokens.
  * cachedTokens dihitung dangan bobot lebih ringan (lihat CACHED_TOKEN_RATIO
- * di billing.ts via calculateEffectiveTokens) — sesuai kebijakan masing-masing
+ * di billing.ts via calculateEffectiveTokens) - sesuai kebijakan masing-masing
  * provider. Downstream CUKUP memanggil ini; TIDAK perlu membaca
  * struktur response provider tertentu.
  *
+ * Sistem AKUMULASI TOKEN aktif: Poin dipotong hanya saat akumulasi >= tokensPerPoin.
+ *
  * @returns Result + ratio_used_at_transaction yang disimpan ke ledger
+ */
+/**
+ * Konsumsi Poin dari hasil AI usage.
+ *
+ * GUARD: Jika usage null/undefined/zero tokens, langsung return no-op
+ * tanpa menulis ke DB. Ini mencegah bug di caller yang lupa cek kondisi.
  */
 export async function consumeUserPoinFromUsage(
   userId: string,
@@ -323,14 +351,34 @@ export async function consumeUserPoinFromUsage(
     jenjang?: string;
     jumlahSoal?: number;
   }
-): Promise<PoinDeductionResult & { ratioUsed: number }> {
+): Promise<PoinDeductionResult & { ratioUsed: number; tokenAccumulated: number; tokensUntilNextPoin: number }> {
   const inputTokens = usage?.inputTokens || 0;
   const outputTokens = usage?.outputTokens || 0;
   const cachedTokens = usage?.cachedTokens || 0;
-  const model = usage?.model || 'gemini-2.5-flash-lite';
-  const provider = usage?.provider || 'gemini';
 
-  // Total token efektif (cached di-discount)
+  // GUARD: No real usage = no Poin deduction. Early return.
+  if (!usage || (inputTokens === 0 && outputTokens === 0)) {
+    const ratioUsed = await getTokensPerPoin();
+    const userRes = await query(
+      "SELECT token_accumulated FROM users WHERE id = $1",
+      [userId]
+    );
+    const tokenAccumulated = userRes.rows[0]?.token_accumulated || 0;
+    return {
+      success: true,
+      poinDeducted: 0,
+      remainingPoin: 0,
+      rawTokens: 0,
+      source: 'main' as const,
+      ratioUsed,
+      tokenAccumulated,
+      tokensUntilNextPoin: ratioUsed - tokenAccumulated,
+    };
+  }
+
+  const model = usage.model || 'gemini-2.5-flash-lite';
+  const provider = usage.provider || 'gemini';
+
   const effectiveTokens = calculateEffectiveTokens({
     promptTokenCount: inputTokens,
     candidatesTokenCount: outputTokens,

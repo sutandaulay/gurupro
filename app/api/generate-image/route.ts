@@ -119,8 +119,8 @@ export async function POST(req: Request) {
     // Deduct Poin based on actual usage (non-admin)
     if (role !== "admin") {
       try {
-        // Imagen API estimates roughly 200 tokens per image
-        const poinCalc = calculatePoinFromTokens(200, 100, 0);
+        // Imagen API estimates roughly 1000 tokens per image (input+output)
+        const poinCalc = calculatePoinFromTokens(300, 700, 0);
 
         await consumeUserPoin(userId as string, poinCalc.rawTokens, "generate-image", {
           model: "imagen-4.0-generate-001",

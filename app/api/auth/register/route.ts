@@ -172,8 +172,6 @@ export async function POST(request: NextRequest) {
     // 5. Check referral
     const selfRefCode = 'GPRO-' + Math.random().toString(36).substring(2, 7).toUpperCase();
     let referredByUserId = null;
-    let refereeTokenBonus = 0;
-
     if (referralCode) {
       const referrer = await query(
         'SELECT id FROM users WHERE referral_code = $1',
@@ -181,11 +179,7 @@ export async function POST(request: NextRequest) {
       );
       if (referrer.rows.length > 0) {
         referredByUserId = referrer.rows[0].id;
-        refereeTokenBonus = 10;
-        await query(
-          'UPDATE users SET token_limit = token_limit + 20, cashback_balance = cashback_balance + 10000 WHERE id = $1',
-          [referredByUserId]
-        );
+        // Reward referral ONLY when referee PAYS for subscription (handled in activateTransaction)
       }
     }
 
@@ -194,34 +188,26 @@ export async function POST(request: NextRequest) {
     // 6. Create User in public.users with verification pending
     const newUser = await query(
       `INSERT INTO users (
-         username, email, whatsapp, nama_lengkap, token_limit, referral_code, 
-         referred_by, password_hash, subscription_start, subscription_end, 
-         status_langganan, is_active, pdp_consent_given, pdp_consent_version, 
+         username, email, whatsapp, nama_lengkap, quota_poin_total, referral_code,
+         referred_by, password_hash, subscription_start, subscription_end,
+         status_langganan, is_active, pdp_consent_given, pdp_consent_version,
          pdp_consent_date, phone_verified, email_verified, account_type, pending_invitation_token
        )
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 'free', TRUE, TRUE, $9, NOW(), FALSE, FALSE, $10, $11)
        RETURNING id, email, whatsapp`,
       [
-        usernameRaw || null, cleanEmail, cleanPhone, namaLengkap, 
-        5 + refereeTokenBonus, selfRefCode, referredByUserId, hashed,
+        usernameRaw || null, cleanEmail, cleanPhone, namaLengkap,
+        5, selfRefCode, referredByUserId, hashed,
         pdpPolicyVersion, accountType, invitationToken || null
       ]
     );
 
     const user = newUser.rows[0];
 
-    if (referredByUserId) {
-      await query(
-        `INSERT INTO referrals (referrer_id, referee_id, reward_tokens, cashback_amount)
-         VALUES ($1, $2, 20, 10000)`,
-        [referredByUserId, user.id]
-      );
-    }
-
     await query(
       `INSERT INTO audit_trails (user_id, aksi, deskripsi, ip_address)
        VALUES ($1, $2, $3, $4)`,
-      [user.id, 'Registrasi Akun Baru', `Registrasi tertunda verifikasi OTP ${referredByUserId ? 'menggunakan referral ' + referralCode : ''}`, '127.0.0.1']
+      [user.id, 'Registrasi Akun Baru', `Registrasi tertunda verifikasi OTP${referredByUserId ? ' (kode referral digunakan - reward saat bayar)' : ''}`, '127.0.0.1']
     );
 
     // 7. Create OTP verification in payload schema

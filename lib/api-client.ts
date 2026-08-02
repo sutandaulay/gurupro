@@ -17,7 +17,10 @@ function addSchoolId(url: string): string {
 }
 
 export async function apiFetch(url: string, options?: RequestInit): Promise<Response> {
-  return fetch(addSchoolId(url), options)
+  return fetch(addSchoolId(url), {
+    ...options,
+    credentials: 'include',
+  })
 }
 
 export function apiUrl(url: string): string {

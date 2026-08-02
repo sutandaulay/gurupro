@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getKontakByLinkToken, getDataRaportForKelas, getNilaiMapelForRaport, getPemetaanKolomProfile, isPemetaanProfileExpired, isOtpVerified } from '@/lib/raport/kontak-eksternal-repository';
+import { getKontakByLinkToken, getDataRaportForKelas, getPemetaanKolomProfile, isPemetaanProfileExpired, isOtpVerified } from '@/lib/raport/kontak-eksternal-repository';
 import { getPenilaianEkstrakurikuler } from '@/lib/sikap-ekskul';
 
 export async function POST(request: NextRequest) {
@@ -51,21 +51,31 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      const allRaports = await getDataRaportForKelas(kontak.kelas_id);
       const raportsToExport = dataRaportIds && dataRaportIds.length > 0
-        ? (await Promise.all(
-            dataRaportIds.map(async (id: string) => {
-              const allRaports = await getDataRaportForKelas(kontak.kelas_id);
-              return allRaports.find((r: any) => r.id === id);
-            })
-          )).filter(Boolean)
-        : await getDataRaportForKelas(kontak.kelas_id);
+        ? allRaports.filter((r: any) => dataRaportIds.includes(r.id))
+        : allRaports;
 
-      const allNilai = await Promise.all(
-        raportsToExport.map(async (siswa: any) => {
-          const nilaiMapel = await getNilaiMapelForRaport(siswa.id);
-          return { siswa, nilaiMapel };
-        })
-      );
+      const raportIds = raportsToExport.map(s => s.id);
+      const allNilaiRes = raportIds.length > 0 ? await query(
+        `SELECT dnrm.*, sb.nama_mapel
+         FROM data_raport_nilai_mapel dnrm
+         LEFT JOIN subjects sb ON sb.id = dnrm.mapel_id
+         WHERE dnrm.data_raport_id = ANY($1::uuid[])
+         ORDER BY dnrm.data_raport_id, sb.nama_mapel ASC`,
+        [raportIds]
+      ) : { rows: [] };
+
+      const nilaiByRaportId = new Map();
+      for (const row of allNilaiRes.rows) {
+        const list = nilaiByRaportId.get(row.data_raport_id);
+        if (list) { list.push(row); } else { nilaiByRaportId.set(row.data_raport_id, [row]); }
+      }
+
+      const allNilai = raportsToExport.map(siswa => ({
+        siswa,
+        nilaiMapel: nilaiByRaportId.get(siswa.id) || [],
+      }));
 
       interface RowData {
         nama: string;

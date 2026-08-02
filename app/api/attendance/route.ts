@@ -1,11 +1,13 @@
 import { query } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireSchoolAccess } from "@/lib/school-access";
+import { parsePagination, offset, wrapResponse } from "@/lib/pagination";
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const type = searchParams.get("type");
+    const pag = parsePagination(searchParams);
 
     if (type === "teacher") {
       const schoolId = searchParams.get("school_id");
@@ -15,11 +17,17 @@ export async function GET(req: Request) {
 
       const { userId } = await requireSchoolAccess(schoolId);
 
-      const logs = await query(
-        "SELECT * FROM teacher_attendance WHERE user_id = $1 AND school_id = $2 ORDER BY tanggal DESC",
+      const countRes = await query(
+        "SELECT COUNT(*)::int as total FROM teacher_attendance WHERE user_id = $1 AND school_id = $2",
         [userId, schoolId]
       );
-      return NextResponse.json(logs.rows);
+      const total = countRes.rows[0].total;
+
+      const logs = await query(
+        "SELECT * FROM teacher_attendance WHERE user_id = $1 AND school_id = $2 ORDER BY tanggal DESC LIMIT $3 OFFSET $4",
+        [userId, schoolId, pag.limit, offset(pag)]
+      );
+      return NextResponse.json(wrapResponse(logs.rows, total, pag));
     } 
     
     if (type === "student") {
@@ -36,15 +44,25 @@ export async function GET(req: Request) {
       }
       await requireSchoolAccess(schedCheck.rows[0].school_id);
 
+      const countRes = await query(
+        `SELECT COUNT(*)::int as total
+         FROM student_attendance sa
+         JOIN students s ON sa.student_id = s.id
+         WHERE sa.schedule_id = $1 AND sa.tanggal = $2`,
+        [scheduleId, tanggal]
+      );
+      const total = countRes.rows[0].total;
+
       const logs = await query(
         `SELECT sa.*, s.nama_siswa, s.nomor_absen 
          FROM student_attendance sa
          JOIN students s ON sa.student_id = s.id
          WHERE sa.schedule_id = $1 AND sa.tanggal = $2
-         ORDER BY s.nomor_absen ASC, s.nama_siswa ASC`,
-        [scheduleId, tanggal]
+         ORDER BY s.nomor_absen ASC, s.nama_siswa ASC
+         LIMIT $3 OFFSET $4`,
+        [scheduleId, tanggal, pag.limit, offset(pag)]
       );
-      return NextResponse.json(logs.rows);
+      return NextResponse.json(wrapResponse(logs.rows, total, pag));
     }
 
     return NextResponse.json({ error: "Invalid type parameter" }, { status: 400 });
@@ -93,21 +111,21 @@ export async function POST(req: Request) {
 
       // Insert new log with optional verification data
       const res = await query(
-        `INSERT INTO teacher_attendance 
-          (user_id, school_id, tanggal, status, catatan, face_match_score, latitude, longitude, accuracy, liveness_passed) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+        `INSERT INTO teacher_attendance
+          (user_id, school_id, tanggal, status, catatan, face_match_score, latitude, longitude, accuracy, liveness_passed, check_in_time)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
          RETURNING *`,
         [
-          userId, 
-          school_id, 
-          tanggal, 
-          status, 
+          userId,
+          school_id,
+          tanggal,
+          status,
           catatan || null,
           face_match_score || null,
           latitude || null,
           longitude || null,
           accuracy || null,
-          liveness_passed || false
+          liveness_passed || false,
         ]
       );
       return NextResponse.json(res.rows[0]);

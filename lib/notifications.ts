@@ -1,5 +1,7 @@
 import nodemailer from "nodemailer";
+import { query } from "@/lib/db";
 import { getEmailSenderConfig, getWASenderConfig, getNotificationTemplates } from "./settings";
+import { sendInAppNotification } from "@/lib/institution-members";
 
 /**
  * Send actual email notification using dynamic settings from database.
@@ -134,7 +136,7 @@ ${message}
 /**
  * Interpolates variables inside a template string
  */
-function interpolate(template: string, variables: Record<string, any>): string {
+export function interpolate(template: string, variables: Record<string, any>): string {
   let result = template;
   for (const [key, value] of Object.entries(variables)) {
     const placeholder = new RegExp(`{${key}}`, "g");
@@ -222,5 +224,79 @@ export async function sendEventNotification(
     return results;
   } catch (error) {
     console.error(`Error dispatching event notification ${event}:`, error);
+  }
+}
+
+export interface TeachingReportNotificationParams {
+  guruId: string;
+  guruNama: string;
+  institutionId: number;
+  kelas: string;
+  mapel: string;
+  tanggal: string;
+  kehadiran: string;
+  reportUrl: string;
+}
+
+export async function sendTeachingReportNotification(params: TeachingReportNotificationParams): Promise<void> {
+  const { guruId, guruNama, institutionId, kelas, mapel, tanggal, kehadiran, reportUrl } = params;
+
+  try {
+    // Query kepala_sekolah and wakasek from this institution
+    const leaders = await query(
+      `SELECT u.id, u.email, u.whatsapp, u.nama_lengkap, imr.value as role
+       FROM institution_members im
+       JOIN institution_members_role imr ON imr.parent_id = im.id
+       JOIN users u ON u.id = im.user_id
+       WHERE im.institution_id = $1
+         AND im.status = 'active'
+         AND imr.value IN ('kepala_sekolah', 'wakasek')
+       ORDER BY imr.value = 'kepala_sekolah' DESC`,
+      [institutionId]
+    );
+
+    if (leaders.rows.length === 0) return;
+
+    const templates = await getNotificationTemplates();
+    const template = templates.teaching_report_completed;
+
+    const mergeVars = {
+      guru_nama: guruNama,
+      kepala_nama: "", // filled per recipient below
+      tanggal,
+      kelas,
+      mapel,
+      kehadiran,
+      report_url: reportUrl,
+    };
+
+    for (const leader of leaders.rows) {
+      const vars = {
+        ...mergeVars,
+        kepala_nama: leader.nama_lengkap || "Bapak/Ibu",
+      };
+
+      const jobs: Promise<any>[] = [];
+
+      if (template.wa_enabled && leader.whatsapp) {
+        const waMsg = interpolate(template.wa_message, vars);
+        jobs.push(sendWhatsAppNotification(leader.whatsapp, waMsg));
+      }
+
+      if (template.email_enabled && leader.email) {
+        const subject = interpolate(template.email_subject, vars);
+        const htmlBody = interpolate(template.email_body, vars);
+        jobs.push(sendEmailNotification(leader.email, subject, htmlBody));
+      }
+
+      // Always send in-app notification
+      const inAppTitle = "📋 Laporan Mengajar Baru";
+      const inAppBody = `Guru ${guruNama} telah menyelesaikan administrasi mengajar ${mapel} kelas ${kelas} pada ${tanggal}.`;
+      jobs.push(sendInAppNotification(leader.id, inAppTitle, inAppBody, "teaching_report", "laporan_mengajar", guruId));
+
+      await Promise.allSettled(jobs);
+    }
+  } catch (error) {
+    console.error("[sendTeachingReportNotification] Error:", error);
   }
 }

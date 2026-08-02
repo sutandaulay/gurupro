@@ -14,6 +14,10 @@ export default function SettingsLayout({ children }: SettingsLayoutProps) {
       href: '/settings',
     },
     {
+      title: 'Detail Sekolah Terpilih',
+      href: '/settings/schools',
+    },
+    {
       title: 'Keamanan',
       href: '/settings/security',
     },

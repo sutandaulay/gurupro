@@ -39,13 +39,23 @@ export async function GET() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Get today's session
-    const todaySession = await prisma.teaching_sessions.findFirst({
-      where: {
-        user_id: userId,
-        session_date: today,
-      },
-    });
+    // Get today's session (prefer completed one if multiple exist)
+    const todaySession =
+      (await prisma.teaching_sessions.findFirst({
+        where: {
+          user_id: userId,
+          session_date: today,
+          status: 'completed',
+        },
+        orderBy: { completed_at: 'desc' },
+      })) ??
+      (await prisma.teaching_sessions.findFirst({
+        where: {
+          user_id: userId,
+          session_date: today,
+        },
+        orderBy: { created_at: 'desc' },
+      }));
 
     // Get pending tasks
     const pendingTasks = await prisma.admin_tasks.findMany({

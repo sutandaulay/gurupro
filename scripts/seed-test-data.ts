@@ -90,6 +90,9 @@ async function cleanupExistingTestData(): Promise<void> {
     }
     await c.query(`DELETE FROM schools WHERE npsn LIKE $1`, [`${TEST_PREFIX}%`]);
     await c.query(`DELETE FROM users WHERE email LIKE $1`, [TEST_EMAIL_PATTERN]);
+    // Also cleanup elhanum test user by ID
+    await c.query(`DELETE FROM users WHERE id = $1`, ['50e096cc-9dc2-4403-b731-5506088ddc32']);
+    await c.query(`DELETE FROM schools WHERE id = $1`, ['8606e992-1379-41ef-8834-e834e9312dee']);
     console.log('✅ Cleanup complete');
   } finally {
     c.release();
@@ -204,7 +207,9 @@ async function seedTestData(): Promise<{
     ]);
     users.push(user3Result.rows[0]);
 
-    // User 4: Wali Kelas
+    // User 4: Wali Kelas (elhanum)
+    const ELHANUM_USER_ID = '50e096cc-9dc2-4403-b731-5506088ddc32';
+    const ELHANUM_EMAIL = 'ptgenerasidigitalindonesiaemas@gmail.com';
     const hashedPassword4 = await hashPassword('test123');
     const user4Result = await client.query(`
       INSERT INTO users (
@@ -220,12 +225,12 @@ async function seedTestData(): Promise<{
         true, true, 0, NULL
       ) RETURNING id, email, whatsapp, nama_lengkap
     `, [
-      generateUUID(),
-      `${TEST_PREFIX}wali-kelas@test.gurupro.id`,
-      generatePhoneNumber(),
-      'TEST_Wali Kelas Test',
-      'hashed_password_placeholder',
-      'wali_kelas_test'
+      ELHANUM_USER_ID,
+      ELHANUM_EMAIL,
+      '+6281234567890',
+      'ElHanum, M.Pd',
+      hashedPassword4,
+      'elhanum'
     ]);
     users.push(user4Result.rows[0]);
 
@@ -280,6 +285,28 @@ async function seedTestData(): Promise<{
     ]);
     schools.push(school1Result.rows[0]);
 
+    // School 2: elhanum's school (SMA IDEA 1)
+    const ELHANUM_SCHOOL_ID = '8606e992-1379-41ef-8834-e834e9312dee';
+    const school2Result = await client.query(`
+      INSERT INTO schools (
+        id, user_id, nama_sekolah, npsn, alamat,
+        nama_kepala_sekolah, nip_kepala_sekolah,
+        nama_wali_kelas, nip_wali_kelas
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING id, nama_sekolah, npsn
+    `, [
+      ELHANUM_SCHOOL_ID,
+      ELHANUM_USER_ID,
+      'SMA IDEA 1',
+      '20202020',
+      'Jl. Pendidikan No. 1, Jakarta',
+      'Drs. Kepala Sekolah',
+      '196501011990031000',
+      'ElHanum, M.Pd',
+      '198505052010122000'
+    ]);
+    schools.push(school2Result.rows[0]);
+
     console.log(`   ✅ Created ${schools.length} schools`);
 
     // ============================================
@@ -293,12 +320,32 @@ async function seedTestData(): Promise<{
       'Pendidikan Pancasila', 'Seni Budaya', 'Prakarya'
     ];
 
+    // Subjects for school 1 (SMP)
     for (const namaMapel of subjectNames) {
       const result = await client.query(`
         INSERT INTO subjects (id, school_id, nama_mapel)
         VALUES ($1, $2, $3)
         RETURNING id, nama_mapel
       `, [generateUUID(), schools[0].id, namaMapel]);
+      subjects.push(result.rows[0]);
+    }
+
+    // Subjects for school 2 (elhanum's SMA IDEA 1)
+    const smaSubjectNames = [
+      'MATEMATIKA', 'BAHASA INDONESIA', 'BAHASA INGGRIS',
+      'FISIKA', 'KIMIA', 'BIOLOGI',
+      'SEJARAH', 'GEOGRAFI', 'EKONOMI',
+      'SOSIOLOGI', 'INFORMATIKA', 'PENDIDIKAN AGAMA ISLAM',
+      'PENDIDIKAN PANCASILA', 'SENI BUDAYA', 'PRAKARYA',
+      'PENDIDIKAN JASMANI', 'BAHASA JAWA', 'BAHASA ARAB'
+    ];
+
+    for (const namaMapel of smaSubjectNames) {
+      const result = await client.query(`
+        INSERT INTO subjects (id, school_id, nama_mapel)
+        VALUES ($1, $2, $3)
+        RETURNING id, nama_mapel
+      `, [generateUUID(), schools[1].id, namaMapel]);
       subjects.push(result.rows[0]);
     }
 
@@ -309,13 +356,29 @@ async function seedTestData(): Promise<{
     // ============================================
     console.log('   Creating classes...');
 
-    const classNames = ['VII-A', 'VII-B', 'VIII-A', 'VIII-B', 'IX-A'];
-    for (const namaKelas of classNames) {
+    // Classes for school 1 (SMP)
+    const smpClassNames = ['VII-A', 'VII-B', 'VIII-A', 'VIII-B', 'IX-A'];
+    for (const namaKelas of smpClassNames) {
       const result = await client.query(`
         INSERT INTO classes (id, school_id, nama_kelas, wali_kelas)
         VALUES ($1, $2, $3, $4)
         RETURNING id, nama_kelas
       `, [generateUUID(), schools[0].id, namaKelas, namaKelas === 'VII-A' ? users[3].nama_lengkap : null]);
+      classes.push(result.rows[0]);
+    }
+
+    // Classes for school 2 (elhanum's SMA IDEA 1) - X.1 is elhanum's wali kelas
+    const ELHANUM_CLASS_ID = 'a70db632-5e6a-4654-8eeb-90646814500d';
+    const smaClassNames = ['X.1', 'X.2', 'X.3', 'XI.1', 'XI.2', 'XI.3', 'XII.1', 'XII.2'];
+    for (const namaKelas of smaClassNames) {
+      const classId = namaKelas === 'X.1' ? ELHANUM_CLASS_ID : generateUUID();
+      const waliKelas = namaKelas === 'X.1' ? 'ElHanum, M.Pd' : null;
+      const waliKelasUserId = namaKelas === 'X.1' ? ELHANUM_USER_ID : null;
+      const result = await client.query(`
+        INSERT INTO classes (id, school_id, nama_kelas, wali_kelas, wali_kelas_user_id)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, nama_kelas
+      `, [classId, schools[1].id, namaKelas, waliKelas, waliKelasUserId]);
       classes.push(result.rows[0]);
     }
 
@@ -349,6 +412,24 @@ async function seedTestData(): Promise<{
       }
     }
 
+    // Specific students for elhanum's class X.1 (from walikelas seed)
+    const elhanumStudents = [
+      { id: '5beed45d-6e0b-4023-b244-c337450985cf', nama: 'Siswono', nisn: '77226633' },
+      { id: 'c7e6f4a7-f9e2-45ce-a46e-831bdb4fab16', nama: 'Lestari', nisn: '221133' },
+    ];
+    
+    const elhanumClass = classes.find(c => c.nama_kelas === 'X.1');
+    if (elhanumClass) {
+      for (let i = 0; i < elhanumStudents.length; i++) {
+        const s = elhanumStudents[i];
+        await client.query(`
+          INSERT INTO students (id, class_id, nama_siswa, nisn, nomor_absen)
+          VALUES ($1, $2, $3, $4, $5)
+        `, [s.id, elhanumClass.id, s.nama, s.nisn, i + 1]);
+        students.push({ id: s.id, nama_siswa: s.nama, nisn: s.nisn });
+      }
+    }
+
     console.log(`   ✅ Created ${students.length} students`);
 
     // ============================================
@@ -357,7 +438,29 @@ async function seedTestData(): Promise<{
     console.log('   Creating schedules...');
 
     const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
-    for (const classItem of classes) {
+    
+    // Schedules for school 1 (SMP)
+    const smpClasses = classes.filter(c => c.id.startsWith(generateUUID().substring(0, 1)) || true).filter(c => {
+      // Filter SMP classes (VII-A, VII-B, VIII-A, VIII-B, IX-A)
+      return ['VII-A', 'VII-B', 'VIII-A', 'VIII-B', 'IX-A'].includes(c.nama_kelas);
+    });
+    
+    // Schedules for school 2 (SMA IDEA 1)
+    const smaClasses = classes.filter(c => ['X.1', 'X.2', 'X.3', 'XI.1', 'XI.2', 'XI.3', 'XII.1', 'XII.2'].includes(c.nama_kelas));
+    
+    const smpSubjects = subjects.filter(s => {
+      // Get subjects for school 1
+      const smpSubjectNames = ['Matematika', 'Bahasa Indonesia', 'Bahasa Inggris', 'IPA', 'IPS', 'Pendidikan Agama Islam', 'Pendidikan Pancasila', 'Seni Budaya', 'Prakarya'];
+      return smpSubjectNames.includes(s.nama_mapel);
+    });
+    
+    const smaSubjects = subjects.filter(s => {
+      const smaSubjectNames = ['MATEMATIKA', 'BAHASA INDONESIA', 'BAHASA INGGRIS', 'FISIKA', 'KIMIA', 'BIOLOGI', 'SEJARAH', 'GEOGRAFI', 'EKONOMI', 'SOSIOLOGI', 'INFORMATIKA', 'PENDIDIKAN AGAMA ISLAM', 'PENDIDIKAN PANCASILA', 'SENI BUDAYA', 'PRAKARYA', 'PENDIDIKAN JASMANI', 'BAHASA JAWA', 'BAHASA ARAB'];
+      return smaSubjectNames.includes(s.nama_mapel);
+    });
+
+    // Create schedules for SMP classes
+    for (const classItem of smpClasses) {
       for (let i = 0; i < 5; i++) {
         await client.query(`
           INSERT INTO schedules (id, school_id, class_id, subject_id, hari, jam_mulai, jam_selesai)
@@ -366,7 +469,25 @@ async function seedTestData(): Promise<{
           generateUUID(),
           schools[0].id,
           classItem.id,
-          subjects[i % subjects.length].id,
+          smpSubjects[i % smpSubjects.length].id,
+          days[i],
+          `${7 + i}:00`,
+          `${8 + i}:00`
+        ]);
+      }
+    }
+
+    // Create schedules for SMA classes
+    for (const classItem of smaClasses) {
+      for (let i = 0; i < 5; i++) {
+        await client.query(`
+          INSERT INTO schedules (id, school_id, class_id, subject_id, hari, jam_mulai, jam_selesai)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [
+          generateUUID(),
+          schools[1].id,
+          classItem.id,
+          smaSubjects[i % smaSubjects.length].id,
           days[i],
           `${7 + i}:00`,
           `${8 + i}:00`
@@ -389,8 +510,8 @@ async function seedTestData(): Promise<{
       `, [user.nama_lengkap, user.email]);
     }
 
-    // Assign roles to institution 1
-    const roles = [
+    // Assign roles to institution 1 (SMP)
+    const rolesInst1 = [
       { role: 'kepala_sekolah', userEmail: users[0].email },
       { role: 'wakasek', userEmail: users[1].email },
       { role: 'operator', userEmail: users[2].email },
@@ -400,7 +521,7 @@ async function seedTestData(): Promise<{
     ];
 
     const memberMap = new Map<string, { memberId: number; roles: string[] }>();
-    for (const roleEntry of roles) {
+    for (const roleEntry of rolesInst1) {
       const memberResult = await client.query(`
         INSERT INTO payload.institution_members (
           user_id, app_user_id, institution_id, status
@@ -418,6 +539,34 @@ async function seedTestData(): Promise<{
       const key = `${roleEntry.userEmail}-${institutions[0].id}`;
       if (!memberMap.has(key)) memberMap.set(key, { memberId, roles: [] });
       memberMap.get(key)!.roles.push(roleEntry.role);
+    }
+
+    // Assign roles to institution 2 (SMA) - elhanum as guru (wali_kelas is assigned via wali_kelas_assignments table)
+    const elhanum = users.find(u => u.id === ELHANUM_USER_ID);
+    if (elhanum && institutions[1]) {
+      const rolesInst2 = [
+        { role: 'guru', userEmail: ELHANUM_EMAIL },
+      ];
+
+      for (const roleEntry of rolesInst2) {
+        const memberResult = await client.query(`
+          INSERT INTO payload.institution_members (
+            user_id, app_user_id, institution_id, status
+          )
+          SELECT
+            cu.id, u.id, $1, 'active'
+          FROM payload.cms_users cu
+          JOIN users u ON u.email = cu.email
+          WHERE cu.email = $2
+          ON CONFLICT (user_id, institution_id) DO UPDATE SET status = EXCLUDED.status
+          RETURNING id
+        `, [institutions[1].id, roleEntry.userEmail]);
+
+        const memberId = memberResult.rows[0].id;
+        const key = `${roleEntry.userEmail}-${institutions[1].id}`;
+        if (!memberMap.has(key)) memberMap.set(key, { memberId, roles: [] });
+        memberMap.get(key)!.roles.push(roleEntry.role);
+      }
     }
 
     for (const { memberId, roles: memberRoles } of memberMap.values()) {
@@ -483,6 +632,9 @@ async function seedTestData(): Promise<{
     console.log('   Creating user school assignments...');
     for (const user of users) {
       for (const school of schools) {
+        // Check if this user is wali_kelas for this school
+        const isWaliKelas = (user.id === ELHANUM_USER_ID && school.id === '8606e992-1379-41ef-8834-e834e9312dee') || 
+                            (user.role === 'wali_kelas' && school.id === schools[0].id);
         await client.query(`
           INSERT INTO user_school_assignments (id, "userId", "schoolId", tahunajaranid, iswalikelas)
           VALUES ($1, $2, $3, $4, $5)
@@ -491,7 +643,7 @@ async function seedTestData(): Promise<{
           user.id,
           school.id,
           null,
-          user.role === 'wali_kelas'
+          isWaliKelas
         ]);
       }
     }
@@ -715,7 +867,7 @@ async function seedTestData(): Promise<{
         const sched = pick(allScheds.rows);
         if (!sched) continue;
         const result = await client.query(`
-          INSERT INTO teacher_journals (id, teacher_id, school_id, schedule_id, class_id, subject_id, tanggal, materi_pembelajaran, tujuan_pembelajaran, aktivitas_pembelajaran, status)
+          INSERT INTO teacher_journals (id, user_id, school_id, schedule_id, class_id, subject_id, tanggal, materi_pembelajaran, tujuan_pembelajaran, aktivitas_pembelajaran, status)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
           RETURNING id
         `, [
@@ -1252,18 +1404,29 @@ async function seedTestData(): Promise<{
     // 40. WALI KELAS ASSIGNMENTS
     console.log('   Creating wali kelas assignments...');
     for (const classItem of allClasses) {
+      // For elhanum's class X.1, use elhanum as the wali kelas
+      // wali_kelas_member_id is UUID, generate a consistent one for elhanum
+      let waliKelasMemberId = generateUUID();
+      let ditugaskanOleh = users[0].id;
+      
+      if (classItem.nama_kelas === 'X.1') {
+        // Use a consistent UUID for elhanum as wali kelas member
+        waliKelasMemberId = '50e096cc-9dc2-4403-b731-5506088ddc32'; // Same as user ID
+        ditugaskanOleh = ELHANUM_USER_ID;
+      }
+      
       await client.query(`
         INSERT INTO wali_kelas_assignments (id, kelas_id, wali_kelas_member_id, tahun_ajaran, semester, status, ditugaskan_pada, ditugaskan_oleh)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `, [
         generateUUID(),
         classItem.id,
-        generateUUID(),
+        waliKelasMemberId,
         '2025/2026',
         'ganjil',
         'aktif',
         new Date(),
-        users[0].id
+        ditugaskanOleh
       ]);
     }
     console.log(`   ✅ Created wali kelas assignments`);
@@ -1279,6 +1442,30 @@ async function seedTestData(): Promise<{
         generateUUID(),
         student.id,
         pick(allSubjects).id,
+        pick(assessmentIds) || generateUUID(),
+        Math.round((60 + Math.random() * 40) * 100) / 100,
+        'Deskripsi nilai yang dihasilkan oleh AI',
+        new Date()
+      ]);
+    }
+
+    // Raport cache deterministik untuk siswa X.1 (elhanum)
+    const x1StudentsForRaport = (await client.query(
+      `SELECT id FROM students WHERE class_id = $1 LIMIT 3`,
+      [ELHANUM_CLASS_ID]
+    )).rows;
+    for (const student of x1StudentsForRaport) {
+      const subj = (await client.query(
+        `SELECT id FROM subjects WHERE school_id = $1 LIMIT 1`,
+        [ELHANUM_SCHOOL_ID]
+      )).rows[0];
+      await client.query(`
+        INSERT INTO raport_cache (id, student_id, subject_id, assessment_id, nilai, ai_description, generated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [
+        generateUUID(),
+        student.id,
+        subj?.id || generateUUID(),
         pick(assessmentIds) || generateUUID(),
         Math.round((60 + Math.random() * 40) * 100) / 100,
         'Deskripsi nilai yang dihasilkan oleh AI',
@@ -1492,6 +1679,9 @@ async function seedTestData(): Promise<{
       await client.query(`
         INSERT INTO "GeminiCache" (id, cache_name, cache_type, model_name, token_count, expire_time, is_active, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ON CONFLICT (cache_name)
+        DO UPDATE SET cache_type = $3, model_name = $4, token_count = $5,
+                      expire_time = $6, is_active = $7, updated_at = NOW()
       `, [
         generateUUID(),
         `test_cache_${user.id}`,
@@ -1611,6 +1801,37 @@ async function seedTestData(): Promise<{
         JSON.stringify([{ dimensi: 'iman', predikat: 'Baik' }, { dimensi: 'sikap_kerjasama', predikat: 'Sangat Baik' }]),
         'Siswa menunjukkan perilaku yang baik sesuai nilai Profil Pelajar Pancasila',
         generateUUID()
+      ]);
+
+      await client.query(`
+        INSERT INTO catatan_wali_kelas (id, siswa_id, kelas_id, periode, catatan, ditulis_oleh)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [
+        generateUUID(),
+        student.id,
+        student.class_id,
+        '2025/2026-Ganjil',
+        'Perlu ditingkatkan partisipasi aktif di kelas.',
+        ELHANUM_USER_ID
+      ]);
+    }
+
+    // Catatan wali kelas khusus untuk siswa X.1 (ditulis oleh elhanum)
+    const elhanumX1Students = (await client.query(
+      `SELECT id, class_id FROM students WHERE class_id = $1`,
+      [ELHANUM_CLASS_ID]
+    )).rows;
+    for (const student of elhanumX1Students) {
+      await client.query(`
+        INSERT INTO catatan_wali_kelas (id, siswa_id, kelas_id, periode, catatan, ditulis_oleh)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [
+        generateUUID(),
+        student.id,
+        student.class_id,
+        '2025/2026-Ganjil',
+        'Siswa menunjukkan perkembangan positif, perlu pendampingan pada mata pelajaran eksak.',
+        ELHANUM_USER_ID
       ]);
     }
 

@@ -11,7 +11,7 @@ import { query } from "@/lib/db";
 const HARI_INDONESIA = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
 export interface BriefingData {
-  jadwal: { className: string; subject: string; startTime: string; endTime: string }[];
+  jadwal: { schoolName: string; className: string; subject: string; startTime: string; endTime: string }[];
   materiTertinggal: { mapel: string; progress: number; total: number }[];
   tugasBelumDikoreksi: number;
   siswaPerhatian: { nama: string; alasan: string }[];
@@ -24,7 +24,7 @@ export async function buildMorningBriefing(teacherId: string, today = new Date()
   let jadwal: BriefingData["jadwal"] = [];
   try {
     const schedRes = await query(
-      `SELECT sc.jam_mulai, sc.jam_selesai, c.nama_kelas, sb.nama_mapel
+      `SELECT sc.jam_mulai, sc.jam_selesai, c.nama_kelas, sb.nama_mapel, s.nama_sekolah
        FROM schedules sc
        JOIN classes c ON sc.class_id = c.id
        JOIN subjects sb ON sc.subject_id = sb.id
@@ -35,6 +35,7 @@ export async function buildMorningBriefing(teacherId: string, today = new Date()
       [teacherId, todayDay]
     );
     jadwal = schedRes.rows.map((r: any) => ({
+      schoolName: r.nama_sekolah,
       className: r.nama_kelas,
       subject: r.nama_mapel,
       startTime: String(r.jam_mulai).slice(0, 5),
@@ -127,7 +128,7 @@ export function formatBriefingMessage(nama: string, b: BriefingData): string {
   if (b.jadwal.length) {
     lines.push(`📚 Jadwal mengajar (${b.jadwal.length} sesi):`);
     b.jadwal.slice(0, 4).forEach((j) => {
-      lines.push(`• ${j.startTime}–${j.endTime}  ${j.subject} (${j.className})`);
+      lines.push(`• ${j.startTime}–${j.endTime}  ${j.subject} (${j.className}) — ${j.schoolName}`);
     });
     if (b.jadwal.length > 4) lines.push(`• +${b.jadwal.length - 4} sesi lainnya`);
   } else {

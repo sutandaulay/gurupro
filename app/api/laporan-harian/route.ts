@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
 
     const journals = await prisma.teacher_journals.findMany({
       where: {
-        teacher_id: user.id,
+        user_id: user.id,
         ...(sekolahId ? { school_id: sekolahId } : {}),
         tanggal: {
           gte: startDate,

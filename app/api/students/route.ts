@@ -1,6 +1,7 @@
 import { query, requireActiveTahunAjaran } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireSchoolAccess } from "@/lib/school-access";
+import { parsePagination, offset, wrapResponse } from "@/lib/pagination";
 
 export async function GET(req: Request) {
   try {
@@ -17,11 +18,19 @@ export async function GET(req: Request) {
     }
     await requireSchoolAccess(classCheck.rows[0].school_id);
 
-    const students = await query(
-      "SELECT * FROM students WHERE class_id = $1 ORDER BY nomor_absen ASC, nama_siswa ASC",
+    const pag = parsePagination(searchParams);
+
+    const countRes = await query(
+      "SELECT COUNT(*)::int as total FROM students WHERE class_id = $1",
       [classId]
     );
-    return NextResponse.json(students.rows);
+    const total = countRes.rows[0].total;
+
+    const students = await query(
+      "SELECT * FROM students WHERE class_id = $1 ORDER BY nomor_absen ASC, nama_siswa ASC LIMIT $2 OFFSET $3",
+      [classId, pag.limit, offset(pag)]
+    );
+    return NextResponse.json(wrapResponse(students.rows, total, pag));
   } catch (error: any) {
     console.error("Students GET error:", error);
     const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;

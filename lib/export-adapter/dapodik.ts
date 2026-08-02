@@ -41,8 +41,8 @@ export async function buildDapodikWorkbook(opts: DapodikExportOptions): Promise<
   ];
   const ptkRes = await query(
     `SELECT DISTINCT u.id, u.nama_lengkap, u.nip
-     FROM institution_members im
-     JOIN institution_members_role imr ON imr.parent_id = im.id
+     FROM payload.institution_members im
+     JOIN payload.institution_members_role imr ON imr.parent_id = im.id
      JOIN users u ON u.id = im.app_user_id
      WHERE im.institution_id = $1 AND im.status = 'active' AND imr.value = 'guru'`,
     [institutionId]
@@ -65,12 +65,12 @@ export async function buildDapodikWorkbook(opts: DapodikExportOptions): Promise<
             COALESCE(SUM(asum.teaching_minutes_total),0)::int AS menit,
             COALESCE(SUM(asum.teaching_sessions_completed),0)::int AS sesi,
             COUNT(CASE WHEN asum.attendance_status IN ('hadir','telat') THEN 1 END)::int AS hadir
-     FROM teacher_institution_assignments tia
-     JOIN users u ON u.id = tia.teacher_id
-     LEFT JOIN attendance_summary asum ON asum.teacher_id = tia.teacher_id
-        AND asum.institution_id = tia.institution_id
+     FROM payload.institution_members im
+     JOIN users u ON u.id = im.app_user_id
+     LEFT JOIN attendance_summary asum ON asum.teacher_id = im.app_user_id
+        AND asum.institution_id = im.institution_id
         AND asum.date >= $2 AND asum.date <= $3
-     WHERE tia.institution_id = $1 AND tia.status = 'aktif'
+     WHERE im.institution_id = $1 AND im.status = 'active'
      GROUP BY u.id, u.nama_lengkap`,
     [institutionId, start, end]
   );
@@ -102,12 +102,12 @@ export async function buildDapodikWorkbook(opts: DapodikExportOptions): Promise<
             COUNT(CASE WHEN asum.attendance_status='izin' THEN 1 END)::int AS izin,
             COUNT(CASE WHEN asum.attendance_status='sakit' THEN 1 END)::int AS sakit,
             COUNT(CASE WHEN asum.attendance_status='alpa' THEN 1 END)::int AS alpa
-     FROM teacher_institution_assignments tia
-     JOIN users u ON u.id = tia.teacher_id
-     LEFT JOIN attendance_summary asum ON asum.teacher_id = tia.teacher_id
-        AND asum.institution_id = tia.institution_id
+     FROM payload.institution_members im
+     JOIN users u ON u.id = im.app_user_id
+     LEFT JOIN attendance_summary asum ON asum.teacher_id = im.app_user_id
+        AND asum.institution_id = im.institution_id
         AND asum.date >= $2 AND asum.date <= $3
-     WHERE tia.institution_id = $1 AND tia.status = 'aktif'
+     WHERE im.institution_id = $1 AND im.status = 'active'
      GROUP BY u.id, u.nama_lengkap`,
     [institutionId, start, end]
   );

@@ -4,7 +4,7 @@ import { apiFetch } from "@/lib/api-client";
 import { useState, useEffect } from "react";
 
 interface Briefing {
-  jadwal: { className: string; subject: string; startTime: string; endTime: string }[];
+  jadwal: { schoolName: string; className: string; subject: string; startTime: string; endTime: string }[];
   materiTertinggal: { mapel: string; progress: number; total: number }[];
   tugasBelumDikoreksi: number;
   siswaPerhatian: { nama: string; alasan: string }[];
@@ -142,9 +142,12 @@ export default function MorningBriefingCard() {
             <p className="font-semibold text-indigo-700 mb-1">📚 Jadwal mengajar</p>
             <ul className="space-y-0.5">
               {briefing.jadwal.slice(0, 4).map((j, i) => (
-                <li key={i} className="flex justify-between gap-2">
-                  <span className="truncate">{j.subject} · {j.className}</span>
-                  <span className="text-indigo-600 font-medium whitespace-nowrap">{j.startTime}–{j.endTime}</span>
+                <li key={i} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{j.subject} · {j.className}</span>
+                    <span className="block text-[10px] text-indigo-500/70 truncate">{j.schoolName}</span>
+                  </span>
+                  <span className="text-indigo-600 font-medium whitespace-nowrap shrink-0">{j.startTime}–{j.endTime}</span>
                 </li>
               ))}
               {briefing.jadwal.length > 4 && (

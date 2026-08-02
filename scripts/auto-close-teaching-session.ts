@@ -1,8 +1,7 @@
-import { db } from '@/lib/db';
+import { db, query } from '@/lib/db';
 import { 
   attendanceLogs, 
   attendanceSummary,
-  teacherInstitutionAssignments,
   institutions as institutionsTable
 } from '@/lib/schemas/attendance';
 import { eq, and, isNull, lt } from 'drizzle-orm';
@@ -40,7 +39,14 @@ export async function autoCloseTeachingSessions() {
     for (const session of unclosedSessions) {
       try {
         // Ambil jadwal seharusnya dari assignment guru
-        const [assignment] = await db.select().from(teacherInstitutionAssignments).where(eq(teacherInstitutionAssignments.id, session.assignmentId));
+        const assignmentResult = await query(`
+          SELECT tia.weekly_schedule as "weeklySchedule"
+          FROM payload.teacher_institution_assignments tia
+          JOIN payload.institution_members im ON im.user_id = tia.teacher_id_id AND im.institution_id = tia.institution_id_id
+          WHERE im.app_user_id = $1 AND im.status = 'active' AND tia.status = 'aktif'
+          LIMIT 1
+        `, [session.teacherId, session.institutionId]);
+        const assignment = assignmentResult.rows[0];
         
         if (!assignment || !assignment.weeklySchedule) {
           console.warn(`Assignment tidak ditemukan atau tidak memiliki jadwal untuk sesi ${session.id}`);

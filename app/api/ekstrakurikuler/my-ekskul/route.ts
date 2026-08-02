@@ -33,7 +33,7 @@ export async function GET(req: Request) {
     const memberId = String(memberResult.docs[0].id);
 
     // Get ekskul for this pembina
-    const ekskulList = await getEkstrakurikuler({ pembinaMemberId: memberId });
+    const { data: ekskulList } = await getEkstrakurikuler({ pembinaMemberId: memberId });
 
     return NextResponse.json({ data: ekskulList });
   } catch (error: any) {

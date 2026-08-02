@@ -229,17 +229,12 @@ export async function handleAuth(
 
       const selfRefCode = "GPRO-" + Math.random().toString(36).substring(2, 7).toUpperCase();
       let referredByUserId = null;
-      let refereeTokenBonus = 0;
 
       if (referralCode) {
         const referrer = await query("SELECT id FROM users WHERE referral_code = $1", [referralCode]);
         if (referrer.rows.length > 0) {
           referredByUserId = referrer.rows[0].id;
-          refereeTokenBonus = 10;
-          await query(
-            "UPDATE users SET token_limit = token_limit + 20, cashback_balance = cashback_balance + 10000 WHERE id = $1",
-            [referredByUserId]
-          );
+          // Reward referral ONLY when referee PAYS for subscription (handled in activateTransaction)
         }
       }
 
@@ -248,31 +243,31 @@ export async function handleAuth(
       // Create new user unverified
       const newUser = await query(
         `INSERT INTO users (
-           username, email, whatsapp, nama_lengkap, token_limit, referral_code, referred_by, 
+           username, email, whatsapp, nama_lengkap, quota_poin_total, referral_code, referred_by,
            password_hash, subscription_start, subscription_end, status_langganan, is_active,
            pdp_consent_given, pdp_consent_version, pdp_consent_date, phone_verified, email_verified,
            account_type, pending_invitation_token
          )
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 'free', TRUE, TRUE, $9, NOW(), FALSE, FALSE, 'individual', $10)
          RETURNING id, email, whatsapp`,
-        [usernameRaw || null, cleanEmail, cleanPhone, namaLengkap, 5 + refereeTokenBonus, selfRefCode, referredByUserId, hashed, pdpPolicyVersion, invitationToken || null]
+        [usernameRaw || null, cleanEmail, cleanPhone, namaLengkap, 5, selfRefCode, referredByUserId, hashed, pdpPolicyVersion, invitationToken || null]
       );
 
       const createdUser = newUser.rows[0];
 
       if (referredByUserId) {
         await query(
-          `INSERT INTO referrals (referrer_id, referee_id, reward_tokens, cashback_amount)
-           VALUES ($1, $2, 20, 10000)`,
-          [referredByUserId, createdUser.id]
+          `INSERT INTO audit_trails (user_id, aksi, deskripsi, ip_address)
+           VALUES ($1, $2, $3, $4)`,
+          [createdUser.id, "Registrasi Akun", `Registrasi sukses via Server Action, menunggu OTP. Kode referral digunakan: akan dapat reward saat bayar langganan.`, "127.0.0.1"]
+        );
+      } else {
+        await query(
+          `INSERT INTO audit_trails (user_id, aksi, deskripsi, ip_address)
+           VALUES ($1, $2, $3, $4)`,
+          [createdUser.id, "Registrasi Akun", "Registrasi sukses via Server Action, menunggu OTP", "127.0.0.1"]
         );
       }
-
-      await query(
-        `INSERT INTO audit_trails (user_id, aksi, deskripsi, ip_address)
-         VALUES ($1, $2, $3, $4)`,
-        [createdUser.id, "Registrasi Akun", "Registrasi sukses via Server Action, menunggu OTP", "127.0.0.1"]
-      );
 
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const otpHash = crypto.createHash("sha256").update(otp).digest("hex");

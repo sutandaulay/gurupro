@@ -406,7 +406,10 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
                             }`}
                           >
                             {SubIcon && <AppIcon label={sub.label} size={28} iconSize={14} category={resolveCategory(sub.label)} active={active} icon={<SubIcon />} />}
-                            <span className="truncate">{sub.label}</span>
+                            <span className="truncate">
+                              <span className="block">{sub.label}</span>
+                              {sub.desc && <span className="block text-[9px] text-gray-400 font-normal">{sub.desc}</span>}
+                            </span>
                           </Link>
                         );
                       })}

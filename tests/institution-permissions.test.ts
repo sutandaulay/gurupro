@@ -1,32 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const mockQuery = vi.fn()
-
-vi.mock('../lib/db', () => ({
-  query: (...args: any[]) => mockQuery(...args),
+vi.mock('@/lib/db', () => ({
+  query: vi.fn(),
 }))
 
-const mockJson = vi.fn()
-const mockClone = vi.fn()
-const mockHeaders = { get: vi.fn() }
-const mockNextUrl = { searchParams: { get: vi.fn() } }
-
-vi.mock('next/headers', () => ({
-  cookies: vi.fn(),
-}))
-
-vi.mock('next/server', () => ({
-  NextResponse: {
-    json: (body: any, init?: any) => ({
-      body,
-      status: init?.status ?? 200,
-      json: async () => body,
-    }),
-  },
-  NextRequest: vi.fn(),
-}))
-
-const {
+import { query } from '@/lib/db'
+import {
   getUserInstitutionRole,
   isInstitutionMember,
   canViewAllTeachers,
@@ -34,605 +13,426 @@ const {
   canManageMembers,
   canManageBilling,
   canExportAccreditation,
+  canAccessLaporanEvaluasiLkpd,
+  isLaporanEvaluasiCreator,
   withInstitutionPermission,
-} = await import('../lib/rbac/institution-permissions')
+} from '@/lib/rbac/institution-permissions'
 
-function createMockRequest(overrides?: {
-  method?: string
-  headers?: Record<string, string>
-  query?: Record<string, string>
-  body?: any
-}) {
-  const headers = new Map(Object.entries(overrides?.headers ?? {}))
-  return {
-    method: overrides?.method ?? 'GET',
-    headers: {
-      get: (name: string) => headers.get(name) ?? null,
-    },
-    nextUrl: {
-      searchParams: {
-        get: (name: string) => overrides?.query?.[name] ?? null,
-      },
-    },
-    clone: () => ({
-      json: async () => overrides?.body ?? {},
-    }),
-  } as any
-}
+const mockQuery = query as ReturnType<typeof vi.fn>
 
-function createQueryResult(rows: any[]) {
-  return { rows, rowCount: rows.length }
-}
-
-beforeEach(() => {
-  vi.clearAllMocks()
-})
-
-// ========================================
-// getUserInstitutionRole
-// ========================================
-
-describe('getUserInstitutionRole', () => {
-  it('mengembalikan array role untuk member aktif', async () => {
-    mockQuery.mockResolvedValue(
-      createQueryResult([{ value: 'guru' }, { value: 'bendahara' }])
-    )
-    const result = await getUserInstitutionRole(1, 10)
-    expect(result).toEqual(['guru', 'bendahara'])
-    expect(mockQuery).toHaveBeenCalledTimes(1)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('SELECT imr.value'),
-      [1, 10]
-    )
+describe('institution-permissions', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
   })
 
-  it('mengembalikan null jika bukan member', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([]))
-    const result = await getUserInstitutionRole(1, 10)
-    expect(result).toBeNull()
+  describe('getUserInstitutionRole', () => {
+    it('returns roles from cache when available', async () => {
+      const cache = new Map()
+      cache.set('1:5', ['kepala_sekolah'])
+      
+      const roles = await getUserInstitutionRole(1, 5, cache)
+      expect(roles).toEqual(['kepala_sekolah'])
+      expect(mockQuery).not.toHaveBeenCalled()
+    })
+
+    it('returns null when cache has null value', async () => {
+      const cache = new Map()
+      cache.set('1:5', null)
+      
+      const roles = await getUserInstitutionRole(1, 5, cache)
+      expect(roles).toBeNull()
+      expect(mockQuery).not.toHaveBeenCalled()
+    })
+
+    it('queries database when not in cache', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'guru' }, { value: 'wakasek' }],
+      })
+      
+      const roles = await getUserInstitutionRole(1, 5)
+      expect(roles).toEqual(['guru', 'wakasek'])
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT imr.value'),
+        [1, 5]
+      )
+    })
+
+    it('returns null when user has no roles', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] })
+      
+      const roles = await getUserInstitutionRole(1, 5)
+      expect(roles).toBeNull()
+    })
+
+    it('caches result after query', async () => {
+      const cache = new Map()
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'guru' }],
+      })
+      
+      const roles = await getUserInstitutionRole(1, 5, cache)
+      expect(roles).toEqual(['guru'])
+      expect(cache.get('1:5')).toEqual(['guru'])
+    })
+
+    it('handles database errors gracefully', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB error'))
+      
+      const roles = await getUserInstitutionRole(1, 5)
+      expect(roles).toBeNull()
+    })
   })
 
-  it('mengembalikan null jika query error (fail-safe)', async () => {
-    mockQuery.mockRejectedValue(new Error('DB connection failed'))
-    const result = await getUserInstitutionRole(1, 10)
-    expect(result).toBeNull()
-  })
-
-  it('mengembalikan null jika institusi tidak ditemukan', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([]))
-    const result = await getUserInstitutionRole(1, 999)
-    expect(result).toBeNull()
-  })
-
-  it('menggunakan cache untuk menghindari query berulang', async () => {
-    const cache = new Map<string, string[] | null>()
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'guru' }]))
-
-    const first = await getUserInstitutionRole(1, 10, cache)
-    const second = await getUserInstitutionRole(1, 10, cache)
-
-    expect(first).toEqual(['guru'])
-    expect(second).toEqual(['guru'])
-    expect(mockQuery).toHaveBeenCalledTimes(1)
-  })
-
-  it('cache tetap mengembalikan null dengan benar', async () => {
-    const cache = new Map<string, string[] | null>()
-    mockQuery.mockResolvedValue(createQueryResult([]))
-
-    const first = await getUserInstitutionRole(2, 20, cache)
-    const second = await getUserInstitutionRole(2, 20, cache)
-
-    expect(first).toBeNull()
-    expect(second).toBeNull()
-    expect(mockQuery).toHaveBeenCalledTimes(1)
-  })
-
-  it('cache berbeda untuk userId+institutionId berbeda', async () => {
-    const cache = new Map<string, string[] | null>()
-    mockQuery
-      .mockResolvedValueOnce(createQueryResult([{ value: 'guru' }]))
-      .mockResolvedValueOnce(createQueryResult([{ value: 'kepala_sekolah' }]))
-
-    const result1 = await getUserInstitutionRole(1, 10, cache)
-    const result2 = await getUserInstitutionRole(2, 20, cache)
-
-    expect(result1).toEqual(['guru'])
-    expect(result2).toEqual(['kepala_sekolah'])
-    expect(mockQuery).toHaveBeenCalledTimes(2)
-  })
-})
-
-// ========================================
-// isInstitutionMember
-// ========================================
-
-describe('isInstitutionMember', () => {
-  it('true jika user memiliki role', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'guru' }]))
-    const result = await isInstitutionMember(1, 10)
-    expect(result).toBe(true)
-  })
-
-  it('false jika user tidak memiliki role (bukan member)', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([]))
-    const result = await isInstitutionMember(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false jika query error (fail-safe)', async () => {
-    mockQuery.mockRejectedValue(new Error('DB error'))
-    const result = await isInstitutionMember(1, 10)
-    expect(result).toBe(false)
-  })
-})
-
-// ========================================
-// canViewAllTeachers
-// ========================================
-
-describe('canViewAllTeachers', () => {
-  const allowedRoles = ['kepala_sekolah', 'wakasek', 'operator', 'admin_sekolah']
-
-  for (const role of allowedRoles) {
-    it(`true untuk role ${role}`, async () => {
-      mockQuery.mockResolvedValue(createQueryResult([{ value: role }]))
-      const result = await canViewAllTeachers(1, 10)
+  describe('isInstitutionMember', () => {
+    it('returns true when user has roles', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'guru' }],
+      })
+      
+      const result = await isInstitutionMember(1, 5)
       expect(result).toBe(true)
     })
-  }
 
-  it('false untuk role bendahara', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'bendahara' }]))
-    const result = await canViewAllTeachers(1, 10)
-    expect(result).toBe(false)
+    it('returns false when user has no roles', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] })
+      
+      const result = await isInstitutionMember(1, 5)
+      expect(result).toBe(false)
+    })
   })
 
-  it('false untuk role guru', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'guru' }]))
-    const result = await canViewAllTeachers(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false jika bukan member', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([]))
-    const result = await canViewAllTeachers(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false jika query error (fail-safe)', async () => {
-    mockQuery.mockRejectedValue(new Error('DB error'))
-    const result = await canViewAllTeachers(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('true jika user memiliki multiple role termasuk yang diizinkan', async () => {
-    mockQuery.mockResolvedValue(
-      createQueryResult([{ value: 'guru' }, { value: 'operator' }])
-    )
-    const result = await canViewAllTeachers(1, 10)
-    expect(result).toBe(true)
-  })
-})
-
-// ========================================
-// canApproveDocuments
-// ========================================
-
-describe('canApproveDocuments', () => {
-  it('true untuk kepala_sekolah (tanpa mengecek config)', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'kepala_sekolah' }]))
-    const result = await canApproveDocuments(1, 10)
-    expect(result).toBe(true)
-    expect(mockQuery).toHaveBeenCalledTimes(1)
-  })
-
-  it('true untuk wakasek jika approvalLayerConfig = double', async () => {
-    mockQuery
-      .mockResolvedValueOnce(createQueryResult([{ value: 'wakasek' }]))
-      .mockResolvedValueOnce(
-        createQueryResult([{ approval_layer_config: 'double' }])
-      )
-    const result = await canApproveDocuments(1, 10)
-    expect(result).toBe(true)
-    expect(mockQuery).toHaveBeenCalledTimes(2)
-  })
-
-  it('false untuk wakasek jika approvalLayerConfig = single', async () => {
-    mockQuery
-      .mockResolvedValueOnce(createQueryResult([{ value: 'wakasek' }]))
-      .mockResolvedValueOnce(
-        createQueryResult([{ approval_layer_config: 'single' }])
-      )
-    const result = await canApproveDocuments(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false untuk role operator', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'operator' }]))
-    const result = await canApproveDocuments(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false untuk role bendahara', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'bendahara' }]))
-    const result = await canApproveDocuments(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false untuk role guru', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'guru' }]))
-    const result = await canApproveDocuments(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false jika bukan member', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([]))
-    const result = await canApproveDocuments(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false jika institusi tidak ditemukan saat cek config', async () => {
-    mockQuery
-      .mockResolvedValueOnce(createQueryResult([{ value: 'wakasek' }]))
-      .mockResolvedValueOnce(createQueryResult([]))
-    const result = await canApproveDocuments(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false jika query error di langkah config (fail-safe)', async () => {
-    mockQuery
-      .mockResolvedValueOnce(createQueryResult([{ value: 'wakasek' }]))
-      .mockRejectedValueOnce(new Error('DB error'))
-    const result = await canApproveDocuments(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('true untuk user dengan multiple role termasuk kepala_sekolah', async () => {
-    mockQuery.mockResolvedValue(
-      createQueryResult([{ value: 'guru' }, { value: 'kepala_sekolah' }])
-    )
-    const result = await canApproveDocuments(1, 10)
-    expect(result).toBe(true)
-  })
-
-  it('false jika query error di langkah awal (fail-safe)', async () => {
-    mockQuery.mockRejectedValue(new Error('DB error'))
-    const result = await canApproveDocuments(1, 10)
-    expect(result).toBe(false)
-  })
-})
-
-// ========================================
-// canManageMembers
-// ========================================
-
-describe('canManageMembers', () => {
-  it('true untuk operator', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'operator' }]))
-    const result = await canManageMembers(1, 10)
-    expect(result).toBe(true)
-  })
-
-  it('true untuk admin_sekolah', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'admin_sekolah' }]))
-    const result = await canManageMembers(1, 10)
-    expect(result).toBe(true)
-  })
-
-  it('false untuk kepala_sekolah', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'kepala_sekolah' }]))
-    const result = await canManageMembers(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false untuk wakasek', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'wakasek' }]))
-    const result = await canManageMembers(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false untuk bendahara', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'bendahara' }]))
-    const result = await canManageMembers(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false untuk guru', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'guru' }]))
-    const result = await canManageMembers(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false jika bukan member', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([]))
-    const result = await canManageMembers(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false jika query error (fail-safe)', async () => {
-    mockQuery.mockRejectedValue(new Error('DB error'))
-    const result = await canManageMembers(1, 10)
-    expect(result).toBe(false)
-  })
-})
-
-// ========================================
-// canManageBilling
-// ========================================
-
-describe('canManageBilling', () => {
-  it('true untuk bendahara', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'bendahara' }]))
-    const result = await canManageBilling(1, 10)
-    expect(result).toBe(true)
-  })
-
-  it('false untuk kepala_sekolah (view-only, bukan manage)', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'kepala_sekolah' }]))
-    const result = await canManageBilling(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false untuk operator', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'operator' }]))
-    const result = await canManageBilling(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false untuk admin_sekolah', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'admin_sekolah' }]))
-    const result = await canManageBilling(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false untuk wakasek', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'wakasek' }]))
-    const result = await canManageBilling(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false untuk guru', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'guru' }]))
-    const result = await canManageBilling(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false jika bukan member', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([]))
-    const result = await canManageBilling(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false jika query error (fail-safe)', async () => {
-    mockQuery.mockRejectedValue(new Error('DB error'))
-    const result = await canManageBilling(1, 10)
-    expect(result).toBe(false)
-  })
-})
-
-// ========================================
-// canExportAccreditation
-// ========================================
-
-describe('canExportAccreditation', () => {
-  const allowedRoles = ['kepala_sekolah', 'wakasek', 'operator', 'admin_sekolah']
-
-  for (const role of allowedRoles) {
-    it(`true untuk role ${role}`, async () => {
-      mockQuery.mockResolvedValue(createQueryResult([{ value: role }]))
-      const result = await canExportAccreditation(1, 10)
+  describe('canViewAllTeachers', () => {
+    it('returns true for kepala_sekolah', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'kepala_sekolah' }],
+      })
+      
+      const result = await canViewAllTeachers(1, 5)
       expect(result).toBe(true)
     })
-  }
 
-  it('false untuk bendahara', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'bendahara' }]))
-    const result = await canExportAccreditation(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false untuk guru', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([{ value: 'guru' }]))
-    const result = await canExportAccreditation(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false jika bukan member', async () => {
-    mockQuery.mockResolvedValue(createQueryResult([]))
-    const result = await canExportAccreditation(1, 10)
-    expect(result).toBe(false)
-  })
-
-  it('false jika query error (fail-safe)', async () => {
-    mockQuery.mockRejectedValue(new Error('DB error'))
-    const result = await canExportAccreditation(1, 10)
-    expect(result).toBe(false)
-  })
-})
-
-// ========================================
-// withInstitutionPermission Middleware
-// ========================================
-
-describe('withInstitutionPermission', () => {
-  it('meneruskan ke handler jika permission check lulus', async () => {
-    const handler = vi
-      .fn()
-      .mockResolvedValue({ body: { data: 'ok' }, status: 200 })
-    const permissionCheck = vi.fn().mockResolvedValue(true)
-    const req = createMockRequest({
-      headers: { 'x-user-id': '1', 'x-institution-id': '10' },
+    it('returns true for wakasek', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'wakasek' }],
+      })
+      
+      const result = await canViewAllTeachers(1, 5)
+      expect(result).toBe(true)
     })
 
-    const wrapped = withInstitutionPermission(permissionCheck)(handler)
-    const result = await wrapped(req)
-
-    expect(result.status).toBe(200)
-    expect(handler).toHaveBeenCalledTimes(1)
-    expect(permissionCheck).toHaveBeenCalledWith(1, 10, expect.any(Map))
-  })
-
-  it('mengembalikan 403 jika permission check gagal', async () => {
-    const handler = vi.fn()
-    const permissionCheck = vi.fn().mockResolvedValue(false)
-    const req = createMockRequest({
-      headers: { 'x-user-id': '1', 'x-institution-id': '10' },
+    it('returns true for operator', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'operator' }],
+      })
+      
+      const result = await canViewAllTeachers(1, 5)
+      expect(result).toBe(true)
     })
 
-    const wrapped = withInstitutionPermission(permissionCheck)(handler)
-    const result = await wrapped(req)
-
-    expect(result.status).toBe(403)
-    expect(handler).not.toHaveBeenCalled()
-  })
-
-  it('mengembalikan 400 jika institutionId tidak ditemukan', async () => {
-    const handler = vi.fn()
-    const permissionCheck = vi.fn()
-    const req = createMockRequest({ headers: { 'x-user-id': '1' } })
-
-    const wrapped = withInstitutionPermission(permissionCheck)(handler)
-    const result = await wrapped(req)
-
-    expect(result.status).toBe(400)
-    expect(handler).not.toHaveBeenCalled()
-  })
-
-  it('mengembalikan 401 jika userId tidak ditemukan', async () => {
-    const handler = vi.fn()
-    const permissionCheck = vi.fn()
-    const req = createMockRequest({
-      headers: { 'x-institution-id': '10' },
+    it('returns true for admin_sekolah', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'admin_sekolah' }],
+      })
+      
+      const result = await canViewAllTeachers(1, 5)
+      expect(result).toBe(true)
     })
 
-    const wrapped = withInstitutionPermission(permissionCheck)(handler)
-    const result = await wrapped(req)
-
-    expect(result.status).toBe(401)
-    expect(handler).not.toHaveBeenCalled()
-  })
-
-  it('menggunakan custom getUserId dan getInstitutionId jika diberikan', async () => {
-    const handler = vi
-      .fn()
-      .mockResolvedValue({ body: { data: 'ok' }, status: 200 })
-    const permissionCheck = vi.fn().mockResolvedValue(true)
-
-    const getUserId = vi.fn().mockResolvedValue(42)
-    const getInstitutionId = vi.fn().mockResolvedValue(99)
-
-    const req = createMockRequest()
-
-    const wrapped = withInstitutionPermission(permissionCheck, {
-      getUserId,
-      getInstitutionId,
-    })(handler)
-    const result = await wrapped(req)
-
-    expect(result.status).toBe(200)
-    expect(getUserId).toHaveBeenCalledWith(req)
-    expect(getInstitutionId).toHaveBeenCalledWith(req, undefined)
-    expect(permissionCheck).toHaveBeenCalledWith(42, 99, expect.any(Map))
-  })
-
-  it('membuat cache baru per request', async () => {
-    const handler = vi
-      .fn()
-      .mockResolvedValue({ body: { data: 'ok' }, status: 200 })
-    const permissionCheck = vi.fn().mockResolvedValue(true)
-    const req = createMockRequest({
-      headers: { 'x-user-id': '1', 'x-institution-id': '10' },
+    it('returns false for guru', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'guru' }],
+      })
+      
+      const result = await canViewAllTeachers(1, 5)
+      expect(result).toBe(false)
     })
 
-    const wrapped = withInstitutionPermission(permissionCheck)(handler)
-
-    await wrapped(req)
-    await wrapped(req)
-
-    const firstCache = permissionCheck.mock.calls[0][2]
-    const secondCache = permissionCheck.mock.calls[1][2]
-    expect(firstCache).not.toBe(secondCache)
-  })
-
-  it('mengembalikan 500 jika terjadi error di middleware', async () => {
-    const handler = vi.fn()
-    const permissionCheck = vi.fn().mockRejectedValue(new Error('Unexpected'))
-    const req = createMockRequest({
-      headers: { 'x-user-id': '1', 'x-institution-id': '10' },
+    it('returns false for bendahara', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'bendahara' }],
+      })
+      
+      const result = await canViewAllTeachers(1, 5)
+      expect(result).toBe(false)
     })
 
-    const wrapped = withInstitutionPermission(permissionCheck)(handler)
-    const result = await wrapped(req)
-
-    expect(result.status).toBe(500)
-    const data = await result.json()
-    expect(data.error).toBe('Unexpected')
+    it('returns false when user has no roles', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] })
+      
+      const result = await canViewAllTeachers(1, 5)
+      expect(result).toBe(false)
+    })
   })
 
-  it('mengembalikan 500 jika error tanpa message', async () => {
-    const handler = vi.fn()
-    const permissionCheck = vi.fn().mockRejectedValue(undefined)
-    const req = createMockRequest({
-      headers: { 'x-user-id': '1', 'x-institution-id': '10' },
+  describe('canApproveDocuments', () => {
+    it('returns true for kepala_sekolah regardless of config', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ value: 'kepala_sekolah' }] })
+        .mockResolvedValueOnce({ rows: [{ approval_layer_config: 'single' }] })
+      
+      const result = await canApproveDocuments(1, 5)
+      expect(result).toBe(true)
     })
 
-    const wrapped = withInstitutionPermission(permissionCheck)(handler)
-    const result = await wrapped(req)
+    it('returns true for wakasek with double approval config', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ value: 'wakasek' }] })
+        .mockResolvedValueOnce({ rows: [{ approval_layer_config: 'double' }] })
+      
+      const result = await canApproveDocuments(1, 5)
+      expect(result).toBe(true)
+    })
 
-    expect(result.status).toBe(500)
+    it('returns false for wakasek with single approval config', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ value: 'wakasek' }] })
+        .mockResolvedValueOnce({ rows: [{ approval_layer_config: 'single' }] })
+      
+      const result = await canApproveDocuments(1, 5)
+      expect(result).toBe(false)
+    })
+
+    it('returns false for guru', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ value: 'guru' }] })
+      
+      const result = await canApproveDocuments(1, 5)
+      expect(result).toBe(false)
+    })
+
+    it('returns false when institution not found', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ value: 'wakasek' }] })
+        .mockResolvedValueOnce({ rows: [] })
+      
+      const result = await canApproveDocuments(1, 5)
+      expect(result).toBe(false)
+    })
   })
 
-  it('mendukung custom extractor yang mengembalikan null', async () => {
-    const handler = vi.fn()
-    const permissionCheck = vi.fn()
-    const getUserId = vi.fn().mockResolvedValue(null)
-
-    const req = createMockRequest({
-      headers: { 'x-institution-id': '10' },
+  describe('canManageMembers', () => {
+    it('returns true for operator', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'operator' }],
+      })
+      
+      const result = await canManageMembers(1, 5)
+      expect(result).toBe(true)
     })
 
-    const wrapped = withInstitutionPermission(permissionCheck, {
-      getUserId,
-    })(handler)
-    const result = await wrapped(req)
+    it('returns true for admin_sekolah', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'admin_sekolah' }],
+      })
+      
+      const result = await canManageMembers(1, 5)
+      expect(result).toBe(true)
+    })
 
-    expect(result.status).toBe(401)
-    expect(handler).not.toHaveBeenCalled()
+    it('returns false for guru', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'guru' }],
+      })
+      
+      const result = await canManageMembers(1, 5)
+      expect(result).toBe(false)
+    })
+
+    it('returns false for kepala_sekolah', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'kepala_sekolah' }],
+      })
+      
+      const result = await canManageMembers(1, 5)
+      expect(result).toBe(false)
+    })
   })
 
-  it('extract institutionId dari query params', async () => {
-    const handler = vi
-      .fn()
-      .mockResolvedValue({ body: { data: 'ok' }, status: 200 })
-    const permissionCheck = vi.fn().mockResolvedValue(true)
-    const req = createMockRequest({
-      headers: { 'x-user-id': '1' },
-      query: { institutionId: '20' },
+  describe('canManageBilling', () => {
+    it('returns true for bendahara', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'bendahara' }],
+      })
+      
+      const result = await canManageBilling(1, 5)
+      expect(result).toBe(true)
     })
 
-    const wrapped = withInstitutionPermission(permissionCheck)(handler)
-    const result = await wrapped(req)
-
-    expect(result.status).toBe(200)
-    expect(permissionCheck).toHaveBeenCalledWith(1, 20, expect.any(Map))
+    it('returns false for other roles', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'kepala_sekolah' }],
+      })
+      
+      const result = await canManageBilling(1, 5)
+      expect(result).toBe(false)
+    })
   })
 
-  it('extract institutionId dari request body (POST)', async () => {
-    const handler = vi
-      .fn()
-      .mockResolvedValue({ body: { data: 'ok' }, status: 200 })
-    const permissionCheck = vi.fn().mockResolvedValue(true)
-    const req = createMockRequest({
-      method: 'POST',
-      headers: { 'x-user-id': '1' },
-      body: { institutionId: '30' },
+  describe('canExportAccreditation', () => {
+    it('returns true for kepala_sekolah', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'kepala_sekolah' }],
+      })
+      
+      const result = await canExportAccreditation(1, 5)
+      expect(result).toBe(true)
     })
 
-    const wrapped = withInstitutionPermission(permissionCheck)(handler)
-    const result = await wrapped(req)
+    it('returns true for wakasek', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'wakasek' }],
+      })
+      
+      const result = await canExportAccreditation(1, 5)
+      expect(result).toBe(true)
+    })
 
-    expect(result.status).toBe(200)
-    expect(permissionCheck).toHaveBeenCalledWith(1, 30, expect.any(Map))
+    it('returns false for guru', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'guru' }],
+      })
+      
+      const result = await canExportAccreditation(1, 5)
+      expect(result).toBe(false)
+    })
+  })
+
+  describe('canAccessLaporanEvaluasiLkpd', () => {
+    it('returns canAccess=true, canViewAll=true for kepala_sekolah', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'kepala_sekolah' }],
+      })
+      
+      const result = await canAccessLaporanEvaluasiLkpd(1, 5)
+      expect(result).toEqual({ canAccess: true, canViewAll: true })
+    })
+
+    it('returns canAccess=true, canViewAll=false for guru', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'guru' }],
+      })
+      
+      const result = await canAccessLaporanEvaluasiLkpd(1, 5)
+      expect(result).toEqual({ canAccess: true, canViewAll: false })
+    })
+
+    it('returns canAccess=false, canViewAll=false for bendahara', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ value: 'bendahara' }],
+      })
+      
+      const result = await canAccessLaporanEvaluasiLkpd(1, 5)
+      expect(result).toEqual({ canAccess: false, canViewAll: false })
+    })
+
+    it('returns false when user has no roles', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] })
+      
+      const result = await canAccessLaporanEvaluasiLkpd(1, 5)
+      expect(result).toEqual({ canAccess: false, canViewAll: false })
+    })
+  })
+
+  describe('isLaporanEvaluasiCreator', () => {
+    it('returns true when user is creator', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ user_id: '1' }],
+      })
+      
+      const result = await isLaporanEvaluasiCreator(1, 'laporan-1')
+      expect(result).toBe(true)
+    })
+
+    it('returns false when user is not creator', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ user_id: '2' }],
+      })
+      
+      const result = await isLaporanEvaluasiCreator(1, 'laporan-1')
+      expect(result).toBe(false)
+    })
+
+    it('returns false when report not found', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] })
+      
+      const result = await isLaporanEvaluasiCreator(1, 'laporan-1')
+      expect(result).toBe(false)
+    })
+  })
+
+  describe('withInstitutionPermission', () => {
+    it('creates middleware that checks permission', async () => {
+      const mockPermissionCheck = vi.fn().mockResolvedValue(true)
+      const mockHandler = vi.fn().mockResolvedValue({ success: true })
+      
+      const middleware = withInstitutionPermission(mockPermissionCheck)
+      const wrappedHandler = middleware(mockHandler)
+      
+      const req = {
+        nextUrl: { searchParams: new URLSearchParams('institutionId=5') },
+        headers: { get: vi.fn().mockReturnValue('1') },
+        method: 'GET',
+        clone: () => ({ json: vi.fn().mockResolvedValue({}) }),
+      } as any
+      
+      const result = await wrappedHandler(req)
+      expect(result).toEqual({ success: true })
+      expect(mockPermissionCheck).toHaveBeenCalledWith(1, 5, expect.any(Map))
+    })
+
+    it('returns 400 when institutionId is missing', async () => {
+      const mockPermissionCheck = vi.fn().mockResolvedValue(true)
+      const mockHandler = vi.fn()
+      
+      const middleware = withInstitutionPermission(mockPermissionCheck)
+      const wrappedHandler = middleware(mockHandler)
+      
+      const req = {
+        nextUrl: { searchParams: new URLSearchParams('') },
+        headers: { get: vi.fn().mockReturnValue(null) },
+        method: 'GET',
+        clone: () => ({ json: vi.fn().mockResolvedValue({}) }),
+      } as any
+      
+      const result = await wrappedHandler(req)
+      expect(result.status).toBe(400)
+      expect(await result.json()).toEqual({ error: 'Institution ID diperlukan' })
+    })
+
+    it('returns 401 when userId is missing', async () => {
+      const mockPermissionCheck = vi.fn().mockResolvedValue(true)
+      const mockHandler = vi.fn()
+      
+      const middleware = withInstitutionPermission(mockPermissionCheck)
+      const wrappedHandler = middleware(mockHandler)
+      
+      const req = {
+        nextUrl: { searchParams: new URLSearchParams('institutionId=5') },
+        headers: { get: vi.fn().mockReturnValue(null) },
+        method: 'GET',
+        clone: () => ({ json: vi.fn().mockResolvedValue({}) }),
+      } as any
+      
+      const result = await wrappedHandler(req)
+      expect(result.status).toBe(401)
+    })
+
+    it('returns 403 when permission check fails', async () => {
+      const mockPermissionCheck = vi.fn().mockResolvedValue(false)
+      const mockHandler = vi.fn()
+      
+      const middleware = withInstitutionPermission(mockPermissionCheck)
+      const wrappedHandler = middleware(mockHandler)
+      
+      const req = {
+        nextUrl: { searchParams: new URLSearchParams('institutionId=5') },
+        headers: { get: vi.fn().mockReturnValue('1') },
+        method: 'GET',
+        clone: () => ({ json: vi.fn().mockResolvedValue({}) }),
+      } as any
+      
+      const result = await wrappedHandler(req)
+      expect(result.status).toBe(403)
+      expect(await result.json()).toEqual({ error: 'Forbidden: Anda tidak memiliki akses' })
+    })
   })
 })

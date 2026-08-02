@@ -15,9 +15,8 @@ async function getUserId() {
  * Process a referral code for a user who registered via Google OAuth
  * Body: { referralCode: string }
  *
- * Rewards:
- * - Referrer: +20 token, +10.000 cashback
- * - Referee (new user): +10 token bonus
+ * Reward: given when referee PAYS (in activateTransaction), not here.
+ * This endpoint only sets the referral relationship (referred_by).
  */
 export async function POST(request: Request) {
   try {
@@ -64,43 +63,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Tidak bisa menggunakan kode referral sendiri' }, { status: 400 });
     }
 
-    // 3. Credit referrer: +20 tokens + 10.000 cashback
-    await query(
-      'UPDATE users SET token_limit = token_limit + 20, cashback_balance = cashback_balance + 10000 WHERE id = $1',
-      [referrerId]
-    );
+    // 3. Credit referrer: +20 poin + 10.000 cashback
+    // NOTE: actual reward is given when referee PAYS (in activateTransaction)
+    // This just records the referral relationship for later activation
 
-    // 4. Credit referee (current user): +10 tokens bonus
+    // 4. Credit referee (current user): NOTHING on registration
+    // Reward only when referee pays subscription
     await query(
-      'UPDATE users SET referred_by = $1, token_limit = token_limit + 10 WHERE id = $2',
+      'UPDATE users SET referred_by = $1 WHERE id = $2',
       [referrerId, userId]
     );
 
-    // 5. Record referral
-    await query(
-      `INSERT INTO referrals (referrer_id, referee_id, reward_tokens, cashback_amount)
-       VALUES ($1, $2, 20, 10000)`,
-      [referrerId, userId]
-    );
+    // NOTE: DO NOT insert into referrals table here — activateTransaction() will create
+    // the record with the correct cashback amount based on the plan duration paid by referee
 
     // 6. Audit trail
     await query(
       `INSERT INTO audit_trails (user_id, aksi, deskripsi, ip_address)
        VALUES ($1, $2, $3, $4)`,
-      [userId, 'Referral Digunakan', `Menggunakan kode referral ${cleanCode}`, '127.0.0.1']
+      [userId, 'Referral Digunakan', `Kode referral ${cleanCode} tercatat. Reward referrer diberikan saat bayar langganan.`, '127.0.0.1']
     );
 
-    // 7. Notify referrer (optional)
+    // 7. Notify referrer (optional) — will get actual bonus when referee pays
     try {
       await query(
         `INSERT INTO in_app_notifications (user_id, title, body, type, reference_type, reference_id, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
         [
           referrerId,
-          'Bonus Referral! 🎉',
-          `Seseorang menggunakan kode referral Anda dan langsung terdaftar. Anda mendapat +20 token & Rp10.000 cashback!`,
-          'success',
-          'referral_bonus',
+          'Referral Used! 🎉',
+          `Seseorang mencatat kode referral Anda. Reward akan masuk saat referee bayar langganan.`,
+          'info',
+          'referral_used',
           String(userId),
         ]
       );
@@ -108,11 +102,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Kode referral berhasil diproses!',
+      message: 'Kode referral berhasil dicatat. Reward referrer akan masuk saat Anda bayar langganan.',
       rewards: {
-        refereeBonus: 10,
-        referrerTokens: 20,
-        referrerCashback: 10000
+        message: "Kode referral tercatat. Referrer akan dapat reward saat Anda bayar langganan."
       }
     });
 

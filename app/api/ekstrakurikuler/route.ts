@@ -12,6 +12,7 @@ import {
   EkstrakurikulerUpdateSchema,
   EkstrakurikulerQuerySchema,
 } from '@/lib/schemas/sikap-ekskul';
+import { parsePagination, wrapResponse } from '@/lib/pagination';
 
 /**
  * GET /api/ekstrakurikuler
@@ -29,9 +30,10 @@ export async function GET(req: Request) {
     if (filters.schoolId) await requireSchoolAccess(filters.schoolId)
 
     const validated = EkstrakurikulerQuerySchema.parse(filters);
-    const result = await getEkstrakurikuler(validated);
+    const pagination = parsePagination(searchParams);
+    const { data, total } = await getEkstrakurikuler(validated, pagination);
 
-    return NextResponse.json({ data: result });
+    return NextResponse.json(wrapResponse(data, total, pagination));
   } catch (error: any) {
     console.error('GET /api/ekstrakurikuler error:', error);
     return NextResponse.json({ error: error.message }, { status: 400 });

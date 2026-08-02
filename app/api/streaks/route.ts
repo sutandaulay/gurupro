@@ -70,7 +70,7 @@ export async function GET() {
     const teacherId = session.id;
 
     const res = await query(
-      `SELECT DISTINCT tanggal FROM teacher_journals WHERE teacher_id = $1`,
+      `SELECT DISTINCT tanggal FROM teacher_journals WHERE user_id = $1`,
       [teacherId]
     );
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { parsePagination, wrapResponse } from '@/lib/pagination'
 
 export async function GET(req: Request) {
   try {
@@ -18,34 +19,48 @@ export async function GET(req: Request) {
     const tahunAjaranId = searchParams.get('tahun_ajaran_id')
     const sekolahId = searchParams.get('sekolah_id')
 
-    let queryStr = `
-      SELECT ok.*, u.nama_lengkap as observer_nama,
-             skp.status as skp_status
-      FROM observasi_kinerja ok
-      LEFT JOIN users u ON u.id = ok.observer_id
-      LEFT JOIN skp_tahunan skp ON skp.id = ok.skp_id
-      WHERE ok.guru_id = $1
-    `
+    let whereClause = 'ok.guru_id = $1'
     const params: any[] = [guruId]
     let paramIdx = 2
 
     if (skpId) {
-      queryStr += ` AND ok.skp_id = $${paramIdx++}`
+      whereClause += ` AND ok.skp_id = $${paramIdx++}`
       params.push(skpId)
     } else if (tahunAjaranId) {
-      queryStr += ` AND ok.tahun_ajaran_id = $${paramIdx++}`
+      whereClause += ` AND ok.tahun_ajaran_id = $${paramIdx++}`
       params.push(tahunAjaranId)
     }
     if (sekolahId) {
-      queryStr += ` AND ok.sekolah_id = $${paramIdx++}`
+      whereClause += ` AND ok.sekolah_id = $${paramIdx++}`
       params.push(sekolahId)
     }
 
-    queryStr += ` ORDER BY ok.tanggal_observasi DESC`
+    const countResult = await query(
+      `SELECT COUNT(*)
+       FROM observasi_kinerja ok
+       LEFT JOIN users u ON u.id = ok.observer_id
+       LEFT JOIN skp_tahunan skp ON skp.id = ok.skp_id
+       WHERE ${whereClause}`,
+      params
+    )
+    const total = parseInt(countResult.rows[0].count, 10)
 
-    const result = await query(queryStr, params)
+    const pagination = parsePagination(searchParams)
+    const off = (pagination.page - 1) * pagination.limit
 
-    return NextResponse.json(result.rows)
+    const result = await query(
+      `SELECT ok.*, u.nama_lengkap as observer_nama,
+              skp.status as skp_status
+       FROM observasi_kinerja ok
+       LEFT JOIN users u ON u.id = ok.observer_id
+       LEFT JOIN skp_tahunan skp ON skp.id = ok.skp_id
+       WHERE ${whereClause}
+       ORDER BY ok.tanggal_observasi DESC
+       LIMIT ${pagination.limit} OFFSET ${off}`,
+      params
+    )
+
+    return NextResponse.json(wrapResponse(result.rows, total, pagination))
   } catch (err) {
     console.error('GET /api/observasi error:', err)
     return NextResponse.json({ error: 'Failed to fetch observasi' }, { status: 500 })

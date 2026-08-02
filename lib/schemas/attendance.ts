@@ -1,9 +1,9 @@
-import { pgTable, uuid, varchar, integer, boolean, timestamp, doublePrecision, jsonb, primaryKey, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, integer, boolean, timestamp, doublePrecision, jsonb, primaryKey, index, numeric, date, text } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { users, institutions, formatInstitution, schools } from './main-schema';
 
-// Re-export institutions and formatInstitution for convenience
-export { institutions, formatInstitution };
+// Re-export institutions, formatInstitution, and schools for convenience
+export { institutions, formatInstitution, schools };
 
 // Institution Members table
 export const institutionMembers = pgTable(
@@ -283,3 +283,23 @@ export const schoolTeachingSessionsRelations = relations(schoolTeachingSessions,
     references: [schools.id],
   }),
 }));
+
+export const teacherAttendance = pgTable(
+  'teacher_attendance',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id),
+    tanggal: date('tanggal').notNull(),
+    status: varchar('status', { length: 50 }).notNull(),
+    catatan: text('catatan'),
+    checkInTime: timestamp('check_in_time'),
+    checkOutTime: timestamp('check_out_time'),
+    faceMatchScore: numeric('face_match_score', { precision: 4, scale: 3 }),
+    latitude: numeric('latitude', { precision: 10, scale: 7 }),
+    longitude: numeric('longitude', { precision: 10, scale: 7 }),
+    accuracy: numeric('accuracy', { precision: 10, scale: 2 }),
+    livenessPassed: boolean('liveness_passed').default(false),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+);

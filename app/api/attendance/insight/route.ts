@@ -2,12 +2,10 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, query } from '@/lib/db';
 import {
   attendanceSummary,
   institutions as institutionsTable,
-  institutionMembers,
-  teacherInstitutionAssignments
 } from '@/lib/schemas/attendance';
 import { attendanceInsights as attendanceInsightsTable } from '@/lib/schemas/attendance-insight';
 import { eq, and, gte, lte, inArray, sql } from 'drizzle-orm';
@@ -53,16 +51,19 @@ export async function POST(req: Request) {
 
     // Jika bukan admin dan ingin melihat insight guru lain, pastikan guru tersebut berada di institusi yang sama
     if (targetTeacherId !== session.user.id && (session.user.role || '') !== 'admin') {
-      const userInstitutionMembers = await db.select({ institutionId: institutionMembers.institutionId })
-        .from(institutionMembers)
-        .where(eq(institutionMembers.userId, session.user.id));
+      const membersResult = await query(`
+        SELECT institution_id as "institutionId"
+        FROM payload.institution_members
+        WHERE app_user_id = $1 AND status = 'active'
+      `, [session.user.id]);
+      const userInstitutionMembers = membersResult.rows;
 
-      const teacherAssignments = await db.select({ institutionId: teacherInstitutionAssignments.institutionId })
-        .from(teacherInstitutionAssignments)
-        .where(and(
-          eq(teacherInstitutionAssignments.teacherId, targetTeacherId),
-          eq(teacherInstitutionAssignments.status, 'aktif')
-        ));
+      const assignmentsResult = await query(`
+        SELECT institution_id as "institutionId"
+        FROM payload.institution_members
+        WHERE app_user_id = $1 AND status = 'active'
+      `, [targetTeacherId]);
+      const teacherAssignments = assignmentsResult.rows;
 
       // Pastikan guru yang dituju berada di salah satu institusi tempat pengguna saat ini bertugas
       const hasAccess = teacherAssignments.some(assignment => 
@@ -130,12 +131,12 @@ export async function POST(req: Request) {
     ));
 
     // Ambil informasi institusi guru yang bersangkutan
-    const teacherAssignments = await db.select({ institutionId: teacherInstitutionAssignments.institutionId })
-      .from(teacherInstitutionAssignments)
-      .where(and(
-        eq(teacherInstitutionAssignments.teacherId, targetTeacherId),
-        eq(teacherInstitutionAssignments.status, 'aktif')
-      ));
+    const assignmentsResult2 = await query(`
+      SELECT institution_id as "institutionId"
+      FROM payload.institution_members
+      WHERE app_user_id = $1 AND status = 'active'
+    `, [targetTeacherId]);
+    const teacherAssignments = assignmentsResult2.rows;
 
     const fallbackInstitutions = await db.select({ id: institutionsTable.id })
       .from(institutionsTable);
@@ -358,16 +359,19 @@ export async function GET(req: Request) {
     }
 
     if (targetTeacherId !== session.user.id && (session.user.role || '') !== 'admin') {
-      const userInstitutionMembers = await db.select({ institutionId: institutionMembers.institutionId })
-        .from(institutionMembers)
-        .where(eq(institutionMembers.userId, session.user.id));
+      const membersResult2 = await query(`
+        SELECT institution_id as "institutionId"
+        FROM payload.institution_members
+        WHERE app_user_id = $1 AND status = 'active'
+      `, [session.user.id]);
+      const userInstitutionMembers = membersResult2.rows;
 
-      const teacherAssignments = await db.select({ institutionId: teacherInstitutionAssignments.institutionId })
-        .from(teacherInstitutionAssignments)
-        .where(and(
-          eq(teacherInstitutionAssignments.teacherId, targetTeacherId),
-          eq(teacherInstitutionAssignments.status, 'aktif')
-        ));
+      const assignmentsResult3 = await query(`
+        SELECT institution_id as "institutionId"
+        FROM payload.institution_members
+        WHERE app_user_id = $1 AND status = 'active'
+      `, [targetTeacherId]);
+      const teacherAssignments = assignmentsResult3.rows;
 
       const hasAccess = teacherAssignments.some(assignment => 
         userInstitutionMembers.some(member => Number(member.institutionId) === assignment.institutionId)

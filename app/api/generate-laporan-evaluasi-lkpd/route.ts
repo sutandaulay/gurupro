@@ -322,14 +322,15 @@ Keluarkan HANYA JSON valid tanpa markdown fence atau teks pembuka.
 
       console.log("[Generate Laporan Evaluasi LKPD] Successfully generated report with",
         parsed.capaianPerKKTP.length, "KKTP evaluated");
-    } catch (aiError: any) {
+    } catch (aiError: unknown) {
       console.error("Laporan Evaluasi LKPD AI generation failed:", aiError);
+      const aiMsg = aiError instanceof Error ? aiError.message : String(aiError ?? "Unknown error");
 
       // Log failed usage
-      await logFailedPoinUsage(userId, 0, "generate-laporan-evaluasi-lkpd", aiError.message);
+      await logFailedPoinUsage(userId, 0, "generate-laporan-evaluasi-lkpd", aiMsg);
 
       return NextResponse.json(
-        { error: `Gagal memproses AI: ${aiError.message || aiError}` },
+        { error: `Gagal memproses AI: ${aiMsg}` },
         { status: 502 }
       );
     }
@@ -386,13 +387,12 @@ Keluarkan HANYA JSON valid tanpa markdown fence atau teks pembuka.
       console.error("Failed to save Laporan Evaluasi LKPD:", dbErr);
     }
 
-    // Deduct Poin based on actual usage
-    if (user.role !== "admin") {
+    // Deduct Poin only if AI was used and succeeded
+    if (user.role !== "admin" && aiResult?.usage) {
       try {
-          await deductPoinFromAIResult({ success: true, usage: aiResult?.usage || null }, userId, "generate-laporan-evaluasi-lkpd", {});
-
-          console.log(`[Generate Laporan Evaluasi LKPD] Poin deducted`);
-      } catch (poinError: any) {
+        await deductPoinFromAIResult({ success: true, usage: aiResult.usage }, userId, "generate-laporan-evaluasi-lkpd", {});
+        console.log(`[Generate Laporan Evaluasi LKPD] Poin deducted`);
+      } catch (poinError: unknown) {
         console.error("[Generate Laporan Evaluasi LKPD] Poin deduction failed:", poinError);
       }
     }
@@ -404,10 +404,11 @@ Keluarkan HANYA JSON valid tanpa markdown fence atau teks pembuka.
       lkpdRef: input.lkpdRef,
       akses_terbatas: canAccess, // True if principal/vp can view
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Laporan Evaluasi LKPD Generation Error:", error);
+    const msg = error instanceof Error ? error.message : String(error ?? "Unknown error");
     return NextResponse.json(
-      { error: error.message || "Gagal generate Laporan Evaluasi LKPD" },
+      { error: msg },
       { status: 500 }
     );
   }

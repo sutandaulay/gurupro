@@ -86,6 +86,7 @@ Berikan saran yang praktis dan langsung bisa digunakan.
       sub_materi: result.data.sub_materi.join(', '),
       perlu_remedial: result.data.perlu_remedial,
       catatan_persiapan: result.data.catatan_persiapan,
+      ai_generated: result.success,
     };
   } catch (error: any) {
     console.error('Error generating next materi:', error);

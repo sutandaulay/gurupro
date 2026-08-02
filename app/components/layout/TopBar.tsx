@@ -19,8 +19,15 @@ import {
   IconMinimize,
 } from "@tabler/icons-react";
 import dynamic from "next/dynamic";
-import InstitutionSwitcher from "@/app/components/institution-switcher";
 import { useTeacherStore, useProfileStore } from "@/lib/stores";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const PoinTopUpModal = dynamic(() => import("@/app/components/ui/PoinTopUpModal"), { ssr: false });
 
@@ -157,6 +164,10 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
   const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false);
   const setStoreActiveSchool = useTeacherStore((s) => s.setActiveSchool);
   const setStoreSchools = useTeacherStore((s) => s.setSchools);
+  const teacherSchools = useTeacherStore((s) => s.schools);
+  const activeSchoolId = useTeacherStore((s) => s.activeSchoolId);
+  const [isContextDropdownOpen, setIsContextDropdownOpen] = useState(false);
+  const [pendingSchool, setPendingSchool] = useState<{ id: string; name: string } | null>(null);
 
   // Fetch profile on mount
   useEffect(() => {
@@ -348,8 +359,99 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
           </div>
           
           <div className="flex items-center gap-2">
-            {/* Institution Switcher (Ruang Kerja) */}
-            <InstitutionSwitcher />
+            {/* School Switcher */}
+            {teacherSchools.length > 0 && (
+              <div className="relative hidden md:block">
+                <button
+                  onClick={() => setIsContextDropdownOpen(!isContextDropdownOpen)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-xs transition-colors cursor-pointer"
+                >
+                  <IconBuilding size={14} className="text-violet-600 shrink-0" />
+                  <span className="text-gray-800 font-semibold max-w-[120px] truncate">
+                    {teacherSchools.find(s => s.id === activeSchoolId)?.nama_sekolah || "Pilih Sekolah"}
+                  </span>
+                  <svg
+                    className={`w-3 h-3 text-gray-400 transition-transform ${isContextDropdownOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {isContextDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsContextDropdownOpen(false)} />
+                    <div className="absolute right-0 top-full mt-1 z-50 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1 animate-fade-in max-h-64 overflow-y-auto">
+                      <div className="px-3 py-2 border-b border-gray-100">
+                        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                          Ganti Sekolah Aktif
+                        </p>
+                      </div>
+                      {teacherSchools.map((school) => (
+                        <button
+                          key={school.id}
+                          onClick={() => {
+                            setPendingSchool({ id: school.id, name: school.nama_sekolah });
+                            setIsContextDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs text-left hover:bg-gray-50 transition-colors cursor-pointer ${
+                            activeSchoolId === school.id
+                              ? 'bg-violet-50 text-violet-700 font-semibold'
+                              : 'text-gray-700'
+                          }`}
+                        >
+                          <IconBuilding size={14} className="shrink-0 text-gray-400" />
+                          <span className="truncate">{school.nama_sekolah}</span>
+                          {activeSchoolId === school.id && (
+                            <span className="ml-auto">
+                              <svg className="w-3.5 h-3.5 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            <Dialog open={!!pendingSchool} onOpenChange={(open) => { if (!open) setPendingSchool(null); }}>
+              <DialogContent className="sm:max-w-[400px]">
+                <DialogHeader>
+                  <DialogTitle>Pindah Sekolah</DialogTitle>
+                  <DialogDescription>
+                    Yakin ingin pindah ke <span className="font-semibold text-slate-800">{pendingSchool?.name}</span>?
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <button
+                    type="button"
+                    onClick={() => setPendingSchool(null)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (pendingSchool) {
+                        setStoreActiveSchool(pendingSchool.id);
+                        sessionStorage.setItem("gurupro_school_selected", pendingSchool.id);
+                        window.dispatchEvent(new Event("gurupro_school_changed"));
+                        setPendingSchool(null);
+                      }
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 transition-colors"
+                  >
+                    Ya, Pindah
+                  </button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
              {/* Beli Poin Ekstra Quick Button */}
             <button
