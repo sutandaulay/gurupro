@@ -90,10 +90,31 @@ export async function GET() {
       },
     });
 
+    // Per-schedule completion: a schedule is "done" when a completed
+    // teaching session exists for it today (not the reverse — one global
+    // session must NOT mark every schedule as completed).
+    const completedSessions = await prisma.teaching_sessions.findMany({
+      where: {
+        user_id: userId,
+        session_date: today,
+        status: 'completed',
+        schedule_id: { not: null },
+      },
+      select: { schedule_id: true },
+    });
+    const completedScheduleIds = new Set(
+      completedSessions.map((s) => s.schedule_id).filter(Boolean)
+    );
+
+    const schedulesWithStatus = todaySchedules.map((s) => ({
+      ...s,
+      isCompleted: completedScheduleIds.has(s.id),
+    }));
+
     return NextResponse.json({
       session: todaySession || null,
       pendingTasks,
-      todaySchedules,
+      todaySchedules: schedulesWithStatus,
       date: today.toISOString().split('T')[0],
     });
   } catch (error) {

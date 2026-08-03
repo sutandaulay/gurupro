@@ -22,6 +22,9 @@ export interface SelesaiMengajarInput {
   rpp_id?: string;
   school_id?: string;
   schedule_id?: string;
+  save_journal?: boolean;
+  generate_next_materi?: boolean;
+  jenjang?: string;
 }
 
 export interface ScheduleInfo {

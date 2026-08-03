@@ -19,6 +19,7 @@ import {
   IconMinimize,
 } from "@tabler/icons-react";
 import dynamic from "next/dynamic";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useTeacherStore, useProfileStore } from "@/lib/stores";
 import {
   Dialog,
@@ -463,6 +464,9 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
               </svg>
               <span>Beli Poin</span>
             </button>
+
+            {/* Theme Toggle */}
+            <ThemeToggle variant="icon" />
 
             {/* Fullscreen Toggle Button */}
             <button

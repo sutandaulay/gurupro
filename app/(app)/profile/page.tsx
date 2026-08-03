@@ -57,7 +57,7 @@ function ProfileContent() {
   const [payoutBankAccountName, setPayoutBankAccountName] = useState("");
 
   const NOTIF_DEFAULTS: NotificationSettings = { email: true, push: true, sms: false };
-  const PREF_DEFAULTS: UserPreferences = { tema: "system", zonaWaktu: "Asia/Jakarta" };
+  const PREF_DEFAULTS: UserPreferences = { tema: "light", zonaWaktu: "Asia/Jakarta" };
 
   // Notification preferences
   const [notifications, setNotifications] = useState<NotificationSettings>(NOTIF_DEFAULTS);
@@ -245,8 +245,21 @@ function ProfileContent() {
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
+    // Sync dropdown state if theme changed elsewhere (e.g. TopBar toggle)
+    const handleThemeChanged = () => {
+      try {
+        const savedPref = localStorage.getItem("gurupro_user_preferences");
+        if (savedPref) {
+          const parsed = JSON.parse(savedPref);
+          if (parsed.tema) setPreferences({ ...preferencesRef.current, tema: parsed.tema });
+        }
+      } catch { /* ignore */ }
+    };
+    window.addEventListener("gurupro_theme_changed", handleThemeChanged);
+
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("gurupro_theme_changed", handleThemeChanged);
     };
   }, [preferences.tema]);
 

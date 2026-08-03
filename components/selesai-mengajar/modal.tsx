@@ -1,7 +1,7 @@
 "use client";
 import { apiFetch } from "@/lib/api-client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   IconX,
   IconCheck,
@@ -75,15 +75,146 @@ function SelesaiMengajarModalContent({
   const [result, setResult] = useState<SelesaiMengajarResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Saved drafts from localStorage
+  const [savedDrafts, setSavedDrafts] = useState<Array<{
+    scheduleId: string;
+    step: string;
+    schedule: any;
+    lastUpdated: string;
+  }>>([]);
+
+  const scanSavedDrafts = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const prefix = 'selesai-mengajar-v2-';
+      const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
+      const drafts = keys.map(k => {
+        const stored = localStorage.getItem(k);
+        if (!stored) return null;
+        try {
+          return { scheduleId: k.replace(prefix, ''), ...JSON.parse(stored) };
+        } catch { return null; }
+      }).filter(Boolean) as Array<{
+        scheduleId: string;
+        step: string;
+        schedule: any;
+        lastUpdated: string;
+      }>;
+      setSavedDrafts(drafts);
+    } catch {}
+  };
+
+  // State persistence via localStorage (survives close + reopen, refresh)
+   const getStorageKey = (scheduleId: string) => `selesai-mengajar-v2-${scheduleId}`;
+
+  const persistState = (scheduleId: string) => {
+    if (typeof window === 'undefined' || !scheduleId) return;
+    try {
+      localStorage.setItem(getStorageKey(scheduleId), JSON.stringify({
+        step,
+        teacherLocation,
+        studentAttendance,
+        topik,
+        catatan,
+        saveJournal,
+        lastUpdated: new Date().toISOString(),
+        sessionId: (selectedSchedule as any)?._sessionId,
+        schedule: selectedSchedule ? {
+          id: selectedSchedule.id,
+          class_id: selectedSchedule.class_id,
+          subject_id: selectedSchedule.subject_id,
+          school_id: selectedSchedule.school_id,
+          class_name: selectedSchedule.class_name,
+          subject_name: selectedSchedule.subject_name,
+          jam_mulai: selectedSchedule.jam_mulai,
+          jam_selesai: selectedSchedule.jam_selesai,
+          school_name: selectedSchedule.school_name || '',
+        } : null,
+      }));
+    } catch {}
+  };
+
+  const clearSavedState = (scheduleId?: string) => {
+    if (typeof window === 'undefined' || !scheduleId) return;
+    try {
+      localStorage.removeItem(getStorageKey(scheduleId));
+    } catch {}
+  };
+
+  const restoreState = (scheduleId: string, schedule?: ScheduleInfo) => {
+    if (typeof window === 'undefined' || !scheduleId) return false;
+    try {
+      const stored = localStorage.getItem(getStorageKey(scheduleId));
+      if (!stored) return false;
+      const data = JSON.parse(stored);
+      if (data.step) setStep(data.step);
+      if (data.teacherLocation) setTeacherLocation(data.teacherLocation);
+      if (data.studentAttendance) setStudentAttendance(data.studentAttendance);
+      if (data.topik !== undefined) setTopik(data.topik);
+      if (data.catatan !== undefined) setCatatan(data.catatan);
+      if (data.saveJournal !== undefined) setSaveJournal(data.saveJournal);
+      if (data.sessionId && schedule) {
+        (schedule as any)._sessionId = data.sessionId;
+      } else if (!schedule && data.schedule) {
+        // Restore schedule object from localStorage when no schedule param provided
+        setSelectedSchedule(data.schedule);
+        if (data.sessionId) {
+          (data.schedule as any)._sessionId = data.sessionId;
+        }
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Skip persist pada render pertama agar tidak menimpa draft tersimpan
+  // sebelum restoreState selesai dijalankan oleh isOpen effect.
+  const skipPersistRef = useRef(true);
+
+  // Persist state to localStorage whenever relevant values change
+  useEffect(() => {
+    if (skipPersistRef.current) {
+      skipPersistRef.current = false;
+      return;
+    }
+    if (selectedSchedule?.id && step !== 'select' && step !== 'processing' && step !== 'result') {
+      persistState(selectedSchedule.id);
+    }
+  }, [step, selectedSchedule?.id, teacherLocation, studentAttendance, topik, catatan, saveJournal]);
+
   const fetchSchedules = async () => {
     try {
       const response = await apiFetch('/api/selesai-mengajar');
       if (response.ok) {
         const data = await response.json();
         setSchedules(data.schedules || []);
-        if (data.schedules?.length === 1) {
-          setSelectedSchedule(data.schedules[0]);
+
+        // If no schedule selected yet, try to find one matching saved state in localStorage
+        if (!selectedSchedule && typeof window !== 'undefined') {
+          const prefix = 'selesai-mengajar-v2-';
+          const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
+          if (keys.length > 0) {
+            const savedScheduleId = keys[0].replace(prefix, '');
+            // Check both schedules (filtered) and allSchedules
+            const allAvailable = (data.schedules || []).concat(data.allSchedules || []);
+            const matchingSchedule = allAvailable.find(
+              (s: any) => s.id === savedScheduleId
+            );
+            if (matchingSchedule) {
+              setSelectedSchedule(matchingSchedule as ScheduleInfo);
+              restoreState(savedScheduleId, matchingSchedule as ScheduleInfo);
+              return;
+            }
+          }
+        }
+
+        // If only 1 schedule and none selected, auto-select
+        if (data.schedules?.length === 1 && !selectedSchedule) {
+          const schedule = data.schedules[0];
+          setSelectedSchedule(schedule);
           setStep('guru');
+          restoreState(schedule.id, schedule);
         }
       } else {
         const data = await response.json().catch(() => null);
@@ -96,20 +227,77 @@ function SelesaiMengajarModalContent({
     }
   };
 
-  useEffect(() => {
-    if (isOpen) fetchSchedules();
+   useEffect(() => {
+    if (!isOpen) return;
+
+    fetchSchedules();
+    scanSavedDrafts();
+
+    const resetFormState = () => {
+      setTeacherLocation(null);
+      setStudentAttendance({});
+      setTopik('');
+      setCatatan('');
+      setSaveJournal(true);
+      setProgress([]);
+      setResult(null);
+      setError(null);
+    };
+
+    if (preselectedSchedule?.id) {
+      // Jika schedule yang dipilih berganti (dari FAB/kartu), reset isian lalu
+      // restore draft tersimpan untuk schedule tersebut (jika ada).
+      if (!selectedSchedule || selectedSchedule.id !== preselectedSchedule.id) {
+        resetFormState();
+        setSelectedSchedule(preselectedSchedule);
+      }
+      const restored = restoreState(preselectedSchedule.id, preselectedSchedule);
+      if (!restored) {
+        // Belum ada draft untuk schedule ini (atau sebelumnya sudah selesai
+        // dan draft sudah dibersihkan) — mulai dari langkah guru dengan
+        // isian bersih.
+        resetFormState();
+        setStep('guru');
+      }
+    } else {
+      // Tanpa preselectedSchedule: jika sebelumnya selesai, kembali ke select.
+      if (step === 'result' || step === 'processing') {
+        resetFormState();
+        setStep('select');
+      }
+      // Fallback: scan localStorage untuk draft tersimpan
+      const prefix = 'selesai-mengajar-v2-';
+      const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
+      if (keys.length > 0) {
+        const savedScheduleId = keys[0].replace(prefix, '');
+        restoreState(savedScheduleId); // schedule restored from localStorage data
+      }
+    }
   }, [isOpen]);
 
   // Fetch students when entering siswa step
   useEffect(() => {
-    if (step === 'siswa' && selectedSchedule?.class_id) {
+    if (isOpen && step === 'siswa' && selectedSchedule?.class_id) {
       fetchStudents();
     }
-  }, [step, selectedSchedule?.class_id]);
+  }, [isOpen, step, selectedSchedule?.class_id]);
 
   const handleSelectSchedule = (schedule: ScheduleInfo) => {
     setSelectedSchedule(schedule);
     setStep('guru');
+    // Restore any previously saved state for this schedule
+    restoreState(schedule.id, schedule);
+  };
+
+  const handleResumeDraft = (draft: {
+    scheduleId: string;
+    step: string;
+    schedule: any;
+    lastUpdated: string;
+  }) => {
+    const schedule = draft.schedule;
+    setSelectedSchedule(schedule);
+    restoreState(draft.scheduleId, schedule);
   };
 
   const getLocation = () => {
@@ -138,11 +326,11 @@ function SelesaiMengajarModalContent({
 
   // Auto-capture lokasi saat masuk step presensi guru
   useEffect(() => {
-    if (step === 'guru' && !teacherLocation && !isGettingLocation && navigator.geolocation) {
+    if (isOpen && step === 'guru' && !teacherLocation && !isGettingLocation && navigator.geolocation) {
       getLocation();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+  }, [isOpen, step]);
 
   const handlePresensiGuru = async () => {
     if (!selectedSchedule) return;
@@ -179,9 +367,12 @@ function SelesaiMengajarModalContent({
       setStep('siswa');
       onSessionStarted?.(selectedSchedule.id, sessionId);
 
-      // Mark session as active in sessionStorage so FAB knows
+      // Persist state immediately so it survives close+reopen
+      persistState(selectedSchedule.id);
+
+      // Mark session as active in localStorage so FAB knows
       if (selectedSchedule.id && typeof window !== 'undefined') {
-        sessionStorage.setItem(`teaching_session_${selectedSchedule.id}`, 'active');
+        localStorage.setItem(`teaching_session_${selectedSchedule.id}`, 'active');
       }
     } catch (err: any) {
       setError(err.message || 'Terjadi kesalahan');
@@ -198,9 +389,23 @@ function SelesaiMengajarModalContent({
       const data = await res.json();
       const list = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
       setStudents(list);
+
+      // Restore saved studentAttendance from localStorage if available
+      let savedAttendance: { [id: string]: { status: string; catatan: string } } = {};
+      if (selectedSchedule?.id && typeof window !== 'undefined') {
+        try {
+          const stored = localStorage.getItem(getStorageKey(selectedSchedule.id));
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            savedAttendance = parsed.studentAttendance || {};
+          }
+        } catch {}
+      }
+
       const initial: { [id: string]: { status: string; catatan: string } } = {};
       list.forEach((s: any) => {
-        initial[s.id] = { status: 'Hadir', catatan: '' };
+        const existing = savedAttendance[s.id];
+        initial[s.id] = existing || { status: 'Hadir', catatan: '' };
       });
       setStudentAttendance(initial);
     } catch (err) {
@@ -211,6 +416,9 @@ function SelesaiMengajarModalContent({
   };
 
   const handlePresensiSelesai = () => {
+    if (selectedSchedule?.id) {
+      persistState(selectedSchedule.id);
+    }
     setStep('selesai');
   };
 
@@ -271,6 +479,7 @@ function SelesaiMengajarModalContent({
       catatan_tambahan: catatan || '',
       schedule_id: selectedSchedule.id,
       school_id: selectedSchedule.school_id,
+      save_journal: saveJournal,
     };
 
     let abortController: AbortController | null = null;
@@ -315,7 +524,8 @@ function SelesaiMengajarModalContent({
             setProgress(steps.map((s) => ({ ...s, status: 'done' as const })));
             setStep('result');
             if (selectedSchedule?.id && typeof window !== 'undefined') {
-              sessionStorage.removeItem(`teaching_session_${selectedSchedule.id}`);
+              localStorage.removeItem(`teaching_session_${selectedSchedule.id}`);
+              clearSavedState(selectedSchedule.id);
             }
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('selesaiMengajarDone', {
@@ -351,6 +561,9 @@ function SelesaiMengajarModalContent({
 
   const handleClose = () => {
     if (step === 'processing') return;
+    if (selectedSchedule?.id) {
+      persistState(selectedSchedule.id);
+    }
     onClose();
   };
 
@@ -434,6 +647,39 @@ function SelesaiMengajarModalContent({
                   ))}
                 </div>
               </>
+            )}
+
+            {savedDrafts.length > 0 && (
+              <div className="pt-4 border-t border-slate-100">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Draft Tersimpan
+                </p>
+                <div className="space-y-2">
+                  {savedDrafts.map((draft) => (
+                    <button
+                      key={draft.scheduleId}
+                      onClick={() => handleResumeDraft(draft)}
+                      className="w-full p-3 bg-amber-50 border border-amber-200 rounded-xl transition-all text-left group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-semibold text-amber-800">
+                            {draft.schedule?.subject_name} — {draft.schedule?.class_name}
+                          </div>
+                          <div className="text-xs text-amber-600">
+                            {draft.step === 'guru' ? 'Presensi Guru' :
+                             draft.step === 'siswa' ? 'Presensi Siswa' :
+                             draft.step === 'selesai' ? 'Selesai Mengajar' : 'Draft'}
+                          </div>
+                        </div>
+                        <span className="text-xs text-amber-500 font-medium">
+                          Klik untuk lanjutkan
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -816,9 +1062,14 @@ function SelesaiMengajarModalContent({
               )}
             </button>
 
-            <button onClick={() => setStep('siswa')} className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1">
-              <IconChevronLeft size={16} /><span>Kembali ke Presensi Siswa</span>
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => setStep('siswa')} className="flex-1 py-2 text-sm text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1">
+                <IconChevronLeft size={16} /><span>Presensi Siswa</span>
+              </button>
+              <button onClick={() => setStep('guru')} className="flex-1 py-2 text-sm text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1">
+                <IconChevronLeft size={16} /><span>Presensi Guru</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -853,5 +1104,8 @@ function SelesaiMengajarModalContent({
 }
 
 export default function SelesaiMengajarModal(props: SelesaiMengajarModalProps) {
-  return props.isOpen ? <SelesaiMengajarModalContent {...props} /> : null;
+  // Komponen SELALU di-mount agar state (absen siswa, topik, dsb) tetap
+  // bertahan saat modal ditutup dan dibuka kembali. Konten disembunyikan
+  // via `if (!isOpen) return null` di dalam komponen.
+  return <SelesaiMengajarModalContent {...props} />;
 }

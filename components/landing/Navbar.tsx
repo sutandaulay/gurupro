@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { IconSparklesFilled, IconMenu2, IconX } from "@tabler/icons-react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export interface NavItem {
   label: string; // CMS: navbar item label
@@ -72,6 +73,7 @@ export default function Navbar({
 
         {/* Desktop CTA Buttons */}
         <div className="hidden md:flex items-center gap-3">
+          <ThemeToggle variant="icon" />
           {isLoggedIn ? (
             <Link
               href="/dashboard"
@@ -144,6 +146,7 @@ export default function Navbar({
 
             {/* Drawer CTA */}
             <div className="p-6 border-t border-neutral-100 space-y-3">
+              <ThemeToggle variant="segmented" className="w-full justify-center" />
               {isLoggedIn ? (
                 <Link
                   href="/dashboard"

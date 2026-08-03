@@ -103,11 +103,33 @@ export default function Providers({
           }
         }
       } else {
-        // Default: apply system preference
-        const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        if (isSystemDark) { document.documentElement.classList.add("dark"); document.body.classList.add("dark"); }
+        // Default: light theme (not system) unless user explicitly saved a preference
+        document.documentElement.classList.add("light");
+        document.body.classList.remove("dark");
       }
     } catch { /* ignore */ }
+
+    // Sync theme when changed elsewhere (e.g. ThemeToggle di TopBar/Navbar)
+    const handleThemeChanged = () => {
+      const savedPref = localStorage.getItem("gurupro_user_preferences");
+      const parsed = savedPref ? JSON.parse(savedPref) : {};
+      const tema = parsed.tema || "light";
+      const root = document.documentElement;
+      root.classList.remove("dark", "light");
+      if (tema === "dark") {
+        root.classList.add("dark");
+        document.body.classList.add("dark");
+      } else if (tema === "light") {
+        root.classList.add("light");
+        document.body.classList.remove("dark");
+      } else {
+        const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (isSystemDark) { root.classList.add("dark"); document.body.classList.add("dark"); }
+        else { root.classList.add("light"); document.body.classList.remove("dark"); }
+      }
+    };
+    window.addEventListener("gurupro_theme_changed", handleThemeChanged);
+    return () => window.removeEventListener("gurupro_theme_changed", handleThemeChanged);
   }, []);
 
   return (

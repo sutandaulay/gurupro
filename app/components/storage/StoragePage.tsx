@@ -1546,7 +1546,7 @@ export default function StoragePage() {
                       </thead>
                       <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
                         {gradesData.map((g, idx) => (
-                          <tr key={g.student_id || idx} className="hover:bg-gray-50/50">
+                          <tr key={`${g.student_id || 'no-id'}-${idx}`} className="hover:bg-gray-50/50">
                             <td className="py-2.5 px-3 text-center text-gray-400">{g.nomor_absen || idx + 1}</td>
                             <td className="py-2.5 px-3 font-semibold text-gray-800">{g.nama_siswa}</td>
                             <td className="py-2.5 px-3 text-center">{g.nilai_awal ?? "-"}</td>

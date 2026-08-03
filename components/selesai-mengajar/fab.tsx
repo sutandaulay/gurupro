@@ -36,11 +36,11 @@ function getScheduleState(
   if (incompleteSchedules.length === 0) return 'completed';
 
   // Check if any incomplete schedule has an active session
-  // We track this via sessionStorage — if user started but didn't finish
+  // We track this via localStorage — if user started but didn't finish
   if (typeof window !== 'undefined') {
     const inProgress = incompleteSchedules.some((s: any) => {
       const key = `teaching_session_${s.id}`;
-      return sessionStorage.getItem(key) === 'active';
+      return localStorage.getItem(key) === 'active';
     });
     if (inProgress) return 'in_progress';
   }

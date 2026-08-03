@@ -306,15 +306,21 @@ export async function GET(req: NextRequest) {
     // ==========================================
     // 5b. Get today's attendance summary
     // ==========================================
-    const todaySummary = await db
-      .select()
-      .from(attendanceSummary)
-      .where(
-        and(
-          eq(attendanceSummary.teacherId, teacherId),
-          eq(attendanceSummary.date, startOfDay)
-        )
-      );
+    let todaySummary = []; // Pastikan inisialisasi eksplisit
+    try {
+      todaySummary = await db
+        .select()
+        .from(attendanceSummary)
+        .where(
+          and(
+            eq(attendanceSummary.teacherId, teacherId),
+            eq(attendanceSummary.date, startOfDay)
+          )
+        );
+    } catch (error) {
+      console.error('Error fetching today\'s attendance summary:', error);
+      todaySummary = []; // Tetapkan array kosong jika terjadi error
+    }
 
     // ==========================================
     // 6. Build response
@@ -333,7 +339,7 @@ export async function GET(req: NextRequest) {
         attendanceStatus = 'completed';
       } else if (checkIn) {
         attendanceStatus = 'check_in_only';
-      } else if (todaySummary.find((s) => s.institutionId === assignment.institutionId)) {
+      } else if (Array.isArray(todaySummary) && todaySummary.find((s) => s.institutionId === assignment.institutionId)) {
         attendanceStatus = 'hadir';
       }
 

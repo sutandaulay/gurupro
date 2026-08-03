@@ -84,22 +84,6 @@ export async function POST(request: NextRequest) {
     const isPro = userDb?.status_langganan && userDb.status_langganan !== 'free';
     const isExpired = isPro && userDb.subscription_end && new Date(userDb.subscription_end).getTime() < Date.now();
 
-    if (isExpired && userDb?.role !== 'admin') {
-      return NextResponse.json({ error: 'expired' }, { status: 403 });
-    }
-
-    // Poin check (hanya untuk non-admin) - cek sebelum stream dibuka
-    if (userDb?.role !== 'admin') {
-      const poinAccess = await getUserPoinAccess(user.id);
-      if (!poinAccess.access.allowed) {
-        const message =
-          poinAccess.access.reason === 'subscription_expired'
-            ? 'Masa aktif langganan akun Anda telah habis! Silakan lakukan perpanjangan langganan terlebih dahulu.'
-            : 'Poin GuruPRO Anda telah habis! Silakan lakukan isi ulang atau upgrade langganan di Landing Page.';
-        return NextResponse.json({ error: message }, { status: 403 });
-      }
-    }
-
     const guruId = user.id;
     const body: SelesaiMengajarInput = await request.json();
 
@@ -109,6 +93,28 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: kelas_id, mapel_id, tanggal' },
         { status: 400 }
       );
+    }
+
+    // Determine if AI tasks should run (based on checkbox and poin availability)
+    // AI check is deferred to here so non-AI data (absensi, ATP, memory) is always saved
+    const useAI = body.save_journal !== false;
+    let aiAllowed = useAI;
+    let aiBlockedReason: string | null = null;
+
+    if (useAI && userDb?.role !== 'admin') {
+      if (isExpired) {
+        aiAllowed = false;
+        aiBlockedReason = 'Masa aktif langganan Anda telah habis. Jurnal AI dilewati, namun absensi tetap disimpan.';
+      } else {
+        const poinAccess = await getUserPoinAccess(guruId);
+        if (!poinAccess.access.allowed) {
+          aiAllowed = false;
+          aiBlockedReason =
+            poinAccess.access.reason === 'subscription_expired'
+              ? 'Masa aktif langganan Anda telah habis. Jurnal AI dilewati, namun absensi tetap disimpan.'
+              : 'Poin GuruPRO Anda telah habis. Jurnal AI dilewati, namun absensi tetap disimpan.';
+        }
+      }
     }
 
     // Get guru name
@@ -131,6 +137,32 @@ export async function POST(request: NextRequest) {
             message: 'Memulai proses administrasi...',
           });
 
+          // Warn if AI blocked but non-AI tasks will proceed
+          if (!useAI) {
+            sendEvent(controller, {
+              step: 'jurnal',
+              status: 'done',
+              message: 'Pembuatan jurnal AI dilewati (dimatikan pengguna)',
+            });
+            sendEvent(controller, {
+              step: 'next',
+              status: 'done',
+              message: 'Saran materi AI dilewati (dimatikan pengguna)',
+            });
+          } else if (!aiAllowed && aiBlockedReason) {
+            errors.push(aiBlockedReason);
+            sendEvent(controller, {
+              step: 'jurnal',
+              status: 'error',
+              message: aiBlockedReason,
+            });
+            sendEvent(controller, {
+              step: 'next',
+              status: 'error',
+              message: 'Saran materi AI dilewati (poin/paket tidak mencukupi)',
+            });
+          }
+
           // PARALLEL TASKS
           const inputData: SelesaiMengajarInput = {
             ...body,
@@ -141,15 +173,20 @@ export async function POST(request: NextRequest) {
           // PARALLEL TASKS - Run all in parallel using Promise.allSettled
           // This ensures one failure doesn't cancel others
 
-          // Task 1: Generate Jurnal
-          sendEvent(controller, {
-            step: 'jurnal',
-            status: 'loading',
-            message: 'Mengisi jurnal mengajar...',
-          });
-          const jurnalPromise = generateAndSaveJurnal(inputData, guruName);
+          // Task 1: Generate Jurnal (AI task - skip if disabled or poin insufficient)
+          let jurnalPromise: Promise<any>;
+          if (useAI && aiAllowed) {
+            sendEvent(controller, {
+              step: 'jurnal',
+              status: 'loading',
+              message: 'Mengisi jurnal mengajar...',
+            });
+            jurnalPromise = generateAndSaveJurnal(inputData, guruName);
+          } else {
+            jurnalPromise = Promise.resolve(null);
+          }
 
-          // Task 2: Save Absensi
+          // Task 2: Save Absensi (always)
           sendEvent(controller, {
             step: 'absensi',
             status: 'loading',
@@ -157,7 +194,7 @@ export async function POST(request: NextRequest) {
           });
           const absensiPromise = saveAbsensiSummary(inputData);
 
-          // Task 3: Update ATP
+          // Task 3: Update ATP (always)
           sendEvent(controller, {
             step: 'atp',
             status: 'loading',
@@ -165,7 +202,7 @@ export async function POST(request: NextRequest) {
           });
           const atpPromise = updateProgressATP(inputData);
 
-          // Task 4: Update Lesson Memory
+          // Task 4: Update Lesson Memory (always)
           sendEvent(controller, {
             step: 'memory',
             status: 'loading',
@@ -173,13 +210,18 @@ export async function POST(request: NextRequest) {
           });
           const memoryPromise = updateLessonMemory(inputData);
 
-          // Task 5: Generate Next Materi
-          sendEvent(controller, {
-            step: 'next',
-            status: 'loading',
-            message: 'Menyiapkan materi pertemuan berikutnya...',
-          });
-          const nextMateriPromise = generateNextMateri(inputData);
+          // Task 5: Generate Next Materi (AI task - skip if disabled or poin insufficient)
+          let nextMateriPromise: Promise<any>;
+          if (useAI && aiAllowed) {
+            sendEvent(controller, {
+              step: 'next',
+              status: 'loading',
+              message: 'Menyiapkan materi pertemuan berikutnya...',
+            });
+            nextMateriPromise = generateNextMateri(inputData);
+          } else {
+            nextMateriPromise = Promise.resolve(null);
+          }
 
           // Wait for all tasks to complete
           const results = await Promise.allSettled([
@@ -194,12 +236,18 @@ export async function POST(request: NextRequest) {
           const [jurnalResult, absensiResult, atpResult, memoryResult, nextMateriResult] = results;
 
           // Report jurnal status
-          if (jurnalResult.status === 'fulfilled') {
+          if (jurnalResult.status === 'fulfilled' && jurnalResult.value) {
             sendEvent(controller, {
               step: 'jurnal',
               status: 'done',
               message: 'Jurnal mengajar tersimpan',
               data: jurnalResult.value,
+            });
+          } else if (jurnalResult.status === 'fulfilled') {
+            sendEvent(controller, {
+              step: 'jurnal',
+              status: 'done',
+              message: 'Jurnal AI dilewati',
             });
           } else {
             errors.push(`Jurnal: ${jurnalResult.reason?.message}`);
@@ -267,11 +315,18 @@ export async function POST(request: NextRequest) {
               message: 'Materi berikutnya siap',
               data: nextMateriResult.value,
             });
-          } else {
+          } else if (nextMateriResult.status === 'fulfilled') {
             sendEvent(controller, {
               step: 'next',
               status: 'done',
-              message: 'Saran materi tidak tersedia',
+              message: 'Saran materi AI dilewati',
+            });
+          } else {
+            errors.push(`NextMateri: ${nextMateriResult.reason?.message}`);
+            sendEvent(controller, {
+              step: 'next',
+              status: 'error',
+              message: 'Gagal menyiapkan materi berikutnya',
             });
           }
 
@@ -410,24 +465,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
 
-      let userDb: { role: string; status_langganan?: string | null; subscription_end?: Date | null } | null = null;
-      try {
-        userDb = await prisma.users.findUnique({
-          where: { id: user.id },
-          select: { role: true, status_langganan: true, subscription_end: true },
-        });
-      } catch (userError) {
-        console.error('[selesai-mengajar] Error fetching user:', userError);
-        return NextResponse.json({ schedules: [], allSchedules: [] });
-      }
-
-      const isPro = userDb?.status_langganan && userDb.status_langganan !== 'free';
-      const isExpired = isPro && userDb?.subscription_end && new Date(userDb.subscription_end).getTime() < Date.now();
-
-      if (isExpired && userDb?.role !== 'admin') {
-        return NextResponse.json({ error: 'expired' }, { status: 403 });
-      }
-
       let schedules: any[] = [];
       let allSchedules: any[] = [];
 
@@ -487,7 +524,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ schedules: [], allSchedules: [] });
         }
 
-        let completedSessions: { schedule_id: string; journal_generated: boolean | null }[] = [];
+        let completedSessions: { schedule_id: string | null; journal_generated: boolean | null }[] = [];
         try {
           completedSessions = await prisma.teaching_sessions.findMany({
             where: {

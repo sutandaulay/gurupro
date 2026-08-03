@@ -634,9 +634,9 @@ function DashboardContent() {
       const { scheduleId } = ((e as CustomEvent).detail || {}) as { scheduleId?: string };
       if (!scheduleId) return;
       setCompletedSessionIds(prev => new Set([...prev, scheduleId]));
-      // Remove sessionStorage active flag
+      // Remove localStorage active flag
       if (typeof window !== 'undefined' && scheduleId) {
-        sessionStorage.removeItem(`teaching_session_${scheduleId}`);
+        localStorage.removeItem(`teaching_session_${scheduleId}`);
       }
     };
     window.addEventListener('selesaiMengajarDone', handleSessionDone);
@@ -9632,7 +9632,7 @@ const renderJurnalModule = () => {
                 {todaySchedules.map((sch: any) => {
                   const isCompleted = completedSessionIds.has(sch.id);
                   const isInProgress = typeof window !== 'undefined'
-                    ? sessionStorage.getItem(`teaching_session_${sch.id}`) === 'active'
+                    ? localStorage.getItem(`teaching_session_${sch.id}`) === 'active'
                     : false;
 
                   // Pulse if: in-progress + time >= jam_selesai - 5 minutes
@@ -12577,24 +12577,22 @@ const renderJurnalModule = () => {
       <FloatingActionButton />
 
       {/* Selesai Mengajar Modal for RPP */}
-      {rppSelesaiModal.isOpen && rppSelesaiModal.rpp && (
-        <SelesaiMengajarModal
-          isOpen={true}
-          onClose={() => setRppSelesaiModal({ isOpen: false, rpp: null, schedule: null })}
-          preselectedSchedule={rppSelesaiModal.schedule}
-          rppId={rppSelesaiModal.rpp.id}
-          onComplete={() => {
-            setRppSelesaiModal({ isOpen: false, rpp: null, schedule: null });
-            setCompletedSessionIds((prev) => {
-              const newSet = new Set(prev);
-              if (rppSelesaiModal.schedule?.id) {
-                newSet.add(rppSelesaiModal.schedule.id);
-              }
-              return newSet;
-            });
-          }}
-        />
-      )}
+      <SelesaiMengajarModal
+        isOpen={rppSelesaiModal.isOpen && !!rppSelesaiModal.rpp}
+        onClose={() => setRppSelesaiModal({ isOpen: false, rpp: null, schedule: null })}
+        preselectedSchedule={rppSelesaiModal.schedule}
+        rppId={rppSelesaiModal.rpp?.id}
+        onComplete={() => {
+          setRppSelesaiModal({ isOpen: false, rpp: null, schedule: null });
+          setCompletedSessionIds((prev) => {
+            const newSet = new Set(prev);
+            if (rppSelesaiModal.schedule?.id) {
+              newSet.add(rppSelesaiModal.schedule.id);
+            }
+            return newSet;
+          });
+        }}
+      />
 
       {/* School Selector Modal for Multi-School Teachers */}
       {showSchoolSelectorModal && schools.length > 1 && (

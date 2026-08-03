@@ -25,6 +25,7 @@ interface ScheduleInfo {
   jam_mulai: string;
   jam_selesai: string;
   school_name?: string;
+  isCompleted?: boolean;
 }
 
 interface TaskItem {
@@ -64,15 +65,17 @@ function isJamMengajar(
 }
 
 function getFabState(
-  schedules: ScheduleInfo[],
-  todaySession: any
+  schedules: ScheduleInfo[]
 ): "completed" | "in_progress" | "available" {
-  if (todaySession?.status === "completed") return "completed";
   if (!schedules.length) return "available";
 
+  // A schedule counts as "done" only when its own completed session exists.
+  const incompleteSchedules = schedules.filter((s) => !s.isCompleted);
+  if (incompleteSchedules.length === 0) return "completed";
+
   if (typeof window !== "undefined") {
-    const inProgress = schedules.some(
-      (s) => sessionStorage.getItem(`teaching_session_${s.id}`) === "active"
+    const inProgress = incompleteSchedules.some(
+      (s) => localStorage.getItem(`teaching_session_${s.id}`) === "active"
     );
     if (inProgress) return "in_progress";
   }
@@ -82,7 +85,9 @@ function getFabState(
 
 function getCurrentSchedule(schedules: ScheduleInfo[]): ScheduleInfo | null {
   const now = new Date();
-  return schedules.find((s) => isJamMengajar([s], now, 30)) || schedules[0] || null;
+  const incomplete = schedules.filter((s) => !s.isCompleted);
+  const candidates = incomplete.length ? incomplete : schedules;
+  return candidates.find((s) => isJamMengajar([s], now, 30)) || candidates[0] || null;
 }
 
 const FAB_LABEL = {
@@ -138,10 +143,11 @@ export default function FloatingActionButton() {
           jam_mulai: s.jam_mulai,
           jam_selesai: s.jam_selesai,
           school_name: s.school?.nama || "",
+          isCompleted: !!s.isCompleted,
         }));
         setTodaySchedules(schedules);
 
-        const state = getFabState(schedules, data.session);
+        const state = getFabState(schedules);
         setFabState(state);
         setCurrentSchedule(getCurrentSchedule(schedules));
       }
@@ -176,8 +182,18 @@ export default function FloatingActionButton() {
   const hasUncompletedJournal = !journalGenerated;
 
   const handleOpenModal = () => {
-    if (todaySchedules.length === 1) {
-      setSelectedSchedule(todaySchedules[0]);
+    const incomplete = todaySchedules.filter((s) => !s.isCompleted);
+    const candidates = incomplete.length ? incomplete : todaySchedules;
+    if (candidates.length === 1) {
+      setSelectedSchedule(candidates[0]);
+    } else if (typeof window !== "undefined") {
+      // If multiple schedules, try to find the one with an active session
+      const inProgressSchedule = candidates.find(
+        (s) => localStorage.getItem(`teaching_session_${s.id}`) === "active"
+      );
+      if (inProgressSchedule) {
+        setSelectedSchedule(inProgressSchedule);
+      }
     }
     setIsModalOpen(true);
     setIsExpanded(false);
@@ -242,8 +258,7 @@ export default function FloatingActionButton() {
                 {/* Selesaikan Mengajar */}
                 <button
                   onClick={() => {
-                    setIsModalOpen(true);
-                    setIsExpanded(false);
+                    handleOpenModal();
                   }}
                   disabled={fabState === "completed"}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left ${

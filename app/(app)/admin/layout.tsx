@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
+import AdminThemeToggle from '@/components/admin/AdminThemeToggle';
 
 export default async function AdminLayout({
   children,
@@ -16,6 +17,7 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen">
+      <AdminThemeToggle />
       {children}
     </div>
   );
