@@ -29,6 +29,10 @@ export async function GET(request: NextRequest) {
     const filter = searchParams.get('filter') || 'hari_ini';
     const tanggalParam = searchParams.get('tanggal');
     const sekolahId = searchParams.get('sekolah_id');
+    const pageParam = searchParams.get('page');
+    const limitParam = searchParams.get('limit');
+    const page = pageParam ? Math.max(1, parseInt(pageParam)) : 1;
+    const limit = limitParam ? Math.max(1, parseInt(limitParam)) : 20;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -107,7 +111,7 @@ export async function GET(request: NextRequest) {
       groupedMap.get(key)!.push(j);
     }
 
-    const reports = Array.from(groupedMap.entries())
+    const reportsAll = Array.from(groupedMap.entries())
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([tanggal, entries]) => ({
         tanggal,
@@ -124,15 +128,29 @@ export async function GET(request: NextRequest) {
         })),
       }));
 
+    const totalReports = reportsAll.length;
+    const totalPages = Math.max(1, Math.ceil(totalReports / limit));
+    const safePage = Math.min(Math.max(1, page), totalPages);
+    const startIdx = (safePage - 1) * limit;
+    const reports = pageParam ? reportsAll.slice(startIdx, startIdx + limit) : reportsAll;
+
     const totalMengajar = filteredJournals.length;
 
     return NextResponse.json({
       reports,
       summary: {
-        total_hari: reports.length,
+        total_hari: reportsAll.length,
         total_mengajar: totalMengajar,
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0],
+      },
+      pagination: {
+        currentPage: pageParam ? safePage : 1,
+        totalPages: totalPages,
+        totalRecords: totalReports,
+        limit: pageParam ? limit : 0,
+        hasNextPage: safePage < totalPages,
+        hasPrevPage: safePage > 1,
       },
     });
   } catch (error: any) {

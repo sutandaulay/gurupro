@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api-client";
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Card, Badge, Spinner } from '@/app/components/ui'
+import { Pagination } from '@/components/ui/pagination'
 import { cn } from '@/lib/utils'
 import { useActiveSchool } from '@/lib/stores'
 
@@ -46,6 +47,10 @@ export default function LaporanHarianPage() {
   const [reports, setReports] = useState<DailyReport[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const pageSize = 20
 
   const buildUrl = useCallback(() => {
     const params = new URLSearchParams()
@@ -55,8 +60,10 @@ export default function LaporanHarianPage() {
       params.set('filter', filter)
     }
     if (activeSchoolId) params.set('sekolah_id', activeSchoolId)
+    params.set('page', String(page))
+    params.set('limit', String(pageSize))
     return `/api/laporan-harian?${params.toString()}`
-  }, [filter, selectedDate, activeSchoolId])
+  }, [filter, selectedDate, activeSchoolId, page, pageSize])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -66,6 +73,8 @@ export default function LaporanHarianPage() {
         const data = await res.json()
         setReports(data.reports || [])
         setSummary(data.summary || null)
+        setTotalPages(data.pagination?.totalPages || 1)
+        setTotal(data.pagination?.totalRecords || data.reports?.length || 0)
       }
     } catch (err) {
       console.error('Failed to fetch daily reports:', err)
@@ -247,6 +256,18 @@ export default function LaporanHarianPage() {
               </div>
             </Card>
           ))}
+
+          {total > 0 && (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={total}
+              totalPages={totalPages}
+              onPageChange={(p) => setPage(p)}
+              onPageSizeChange={() => {}}
+              loading={loading}
+            />
+          )}
         </div>
       )}
     </div>

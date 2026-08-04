@@ -6,6 +6,10 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/app/components/ui'
 import { cn } from '@/lib/utils'
 import { useActiveSchool } from '@/lib/stores'
+import { Pagination } from '@/components/ui/pagination'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { RefreshCw } from 'lucide-react'
 
 interface SKPItem {
   id: string
@@ -37,16 +41,25 @@ export default function LaporanKinerjaListPage() {
   const [skpList, setSkpList] = useState<SKPItem[]>([])
   const [laporanList, setLaporanList] = useState<LaporanItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize] = useState(20)
+  const [totalLaporan, setTotalLaporan] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
 
   async function fetchData() {
     setLoading(true)
     try {
       const skpParams = activeSchoolId ? `?sekolah_id=${activeSchoolId}` : ''
-      const lapParams = activeSchoolId ? `?sekolah_id=${activeSchoolId}` : ''
+      const lapParams = new URLSearchParams()
+      if (activeSchoolId) lapParams.set('sekolah_id', activeSchoolId)
+      lapParams.set('status', statusFilter)
+      lapParams.set('page', String(page))
+      lapParams.set('limit', String(pageSize))
 
       const [skpRes, laporanRes] = await Promise.all([
         apiFetch(`/api/skp${skpParams}`),
-        apiFetch(`/api/laporan-kinerja${lapParams}`),
+        apiFetch(`/api/laporan-kinerja?${lapParams.toString()}`),
       ])
 
       if (skpRes.ok) {
@@ -56,7 +69,10 @@ export default function LaporanKinerjaListPage() {
 
       if (laporanRes.ok) {
         const data = await laporanRes.json()
-        setLaporanList(data?.data ?? (Array.isArray(data) ? data : []))
+        const paginated = data.data;
+        setLaporanList(paginated?.data ?? (Array.isArray(paginated) ? paginated : []))
+        setTotalLaporan(paginated?.pagination?.total || (Array.isArray(paginated) ? paginated.length : 0))
+        setTotalPages(paginated?.pagination?.totalPages || 1)
       }
     } catch (err) {
       console.error('Failed to fetch data:', err)
@@ -168,9 +184,34 @@ export default function LaporanKinerjaListPage() {
 
       {/* Laporan Tergenerate Section */}
       <div className="bg-card border rounded-xl p-6">
-        <h2 className="font-semibold text-lg mb-4">📄 Laporan Tergenerate</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-lg">📄 Laporan Tergenerate</h2>
+          <div className="flex gap-2 items-center">
+            <Label className="text-xs text-slate-500">Status:</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-8 w-36 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="final">Final</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" variant="outline" onClick={() => setPage(1)} className="text-xs">
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Refresh
+            </Button>
+          </div>
+        </div>
 
-        {laporanList.length === 0 ? (
+        {loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-16 bg-gray-200 animate-pulse rounded-lg" />
+            ))}
+          </div>
+        ) : laporanList.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-muted-foreground mb-3">Belum ada laporan yang dibuat</p>
             <p className="text-xs text-muted-foreground mb-4">
@@ -228,6 +269,19 @@ export default function LaporanKinerjaListPage() {
               </div>
             ))}
           </div>
+        )}
+
+        {totalLaporan > 0 && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={totalLaporan}
+            totalPages={totalPages}
+            onPageChange={(p) => setPage(p)}
+            onPageSizeChange={() => {}}
+            loading={loading}
+            className="pt-4"
+          />
         )}
       </div>
     </div>

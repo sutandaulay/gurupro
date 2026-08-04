@@ -16,13 +16,22 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url)
     const sekolahId = searchParams.get('sekolah_id')
+    const statusFilter = searchParams.get('status')
 
     let whereClause = 'guru_id = $1'
     const params: any[] = [guruId]
+    let paramIndex = 2
 
     if (sekolahId) {
-      whereClause += ` AND sekolah_id = $2`
+      whereClause += ` AND sekolah_id = $${paramIndex}`
       params.push(sekolahId)
+      paramIndex++
+    }
+
+    if (statusFilter && statusFilter !== 'all') {
+      whereClause += ` AND status = $${paramIndex}`
+      params.push(statusFilter)
+      paramIndex++
     }
 
     const countResult = await query(
@@ -44,7 +53,19 @@ export async function GET(req: Request) {
       params
     )
 
-    return NextResponse.json(wrapResponse(result.rows, total, pagination))
+    const resultSKP = await query(
+      `SELECT id, tahun_ajaran_id, tahun_ajaran_nama, status, catatan_guru,
+              created_at, indikator_list, observasi
+       FROM skp
+       WHERE guru_id = $1
+       ORDER BY created_at DESC`,
+      [guruId]
+    )
+
+    return NextResponse.json({
+      data: wrapResponse(result.rows, total, pagination),
+      skpList: resultSKP.rows,
+    })
   } catch (err) {
     console.error('GET /api/laporan-kinerja error:', err)
     return NextResponse.json({ error: 'Failed to fetch laporan' }, { status: 500 })
