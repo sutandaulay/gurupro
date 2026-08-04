@@ -1,5 +1,6 @@
 'use client';
 import { apiFetch } from "@/lib/api-client";
+import { Pagination, usePagedItems } from "@/components/ui/pagination";
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,6 +58,7 @@ export default function LeaveApprovalPage() {
   const [notes, setNotes] = useState('');
   const [substitutes, setSubstitutes] = useState<any[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(false);
+  const requestsPager = usePagedItems(filteredRequests, 25);
 
   useEffect(() => {
     const fetchLeaveRequests = async () => {
@@ -313,7 +315,7 @@ export default function LeaveApprovalPage() {
               </TableHeader>
               <TableBody>
                 {filteredRequests.length > 0 ? (
-                  filteredRequests.map((request) => (
+                  requestsPager.pagedItems.map((request) => (
                     <TableRow key={request.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
@@ -372,6 +374,17 @@ export default function LeaveApprovalPage() {
               </TableBody>
             </Table>
           </div>
+
+          {requestsPager.total > 0 && (
+            <Pagination
+              page={requestsPager.page}
+              pageSize={requestsPager.pageSize}
+              total={requestsPager.total}
+              totalPages={requestsPager.totalPages}
+              onPageChange={(p) => requestsPager.reset(p)}
+              onPageSizeChange={(s) => { requestsPager.setPageSize(s); requestsPager.reset(1); }}
+            />
+          )}
         </CardContent>
       </Card>
 

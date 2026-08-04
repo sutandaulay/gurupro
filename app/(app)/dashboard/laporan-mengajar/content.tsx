@@ -3,6 +3,7 @@ import { apiFetch } from "@/lib/api-client";
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Card, Badge, Spinner } from '@/app/components/ui'
+import { Pagination } from '@/components/ui/pagination'
 import { cn } from '@/lib/utils'
 
 interface ReportEntry {
@@ -46,11 +47,12 @@ export default function LaporanMengajarPage() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
+  const [pageSize, setPageSize] = useState(20)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await apiFetch(`/api/laporan-mengajar?period=${filter}&page=${page}`)
+      const res = await apiFetch(`/api/laporan-mengajar?period=${filter}&page=${page}&limit=${pageSize}`)
       if (res.ok) {
         const data = await res.json()
         setReports(data.reports || [])
@@ -62,7 +64,7 @@ export default function LaporanMengajarPage() {
     } finally {
       setLoading(false)
     }
-  }, [filter, page])
+  }, [filter, page, pageSize])
 
   useEffect(() => {
     fetchData()
@@ -196,28 +198,17 @@ export default function LaporanMengajarPage() {
           ))}
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage(p => p - 1)}
-              >
-                ←
-              </Button>
-              <span className="text-sm text-slate-500 px-3">
-                Halaman {page} dari {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage(p => p + 1)}
-              >
-                →
-              </Button>
-            </div>
+          {total > 0 && (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={total}
+              totalPages={totalPages}
+              onPageChange={(p) => setPage(p)}
+              onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+              loading={loading}
+              className="pt-4"
+            />
           )}
         </div>
       )}

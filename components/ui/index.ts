@@ -13,5 +13,7 @@ export {
   SelectTrigger,
   SelectValue,
 } from "./select";
+export { default as Pagination } from "./pagination";
+export { PAGE_SIZE_OPTIONS, ALL_SIZE, usePagedItems } from "./pagination";
 export { Calendar } from "./calendar";
 export { Popover, PopoverContent, PopoverTrigger } from "./popover";

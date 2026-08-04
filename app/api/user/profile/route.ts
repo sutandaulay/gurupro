@@ -249,13 +249,18 @@ export async function PUT(req: Request) {
     // Handle profile update
     const { nama_lengkap, username, bank_name, bank_account_number, bank_account_name, whatsapp, nip, notification_tone, morning_briefing_enabled, weekly_recap_enabled, timezone } = profileData;
 
-    if (!nama_lengkap) {
-      return NextResponse.json({ error: "Nama lengkap wajib diisi." }, { status: 400 });
-    }
+    const sets: string[] = [];
+    const values: (string | null)[] = [];
+    let idx = 1;
 
-    const sets: string[] = ["nama_lengkap = $1"];
-    const values: (string | null)[] = [nama_lengkap.trim()];
-    let idx = 2;
+    if (nama_lengkap !== undefined) {
+      if (!nama_lengkap || !nama_lengkap.trim()) {
+        return NextResponse.json({ error: "Nama lengkap wajib diisi." }, { status: 400 });
+      }
+      sets.push(`nama_lengkap = $${idx}`);
+      values.push(nama_lengkap.trim());
+      idx++;
+    }
 
     if (username !== undefined) {
       const cleanUsername = username && username.toString().trim() !== "" ? username.toString().trim().toLowerCase() : null;
@@ -340,6 +345,10 @@ export async function PUT(req: Request) {
       sets.push(`timezone = $${idx}`);
       values.push(timezone || 'Asia/Jakarta');
       idx++;
+    }
+
+    if (sets.length === 0) {
+      return NextResponse.json({ error: "Tidak ada data yang diperbarui." }, { status: 400 });
     }
 
     values.push(userId);

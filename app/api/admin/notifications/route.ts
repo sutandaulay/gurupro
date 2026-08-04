@@ -123,6 +123,20 @@ export async function GET(req: Request) {
 
     const counts = countsRes.rows[0];
 
+    // Get broadcast history (grouped by title/body from persisted in-app notifications)
+    const broadcastHistoryRes = await query(
+      `SELECT
+         title,
+         body,
+         COUNT(DISTINCT user_id) as sent_count,
+         MAX(created_at) as created_at
+       FROM in_app_notifications
+       WHERE type = 'admin_broadcast'
+       GROUP BY title, body
+       ORDER BY MAX(created_at) DESC
+       LIMIT 20`
+    );
+
     // Combine and sort all notifications
     const notifications = [
       ...pendingTxRes.rows.map(row => ({
@@ -145,6 +159,12 @@ export async function GET(req: Request) {
     return NextResponse.json({
       notifications: notifications.slice(0, limit),
       totalNotifications: notifications.length,
+      broadcastHistory: broadcastHistoryRes.rows.map((row) => ({
+        title: row.title,
+        body: row.body,
+        sentCount: parseInt(row.sent_count || "0", 10),
+        timestamp: row.created_at,
+      })),
       counts: {
         pendingTransactions: parseInt(counts.pending_transactions || "0"),
         pendingPayouts: parseInt(counts.pending_payouts || "0"),

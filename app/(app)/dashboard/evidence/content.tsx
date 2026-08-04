@@ -1,5 +1,6 @@
 'use client'
 import { apiFetch } from "@/lib/api-client";
+import { Pagination, usePagedItems } from "@/components/ui/pagination";
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -106,6 +107,9 @@ export default function EvidenceDashboardPage() {
     ? data?.indikator_score.filter(ik => ik.komponen === selectedKomponen)
     : data?.indikator_score
 
+  const indicatorsPager = usePagedItems(filteredIndicators || [], 25)
+  const missingPager = usePagedItems(data?.missing_evidence || [], 25)
+
   if (loading) {
     return (
       <div className="container max-w-4xl mx-auto py-6 px-4">
@@ -207,7 +211,7 @@ export default function EvidenceDashboardPage() {
         </div>
 
         <div className="bg-card border rounded-xl p-4">
-          {filteredIndicators?.map(ik => (
+          {indicatorsPager.pagedItems.map(ik => (
             <div key={ik.kode} className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors">
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{ik.nama}</div>
@@ -234,6 +238,16 @@ export default function EvidenceDashboardPage() {
               </div>
             </div>
           ))}
+          {indicatorsPager.total > 0 && (
+            <Pagination
+              page={indicatorsPager.page}
+              pageSize={indicatorsPager.pageSize}
+              total={indicatorsPager.total}
+              totalPages={indicatorsPager.totalPages}
+              onPageChange={(p) => indicatorsPager.reset(p)}
+              onPageSizeChange={(s) => { indicatorsPager.setPageSize(s); indicatorsPager.reset(1) }}
+            />
+          )}
         </div>
       </section>
 
@@ -246,7 +260,7 @@ export default function EvidenceDashboardPage() {
                 {data.missing_evidence.length} bukti perlu dilengkapi
               </p>
             </div>
-            {data.missing_evidence.map((item, i) => (
+            {missingPager.pagedItems.map((item, i) => (
               <div key={i} className="flex items-center justify-between gap-4 p-2 rounded-lg bg-amber-100/50">
                 <p className="text-sm text-amber-700 truncate">{item.deskripsi}</p>
                 <Link href={item.action_url}>
@@ -256,6 +270,16 @@ export default function EvidenceDashboardPage() {
                 </Link>
               </div>
             ))}
+            {missingPager.total > 0 && (
+              <Pagination
+                page={missingPager.page}
+                pageSize={missingPager.pageSize}
+                total={missingPager.total}
+                totalPages={missingPager.totalPages}
+                onPageChange={(p) => missingPager.reset(p)}
+                onPageSizeChange={(s) => { missingPager.setPageSize(s); missingPager.reset(1) }}
+              />
+            )}
           </div>
         </section>
       )}

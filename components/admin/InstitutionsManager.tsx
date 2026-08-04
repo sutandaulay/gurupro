@@ -18,6 +18,7 @@ interface Institution {
   _count?: {
     institution_members: number;
   };
+  member_count?: number;
 }
 
 const JENJANG_OPTIONS = ['SD', 'MI', 'SMP', 'MTs', 'SMA', 'MA', 'SMK', 'Pesantren', 'Lainnya'];
@@ -383,7 +384,7 @@ export default function InstitutionsManager() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs font-bold text-slate-700">
-                      👥 {inst._count?.institution_members || 0}
+                      👥 {inst.member_count ?? inst._count?.institution_members ?? 0}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex gap-1.5 justify-center">

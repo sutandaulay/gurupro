@@ -1,0 +1,304 @@
+﻿app/(app)/dashboard/institution/[institutionId]/operator/page.tsx(873,12): error TS2741: Property 'options' is missing in type '{ children: Element[]; value: "ganjil" | "genap"; onChange: (e: any) => void; }' but required in type 'SelectProps'.
+app/(app)/dashboard/institution/[institutionId]/operator/page.tsx(880,12): error TS2741: Property 'options' is missing in type '{ children: Element[]; value: string; onChange: (e: any) => void; }' but required in type 'SelectProps'.
+app/(app)/dashboard/page.tsx(2877,37): error TS7006: Parameter 'd' implicitly has an 'any' type.
+app/(app)/dashboard/page.tsx(4911,70): error TS2322: Type 'Category | null' is not assignable to type 'MenuCategory | undefined'.
+  Type 'null' is not assignable to type 'MenuCategory | undefined'.
+app/(app)/profile/page.tsx(430,64): error TS2322: Type 'Category | null' is not assignable to type 'MenuCategory | undefined'.
+  Type 'null' is not assignable to type 'MenuCategory | undefined'.
+app/(app)/reports/attendance/page.tsx(247,50): error TS2304: Cannot find name 'summary'.
+app/(app)/reports/attendance/page.tsx(249,22): error TS2304: Cannot find name 'summary'.
+app/(app)/reports/attendance/page.tsx(307,18): error TS2304: Cannot find name 'Skeleton'.
+app/(app)/reports/attendance/page.tsx(311,14): error TS2304: Cannot find name 'EmptyState'.
+app/(app)/reports/attendance/page.tsx(358,35): error TS2304: Cannot find name 'getStatusBadge'.
+app/api/admin/institutions/[id]/connection-requests/route.ts(120,30): error TS2304: Cannot find name 'approveConnectionRequest'.
+app/api/admin/institutions/[id]/connection-requests/route.ts(164,30): error TS2304: Cannot find name 'rejectConnectionRequest'.
+app/api/ai/journal/generate/route.ts(133,11): error TS2561: Object literal may only specify known properties, but 'teacher_id' does not exist in type '(Without<teacher_journalsCreateInput, teacher_journalsUncheckedCreateInput> & teacher_journalsUncheckedCreateInput) | (Without<...> & teacher_journalsCreateInput)'. Did you mean to write 'teacher'?
+app/api/attendance/check-in/route.ts(149,9): error TS18047: 'institutionLocation' is possibly 'null'.
+app/api/attendance/check-in/route.ts(150,9): error TS18047: 'institutionLocation' is possibly 'null'.
+app/api/attendance/teaching/start/route.ts(198,7): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+app/api/attendance/tpg-reports/route.ts(151,9): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(left: PgColumn<{ name: "tanggal"; tableName: "teacher_attendance"; dataType: "string"; columnType: "PgDateString"; data: string; driverParam: string; notNull: true; hasDefault: false; isPrimaryKey: false; ... 5 more ...; generated: undefined; }, {}, {}>, right: string | SQLWrapper): SQL<...>', gave the following error.
+    Argument of type 'Date' is not assignable to parameter of type 'string | SQLWrapper'.
+  Overload 2 of 3, '(left: Aliased<Date>, right: Date | SQLWrapper): SQL<unknown>', gave the following error.
+    Argument of type 'PgColumn<{ name: "tanggal"; tableName: "teacher_attendance"; dataType: "string"; columnType: "PgDateString"; data: string; driverParam: string; notNull: true; hasDefault: false; isPrimaryKey: false; ... 5 more ...; generated: undefined; }, {}, {}>' is not assignable to parameter of type 'Aliased<Date>'.
+      Type 'PgColumn<{ name: "tanggal"; tableName: "teacher_attendance"; dataType: "string"; columnType: "PgDateString"; data: string; driverParam: string; notNull: true; hasDefault: false; isPrimaryKey: false; ... 5 more ...; generated: undefined; }, {}, {}>' is missing the following properties from type 'Aliased<Date>': sql, fieldAlias
+  Overload 3 of 3, '(left: never, right: unknown): SQL<unknown>', gave the following error.
+    Argument of type 'PgColumn<{ name: "tanggal"; tableName: "teacher_attendance"; dataType: "string"; columnType: "PgDateString"; data: string; driverParam: string; notNull: true; hasDefault: false; isPrimaryKey: false; ... 5 more ...; generated: undefined; }, {}, {}>' is not assignable to parameter of type 'never'.
+app/api/attendance/tpg-reports/route.ts(152,9): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(left: PgColumn<{ name: "tanggal"; tableName: "teacher_attendance"; dataType: "string"; columnType: "PgDateString"; data: string; driverParam: string; notNull: true; hasDefault: false; isPrimaryKey: false; ... 5 more ...; generated: undefined; }, {}, {}>, right: string | SQLWrapper): SQL<...>', gave the following error.
+    Argument of type 'Date' is not assignable to parameter of type 'string | SQLWrapper'.
+  Overload 2 of 3, '(left: Aliased<Date>, right: Date | SQLWrapper): SQL<unknown>', gave the following error.
+    Argument of type 'PgColumn<{ name: "tanggal"; tableName: "teacher_attendance"; dataType: "string"; columnType: "PgDateString"; data: string; driverParam: string; notNull: true; hasDefault: false; isPrimaryKey: false; ... 5 more ...; generated: undefined; }, {}, {}>' is not assignable to parameter of type 'Aliased<Date>'.
+      Type 'PgColumn<{ name: "tanggal"; tableName: "teacher_attendance"; dataType: "string"; columnType: "PgDateString"; data: string; driverParam: string; notNull: true; hasDefault: false; isPrimaryKey: false; ... 5 more ...; generated: undefined; }, {}, {}>' is missing the following properties from type 'Aliased<Date>': sql, fieldAlias
+  Overload 3 of 3, '(left: never, right: unknown): SQL<unknown>', gave the following error.
+    Argument of type 'PgColumn<{ name: "tanggal"; tableName: "teacher_attendance"; dataType: "string"; columnType: "PgDateString"; data: string; driverParam: string; notNull: true; hasDefault: false; isPrimaryKey: false; ... 5 more ...; generated: undefined; }, {}, {}>' is not assignable to parameter of type 'never'.
+app/api/cron/notification-reminders/route.ts(132,11): error TS2345: Argument of type 'null' is not assignable to parameter of type 'string | undefined'.
+app/api/cron/notification-reminders/route.ts(245,11): error TS2345: Argument of type 'null' is not assignable to parameter of type 'string | undefined'.
+app/api/cron/notification-reminders/route.ts(323,11): error TS2345: Argument of type 'null' is not assignable to parameter of type 'string | undefined'.
+app/api/graphql/graphql-schema.ts(4,27): error TS2339: Property 'schema' does not exist on type 'typeof import("D:/gurupro/payload.config")'.
+app/api/graphql/handler.ts(4,40): error TS7006: Parameter 'payloadConfig' implicitly has an 'any' type.
+app/api/graphql/handler.ts(5,50): error TS7006: Parameter 'config' implicitly has an 'any' type.
+app/api/graphql/handler.ts(9,36): error TS7006: Parameter 'options' implicitly has an 'any' type.
+app/api/graphql/handler.ts(23,26): error TS7006: Parameter 'req' implicitly has an 'any' type.
+app/api/graphql/handler.ts(23,31): error TS7006: Parameter 'res' implicitly has an 'any' type.
+app/api/graphql/handler.ts(80,44): error TS7006: Parameter 'options' implicitly has an 'any' type.
+app/api/graphql/handler.ts(90,28): error TS7006: Parameter 'req' implicitly has an 'any' type.
+app/api/graphql/handler.ts(90,33): error TS7006: Parameter 'reqCtx' implicitly has an 'any' type.
+app/api/graphql/handler.ts(92,15): error TS2339: Property 'query' does not exist on type 'Promise<Response | RequestParams>'.
+app/api/graphql/handler.ts(92,22): error TS2339: Property 'variables' does not exist on type 'Promise<Response | RequestParams>'.
+app/api/graphql/handler.ts(92,33): error TS2339: Property 'operationName' does not exist on type 'Promise<Response | RequestParams>'.
+app/api/graphql/handler.ts(99,28): error TS2304: Cannot find name 'graphqlExecute'.
+app/api/graphql/handler.ts(127,26): error TS7006: Parameter 'req' implicitly has an 'any' type.
+app/api/graphql/handler.ts(127,31): error TS7006: Parameter 'res' implicitly has an 'any' type.
+app/api/graphql/handler.ts(169,74): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+app/api/graphql/handler.ts(171,30): error TS2304: Cannot find name 'graphqlExecute'.
+app/api/graphql/route.ts(4,27): error TS7006: Parameter 'req' implicitly has an 'any' type.
+app/api/graphql/route.ts(4,32): error TS7006: Parameter 'res' implicitly has an 'any' type.
+app/api/graphql/route.ts(19,28): error TS7006: Parameter 'req' implicitly has an 'any' type.
+app/api/graphql/route.ts(19,33): error TS7006: Parameter 'res' implicitly has an 'any' type.
+app/api/institutions/[id]/qr-token/regenerate/route.ts(27,75): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(left: PgColumn<{ name: "id"; tableName: "institutions"; dataType: "number"; columnType: "PgInteger"; data: number; driverParam: string | number; notNull: true; hasDefault: true; isPrimaryKey: true; isAutoincrement: false; ... 4 more ...; generated: undefined; }, {}, {}>, right: number | SQLWrapper): SQL<...>', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'number | SQLWrapper'.
+  Overload 2 of 3, '(left: Aliased<string>, right: string | SQLWrapper): SQL<unknown>', gave the following error.
+    Argument of type 'PgColumn<{ name: "id"; tableName: "institutions"; dataType: "number"; columnType: "PgInteger"; data: number; driverParam: string | number; notNull: true; hasDefault: true; isPrimaryKey: true; isAutoincrement: false; ... 4 more ...; generated: undefined; }, {}, {}>' is not assignable to parameter of type 'Aliased<string>'.
+      Type 'PgColumn<{ name: "id"; tableName: "institutions"; dataType: "number"; columnType: "PgInteger"; data: number; driverParam: string | number; notNull: true; hasDefault: true; isPrimaryKey: true; isAutoincrement: false; ... 4 more ...; generated: undefined; }, {}, {}>' is missing the following properties from type 'Aliased<string>': sql, fieldAlias
+  Overload 3 of 3, '(left: never, right: unknown): SQL<unknown>', gave the following error.
+    Argument of type 'PgColumn<{ name: "id"; tableName: "institutions"; dataType: "number"; columnType: "PgInteger"; data: number; driverParam: string | number; notNull: true; hasDefault: true; isPrimaryKey: true; isAutoincrement: false; ... 4 more ...; generated: undefined; }, {}, {}>' is not assignable to parameter of type 'never'.
+app/api/institutions/[id]/qr-token/regenerate/route.ts(38,41): error TS2339: Property 'attendanceSettings' does not exist on type '{ id: number; name: string; address: string | null; created_at: Date | null; updated_at: Date | null; locationLatitude: string | null; locationLongitude: string | null; ... 5 more ...; qrCodeToken: string | null; }'.
+app/api/institutions/[id]/qr-token/regenerate/route.ts(38,85): error TS2339: Property 'attendanceSettings' does not exist on type '{ id: number; name: string; address: string | null; created_at: Date | null; updated_at: Date | null; locationLatitude: string | null; locationLongitude: string | null; ... 5 more ...; qrCodeToken: string | null; }'.
+app/api/institutions/[id]/qr-token/regenerate/route.ts(47,9): error TS2353: Object literal may only specify known properties, and 'attendanceSettings' does not exist in type '{ name?: string | SQL<unknown> | PgColumn<ColumnBaseConfig<ColumnDataType, string>, {}, {}> | undefined; attendanceRadiusMeters?: string | ... 3 more ... | undefined; ... 9 more ...; locationLongitude?: string | ... 3 more ... | undefined; }'.
+app/api/institutions/[id]/qr-token/regenerate/route.ts(49,14): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(left: PgColumn<{ name: "id"; tableName: "institutions"; dataType: "number"; columnType: "PgInteger"; data: number; driverParam: string | number; notNull: true; hasDefault: true; isPrimaryKey: true; isAutoincrement: false; ... 4 more ...; generated: undefined; }, {}, {}>, right: number | SQLWrapper): SQL<...>', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'number | SQLWrapper'.
+  Overload 2 of 3, '(left: Aliased<string>, right: string | SQLWrapper): SQL<unknown>', gave the following error.
+    Argument of type 'PgColumn<{ name: "id"; tableName: "institutions"; dataType: "number"; columnType: "PgInteger"; data: number; driverParam: string | number; notNull: true; hasDefault: true; isPrimaryKey: true; isAutoincrement: false; ... 4 more ...; generated: undefined; }, {}, {}>' is not assignable to parameter of type 'Aliased<string>'.
+      Type 'PgColumn<{ name: "id"; tableName: "institutions"; dataType: "number"; columnType: "PgInteger"; data: number; driverParam: string | number; notNull: true; hasDefault: true; isPrimaryKey: true; isAutoincrement: false; ... 4 more ...; generated: undefined; }, {}, {}>' is missing the following properties from type 'Aliased<string>': sql, fieldAlias
+  Overload 3 of 3, '(left: never, right: unknown): SQL<unknown>', gave the following error.
+    Argument of type 'PgColumn<{ name: "id"; tableName: "institutions"; dataType: "number"; columnType: "PgInteger"; data: number; driverParam: string | number; notNull: true; hasDefault: true; isPrimaryKey: true; isAutoincrement: false; ... 4 more ...; generated: undefined; }, {}, {}>' is not assignable to parameter of type 'never'.
+app/api/institutions/[id]/qr-token/regenerate/route.ts(65,26): error TS2339: Property 'errors' does not exist on type 'ZodError<unknown>'.
+app/api/laporan-harian/[tanggal]/download/route.ts(68,9): error TS2561: Object literal may only specify known properties, but 'teacher_id' does not exist in type 'teacher_journalsWhereInput'. Did you mean to write 'teacher'?
+app/api/laporan-harian/[tanggal]/route.ts(44,9): error TS2561: Object literal may only specify known properties, but 'teacher_id' does not exist in type 'teacher_journalsWhereInput'. Did you mean to write 'teacher'?
+app/api/laporan-harian/[tanggal]/route.ts(61,20): error TS2339: Property 'schedules' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/[tanggal]/route.ts(62,22): error TS2339: Property 'schedules' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/[tanggal]/route.ts(63,16): error TS2339: Property 'subjects' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/[tanggal]/route.ts(64,16): error TS2339: Property 'classes' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/[tanggal]/route.ts(65,30): error TS2339: Property 'materi_pembelajaran' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/[tanggal]/route.ts(67,33): error TS2339: Property 'aktivitas_pembelajaran' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/[tanggal]/route.ts(68,29): error TS2551: Property 'media_pembelajaran' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'. Did you mean 'kegiatan_pembelajaran'?
+app/api/laporan-harian/[tanggal]/route.ts(69,31): error TS2339: Property 'asesmen_pembelajaran' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/[tanggal]/route.ts(70,24): error TS2339: Property 'refleksi_guru' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/[tanggal]/route.ts(71,24): error TS2339: Property 'tindak_lanjut' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/[tanggal]/route.ts(72,17): error TS2339: Property 'status' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/[tanggal]/route.ts(73,25): error TS2339: Property 'auto_generated' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/route.ts(74,9): error TS2561: Object literal may only specify known properties, but 'teacher_id' does not exist in type 'teacher_journalsWhereInput'. Did you mean to write 'teacher'?
+app/api/laporan-harian/route.ts(116,49): error TS2339: Property 'subjects' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/route.ts(117,49): error TS2339: Property 'classes' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/route.ts(120,20): error TS2339: Property 'subjects' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/route.ts(121,20): error TS2339: Property 'classes' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/route.ts(122,21): error TS2339: Property 'materi_pembelajaran' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/laporan-harian/route.ts(123,21): error TS2339: Property 'status' does not exist on type '{ id: string; mapel: string | null; kelas: string | null; school_id: string; created_at: Date | null; user_id: string; catatan: string | null; tanggal: Date; tujuan_pembelajaran: string | null; kegiatan_pembelajaran: string | null; supervisor_id: string | null; }'.
+app/api/leave-requests/[id]/route.ts(52,9): error TS2304: Cannot find name 'session'.
+app/api/leave-requests/[id]/route.ts(55,48): error TS2304: Cannot find name 'session'.
+app/api/leave-requests/[id]/route.ts(63,52): error TS2304: Cannot find name 'session'.
+app/api/leave-requests/[id]/route.ts(71,21): error TS2304: Cannot find name 'session'.
+app/api/leave-requests/[id]/route.ts(73,9): error TS2353: Object literal may only specify known properties, and 'notes' does not exist in type '{ type?: string | SQL<unknown> | PgColumn<ColumnBaseConfig<ColumnDataType, string>, {}, {}> | undefined; teacherId?: string | SQL<unknown> | PgColumn<...> | undefined; ... 11 more ...; schoolId?: string | ... 3 more ... | undefined; }'.
+app/api/leave-requests/[id]/route.ts(82,9): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+app/api/leave-requests/[id]/route.ts(94,11): error TS2345: Argument of type 'Date' is not assignable to parameter of type 'string'.
+app/api/leave-requests/[id]/route.ts(129,31): error TS2339: Property 'notes' does not exist on type '{ id: string; teacherId: string; institutionId: number | null; schoolId: string | null; type: string; startDate: Date; endDate: Date; reason: string; attachmentUrl: string | null; ... 4 more ...; updatedAt: Date; }'.
+app/api/leave-requests/[id]/route.ts(139,26): error TS2339: Property 'errors' does not exist on type 'ZodError<unknown>'.
+app/api/leave-requests/[id]/route.ts(176,9): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(left: PgColumn<{ name: "institution_id"; tableName: "attendance_summary"; dataType: "number"; columnType: "PgInteger"; data: number; driverParam: string | number; notNull: true; hasDefault: false; ... 6 more ...; generated: undefined; }, {}, {}>, right: number | SQLWrapper): SQL<...>', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'number | SQLWrapper'.
+  Overload 2 of 3, '(left: Aliased<string>, right: string | SQLWrapper): SQL<unknown>', gave the following error.
+    Argument of type 'PgColumn<{ name: "institution_id"; tableName: "attendance_summary"; dataType: "number"; columnType: "PgInteger"; data: number; driverParam: string | number; notNull: true; hasDefault: false; isPrimaryKey: false; ... 5 more ...; generated: undefined; }, {}, {}>' is not assignable to parameter of type 'Aliased<string>'.
+      Type 'PgColumn<{ name: "institution_id"; tableName: "attendance_summary"; dataType: "number"; columnType: "PgInteger"; data: number; driverParam: string | number; notNull: true; hasDefault: false; isPrimaryKey: false; ... 5 more ...; generated: undefined; }, {}, {}>' is missing the following properties from type 'Aliased<string>': sql, fieldAlias
+  Overload 3 of 3, '(left: never, right: unknown): SQL<unknown>', gave the following error.
+    Argument of type 'PgColumn<{ name: "institution_id"; tableName: "attendance_summary"; dataType: "number"; columnType: "PgInteger"; data: number; driverParam: string | number; notNull: true; hasDefault: false; isPrimaryKey: false; ... 5 more ...; generated: undefined; }, {}, {}>' is not assignable to parameter of type 'never'.
+app/api/leave-requests/[id]/route.ts(190,42): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(value: { date: Date | SQL<unknown> | Placeholder<string, any>; teacherId: string | SQL<unknown> | Placeholder<string, any>; institutionId: number | SQL<...> | Placeholder<...>; ... 9 more ...; lateMinutes?: number | ... 3 more ... | undefined; }): PgInsertBase<...>', gave the following error.
+    Type 'string' is not assignable to type 'number | SQL<unknown> | Placeholder<string, any>'.
+  Overload 2 of 2, '(values: { date: Date | SQL<unknown> | Placeholder<string, any>; teacherId: string | SQL<unknown> | Placeholder<string, any>; institutionId: number | SQL<...> | Placeholder<...>; ... 9 more ...; lateMinutes?: number | ... 3 more ... | undefined; }[]): PgInsertBase<...>', gave the following error.
+    Object literal may only specify known properties, and 'id' does not exist in type '{ date: Date | SQL<unknown> | Placeholder<string, any>; teacherId: string | SQL<unknown> | Placeholder<string, any>; institutionId: number | SQL<...> | Placeholder<...>; ... 9 more ...; lateMinutes?: number | ... 3 more ... | undefined; }[]'.
+app/api/leave-requests/[id]/route.ts(219,9): error TS2304: Cannot find name 'session'.
+app/api/leave-requests/[id]/route.ts(225,11): error TS2304: Cannot find name 'session'.
+app/api/leave-requests/[id]/route.ts(244,26): error TS2339: Property 'errors' does not exist on type 'ZodError<unknown>'.
+app/api/leave-requests/route.ts(53,33): error TS2345: Argument of type 'Date' is not assignable to parameter of type 'string'.
+app/api/leave-requests/route.ts(54,31): error TS2345: Argument of type 'Date' is not assignable to parameter of type 'string'.
+app/api/leave-requests/route.ts(103,30): error TS2339: Property 'length' does not exist on type 'QueryResult<any>'.
+app/api/leave-requests/route.ts(104,34): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'QueryResult<any>'.
+  Property '0' does not exist on type 'QueryResult<any>'.
+app/api/leave-requests/route.ts(142,26): error TS2339: Property 'errors' does not exist on type 'ZodError<unknown>'.
+app/api/opt-out/route.ts(34,9): error TS2322: Type 'Record<string, unknown>[]' is not assignable to type 'Where[]'.
+  Type 'Record<string, unknown>' is not assignable to type 'Where'.
+    'string' index signatures are incompatible.
+      Type 'unknown' is not assignable to type 'Where[] | WhereField'.
+app/api/performance-share/attendance-data/[token]/route.ts(162,45): error TS2339: Property 'desc' does not exist on type 'PgColumn<{ name: "created_at"; tableName: "attendance_insights"; dataType: "date"; columnType: "PgTimestamp"; data: Date; driverParam: string; notNull: true; hasDefault: true; isPrimaryKey: false; ... 5 more ...; generated: undefined; }, {}, {}>'.
+app/api/performance-share/attendance-data/[token]/route.ts(188,52): error TS2353: Object literal may only specify known properties, and 'code' does not exist in type 'Pick<Locale, "options" | "localize" | "formatLong">'.
+app/api/performance-share/attendance-data/[token]/route.ts(199,50): error TS2353: Object literal may only specify known properties, and 'code' does not exist in type 'Pick<Locale, "options" | "localize" | "formatLong">'.
+app/api/performance-share/route.ts(28,7): error TS2322: Type 'Record<string, unknown>' is not assignable to type 'Where'.
+  'string' index signatures are incompatible.
+    Type 'unknown' is not assignable to type 'Where[] | WhereField'.
+app/api/performance-share/token/[token]/resend-otp/route.ts(95,19): error TS2339: Property 'updateMany' does not exist on type 'BasePayload'.
+app/api/raport/refresh-nilai/route.ts(98,45): error TS7006: Parameter 'r' implicitly has an 'any' type.
+app/api/raport/refresh-nilai/route.ts(99,38): error TS7006: Parameter 'r' implicitly has an 'any' type.
+app/api/raport/refresh-nilai/route.ts(111,45): error TS7006: Parameter 'r' implicitly has an 'any' type.
+app/api/raport/status/route.ts(189,26): error TS2304: Cannot find name 'ubahStatus'.
+app/api/raport/status/route.ts(191,21): error TS2304: Cannot find name 'StatusRaport'.
+app/api/raport/status/route.ts(193,26): error TS2304: Cannot find name 'RoleChangedBy'.
+app/api/raport/status/route.ts(200,11): error TS2304: Cannot find name 'logAudit'.
+app/api/selesai-mengajar/route.ts(27,14): error TS2561: Object literal may only specify known properties, but 'userId' does not exist in type 'schoolsWhereInput'. Did you mean to write 'user_id'?
+app/api/selesai-mengajar/route.ts(32,25): error TS2561: Object literal may only specify known properties, but 'userId' does not exist in type '(Without<SchoolsScalarRelationFilter, schoolsWhereInput> & schoolsWhereInput) | (Without<schoolsWhereInput, SchoolsScalarRelationFilter> & SchoolsScalarRelationFilter)'. Did you mean to write 'user_id'?
+app/api/selesai-mengajar/route.ts(34,35): error TS2551: Property 'schoolId' does not exist on type '{ id: string; wali_kelas: string | null; school_id: string; created_at: Date | null; nama_kelas: string; }'. Did you mean 'school_id'?
+app/api/selesai-mengajar/route.ts(79,29): error TS2561: Object literal may only specify known properties, but 'statusLangganan' does not exist in type 'usersSelect<DefaultArgs>'. Did you mean to write 'status_langganan'?
+app/api/selesai-mengajar/route.ts(82,27): error TS2551: Property 'statusLangganan' does not exist on type '{ username: string | null; email: string; role: string | null; id: string; is_active: boolean | null; whatsapp: string; nama_lengkap: string; referral_code: string | null; otp_code: string | null; ... 27 more ...; pending_invitation_token: string | null; }'. Did you mean 'status_langganan'?
+app/api/selesai-mengajar/route.ts(82,53): error TS2551: Property 'statusLangganan' does not exist on type '{ username: string | null; email: string; role: string | null; id: string; is_active: boolean | null; whatsapp: string; nama_lengkap: string; referral_code: string | null; otp_code: string | null; ... 27 more ...; pending_invitation_token: string | null; }'. Did you mean 'status_langganan'?
+app/api/selesai-mengajar/route.ts(83,39): error TS2551: Property 'subscriptionEnd' does not exist on type '{ username: string | null; email: string; role: string | null; id: string; is_active: boolean | null; whatsapp: string; nama_lengkap: string; referral_code: string | null; otp_code: string | null; ... 27 more ...; pending_invitation_token: string | null; }'. Did you mean 'subscription_end'?
+app/api/selesai-mengajar/route.ts(83,74): error TS2551: Property 'subscriptionEnd' does not exist on type '{ username: string | null; email: string; role: string | null; id: string; is_active: boolean | null; whatsapp: string; nama_lengkap: string; referral_code: string | null; otp_code: string | null; ... 27 more ...; pending_invitation_token: string | null; }'. Did you mean 'subscription_end'?
+app/api/selesai-mengajar/route.ts(137,29): error TS2339: Property 'mapel' does not exist on type 'SelesaiMengajarInput'.
+app/api/selesai-mengajar/route.ts(138,31): error TS2339: Property 'jenjang' does not exist on type 'SelesaiMengajarInput'.
+app/api/selesai-mengajar/route.ts(368,9): error TS2322: Type '{ username: string | null; email: string; role: string | null; id: string; is_active: boolean | null; whatsapp: string; nama_lengkap: string; referral_code: string | null; otp_code: string | null; ... 27 more ...; pending_invitation_token: string | null; } | null' is not assignable to type '{ role: string; statusLangganan?: string | null | undefined; subscriptionEnd?: Date | null | undefined; } | null'.
+  Type '{ username: string | null; email: string; role: string | null; id: string; is_active: boolean | null; whatsapp: string; nama_lengkap: string; referral_code: string | null; otp_code: string | null; ... 27 more ...; pending_invitation_token: string | null; }' is not assignable to type '{ role: string; statusLangganan?: string | null | undefined; subscriptionEnd?: Date | null | undefined; }'.
+    Types of property 'role' are incompatible.
+      Type 'string | null' is not assignable to type 'string'.
+        Type 'null' is not assignable to type 'string'.
+app/api/selesai-mengajar/route.ts(370,33): error TS2561: Object literal may only specify known properties, but 'statusLangganan' does not exist in type 'usersSelect<DefaultArgs>'. Did you mean to write 'status_langganan'?
+app/api/selesai-mengajar/route.ts(390,11): error TS2322: Type '{ id: string; npsn: string | null; created_at: Date | null; nama_sekolah: string; user_id: string; logo: string | null; alamat: string | null; nama_kepala_sekolah: string | null; ... 10 more ...; attendance_radius_meters: number | null; }[]' is not assignable to type '{ id: string; namaSekolah: string | null; }[]'.
+  Property 'namaSekolah' is missing in type '{ id: string; npsn: string | null; created_at: Date | null; nama_sekolah: string; user_id: string; logo: string | null; alamat: string | null; nama_kepala_sekolah: string | null; ... 10 more ...; attendance_radius_meters: number | null; }' but required in type '{ id: string; namaSekolah: string | null; }'.
+app/api/selesai-mengajar/route.ts(391,22): error TS2561: Object literal may only specify known properties, but 'userId' does not exist in type 'schoolsWhereInput'. Did you mean to write 'user_id'?
+app/api/selesai-mengajar/route.ts(392,33): error TS2561: Object literal may only specify known properties, but 'namaSekolah' does not exist in type 'schoolsSelect<DefaultArgs>'. Did you mean to write 'nama_sekolah'?
+app/api/selesai-mengajar/route.ts(402,35): error TS2561: Object literal may only specify known properties, but 'userId' does not exist in type '(Without<SchoolsScalarRelationFilter, schoolsWhereInput> & schoolsWhereInput) | (Without<schoolsWhereInput, SchoolsScalarRelationFilter> & SchoolsScalarRelationFilter)'. Did you mean to write 'user_id'?
+app/api/selesai-mengajar/route.ts(403,25): error TS2561: Object literal may only specify known properties, but 'schoolId' does not exist in type 'classesSelect<DefaultArgs>'. Did you mean to write 'school_id'?
+app/api/selesai-mengajar/route.ts(405,81): error TS2551: Property 'schoolId' does not exist on type '{ id: string; wali_kelas: string | null; school_id: string; created_at: Date | null; nama_kelas: string; }'. Did you mean 'school_id'?
+app/api/selesai-mengajar/route.ts(428,15): error TS2561: Object literal may only specify known properties, but 'schoolId' does not exist in type 'schedulesWhereInput'. Did you mean to write 'school_id'?
+app/api/selesai-mengajar/route.ts(432,36): error TS2561: Object literal may only specify known properties, but 'namaKelas' does not exist in type 'classesSelect<DefaultArgs>'. Did you mean to write 'nama_kelas'?
+app/api/selesai-mengajar/route.ts(433,37): error TS2561: Object literal may only specify known properties, but 'namaMapel' does not exist in type 'subjectsSelect<DefaultArgs>'. Did you mean to write 'nama_mapel'?
+app/api/selesai-mengajar/route.ts(434,36): error TS2561: Object literal may only specify known properties, but 'namaSekolah' does not exist in type 'schoolsSelect<DefaultArgs>'. Did you mean to write 'nama_sekolah'?
+app/api/selesai-mengajar/route.ts(436,25): error TS2561: Object literal may only specify known properties, but 'schoolId' does not exist in type 'schedulesOrderByWithRelationInput'. Did you mean to write 'school_id'?
+app/api/selesai-mengajar/route.ts(436,46): error TS2561: Object literal may only specify known properties, but 'jamMulai' does not exist in type 'schedulesOrderByWithRelationInput'. Did you mean to write 'jam_mulai'?
+app/api/selesai-mengajar/route.ts(445,44): error TS2551: Property 'teachingSessions' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'. Did you mean 'teaching_sessions'?
+app/api/storage/files/download/route.ts(41,34): error TS2304: Cannot find name 'body'.
+app/api/teacher-institution-assignments/route.ts(14,39): error TS2353: Object literal may only specify known properties, and 'token' does not exist in type 'AuthArgs'.
+app/api/teacher-institution-assignments/route.ts(25,24): error TS2339: Property 'id' does not exist on type 'AuthResult'.
+app/api/teaching-session/complete/route.ts(162,15): error TS2561: Object literal may only specify known properties, but 'teacher_id' does not exist in type '(Without<teacher_journalsCreateInput, teacher_journalsUncheckedCreateInput> & teacher_journalsUncheckedCreateInput) | (Without<...> & teacher_journalsCreateInput)'. Did you mean to write 'teacher'?
+app/api/user/profile/route.ts(124,9): error TS1117: An object literal cannot have multiple properties with the same name.
+app/api/user/profile/route.ts(358,19): error TS2345: Argument of type 'boolean' is not assignable to parameter of type 'string'.
+app/api/user/profile/route.ts(364,19): error TS2345: Argument of type 'boolean' is not assignable to parameter of type 'string'.
+app/api/wali-kelas/route.ts(114,9): error TS2304: Cannot find name 'userId'.
+app/api/wali-kelas/route.ts(122,25): error TS2304: Cannot find name 'userId'.
+app/approve-school-registration/page.tsx(24,105): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | number | boolean'.
+  Type 'null' is not assignable to type 'string | number | boolean'.
+app/components/bahan-ajar/GenerateBahanAjarButton.tsx(107,11): error TS2322: Type 'string | undefined' is not assignable to type 'string | null'.
+  Type 'undefined' is not assignable to type 'string | null'.
+app/components/bahan-ajar/GenerateBahanAjarButton.tsx(108,11): error TS2719: Type '{ jenjang?: string | undefined; fase?: string | undefined; mapel?: string | undefined; kelas?: string | undefined; cp?: string | undefined; tp?: string[] | undefined; atp?: any; topik?: string | undefined; materiPokok?: string[] | undefined; jumlahPertemuan?: number | undefined; alokasiWaktu?: string | undefined; } ...' is not assignable to type '{ jenjang?: string | undefined; fase?: string | undefined; mapel?: string | undefined; kelas?: string | undefined; cp?: string | undefined; tp?: string[] | undefined; atp?: any; topik?: string | undefined; materiPokok?: string[] | undefined; jumlahPertemuan?: number | undefined; alokasiWaktu?: string | undefined; } ...'. Two different types with this name exist, but they are unrelated.
+  Type 'undefined' is not assignable to type '{ jenjang?: string | undefined; fase?: string | undefined; mapel?: string | undefined; kelas?: string | undefined; cp?: string | undefined; tp?: string[] | undefined; atp?: any; topik?: string | undefined; materiPokok?: string[] | undefined; jumlahPertemuan?: number | undefined; alokasiWaktu?: string | undefined; } ...'.
+app/components/layout/MenuBar.tsx(210,80): error TS2322: Type 'Category | null' is not assignable to type 'MenuCategory | undefined'.
+  Type 'null' is not assignable to type 'MenuCategory | undefined'.
+app/components/layout/MenuBar.tsx(228,80): error TS2322: Type 'Category | null' is not assignable to type 'MenuCategory | undefined'.
+  Type 'null' is not assignable to type 'MenuCategory | undefined'.
+app/components/layout/MenuBar.tsx(243,80): error TS2322: Type 'Category | null' is not assignable to type 'MenuCategory | undefined'.
+  Type 'null' is not assignable to type 'MenuCategory | undefined'.
+app/components/layout/MenuBar.tsx(265,100): error TS2322: Type 'Category | null' is not assignable to type 'MenuCategory | undefined'.
+  Type 'null' is not assignable to type 'MenuCategory | undefined'.
+app/components/layout/MenuBar.tsx(287,98): error TS2322: Type 'Category | null' is not assignable to type 'MenuCategory | undefined'.
+  Type 'null' is not assignable to type 'MenuCategory | undefined'.
+app/components/layout/MenuBar.tsx(325,88): error TS2322: Type 'Category | null' is not assignable to type 'MenuCategory | undefined'.
+  Type 'null' is not assignable to type 'MenuCategory | undefined'.
+app/components/layout/Sidebar.tsx(362,82): error TS2322: Type 'Category | null' is not assignable to type 'MenuCategory | undefined'.
+  Type 'null' is not assignable to type 'MenuCategory | undefined'.
+app/components/layout/Sidebar.tsx(381,82): error TS2322: Type 'Category | null' is not assignable to type 'MenuCategory | undefined'.
+  Type 'null' is not assignable to type 'MenuCategory | undefined'.
+app/components/layout/Sidebar.tsx(408,92): error TS2322: Type 'Category | null' is not assignable to type 'MenuCategory | undefined'.
+  Type 'null' is not assignable to type 'MenuCategory | undefined'.
+app/components/mobile/MobileBottomNav.tsx(76,17): error TS2322: Type 'Category | null' is not assignable to type 'MenuCategory | undefined'.
+  Type 'null' is not assignable to type 'MenuCategory | undefined'.
+app/components/mobile/MobileHomeMenu.tsx(232,19): error TS2322: Type 'Category | null' is not assignable to type 'MenuCategory | undefined'.
+  Type 'null' is not assignable to type 'MenuCategory | undefined'.
+app/components/performance-share/PerformanceSharePanel.tsx(373,13): error TS2719: Type '(data: LeaderContact) => Promise<void>' is not assignable to type '(data: LeaderContact) => Promise<void>'. Two different types with this name exist, but they are unrelated.
+  Types of parameters 'data' and 'data' are incompatible.
+    Type 'LeaderContact' is not assignable to type 'LeaderContact'. Two different types with this name exist, but they are unrelated.
+      Types of property 'id' are incompatible.
+        Type 'string | undefined' is not assignable to type 'string'.
+          Type 'undefined' is not assignable to type 'string'.
+app/leader-view/[token]/page.tsx(111,31): error TS2345: Argument of type 'Set<unknown>' is not assignable to parameter of type 'SetStateAction<Set<string>>'.
+  Type 'Set<unknown>' is not assignable to type 'Set<string>'.
+    Type 'unknown' is not assignable to type 'string'.
+app/leader-view/attendance-performance/[token]/page.tsx(80,34): error TS2339: Property 'error' does not exist on type 'AttendanceDataResponse'.
+collections/Attendance.ts(1,34): error TS2307: Cannot find module 'payload/types' or its corresponding type declarations.
+collections/Attendance.ts(2,10): error TS2614: Module '"./Users"' has no exported member 'Users'. Did you mean to use 'import Users from "./Users"' instead?
+collections/Attendance.ts(3,10): error TS2614: Module '"./Institutions"' has no exported member 'Institutions'. Did you mean to use 'import Institutions from "./Institutions"' instead?
+collections/DocumentAccessGrants.ts(70,9): error TS2353: Object literal may only specify known properties, and 'validate' does not exist in type '{ afterChange?: FieldHook<any, any, any>[] | undefined; afterRead?: FieldHook<any, any, any>[] | undefined; beforeChange?: FieldHook<any, any, any>[] | undefined; beforeDuplicate?: FieldHook<...>[] | undefined; beforeValidate?: FieldHook<...>[] | undefined; }'.
+collections/DocumentAccessGrants.ts(71,12): error TS7006: Parameter '_' implicitly has an 'any' type.
+collections/DocumentAccessGrants.ts(71,17): error TS7031: Binding element 'value' implicitly has an 'any' type.
+collections/LeaderContacts.ts(80,9): error TS2353: Object literal may only specify known properties, and 'validate' does not exist in type '{ afterChange?: FieldHook<any, any, any>[] | undefined; afterRead?: FieldHook<any, any, any>[] | undefined; beforeChange?: FieldHook<any, any, any>[] | undefined; beforeDuplicate?: FieldHook<...>[] | undefined; beforeValidate?: FieldHook<...>[] | undefined; }'.
+collections/LeaderContacts.ts(81,12): error TS7006: Parameter '_' implicitly has an 'any' type.
+collections/LeaderContacts.ts(81,17): error TS7031: Binding element 'value' implicitly has an 'any' type.
+collections/LeaderContacts.ts(106,9): error TS2353: Object literal may only specify known properties, and 'validate' does not exist in type '{ afterChange?: FieldHook<any, any, any>[] | undefined; afterRead?: FieldHook<any, any, any>[] | undefined; beforeChange?: FieldHook<any, any, any>[] | undefined; beforeDuplicate?: FieldHook<...>[] | undefined; beforeValidate?: FieldHook<...>[] | undefined; }'.
+collections/LeaderContacts.ts(107,12): error TS7006: Parameter '_' implicitly has an 'any' type.
+collections/LeaderContacts.ts(107,17): error TS7031: Binding element 'value' implicitly has an 'any' type.
+collections/LeaderContacts.ts(107,24): error TS7031: Binding element 'siblingData' implicitly has an 'any' type.
+components/attendance/FaceCaptureWidget.tsx(36,25): error TS2554: Expected 1 arguments, but got 0.
+components/attendance/FaceCaptureWidget.tsx(59,5): error TS2322: Type '(input: HTMLVideoElement | HTMLCanvasElement | HTMLImageElement | ImageData) => Promise<FaceDetectionResult>' is not assignable to type '(input: HTMLVideoElement) => Promise<Promise<FaceDetectionResult>>'.
+  Type 'Promise<FaceDetectionResult>' is not assignable to type 'Promise<Promise<FaceDetectionResult>>'.
+    Type 'FaceDetectionResult' is missing the following properties from type 'Promise<FaceDetectionResult>': then, catch, finally, [Symbol.toStringTag]
+components/settings/FaceEnrollmentSection.tsx(55,25): error TS2554: Expected 1 arguments, but got 0.
+components/settings/FaceEnrollmentSection.tsx(87,5): error TS2322: Type '(input: HTMLVideoElement | HTMLCanvasElement | HTMLImageElement | ImageData) => Promise<FaceDetectionResult>' is not assignable to type '(input: HTMLVideoElement) => Promise<Promise<FaceDetectionResult>>'.
+  Type 'Promise<FaceDetectionResult>' is not assignable to type 'Promise<Promise<FaceDetectionResult>>'.
+    Type 'FaceDetectionResult' is missing the following properties from type 'Promise<FaceDetectionResult>': then, catch, finally, [Symbol.toStringTag]
+components/ui/calendar.tsx(25,9): error TS2353: Object literal may only specify known properties, and 'caption' does not exist in type 'Partial<ClassNames>'.
+components/ui/calendar.tsx(57,9): error TS2353: Object literal may only specify known properties, and 'IconLeft' does not exist in type 'Partial<CustomComponents>'.
+lib/ai/alerts.ts(310,24): error TS1205: Re-exporting a type when 'isolatedModules' is enabled requires using 'export type'.
+lib/ai/alerts.ts(310,37): error TS1205: Re-exporting a type when 'isolatedModules' is enabled requires using 'export type'.
+lib/ai/alerts.ts(310,37): error TS2484: Export declaration conflicts with exported declaration of 'Alert'.
+lib/ai/alerts.ts(310,44): error TS1205: Re-exporting a type when 'isolatedModules' is enabled requires using 'export type'.
+lib/ai/alerts.ts(310,44): error TS2484: Export declaration conflicts with exported declaration of 'AlertType'.
+lib/ai/analytics.ts(15,14): error TS2323: Cannot redeclare exported variable 'AIAnalyticsEventSchema'.
+lib/ai/analytics.ts(25,15): error TS2554: Expected 2-3 arguments, but got 1.
+lib/ai/analytics.ts(292,30): error TS2323: Cannot redeclare exported variable 'AIAnalyticsEventSchema'.
+lib/ai/analytics.ts(292,30): error TS2484: Export declaration conflicts with exported declaration of 'AIAnalyticsEventSchema'.
+lib/ai/analytics.ts(293,15): error TS2484: Export declaration conflicts with exported declaration of 'AIAnalyticsEvent'.
+lib/ai/bahanAjarExport.ts(112,15): error TS2353: Object literal may only specify known properties, and 'fill' does not exist in type 'ShapeFillProps'.
+lib/ai/bahanAjarExport.ts(158,15): error TS2353: Object literal may only specify known properties, and 'fill' does not exist in type 'ShapeFillProps'.
+lib/ai/bahanAjarExport.ts(195,15): error TS2353: Object literal may only specify known properties, and 'fill' does not exist in type 'ShapeFillProps'.
+lib/ai/generateBahanAjar.ts(271,34): error TS2304: Cannot find name 'getUserTokenAccess'.
+lib/ai/monitoring.ts(73,28): error TS2345: Argument of type '{ length: number; maxAllowed: number; field: string; }' is not assignable to parameter of type '{ field: string; originalLength: number; maxAllowed: number; }'.
+  Property 'originalLength' is missing in type '{ length: number; maxAllowed: number; field: string; }' but required in type '{ field: string; originalLength: number; maxAllowed: number; }'.
+lib/ai/silabusPrompts.ts(297,45): error TS2339: Property 'mataPelajaran' does not exist on type '{}'.
+lib/ai/silabusPrompts.ts(298,36): error TS2339: Property 'fase' does not exist on type '{}'.
+lib/ai/silabusPrompts.ts(299,37): error TS2339: Property 'kelas' does not exist on type '{}'.
+lib/ai/silabusPrompts.ts(300,40): error TS2339: Property 'semester' does not exist on type '{}'.
+lib/ai/silabusPrompts.ts(301,36): error TS2339: Property 'tahunAjaran' does not exist on type '{}'.
+lib/ai/silabusPrompts.ts(304,7): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string | null | undefined'.
+lib/ai/silabusPrompts.ts(333,50): error TS2339: Property 'totalPertemuan' does not exist on type '{}'.
+lib/ai/silabusPrompts.ts(334,47): error TS2339: Property 'totalMinggu' does not exist on type '{}'.
+lib/ai/validation-utils.test.ts(92,28): error TS2345: Argument of type 'null' is not assignable to parameter of type 'unknown[]'.
+lib/ai/validation-utils.test.ts(93,28): error TS2345: Argument of type 'undefined' is not assignable to parameter of type 'unknown[]'.
+lib/detect-shared-leader.ts(57,7): error TS2322: Type 'Record<string, unknown>[]' is not assignable to type 'Where[]'.
+  Type 'Record<string, unknown>' is not assignable to type 'Where'.
+    'string' index signatures are incompatible.
+      Type 'unknown' is not assignable to type 'Where[] | WhereField'.
+lib/raport/__tests__/agregatorNilai.test.ts(331,9): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?
+lib/selesai-mengajar/generate-jurnal.ts(155,7): error TS2561: Object literal may only specify known properties, but 'teacher_id' does not exist in type 'Without<teacher_journalsCreateInput, teacher_journalsUncheckedCreateInput> & teacher_journalsUncheckedCreateInput'. Did you mean to write 'teacher'?
+lib/settings.ts(145,9): error TS2741: Property 'refund' is missing in type '{ register: { email_enabled: true; wa_enabled: true; email_subject: string; email_body: string; wa_message: string; }; forgot_password: { email_enabled: true; wa_enabled: true; email_subject: string; email_body: string; wa_message: string; }; payout_approved: { ...; }; payout_rejected: { ...; }; payment_success: { ....' but required in type 'NotificationTemplates'.
+lib/token-system.ts(122,11): error TS2345: Argument of type 'null' is not assignable to parameter of type 'string | undefined'.
+tests/e2e/batch-input-nilai.spec.ts(238,17): error TS2769: No overload matches this call.
+  Overload 1 of 5, '(condition: boolean, description?: string | undefined): void', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'boolean'.
+  Overload 2 of 5, '(callback: ConditionBody<PlaywrightTestArgs & PlaywrightTestOptions & PlaywrightWorkerArgs & PlaywrightWorkerOptions>, description?: string | undefined): void', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'ConditionBody<PlaywrightTestArgs & PlaywrightTestOptions & PlaywrightWorkerArgs & PlaywrightWorkerOptions>'.
+tests/e2e/batch-input-nilai.spec.ts(328,17): error TS2769: No overload matches this call.
+  Overload 1 of 5, '(condition: boolean, description?: string | undefined): void', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'boolean'.
+  Overload 2 of 5, '(callback: ConditionBody<PlaywrightTestArgs & PlaywrightTestOptions & PlaywrightWorkerArgs & PlaywrightWorkerOptions>, description?: string | undefined): void', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'ConditionBody<PlaywrightTestArgs & PlaywrightTestOptions & PlaywrightWorkerArgs & PlaywrightWorkerOptions>'.
+tests/e2e/e-raport.spec.ts(660,31): error TS2345: Argument of type 'RegExp' is not assignable to parameter of type 'string'.
+tests/payments.test.ts(14,10): error TS2305: Module '"@/lib/settings"' has no exported member 'getPricingConfig'.
+tests/share-to-principal.test.ts(636,28): error TS2554: Expected 2 arguments, but got 1.
+tests/share-to-principal.test.ts(673,28): error TS2554: Expected 3 arguments, but got 1.
+tests/wali-kelas-api.test.ts(142,28): error TS2554: Expected 3 arguments, but got 1.
+tests/wali-kelas-api.test.ts(436,23): error TS2872: This kind of expression is always truthy.
+tests/wali-kelas-api.test.ts(656,28): error TS2554: Expected 3 arguments, but got 1.
+tests/wali-kelas-api.test.ts(665,28): error TS2554: Expected 3 arguments, but got 1.
+tests/wali-kelas-share.test.ts(4,10): error TS2724: '"@/lib/raport/notifications"' has no exported member named 'sendInAppNotification'. Did you mean 'sendRaportNotification'?

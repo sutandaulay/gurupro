@@ -1,0 +1,171 @@
+Error fetching today schedule: SyntaxError: Bad escaped character in JSON at position 6 (line 1 column 7)
+    at JSON.parse (<anonymous>)
+    at GET (app\api\attendance\schedule\today\route.ts:12:26)
+  10 |       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  11 |     }
+> 12 |     const session = JSON.parse(sessionCookie);
+     |                          ^
+  13 |     const userId = session.id;
+  14 |
+  15 |     const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+Error fetching institutions: SyntaxError: Bad escaped character in JSON at position 6 (line 1 column 7)
+    at JSON.parse (<anonymous>)
+    at GET (app\api\institutions\route.ts:12:26)
+  10 |       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  11 |     }
+> 12 |     const session = JSON.parse(sessionCookie);
+     |                          ^
+  13 |     const userId = session.id;
+  14 |
+  15 |     // 1. Get user's email and details
+Subjects GET error: SyntaxError: Bad escaped character in JSON at position 6 (line 1 column 7)
+    at JSON.parse (<anonymous>)
+    at getUserId (lib\school-access.ts:11:24)
+    at async requireSchoolAccess (lib\school-access.ts:24:18)
+    at async GET (app\api\subjects\route.ts:14:5)
+   9 |     throw new Error("Unauthorized")
+  10 |   }
+> 11 |   const session = JSON.parse(sessionCookie)
+     |                        ^
+  12 |   return session.id
+  13 | }
+  14 |
+Error fetching today schedule: SyntaxError: Bad escaped character in JSON at position 6 (line 1 column 7)
+    at JSON.parse (<anonymous>)
+    at GET (app\api\attendance\schedule\today\route.ts:12:26)
+  10 |       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  11 |     }
+> 12 |     const session = JSON.parse(sessionCookie);
+     |                          ^
+  13 |     const userId = session.id;
+  14 |
+  15 |     const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+Error fetching institutions: SyntaxError: Bad escaped character in JSON at position 6 (line 1 column 7)
+    at JSON.parse (<anonymous>)
+    at GET (app\api\institutions\route.ts:12:26)
+  10 |       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  11 |     }
+> 12 |     const session = JSON.parse(sessionCookie);
+     |                          ^
+  13 |     const userId = session.id;
+  14 |
+  15 |     // 1. Get user's email and details
+Error fetching today schedule: error: sintaks masukan tidak valid untuk tipe uuid : « abc123 »
+    at async GET (app\api\attendance\schedule\today\route.ts:19:34)
+  17 |
+  18 |     // 1. Fetch schedules via user_school_assignments (institutional teachers)
+> 19 |     const institutionSchedules = await pgQuery(
+     |                                  ^
+  20 |       `SELECT sc.id, sc.school_id, sc.class_id, sc.subject_id, sc.hari, 
+  21 |               sc.jam_mulai, sc.jam_selesai, c.nama_kelas, sb.nama_mapel,
+  22 |               i.id as institution_id, s.nama_sekolah as school_name {
+  length: 152,
+  severity: 'ERROR',
+  code: '22P02',
+  detail: undefined,
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: "unnamed portal parameter $1 = '...'",
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'uuid.c',
+  line: '136',
+  routine: 'string_to_uuid'
+}
+Error fetching institutions: error: sintaks masukan tidak valid untuk tipe uuid : « abc123 »
+    at async GET (app\api\institutions\route.ts:16:24)
+  14 |
+  15 |     // 1. Get user's email and details
+> 16 |     const userResult = await pgQuery("SELECT email, nama_lengkap FROM users WHERE id = $1"...
+     |                        ^
+  17 |     if (userResult.rows.length === 0) {
+  18 |       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  19 |     } {
+  length: 152,
+  severity: 'ERROR',
+  code: '22P02',
+  detail: undefined,
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: "unnamed portal parameter $1 = '...'",
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'uuid.c',
+  line: '136',
+  routine: 'string_to_uuid'
+}
+Subjects GET error: error: sintaks masukan tidak valid untuk tipe uuid : « test »
+    at async requireSchoolAccess (lib\school-access.ts:25:17)
+    at async GET (app\api\subjects\route.ts:14:5)
+  23 | export async function requireSchoolAccess(schoolId: string): Promise<{ userId: string }> {
+  24 |   const userId = await getUserId()
+> 25 |   const check = await query(
+     |                 ^
+  26 |     `SELECT id FROM schools WHERE id = $1 AND user_id = $2`,
+  27 |     [schoolId, userId]
+  28 |   ) {
+  length: 150,
+  severity: 'ERROR',
+  code: '22P02',
+  detail: undefined,
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: "unnamed portal parameter $1 = '...'",
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'uuid.c',
+  line: '136',
+  routine: 'string_to_uuid'
+}
+Error fetching today schedule: error: kolom « school_id » tidak ada
+    at async GET (app\api\attendance\schedule\today\route.ts:56:24)
+  54 |
+  55 |     // 3. Fetch teaching session logs for today from both attendance_logs and teacher_atte...
+> 56 |     const logsResult = await pgQuery(
+     |                        ^
+  57 |       `SELECT id, type, class_session_id, timestamp, institution_id, school_id
+  58 |        FROM attendance_logs
+  59 |        WHERE teacher_id = $1 AND timestamp >= CURRENT_DATE AND timestamp < CURRENT_DATE + 1 {
+  length: 107,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '63',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3727',
+  routine: 'errorMissingColumn'
+}
+Subjects GET error: Error: Forbidden
+    at requireSchoolAccess (lib\school-access.ts:35:13)
+    at async GET (app\api\subjects\route.ts:14:5)
+  33 |     )
+  34 |     if (assigned.rows.length === 0) {
+> 35 |       throw new Error("Forbidden")
+     |             ^
+  36 |     }
+  37 |   }
+  38 |   return { userId }

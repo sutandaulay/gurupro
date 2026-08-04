@@ -1,5 +1,6 @@
 'use client';
 import { apiFetch } from "@/lib/api-client";
+import { Pagination, usePagedItems } from "@/components/ui/pagination";
 
 import { useState, useEffect, useCallback, startTransition, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
@@ -77,6 +78,7 @@ function RapotReviewContent() {
   const [schools, setSchools] = useState<SchoolOption[]>([]);
   const [showSchoolSelector, setShowSchoolSelector] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const raportsPager = usePagedItems(raports, 25);
 
   // Check authentication and initialize
   useEffect(() => {
@@ -488,8 +490,9 @@ function RapotReviewContent() {
               <p className="text-gray-500">Tidak ada raport untuk kelas ini.</p>
             </div>
           ) : (
+            <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {raports.map((raport) => (
+              {raportsPager.pagedItems.map((raport) => (
                 <div key={raport.id} className="bg-white rounded-lg shadow p-4 hover:shadow-md transition cursor-pointer"
                      onClick={() => handleOpenReview(raport)}>
                   <h3 className="font-semibold text-gray-900">{raport.nama_siswa}</h3>
@@ -509,6 +512,17 @@ function RapotReviewContent() {
                 </div>
               ))}
             </div>
+            {raportsPager.total > 0 && (
+              <Pagination
+                page={raportsPager.page}
+                pageSize={raportsPager.pageSize}
+                total={raportsPager.total}
+                totalPages={raportsPager.totalPages}
+                onPageChange={(p) => raportsPager.reset(p)}
+                onPageSizeChange={(s) => { raportsPager.setPageSize(s); raportsPager.reset(1); }}
+              />
+            )}
+            </>
           )}
         </div>
       ) : (

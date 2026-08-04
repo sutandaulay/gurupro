@@ -1,5 +1,6 @@
 "use client"
 import { apiFetch } from "@/lib/api-client";
+import { Pagination, usePagedItems } from "@/components/ui/pagination";
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
@@ -286,6 +287,7 @@ function MembersTable({
   onRefresh: () => void
 }) {
   const toast = useToast()
+  const membersPager = usePagedItems(members, 25)
 
   const handleToggleStatus = async (member: Member) => {
     const newStatus = member.status === "active" ? "left" : "active"
@@ -332,7 +334,7 @@ function MembersTable({
                 </td>
               </tr>
             ) : (
-              members.map((m) => (
+              membersPager.pagedItems.map((m) => (
                 <tr key={m.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-900">{m.nama_lengkap || m.cms_user_name}</p>
@@ -394,6 +396,17 @@ function MembersTable({
           </tbody>
         </table>
       </div>
+      {membersPager.total > 0 && (
+        <Pagination
+          page={membersPager.page}
+          pageSize={membersPager.pageSize}
+          total={membersPager.total}
+          totalPages={membersPager.totalPages}
+          onPageChange={(p) => membersPager.reset(p)}
+          onPageSizeChange={(s) => { membersPager.setPageSize(s); membersPager.reset(1); }}
+          className="px-4 pb-4"
+        />
+      )}
     </Card>
   )
 }

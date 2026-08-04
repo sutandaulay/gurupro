@@ -18,18 +18,30 @@ export async function GET() {
   try {
     await verifyAdmin();
     // Fetch all referrals
-    const referrals = await query(
-      `SELECT r.id, r.created_at, 
-              u1.nama_lengkap AS referrer_name, u1.email AS referrer_email, u1.whatsapp AS referrer_wa, u1.cashback_balance AS referrer_balance,
-              u2.nama_lengkap AS referee_name, u2.email AS referee_email,
-              r.reward_tokens, r.cashback_amount
-       FROM referrals r
-       JOIN users u1 ON r.referrer_id = u1.id
-       JOIN users u2 ON r.referee_id = u2.id
-       ORDER BY r.created_at DESC
-       LIMIT 100`
-    );
-    return NextResponse.json(referrals.rows);
+    const [referralsRes, totalsRes] = await Promise.all([
+      query(
+        `SELECT r.id, r.created_at, 
+                u1.nama_lengkap AS referrer_name, u1.email AS referrer_email, u1.whatsapp AS referrer_wa, u1.cashback_balance AS referrer_balance,
+                u2.nama_lengkap AS referee_name, u2.email AS referee_email,
+                r.reward_tokens, r.cashback_amount
+         FROM referrals r
+         JOIN users u1 ON r.referrer_id = u1.id
+         JOIN users u2 ON r.referee_id = u2.id
+         ORDER BY r.created_at DESC
+         LIMIT 100`
+      ),
+      query(
+        `SELECT COUNT(*) AS total,
+                COALESCE(SUM(r.cashback_amount), 0) AS total_cashback
+         FROM referrals r`
+      ),
+    ]);
+    const totals = totalsRes.rows[0] || { total: 0, total_cashback: 0 };
+    return NextResponse.json({
+      referrals: referralsRes.rows,
+      total: parseInt(totals.total || "0", 10),
+      total_cashback: Number(totals.total_cashback) || 0,
+    });
   } catch (error: any) {
     console.error("GET admin referrals error:", error);
     const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;

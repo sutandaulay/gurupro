@@ -1,5 +1,6 @@
 'use client';
 import { apiFetch } from "@/lib/api-client";
+import { Pagination, usePagedItems } from "@/components/ui/pagination";
 
 import { useState, useEffect } from 'react';
 import PenilaianEkstrakurikulerForm from '@/app/components/PenilaianEkstrakurikulerForm';
@@ -127,6 +128,8 @@ function DaftarNilaiEkskul({ ekstrakurikulerId, periode }: { ekstrakurikulerId: 
       .catch(() => setLoading(false));
   }, [ekstrakurikulerId, periode]);
 
+  const nilaiPager = usePagedItems(nilaiList, 25);
+
   if (loading) return <p>Memuat...</p>;
   if (nilaiList.length === 0) return <p className="text-gray-500">Belum ada penilaian.</p>;
 
@@ -138,39 +141,51 @@ function DaftarNilaiEkskul({ ekstrakurikulerId, periode }: { ekstrakurikulerId: 
   };
 
   return (
-    <table className="w-full border-collapse border">
-      <thead>
-        <tr className="bg-gray-100">
-          <th className="border p-2 text-left">No</th>
-          <th className="border p-2 text-left">Nama Siswa</th>
-          <th className="border p-2 text-left">Predikat</th>
-          <th className="border p-2 text-left">Deskripsi</th>
-        </tr>
-      </thead>
-      <tbody>
-        {nilaiList.map((nilai, idx) => (
-          <tr key={nilai.id}>
-            <td className="border p-2">{idx + 1}</td>
-            <td className="border p-2">{nilai.siswaId}</td>
-            <td className="border p-2">
-              <span
-                className={`px-2 py-1 rounded text-sm ${
-                  nilai.predikat === 'sangat_baik'
-                    ? 'bg-green-100 text-green-800'
-                    : nilai.predikat === 'baik'
-                    ? 'bg-blue-100 text-blue-800'
-                    : nilai.predikat === 'cukup'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-red-100 text-red-800'
-                }`}
-              >
-                {predikatLabels[nilai.predikat]}
-              </span>
-            </td>
-            <td className="border p-2">{nilai.deskripsi}</td>
+    <>
+      <table className="w-full border-collapse border">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="border p-2 text-left">No</th>
+            <th className="border p-2 text-left">Nama Siswa</th>
+            <th className="border p-2 text-left">Predikat</th>
+            <th className="border p-2 text-left">Deskripsi</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {nilaiPager.pagedItems.map((nilai, idx) => (
+            <tr key={nilai.id}>
+              <td className="border p-2">{(nilaiPager.page - 1) * nilaiPager.pageSize + idx + 1}</td>
+              <td className="border p-2">{nilai.siswaId}</td>
+              <td className="border p-2">
+                <span
+                  className={`px-2 py-1 rounded text-sm ${
+                    nilai.predikat === 'sangat_baik'
+                      ? 'bg-green-100 text-green-800'
+                      : nilai.predikat === 'baik'
+                      ? 'bg-blue-100 text-blue-800'
+                      : nilai.predikat === 'cukup'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}
+                >
+                  {predikatLabels[nilai.predikat]}
+                </span>
+              </td>
+              <td className="border p-2">{nilai.deskripsi}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {nilaiPager.total > 0 && (
+        <Pagination
+          page={nilaiPager.page}
+          pageSize={nilaiPager.pageSize}
+          total={nilaiPager.total}
+          totalPages={nilaiPager.totalPages}
+          onPageChange={(p) => nilaiPager.reset(p)}
+          onPageSizeChange={(s) => { nilaiPager.setPageSize(s); nilaiPager.reset(1); }}
+        />
+      )}
+    </>
   );
 }

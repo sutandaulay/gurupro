@@ -1,5 +1,6 @@
 'use client';
 import { apiFetch } from "@/lib/api-client";
+import { Pagination, usePagedItems } from "@/components/ui/pagination";
 
 import React, { useState, useEffect } from 'react';
 import { useTeacherStore, useKurikulumStore } from '@/lib/stores';
@@ -24,6 +25,7 @@ export default function ATPEditorPage() {
   const [editMode, setEditMode] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [resolvedSubjectName, setResolvedSubjectName] = useState('');
+  const atpPager = usePagedItems(atpList, 25);
 
   // Token Modal State
   const [showTokenModal, setShowTokenModal] = useState(false);
@@ -319,31 +321,43 @@ export default function ATPEditorPage() {
                   Belum ada ATP. Buat ATP baru di atas.
                 </div>
               ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {atpList.map((atp: any) => (
-                    <button
-                      key={atp.id}
-                      onClick={() => {
-                        setSelectedATP(atp);
-                        setEditMode(false);
-                        setEditContent(atp.konten);
-                      }}
-                      className={`w-full text-left p-3 rounded-xl border transition ${
-                        selectedATP?.id === atp.id
-                          ? 'border-indigo-400 bg-indigo-50'
-                          : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
-                      }`}
-                    >
-                      <p className="text-sm font-semibold text-slate-800 line-clamp-1">{atp.judul_dokumen}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
-                        {atp.kurikulum || 'Kurikulum'} • {atp.jenjang || ''} {atp.fase ? `Fase ${atp.fase}` : ''} • {atp.semester || ''}
-                      </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        {new Date(atp.created_at).toLocaleDateString('id-ID')}
-                      </p>
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {atpPager.pagedItems.map((atp: any) => (
+                      <button
+                        key={atp.id}
+                        onClick={() => {
+                          setSelectedATP(atp);
+                          setEditMode(false);
+                          setEditContent(atp.konten);
+                        }}
+                        className={`w-full text-left p-3 rounded-xl border transition ${
+                          selectedATP?.id === atp.id
+                            ? 'border-indigo-400 bg-indigo-50'
+                            : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                        }`}
+                      >
+                        <p className="text-sm font-semibold text-slate-800 line-clamp-1">{atp.judul_dokumen}</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">
+                          {atp.kurikulum || 'Kurikulum'} • {atp.jenjang || ''} {atp.fase ? `Fase ${atp.fase}` : ''} • {atp.semester || ''}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {new Date(atp.created_at).toLocaleDateString('id-ID')}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                  {atpPager.total > 0 && (
+                    <Pagination
+                      page={atpPager.page}
+                      pageSize={atpPager.pageSize}
+                      total={atpPager.total}
+                      totalPages={atpPager.totalPages}
+                      onPageChange={(p) => atpPager.reset(p)}
+                      onPageSizeChange={(s) => { atpPager.setPageSize(s); atpPager.reset(1); }}
+                    />
+                  )}
+                </>
               )}
             </div>
           </div>

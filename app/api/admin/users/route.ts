@@ -24,29 +24,38 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const q = searchParams.get("q") || "";
 
+    let whereClause = "";
+    const params: any[] = [];
+
+    if (q) {
+      whereClause = `
+        WHERE nama_lengkap ILIKE $1
+           OR email ILIKE $1
+           OR username ILIKE $1
+           OR whatsapp ILIKE $1
+      `;
+      params.push(`%${q}%`);
+    }
+
     let usersQuery = `
       SELECT id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan,
              quota_poin_total, quota_poin_used, addon_poin, addon_poin_used,
              subscription_start, subscription_end, is_active, created_at
       FROM users
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT 100
     `;
-    const params: any[] = [];
 
-    if (q) {
-      usersQuery += `
-        WHERE nama_lengkap ILIKE $1 
-           OR email ILIKE $1 
-           OR username ILIKE $1
-           OR whatsapp ILIKE $1
-      `;
-      params.push(`%${q}%`);
-      usersQuery += " ORDER BY created_at DESC LIMIT 100";
-    } else {
-      usersQuery += " ORDER BY created_at DESC LIMIT 100";
-    }
+    const [usersRes, totalRes] = await Promise.all([
+      query(usersQuery, params),
+      query(`SELECT COUNT(*) AS total FROM users ${whereClause}`, params),
+    ]);
 
-    const usersRes = await query(usersQuery, params);
-    return NextResponse.json(usersRes.rows);
+    return NextResponse.json({
+      users: usersRes.rows,
+      total: parseInt(totalRes.rows[0]?.total || "0", 10),
+    });
   } catch (error: any) {
     console.error("Admin Users GET error:", error);
     const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;

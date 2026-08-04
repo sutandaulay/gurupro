@@ -130,8 +130,12 @@ const menuItems: MenuItem[] = [
   {
     label: "Institusi",
     submenu: [
-      { label: "Manajemen Institusi", href: "/dashboard/institution" },
+      { label: "Overview Institusi", href: "/dashboard/institution" },
       { label: "Anggota Institusi", href: "/dashboard/institution/members" },
+      { label: "Rekap TPG", href: "/dashboard/institution/tpg" },
+      { label: "Laporan Mengajar", href: "/dashboard/institution/laporan-mengajar" },
+      { label: "Approval / Persetujuan", href: "/dashboard/institution/approval" },
+      { label: "Langganan & Billing", href: "/dashboard/institution/langganan" },
       { label: "Pengaturan Institusi", href: "/dashboard/institution/settings" },
     ],
   },

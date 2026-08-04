@@ -26,10 +26,21 @@ import MobileBottomNav from "@/app/components/mobile/MobileBottomNav";
 import AppIcon from "@/app/components/ui/AppIcon";
 import { Calendar, School, BookOpen, Users, Clock } from "lucide-react";
 import { getLucideIcon, resolveCategory } from "@/lib/menuConfig";
+import { Pagination, usePagedItems } from "@/components/ui/pagination";
 
 // Safe JSON fetch - always returns an object or array, never throws
 async function safeJson(url: string): Promise<any> {
   const res = await apiFetch(url);
+  if (!res.ok) return null;
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+// Safe JSON parse of an existing Response (for chained fetches)
+async function safeParse(res: Response): Promise<any> {
   if (!res.ok) return null;
   try {
     return await res.json();
@@ -602,9 +613,7 @@ function DashboardContent() {
   });
 
   // Web Notification & In-App Notification Center States
-  const [notifications, setNotifications] = useState<any[]>([
-    { id: "init-welcome", title: "Selamat Datang!", body: "Terima kasih telah bergabung dengan GuruPRO. Mulai rancang kegiatan mengajar Anda sekarang!", date: "Baru saja", read: false }
-  ]);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
 
   // Scheduler States
@@ -628,6 +637,16 @@ function DashboardContent() {
   const [attendanceDate, setAttendanceDate] = useState<string>(getLocalDateString());
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
   const [completedSessionIds, setCompletedSessionIds] = useState<Set<string>>(new Set());
+
+  // Client-side pagination for data tables
+  const studentsPager = usePagedItems(
+    [...students].sort((a, b) => (a.nomor_absen || 999) - (b.nomor_absen || 999)),
+    25
+  );
+  const studentGradesPager = usePagedItems(studentGrades, 25);
+  const jurnalListPager = usePagedItems(jurnalList, 25);
+  const auditLogsPager = usePagedItems(auditLogs, 25);
+  const notificationsPager = usePagedItems(notifications, 25);
 
   useEffect(() => {
     const handleSessionDone = (e: Event) => {
@@ -1005,7 +1024,7 @@ function DashboardContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transactionId: txId }),
       })
-        .then((r) => r.json())
+        .then((r) => safeParse(r))
         .then((data) => {
           if (data.verified || data.alreadyActivated) {
             window.location.reload();
@@ -1030,6 +1049,8 @@ function DashboardContent() {
       fetchJournals();
       // eslint-disable-next-line react-hooks/immutability
       fetchChecklist();
+      // eslint-disable-next-line react-hooks/immutability
+      fetchNotifications();
       // eslint-disable-next-line react-hooks/immutability
       fetchKeuangan();
       fetchSignatures();
@@ -2810,10 +2831,10 @@ function DashboardContent() {
       if (tahunAjaranId) params.set('tahun_ajaran_id', tahunAjaranId)
 
       const [docs, journals, assessments, dokumenBuktis] = await Promise.all([
-        apiFetch(`/api/administrasi${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`).then((r) => r.json()),
-        apiFetch(`/api/journals${selectedSchoolId ? `?school_id=${selectedSchoolId}&limit=100` : ''}`).then((r) => r.json()),
-        apiFetch(`/api/assessments${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`).then((r) => r.json()),
-        apiFetch(`/api/dokumen-bukti?${params.toString()}`).then((r) => r.json())
+        safeJson(`/api/administrasi${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`),
+        safeJson(`/api/journals${selectedSchoolId ? `?school_id=${selectedSchoolId}&limit=100` : ''}`),
+        safeJson(`/api/assessments${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`),
+        safeJson(`/api/dokumen-bukti?${params.toString()}`)
       ]);
       setAllExplorerDocs(docs?.data ?? (Array.isArray(docs) ? docs : []));
       if (journals?.data) setAllExplorerJournals(journals.data);
@@ -2829,7 +2850,7 @@ function DashboardContent() {
   const fetchExplorerAssessmentGrades = async (assessmentId: string) => {
     setIsLoadingGrades(true);
     try {
-      const res = await apiFetch(`/api/assessments/grades?assessment_id=${assessmentId}&school_id=${selectedSchoolId}`).then((r) => r.json());
+      const res = await safeJson(`/api/assessments/grades?assessment_id=${assessmentId}&school_id=${selectedSchoolId}`);
       if (Array.isArray(res)) {
         setExplorerGrades(res);
       } else {
@@ -2846,6 +2867,10 @@ function DashboardContent() {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (selectedSchoolId) {
+        if (currentModule === "tugas_harian") {
+          fetchAnalytics(selectedSchoolId);
+          fetchSchedules(selectedSchoolId);
+        }
         if (currentModule === "jurnal") {
           fetchAllUsers();
           fetchSupervisions();
@@ -2940,7 +2965,7 @@ function DashboardContent() {
 
   const fetchSavedDocs = async () => {
     try {
-      const res = await apiFetch(`/api/administrasi${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`).then((r) => r.json());
+      const res = await safeJson(`/api/administrasi${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`);
       const list = res?.data ?? (Array.isArray(res) ? res : []);
       const filtered = list.filter((d) =>
         ["rpp", "modul", "silabus", "lkpd", "laporan_lkpd", "bahan_ajar"].includes(d.tipe_dokumen)
@@ -2953,7 +2978,7 @@ function DashboardContent() {
 
   const fetchJournals = async () => {
     try {
-      const res = await apiFetch(`/api/administrasi?tipe=jurnal${selectedSchoolId ? `&school_id=${selectedSchoolId}` : ''}`).then((r) => r.json());
+      const res = await safeJson(`/api/administrasi?tipe=jurnal${selectedSchoolId ? `&school_id=${selectedSchoolId}` : ''}`);
       setJurnalList(res?.data ?? (Array.isArray(res) ? res : []));
     } catch (e) {
       console.error(e);
@@ -2962,7 +2987,7 @@ function DashboardContent() {
 
   const fetchChecklist = async () => {
     try {
-      const res = await apiFetch(`/api/administrasi?tipe=ceklis${selectedSchoolId ? `&school_id=${selectedSchoolId}` : ''}`).then((r) => r.json());
+      const res = await safeJson(`/api/administrasi?tipe=ceklis${selectedSchoolId ? `&school_id=${selectedSchoolId}` : ''}`);
       const list = res?.data ?? (Array.isArray(res) ? res : []);
       if (list.length > 0 && list[0].konten?.tasks?.length > 0) {
         setCeklisTasks(list[0].konten.tasks);
@@ -2980,9 +3005,29 @@ function DashboardContent() {
     }
   };
 
+  const fetchNotifications = async () => {
+    try {
+      const data = await safeJson("/api/user/notifications?limit=50&includeRead=true");
+      const list = data?.notifications ?? (Array.isArray(data) ? data : []);
+      setNotifications(
+        list.map((n: any) => ({
+          id: String(n.id),
+          title: n.title,
+          body: n.body,
+          date: n.created_at
+            ? new Date(n.created_at).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+            : "Baru saja",
+          read: Boolean(n.is_read),
+        }))
+      );
+    } catch (e) {
+      console.error("Gagal memuat notifikasi:", e);
+    }
+  };
+
   const fetchKeuangan = async () => {
     try {
-      const res = await apiFetch("/api/administrasi?tipe=keuangan").then((r) => r.json());
+      const res = await safeJson("/api/administrasi?tipe=keuangan");
       const list = res?.data ?? (Array.isArray(res) ? res : []);
       if (list.length > 0) {
         const doc = list[0];
@@ -3027,9 +3072,8 @@ function DashboardContent() {
 
   const fetchSignatures = async () => {
     try {
-      const response = await apiFetch("/api/administrasi?tipe=tanda_tangan");
-      if (response.ok) {
-        const body = await response.json();
+      const body = await safeJson("/api/administrasi?tipe=tanda_tangan");
+      if (body) {
         const list = body?.data ?? (Array.isArray(body) ? body : []);
         if (list.length > 0) {
           const doc = list[0];
@@ -5744,9 +5788,7 @@ function DashboardContent() {
                           </tr>
                         </thead>
                         <tbody>
-                          {students
-                            .sort((a, b) => (a.nomor_absen || 999) - (b.nomor_absen || 999))
-                            .map((st) => (
+                          {studentsPager.pagedItems.map((st) => (
                               <tr key={st.id} className="border-b border-slate-100/60 hover:bg-slate-50/50 transition text-xs font-semibold text-slate-700">
                                 <td className="py-2.5 px-3 text-center text-slate-400 font-bold">{st.nomor_absen || "-"}</td>
                                 <td className="py-2.5 px-3 text-slate-900">{st.nama_siswa}</td>
@@ -5782,6 +5824,20 @@ function DashboardContent() {
                       </table>
                     )}
                   </div>
+                  {studentsPager.total > 0 && (
+                    <Pagination
+                      page={studentsPager.page}
+                      pageSize={studentsPager.pageSize}
+                      total={studentsPager.total}
+                      totalPages={studentsPager.totalPages}
+                      onPageChange={(p) => studentsPager.reset(p)}
+                      onPageSizeChange={(s) => {
+                        studentsPager.setPageSize(s);
+                        studentsPager.reset(1);
+                      }}
+                      loading={false}
+                    />
+                  )}
                 </div>
               </div>
             )}
@@ -7648,7 +7704,7 @@ const renderJurnalModule = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {jurnalList.map((j) => (
+                        {jurnalListPager.pagedItems.map((j) => (
                           <tr key={j.id} className="border-b border-slate-100/60 hover:bg-slate-50/50 transition text-xs font-semibold text-slate-700">
                             <td className="py-3 px-3 text-slate-500 font-mono">
                               {new Date(j.tanggal).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
@@ -7733,6 +7789,20 @@ const renderJurnalModule = () => {
                     </table>
                   )}
                 </div>
+                {jurnalListPager.total > 0 && (
+                  <Pagination
+                    page={jurnalListPager.page}
+                    pageSize={jurnalListPager.pageSize}
+                    total={jurnalListPager.total}
+                    totalPages={jurnalListPager.totalPages}
+                    onPageChange={(p) => jurnalListPager.reset(p)}
+                    onPageSizeChange={(s) => {
+                      jurnalListPager.setPageSize(s);
+                      jurnalListPager.reset(1);
+                    }}
+                    loading={false}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -8287,7 +8357,7 @@ const renderJurnalModule = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {studentGrades.map((g, idx) => {
+                        {studentGradesPager.pagedItems.map((g, idx) => {
                           const isFailed = Number(g.nilai_akhir || g.nilai_awal || 0) < assessKkm;
                           return (
                             <tr key={g.student_id} className="border-b border-slate-100/60 hover:bg-slate-50/50 transition text-xs font-semibold text-slate-700">
@@ -8346,6 +8416,20 @@ const renderJurnalModule = () => {
                       </tbody>
                     </table>
                   </div>
+                  {studentGradesPager.total > 0 && (
+                    <Pagination
+                      page={studentGradesPager.page}
+                      pageSize={studentGradesPager.pageSize}
+                      total={studentGradesPager.total}
+                      totalPages={studentGradesPager.totalPages}
+                      onPageChange={(p) => studentGradesPager.reset(p)}
+                      onPageSizeChange={(s) => {
+                        studentGradesPager.setPageSize(s);
+                        studentGradesPager.reset(1);
+                      }}
+                      loading={false}
+                    />
+                  )}
 
                   <div className="flex justify-between items-center pt-3 border-t border-slate-100">
                     <button
@@ -8971,7 +9055,7 @@ const renderJurnalModule = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {auditLogs.map((log) => (
+                      {auditLogsPager.pagedItems.map((log) => (
                         <tr key={log.id} className="border-b border-slate-100/60 hover:bg-slate-50/50 transition font-medium text-slate-600">
                           <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">
                             {new Date(log.created_at).toLocaleString("id-ID")}
@@ -8993,6 +9077,20 @@ const renderJurnalModule = () => {
                     </tbody>
                   </table>
                 </div>
+                {auditLogsPager.total > 0 && (
+                  <Pagination
+                    page={auditLogsPager.page}
+                    pageSize={auditLogsPager.pageSize}
+                    total={auditLogsPager.total}
+                    totalPages={auditLogsPager.totalPages}
+                    onPageChange={(p) => auditLogsPager.reset(p)}
+                    onPageSizeChange={(s) => {
+                      auditLogsPager.setPageSize(s);
+                      auditLogsPager.reset(1);
+                    }}
+                    loading={false}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -9980,7 +10078,7 @@ const renderJurnalModule = () => {
                 {notifications.length === 0 ? (
                   <div className="py-6 text-center text-slate-400 font-semibold text-xs">Belum ada riwayat notifikasi.</div>
                 ) : (
-                  notifications.map((notif) => (
+                  notificationsPager.pagedItems.map((notif) => (
                     <div key={notif.id} className="pt-3 flex justify-between items-start gap-4 text-left">
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
@@ -9994,6 +10092,22 @@ const renderJurnalModule = () => {
                   ))
                 )}
               </div>
+              {notificationsPager.total > 0 && (
+                <div className="border-t border-slate-100 mt-1">
+                  <Pagination
+                    page={notificationsPager.page}
+                    pageSize={notificationsPager.pageSize}
+                    total={notificationsPager.total}
+                    totalPages={notificationsPager.totalPages}
+                    onPageChange={(p) => notificationsPager.reset(p)}
+                    onPageSizeChange={(s) => {
+                      notificationsPager.setPageSize(s);
+                      notificationsPager.reset(1);
+                    }}
+                    loading={false}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -7,7 +7,7 @@ import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { useProfileStore, useTeacherStore } from "@/lib/stores";
 import AppIcon from "@/app/components/ui/AppIcon";
-import { getLucideIcon, masterMenus, resolveCategory } from "@/lib/menuConfig";
+import { getLucideIcon, masterMenus, resolveCategory, isInstitutionHref, resolveInstitutionHref, resolveActiveInstitutionId } from "@/lib/menuConfig";
 import {
   IconX,
   IconChevronDown,
@@ -35,6 +35,7 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
   const profile = useProfileStore(s => s.profile);
   const [expandedItems, setExpandedItems] = useState<{[key: string]: boolean}>({});
   const [roleFlags, setRoleFlags] = useState<{ isWaliKelas: boolean; isPembinaEkskul: boolean } | null>(null);
+  const [activeInstitutionId, setActiveInstitutionId] = useState<number | null>(null);
 
   const {
     schools,
@@ -58,6 +59,21 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
       }
     };
     fetchRoleFlags();
+  }, []);
+
+  useEffect(() => {
+    const fetchActiveContext = async () => {
+      try {
+        const res = await apiFetch('/api/auth/active-context');
+        if (res.ok) {
+          const data = await res.json();
+          setActiveInstitutionId(resolveActiveInstitutionId(data));
+        }
+      } catch {
+        // silently fail
+      }
+    };
+    fetchActiveContext();
   }, []);
 
   const handleSchoolChange = (schoolId: string) => {
@@ -127,8 +143,8 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
 
   const resolveHref = (href?: string) => {
     if (!href) return "";
-    if (href === "/dashboard/institution" || href.startsWith("/dashboard/institution/")) {
-      return activeSchoolId ? `/dashboard/institution/${activeSchoolId}/operator` : "/dashboard";
+    if (isInstitutionHref(href)) {
+      return resolveInstitutionHref(href, activeInstitutionId);
     }
     return href;
   };

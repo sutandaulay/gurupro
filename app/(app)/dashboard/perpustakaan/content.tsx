@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { apiFetch } from "@/lib/api-client";
 import LibraryCard from "@/components/library/LibraryCard";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Pagination } from "@/components/ui/pagination";
 import type { LibraryItem, LibraryCategory, ProgressItem } from "@/lib/library/types";
 
 const BookReader = dynamic(() => import("@/components/library/BookReader"), { ssr: false });
@@ -17,6 +18,8 @@ export default function PerpustakaanPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
   const [loading, setLoading] = useState(true);
   const [activeItem, setActiveItem] = useState<any>(null);
   const [activeItemUrl, setActiveItemUrl] = useState<string | null>(null);
@@ -42,23 +45,25 @@ export default function PerpustakaanPage() {
   }, []);
 
   // Fetch catalog
-  const fetchItems = useCallback(async (cat = selectedCategory, q = search, pg = page) => {
+  const fetchItems = useCallback(async (cat = selectedCategory, q = search, pg = page, lim = pageSize) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (q) params.set("search", q);
       if (cat) params.set("category", cat);
       params.set("page", String(pg));
+      params.set("limit", String(lim));
       const res = await apiFetch(`/api/library/items?${params}`);
       const d = await res.json();
       if (d.data) {
         setItems(d.data);
         setTotalPages(d.pagination?.totalPages ?? 1);
+        setTotalItems(d.pagination?.total ?? 0);
       }
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, page]);
+  }, [selectedCategory, page, pageSize]);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
@@ -117,6 +122,17 @@ export default function PerpustakaanPage() {
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.data) setContinueReading(d.data.slice(0, 5)); });
   };
+
+  const handleRefreshItemUrl = useCallback(async (): Promise<string | null> => {
+    if (!activeItem?.id) return null;
+    try {
+      const res = await apiFetch(`/api/library/items/${activeItem.id}`);
+      const d = await res.json();
+      return d.data?.file_signed_url ?? null;
+    } catch {
+      return null;
+    }
+  }, [activeItem]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-50 via-white to-indigo-50">
@@ -261,24 +277,16 @@ export default function PerpustakaanPage() {
           )}
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-8">
-              <button
-                onClick={() => { setPage(p => Math.max(1, p - 1)); }}
-                disabled={page === 1}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm disabled:opacity-50 hover:bg-slate-50"
-              >
-                Prev
-              </button>
-              <span className="text-sm text-slate-600">Halaman {page} / {totalPages}</span>
-              <button
-                onClick={() => { setPage(p => Math.min(totalPages, p + 1)); }}
-                disabled={page === totalPages}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm disabled:opacity-50 hover:bg-slate-50"
-              >
-                Next
-              </button>
-            </div>
+          {totalItems > 0 && (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={totalItems}
+              totalPages={totalPages}
+              onPageChange={(p) => { setPage(p); }}
+              onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+              loading={loading}
+            />
           )}
         </section>
       </div>

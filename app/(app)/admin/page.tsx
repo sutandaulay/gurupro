@@ -11,6 +11,7 @@ import InstitutionsManager from "@/components/admin/InstitutionsManager";
 import NotificationBell from "@/components/admin/NotificationBell";
 import LibraryAdmin from "@/components/admin/LibraryAdmin";
 import { ToastProvider, useToast } from "@/components/admin/ToastNotification";
+import { Pagination, usePagedItems } from "@/components/ui/pagination";
 
 function AdminPageContent() {
   const [activeTab, setActiveTab] = useState<"users" | "transactions" | "cms" | "registrations" | "institutions" | "referrals" | "admins" | "settings" | "notifications" | "library">("users");
@@ -18,12 +19,16 @@ function AdminPageContent() {
   // Data States
   const [users, setUsers] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [txStats, setTxStats] = useState<any>(null);
+  const [totalUsersCount, setTotalUsersCount] = useState(0);
   
   // CMS States (managed by CmsLandingEditor component)
 
   // Referrals State
   const [referralsList, setReferralsList] = useState<any[]>([]);
   const [payoutRequestsList, setPayoutRequestsList] = useState<any[]>([]);
+  const [totalReferralsCount, setTotalReferralsCount] = useState(0);
+  const [totalReferralCashback, setTotalReferralCashback] = useState(0);
   const [isLoadingReferrals, setIsLoadingReferrals] = useState(true);
   const [isLoadingPayouts, setIsLoadingPayouts] = useState(true);
   const [isProcessingPayout, setIsProcessingPayout] = useState<{ [key: string]: boolean }>({});
@@ -106,6 +111,13 @@ function AdminPageContent() {
 
   // Toast hook
   const { addToast } = useToast();
+
+  // Pagers (client-side pagination)
+  const usersPager = usePagedItems(users, 25);
+  const referralsPager = usePagedItems(referralsList, 25);
+  const payoutRequestsPager = usePagedItems(payoutRequestsList, 25);
+  const ratioHistoryPager = usePagedItems(ratioHistory, 25);
+  const broadcastHistoryPager = usePagedItems(broadcastHistory, 25);
 
   // Ref untuk tracking notifikasi baru (berbasis ID unik, bukan selisih counter)
   const lastNotifiedTxIdRef = useRef<string | null>(null);
@@ -219,6 +231,7 @@ function AdminPageContent() {
     fetchTransactions();
     fetchReferralsList();
     fetchPayoutRequestsList();
+    fetchBroadcastHistory();
     fetchSettings();
     fetchRatioHistory();
   }, []);
@@ -293,7 +306,9 @@ function AdminPageContent() {
       const res = await apiFetch(`/api/admin/users?q=${encodeURIComponent(queryStr)}`);
       if (res.ok) {
         const data = await res.json();
-        setUsers(data);
+        const usersList = Array.isArray(data) ? data : (data.users || []);
+        setUsers(usersList);
+        setTotalUsersCount(data.total ?? usersList.length);
       } else {
         let errMsg = "Gagal memuat daftar pengguna";
         try {
@@ -319,6 +334,7 @@ function AdminPageContent() {
         // Support both old format (array) and new format (object with transactions key)
         const txList = Array.isArray(data) ? data : (data.transactions || []);
         setTransactions(txList);
+        if (data && !Array.isArray(data) && data.stats) setTxStats(data.stats);
       } else {
         let errMsg = "Gagal memuat transaksi";
         try {
@@ -727,7 +743,10 @@ function AdminPageContent() {
       const res = await apiFetch("/api/admin/referrals");
       if (res.ok) {
         const data = await res.json();
-        setReferralsList(data);
+        const refList = Array.isArray(data) ? data : (data.referrals || []);
+        setReferralsList(refList);
+        setTotalReferralsCount(data.total ?? refList.length);
+        setTotalReferralCashback(Number(data.total_cashback) || refList.reduce((acc: number, curr: any) => acc + (curr.cashback_amount || 0), 0));
       }
     } catch (e) {
       console.error("Gagal memuat referrals:", e);
@@ -784,6 +803,27 @@ function AdminPageContent() {
     }
   };
 
+  const fetchBroadcastHistory = async () => {
+    try {
+      const res = await apiFetch("/api/admin/notifications?limit=5");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.broadcastHistory) {
+          setBroadcastHistory(
+            data.broadcastHistory.map((item: any) => ({
+              title: item.title,
+              body: item.body,
+              sentCount: item.sentCount,
+              timestamp: new Date(item.timestamp),
+            }))
+          );
+        }
+      }
+    } catch (e) {
+      console.error("Gagal memuat riwayat broadcast:", e);
+    }
+  };
+
   const handleProcessAdminPayout = async (requestId: string, status: "APPROVED" | "REJECTED", userEmail: string, amount: number) => {
     const actionText = status === "APPROVED" ? "menyetujui" : "menolak";
     if (!confirm(`Apakah Anda yakin ingin ${actionText} pencairan saldo sebesar Rp ${amount.toLocaleString("id-ID")} untuk ${userEmail}?`)) {
@@ -834,11 +874,19 @@ function AdminPageContent() {
   }, [errorMsg]);
 
   // Calculations for Metrics
-  const totalUsers = users.length;
+  const totalUsers = totalUsersCount > 0 ? totalUsersCount : users.length;
   const transactionsList = Array.isArray(transactions) ? transactions : [];
   const paidTransactions = transactionsList.filter((t) => t.status === "PAID");
-  const totalPaidTxCount = paidTransactions.length;
-  const grossRevenue = paidTransactions.reduce((acc, curr) => acc + Number(curr.amount), 0);
+  const totalPaidTxCount =
+    txStats?.successful_transactions != null
+      ? Number(txStats.successful_transactions)
+      : txStats?.paid_count != null
+        ? Number(txStats.paid_count)
+        : paidTransactions.length;
+  const grossRevenue =
+    txStats?.gross_revenue != null
+      ? Number(txStats.gross_revenue)
+      : paidTransactions.reduce((acc, curr) => acc + Number(curr.amount), 0);
 
   const formatter = new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -906,7 +954,7 @@ function AdminPageContent() {
           <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-white/5 rounded-full blur-2xl" />
           <span className="text-xs font-bold block uppercase tracking-wider text-indigo-100">Total Pengguna Terdaftar</span>
           <span className="text-3xl font-black block mt-2">{totalUsers} Guru</span>
-          <span className="text-[10px] text-indigo-100 mt-2 block font-medium">Berdasarkan hasil pencarian / data terisi</span>
+          <span className="text-[10px] text-indigo-100 mt-2 block font-medium">Total seluruh pengguna terdaftar di sistem</span>
         </div>
 
         <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
@@ -1090,7 +1138,7 @@ function AdminPageContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
-                    {users.map((user) => {
+                    {usersPager.pagedItems.map((user) => {
                       const isEditing = editingUserId === user.id;
                       return (
                         <tr key={user.id} className="hover:bg-slate-50/50">
@@ -1304,6 +1352,18 @@ function AdminPageContent() {
                   </tbody>
                 </table>
               )}
+              {usersPager.total > 0 && (
+                <div className="px-5 pb-4">
+                  <Pagination
+                    page={usersPager.page}
+                    pageSize={usersPager.pageSize}
+                    total={usersPager.total}
+                    totalPages={usersPager.totalPages}
+                    onPageChange={(p) => usersPager.reset(p)}
+                    onPageSizeChange={(s) => { usersPager.setPageSize(s); usersPager.reset(1); }}
+                  />
+                </div>
+              )}
             </div>
           ) : activeTab === "transactions" ? (
             <TransactionsManager
@@ -1334,13 +1394,13 @@ function AdminPageContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/30 border border-indigo-100 rounded-3xl p-6 shadow-sm relative overflow-hidden">
                   <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider block">Total Terdaftar Lewat Referral</span>
-                  <span className="text-3xl font-black text-slate-800 block mt-2">{referralsList.length} Guru</span>
+                  <span className="text-3xl font-black text-slate-800 block mt-2">{totalReferralsCount} Guru</span>
                   <p className="text-[10px] text-slate-400 font-semibold mt-1">Pengguna yang memasukkan kode referral saat pendaftaran</p>
                 </div>
                 <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/30 border border-emerald-100 rounded-3xl p-6 shadow-sm relative overflow-hidden">
                   <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider block">Total Potensi Komisi Cashback</span>
                   <span className="text-3xl font-black text-slate-800 block mt-2">
-                    {formatter.format(referralsList.reduce((acc, curr) => acc + (curr.cashback_amount || 0), 0))}
+                    {formatter.format(totalReferralCashback)}
                   </span>
                   <p className="text-[10px] text-slate-400 font-semibold mt-1">Akumulasi komisi yang diberikan oleh sistem kepada referrer</p>
                 </div>
@@ -1437,6 +1497,16 @@ function AdminPageContent() {
                     </table>
                   )}
                 </div>
+                {payoutRequestsPager.total > 0 && (
+                  <Pagination
+                    page={payoutRequestsPager.page}
+                    pageSize={payoutRequestsPager.pageSize}
+                    total={payoutRequestsPager.total}
+                    totalPages={payoutRequestsPager.totalPages}
+                    onPageChange={(p) => payoutRequestsPager.reset(p)}
+                    onPageSizeChange={(s) => { payoutRequestsPager.setPageSize(s); payoutRequestsPager.reset(1); }}
+                  />
+                )}
               </div>
 
               {/* Referrals Ledger Table */}
@@ -1505,6 +1575,16 @@ function AdminPageContent() {
                     </table>
                   )}
                 </div>
+                {referralsPager.total > 0 && (
+                  <Pagination
+                    page={referralsPager.page}
+                    pageSize={referralsPager.pageSize}
+                    total={referralsPager.total}
+                    totalPages={referralsPager.totalPages}
+                    onPageChange={(p) => referralsPager.reset(p)}
+                    onPageSizeChange={(s) => { referralsPager.setPageSize(s); referralsPager.reset(1); }}
+                  />
+                )}
               </div>
             </div>
           ) : activeTab === "admins" ? (
@@ -1642,7 +1722,7 @@ function AdminPageContent() {
                       <span>📜</span> Riwayat Broadcast Terakhir
                     </h3>
                     <div className="space-y-2">
-                      {broadcastHistory.map((item, idx) => (
+                      {broadcastHistoryPager.pagedItems.map((item, idx) => (
                         <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs">
                           <div>
                             <p className="font-bold text-slate-800">{item.title}</p>
@@ -1652,6 +1732,16 @@ function AdminPageContent() {
                         </div>
                       ))}
                     </div>
+                    {broadcastHistoryPager.total > 0 && (
+                      <Pagination
+                        page={broadcastHistoryPager.page}
+                        pageSize={broadcastHistoryPager.pageSize}
+                        total={broadcastHistoryPager.total}
+                        totalPages={broadcastHistoryPager.totalPages}
+                        onPageChange={(p) => broadcastHistoryPager.reset(p)}
+                        onPageSizeChange={(s) => { broadcastHistoryPager.setPageSize(s); broadcastHistoryPager.reset(1); }}
+                      />
+                    )}
                   </div>
                 )}
               </div>
@@ -2612,19 +2702,20 @@ function AdminPageContent() {
                           ) : ratioHistory.length === 0 ? (
                             <div className="text-center py-6 text-slate-400 italic text-xs">Belum ada perubahan rasio yang tercatat.</div>
                           ) : (
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-xs text-left text-slate-600">
-                                <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[9px]">
-                                  <tr>
-                                    <th className="px-3 py-2">Tanggal</th>
-                                    <th className="px-3 py-2">Admin</th>
-                                    <th className="px-3 py-2 text-center">Rasio Lama</th>
-                                    <th className="px-3 py-2 text-center">Rasio Baru</th>
-                                    <th className="px-3 py-2">Catatan</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 font-medium">
-                                  {ratioHistory.map((item) => (
+                            <>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-xs text-left text-slate-600">
+                                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[9px]">
+                                    <tr>
+                                      <th className="px-3 py-2">Tanggal</th>
+                                      <th className="px-3 py-2">Admin</th>
+                                      <th className="px-3 py-2 text-center">Rasio Lama</th>
+                                      <th className="px-3 py-2 text-center">Rasio Baru</th>
+                                      <th className="px-3 py-2">Catatan</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100 font-medium">
+                                  {ratioHistoryPager.pagedItems.map((item) => (
                                     <tr key={item.id} className="hover:bg-slate-50/50">
                                       <td className="px-3 py-2.5 whitespace-nowrap text-slate-400 font-mono text-[10px]">
                                         {new Date(item.changed_at).toLocaleString("id-ID")}
@@ -2650,7 +2741,19 @@ function AdminPageContent() {
                                   ))}
                                 </tbody>
                               </table>
-                            </div>
+                              </div>
+                              {ratioHistoryPager.total > 0 && (
+                                <Pagination
+                                  page={ratioHistoryPager.page}
+                                  pageSize={ratioHistoryPager.pageSize}
+                                  total={ratioHistoryPager.total}
+                                  totalPages={ratioHistoryPager.totalPages}
+                                  onPageChange={(p) => ratioHistoryPager.reset(p)}
+                                  onPageSizeChange={(s) => { ratioHistoryPager.setPageSize(s); ratioHistoryPager.reset(1); }}
+                                  className="pt-2"
+                                />
+                              )}
+                            </>
                           )}
                         </div>
                       </div>

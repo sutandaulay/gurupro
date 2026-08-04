@@ -1,5 +1,6 @@
 "use client";
 import { apiFetch } from "@/lib/api-client";
+import { Pagination, usePagedItems } from "@/components/ui/pagination";
 
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +46,9 @@ export default function ForumPage() {
   const [replies, setReplies] = useState<any[]>([]);
   const [replyText, setReplyText] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
+
+  const topicsPager = usePagedItems(topics, 25);
+  const repliesPager = usePagedItems(replies, 25);
 
   const fetchTopics = useCallback(async () => {
     setLoading(true);
@@ -192,32 +196,44 @@ export default function ForumPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {topics.map((t) => (
-            <Card key={t.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => openTopicDetail(t)}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-slate-800 truncate">{t.title}</h3>
-                    <p className="text-sm text-slate-500 line-clamp-2 mt-1">{t.body}</p>
-                    <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
-                      <span>{t.author}</span>
-                      <span>•</span>
-                      <span>{formatDate(t.created_at)}</span>
-                      {scope === "all" && t.institution_id && (
-                        <Badge variant="outline" className="text-[10px]">Sekolah #{t.institution_id}</Badge>
-                      )}
+        <>
+          <div className="space-y-3">
+            {topicsPager.pagedItems.map((t) => (
+              <Card key={t.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => openTopicDetail(t)}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-slate-800 truncate">{t.title}</h3>
+                      <p className="text-sm text-slate-500 line-clamp-2 mt-1">{t.body}</p>
+                      <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
+                        <span>{t.author}</span>
+                        <span>•</span>
+                        <span>{formatDate(t.created_at)}</span>
+                        {scope === "all" && t.institution_id && (
+                          <Badge variant="outline" className="text-[10px]">Sekolah #{t.institution_id}</Badge>
+                        )}
+                      </div>
                     </div>
+                    <Badge variant="secondary" className="shrink-0">{t.reply_count} balasan</Badge>
                   </div>
-                  <Badge variant="secondary" className="shrink-0">{t.reply_count} balasan</Badge>
-                </div>
-                <div className="mt-2">
-                  <Badge variant="outline" className="text-[10px]">{t.mapel}</Badge>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <div className="mt-2">
+                    <Badge variant="outline" className="text-[10px]">{t.mapel}</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          {topicsPager.total > 0 && (
+            <Pagination
+              page={topicsPager.page}
+              pageSize={topicsPager.pageSize}
+              total={topicsPager.total}
+              totalPages={topicsPager.totalPages}
+              onPageChange={(p) => topicsPager.reset(p)}
+              onPageSizeChange={(s) => { topicsPager.setPageSize(s); topicsPager.reset(1); }}
+            />
+          )}
+        </>
       )}
 
       {/* Dialog topik baru */}
@@ -273,12 +289,22 @@ export default function ForumPage() {
                 <div className="border-t pt-3 space-y-2">
                   <h4 className="text-sm font-semibold text-slate-700">Balasan ({replies.length})</h4>
                   {replies.length === 0 && <p className="text-sm text-slate-400">Belum ada balasan. Jadilah yang pertama! 💡</p>}
-                  {replies.map((r) => (
+                  {repliesPager.pagedItems.map((r) => (
                     <div key={r.id} className="text-sm bg-white border border-slate-100 rounded-lg p-3">
                       <p className="text-slate-700">{r.body}</p>
                       <p className="text-[11px] text-slate-400 mt-1">{r.author} • {formatDate(r.created_at)}</p>
                     </div>
                   ))}
+                  {repliesPager.total > 0 && (
+                    <Pagination
+                      page={repliesPager.page}
+                      pageSize={repliesPager.pageSize}
+                      total={repliesPager.total}
+                      totalPages={repliesPager.totalPages}
+                      onPageChange={(p) => repliesPager.reset(p)}
+                      onPageSizeChange={(s) => { repliesPager.setPageSize(s); repliesPager.reset(1); }}
+                    />
+                  )}
                 </div>
 
                 <div className="border-t pt-3">

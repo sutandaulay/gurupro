@@ -112,13 +112,17 @@ export async function GET(req: Request) {
         SELECT
           COUNT(*) as total_transactions,
           COUNT(CASE WHEN status = 'PENDING' THEN 1 END) as pending_count,
+          COALESCE(SUM(CASE WHEN status = 'PENDING' THEN amount::numeric ELSE 0 END), 0) as pending_amount,
           COUNT(CASE WHEN status = 'PAID' THEN 1 END) as paid_count,
           COUNT(CASE WHEN status = 'ACTIVATED' THEN 1 END) as activated_count,
           COUNT(CASE WHEN status = 'REFUNDED' THEN 1 END) as refunded_count,
           COUNT(CASE WHEN status = 'EXPIRED' THEN 1 END) as expired_count,
           COALESCE(SUM(CASE WHEN status IN ('PAID', 'ACTIVATED') THEN amount::numeric ELSE 0 END), 0) as gross_revenue,
           COALESCE(SUM(CASE WHEN status = 'ACTIVATED' THEN amount::numeric ELSE 0 END), 0) as net_revenue,
-          COALESCE(SUM(CASE WHEN status = 'REFUNDED' THEN amount::numeric ELSE 0 END), 0) as total_refunds
+          COALESCE(SUM(CASE WHEN status = 'REFUNDED' THEN amount::numeric ELSE 0 END), 0) as total_refunds,
+          COUNT(CASE WHEN status IN ('PAID', 'ACTIVATED') THEN 1 END) as successful_transactions,
+          COALESCE(ROUND(AVG(CASE WHEN status IN ('PAID', 'ACTIVATED') THEN amount::numeric END)::numeric, 2), 0) as average_transaction_value,
+          COALESCE(ROUND(100.0 * COUNT(CASE WHEN status IN ('PAID', 'ACTIVATED') THEN 1 END) / NULLIF(COUNT(*), 0)::numeric, 2), 0) as conversion_rate
         FROM transactions t
         JOIN users u ON t.user_id = u.id
       `;
@@ -279,7 +283,7 @@ export async function POST(req: Request) {
 
       // Default follow-up message if no template
       const defaultEmailSubject = `Pengingat Pembayaran GuruPRO - Invoice #${transaction.external_id}`;
-      const defaultWaMessage = `Halo ${user.nama_lengkap},\n\nKami dari GuruPRO ingin mengingatkan bahwa pembayaran untuk paket premium Anda dengan invoice #${transaction.external_id} sebesar Rp ${Number(transaction.amount).toLocaleString("id-ID")} masih belum完成.\n\nMohon segera menyelesaikan pembayaran untuk menikmati fitur premium GuruPRO.\n\nTerima kasih.\n\nSalam,\nTim GuruPRO`;
+      const           defaultWaMessage = `Halo ${user.nama_lengkap},\n\nKami dari GuruPRO ingin mengingatkan bahwa pembayaran untuk paket premium Anda dengan invoice #${transaction.external_id} sebesar Rp ${Number(transaction.amount).toLocaleString("id-ID")} masih belum diselesaikan.\n\nMohon segera menyelesaikan pembayaran untuk menikmati fitur premium GuruPRO.\n\nTerima kasih.\n\nSalam,\nTim GuruPRO`;
 
       const emailSubject = followUpMessage.emailSubject || defaultEmailSubject;
       const emailBody = followUpMessage.emailBody || defaultWaMessage;

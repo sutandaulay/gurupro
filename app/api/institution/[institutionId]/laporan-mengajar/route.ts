@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { requireSession } from '@/lib/session'
 import { canViewAllTeachers } from '@/lib/rbac/institution-permissions'
+import { parsePagination, offset } from '@/lib/pagination'
 
 async function checkPermission(institutionId: number): Promise<NextResponse | null> {
   try {
@@ -39,9 +40,8 @@ export async function GET(
     const period = searchParams.get('period') || 'month'
     const guruId = searchParams.get('guru_id')
     const kelas = searchParams.get('kelas')
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
-    const skip = (page - 1) * limit
+    const pag = parsePagination(searchParams)
+    const skip = offset(pag)
 
     // Build date filter
     const now = new Date()
@@ -93,7 +93,7 @@ export async function GET(
     )
     const total = parseInt(countResult.rows[0].count) || 0
 
-    const dataParams = [...params, skip, limit]
+    const dataParams = [...params, skip, pag.limit]
     const dataResult = await query(
       `SELECT tj.id, tj.tanggal, tj.materi_pembelajaran, tj.status,
               u.nama_lengkap as guru_nama,
@@ -134,10 +134,10 @@ export async function GET(
     return NextResponse.json({
       reports,
       pagination: {
-        page,
-        limit,
+        page: pag.page,
+        limit: pag.limit,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / pag.limit),
       },
     })
   } catch (error) {

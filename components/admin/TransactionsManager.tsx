@@ -2,6 +2,7 @@
 import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback } from "react";
+import { Pagination } from "@/components/ui/pagination";
 import FollowUpModal from "./FollowUpModal";
 import TransactionDetailModal from "./TransactionDetailModal";
 
@@ -33,6 +34,7 @@ interface PaginationInfo {
 interface Stats {
   total_transactions: number;
   pending_count: number;
+  pending_amount: number;
   paid_count: number;
   activated_count: number;
   refunded_count: number;
@@ -57,6 +59,7 @@ export default function TransactionsManager({ onSuccess, onError }: Transactions
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState<{ [key: string]: boolean }>({});
+  const [pageSize, setPageSize] = useState(25);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -81,7 +84,7 @@ export default function TransactionsManager({ onSuccess, onError }: Transactions
       if (searchQuery) params.append("q", searchQuery);
       if (statusFilter) params.append("status", statusFilter);
       params.append("page", "1");
-      params.append("limit", "20");
+      params.append("limit", pageSize.toString());
       params.append("sortBy", sortBy);
       params.append("sortOrder", sortOrder);
       if (startDate) params.append("startDate", startDate);
@@ -104,7 +107,7 @@ export default function TransactionsManager({ onSuccess, onError }: Transactions
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, statusFilter, sortBy, sortOrder, startDate, endDate, onError]);
+  }, [searchQuery, statusFilter, sortBy, sortOrder, startDate, endDate, onError, pageSize]);
 
   const fetchPage = async (page: number) => {
     setIsLoading(true);
@@ -113,7 +116,7 @@ export default function TransactionsManager({ onSuccess, onError }: Transactions
       if (searchQuery) params.append("q", searchQuery);
       if (statusFilter) params.append("status", statusFilter);
       params.append("page", page.toString());
-      params.append("limit", "20");
+      params.append("limit", pageSize.toString());
       params.append("sortBy", sortBy);
       params.append("sortOrder", sortOrder);
       if (startDate) params.append("startDate", startDate);
@@ -231,9 +234,11 @@ export default function TransactionsManager({ onSuccess, onError }: Transactions
 
   // Calculate pending follow-up stats
   const pendingCount = stats?.pending_count || 0;
-  const pendingAmount = transactions
-    .filter(t => t.status === "PENDING")
-    .reduce((sum, t) => sum + Number(t.amount), 0);
+  const pendingAmount = stats?.pending_amount != null
+    ? Number(stats.pending_amount)
+    : transactions
+        .filter(t => t.status === "PENDING")
+        .reduce((sum, t) => sum + Number(t.amount), 0);
 
   return (
     <div className="space-y-4">
@@ -508,52 +513,17 @@ export default function TransactionsManager({ onSuccess, onError }: Transactions
             </div>
 
             {/* Pagination */}
-            {pagination && pagination.totalPages > 1 && (
-              <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between">
-                <p className="text-[10px] text-slate-500">
-                  Menampilkan {(pagination.currentPage - 1) * pagination.limit + 1} - {Math.min(pagination.currentPage * pagination.limit, pagination.totalRecords)} dari {pagination.totalRecords} transaksi
-                </p>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => fetchPage(pagination.currentPage - 1)}
-                    disabled={!pagination.hasPrevPage || isLoading}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition disabled:opacity-50"
-                  >
-                    ← Prev
-                  </button>
-                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                    let page = i + 1;
-                    if (pagination.totalPages > 5) {
-                      if (pagination.currentPage > 3) {
-                        page = pagination.currentPage - 2 + i;
-                      }
-                      if (pagination.currentPage > pagination.totalPages - 2) {
-                        page = pagination.totalPages - 4 + i;
-                      }
-                    }
-                    if (page < 1 || page > pagination.totalPages) return null;
-                    return (
-                      <button
-                        key={page}
-                        onClick={() => fetchPage(page)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                          page === pagination.currentPage
-                            ? "bg-indigo-600 text-white"
-                            : "bg-slate-100 hover:bg-slate-200 text-slate-600"
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    );
-                  })}
-                  <button
-                    onClick={() => fetchPage(pagination.currentPage + 1)}
-                    disabled={!pagination.hasNextPage || isLoading}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition disabled:opacity-50"
-                  >
-                    Next →
-                  </button>
-                </div>
+            {pagination && pagination.totalRecords > 0 && (
+              <div className="px-4 py-3 border-t border-slate-200">
+                <Pagination
+                  page={pagination.currentPage}
+                  pageSize={pageSize}
+                  total={pagination.totalRecords}
+                  totalPages={pagination.totalPages}
+                  onPageChange={(p) => fetchPage(p)}
+                  onPageSizeChange={(s) => setPageSize(s)}
+                  loading={isLoading}
+                />
               </div>
             )}
           </div>

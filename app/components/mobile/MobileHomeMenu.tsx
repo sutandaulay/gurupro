@@ -7,7 +7,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useProfileStore } from "@/lib/stores";
 import AppIcon from "@/app/components/ui/AppIcon";
-import { getLucideIcon, masterMenus, resolveCategory } from "@/lib/menuConfig";
+import { getLucideIcon, masterMenus, resolveCategory, isInstitutionHref, resolveInstitutionHref, resolveActiveInstitutionId } from "@/lib/menuConfig";
 
 export type MenuItem = {
   label: string;
@@ -62,6 +62,7 @@ export default function MobileHomeMenu({ currentModule, onNavigate }: MobileHome
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [roleFlags, setRoleFlags] = useState<{ isWaliKelas: boolean; isPembinaEkskul: boolean } | null>(null);
+  const [activeInstitutionId, setActiveInstitutionId] = useState<number | null>(null);
   const [greeting, setGreeting] = useState("Selamat pagi");
   const [currentDate, setCurrentDate] = useState("");
 
@@ -100,6 +101,21 @@ export default function MobileHomeMenu({ currentModule, onNavigate }: MobileHome
     fetchRoleFlags();
   }, []);
 
+  useEffect(() => {
+    const fetchActiveContext = async () => {
+      try {
+        const res = await apiFetch('/api/auth/active-context');
+        if (res.ok) {
+          const data = await res.json();
+          setActiveInstitutionId(resolveActiveInstitutionId(data));
+        }
+      } catch {
+        // silently fail
+      }
+    };
+    fetchActiveContext();
+  }, []);
+
   const filteredMenus = useMemo(() => {
     let base = masterMenus;
     if (roleFlags) {
@@ -130,7 +146,14 @@ export default function MobileHomeMenu({ currentModule, onNavigate }: MobileHome
 
   const handleSubmenuNavigate = (href: string) => {
     if (onNavigate) onNavigate();
-    router.push(href);
+    router.push(resolveMenuHref(href) || "/dashboard");
+  };
+
+  const resolveMenuHref = (href?: string) => {
+    if (isInstitutionHref(href)) {
+      return resolveInstitutionHref(href as string, activeInstitutionId);
+    }
+    return href;
   };
 
   React.useEffect(() => {

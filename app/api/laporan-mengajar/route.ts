@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
+import { parsePagination, offset } from '@/lib/pagination';
 
 const prisma = new PrismaClient();
 
@@ -31,9 +32,8 @@ export async function GET(request: NextRequest) {
     const period = searchParams.get('period') || 'all';
     const dateFrom = searchParams.get('from');
     const dateTo = searchParams.get('to');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const skip = (page - 1) * limit;
+    const pag = parsePagination(searchParams);
+    const skip = offset(pag);
 
     // Build date filter
     let dateFilter: { gte?: Date; lte?: Date } = {};
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { tanggal: 'desc' },
         skip,
-        take: limit,
+        take: pag.limit,
       }),
       prisma.teacher_journals.count({ where: whereClause }),
     ]);
@@ -138,10 +138,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       reports,
       pagination: {
-        page,
-        limit,
+        page: pag.page,
+        limit: pag.limit,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / pag.limit),
       },
     });
   } catch (error: any) {

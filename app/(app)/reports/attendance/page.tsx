@@ -23,7 +23,6 @@ import {
   Search,
   Loader2,
   RotateCcw,
-  ChevronLeft,
   ChevronRight,
   Building2,
   GraduationCap,
@@ -34,6 +33,7 @@ import {
 import { format, startOfMonth, endOfMonth, subDays, startOfWeek, endOfWeek, startOfDay, endOfDay } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { Pagination } from '@/components/ui/pagination';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { toast } from 'sonner';
 
@@ -307,6 +307,7 @@ export default function AttendanceReportsPage() {
   const [exporting, setExporting] = useState(false);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [summary, setSummary] = useState<Summary>({
     totalDays: 0,
@@ -328,7 +329,7 @@ export default function AttendanceReportsPage() {
       params.set('startDate', format(filters.startDate, 'yyyy-MM-dd'));
       params.set('endDate', format(filters.endDate, 'yyyy-MM-dd'));
       params.set('page', page.toString());
-      params.set('limit', '15');
+      params.set('limit', pageSize.toString());
       if (activeSchoolId) params.set('schoolId', activeSchoolId);
       if (filters.teacherId && filters.teacherId !== 'all') params.set('teacherId', filters.teacherId);
       if (filters.institutionId && filters.institutionId !== 'all') params.set('institutionId', filters.institutionId);
@@ -363,7 +364,7 @@ export default function AttendanceReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, pageSize]);
 
   useEffect(() => {
     fetchReports(1);
@@ -723,53 +724,17 @@ export default function AttendanceReportsPage() {
               </div>
 
               {/* Pagination */}
-              {pagination && pagination.totalPages > 1 && (
-                <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    Halaman {pagination.currentPage} dari {pagination.totalPages} ({pagination.totalRecords} data)
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 w-7 p-0"
-                      onClick={() => fetchReports(pagination.currentPage - 1)}
-                      disabled={!pagination.hasPrevPage || loading}
-                    >
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                    </Button>
-                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                      let page = i + 1;
-                      if (pagination.totalPages > 5 && pagination.currentPage > 3) {
-                        page = pagination.currentPage - 2 + i;
-                      }
-                      if (pagination.totalPages > 5 && pagination.currentPage > pagination.totalPages - 2) {
-                        page = pagination.totalPages - 4 + i;
-                      }
-                      if (page < 1 || page > pagination.totalPages) return null;
-                      return (
-                        <Button
-                          key={page}
-                          variant={page === pagination.currentPage ? 'default' : 'outline'}
-                          size="sm"
-                          className="h-7 w-7 p-0 text-xs"
-                          onClick={() => fetchReports(page)}
-                          disabled={loading}
-                        >
-                          {page}
-                        </Button>
-                      );
-                    })}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 w-7 p-0"
-                      onClick={() => fetchReports(pagination.currentPage + 1)}
-                      disabled={!pagination.hasNextPage || loading}
-                    >
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
+              {pagination && pagination.totalRecords > 0 && (
+                <div className="px-4 py-3 border-t border-slate-200">
+                  <Pagination
+                    page={pagination.currentPage}
+                    pageSize={pageSize}
+                    total={pagination.totalRecords}
+                    totalPages={pagination.totalPages}
+                    onPageChange={(p) => fetchReports(p)}
+                    onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }}
+                    loading={loading}
+                  />
                 </div>
               )}
             </>

@@ -133,6 +133,16 @@ export const categoryThemes: Record<Category, CategoryTheme> = {
   },
 };
 
+export const institutionSubmenus: MenuItem["submenu"] = [
+  { label: "Overview Institusi", href: "/dashboard/institution", desc: "Ringkasan data institusi" },
+  { label: "Anggota Institusi", href: "/dashboard/institution/members", desc: "Kelola guru, undang, dan role" },
+  { label: "Rekap TPG", href: "/dashboard/institution/tpg", desc: "Rekap tunjangan profesi guru" },
+  { label: "Laporan Mengajar", href: "/dashboard/institution/laporan-mengajar" },
+  { label: "Approval / Persetujuan", href: "/dashboard/institution/approval" },
+  { label: "Langganan & Billing", href: "/dashboard/institution/langganan" },
+  { label: "Pengaturan Institusi", href: "/dashboard/institution/settings" },
+];
+
 export const masterMenus: MenuItem[] = [
   { label: "Dasbor", href: "/dashboard" },
   {
@@ -236,11 +246,7 @@ export const masterMenus: MenuItem[] = [
   },
   {
     label: "Institusi",
-    submenu: [
-      { label: "Manajemen Institusi", href: "/dashboard/institution" },
-      { label: "Anggota Institusi", href: "/dashboard/institution/members" },
-      { label: "Pengaturan Institusi", href: "/dashboard/institution/settings" },
-    ],
+    submenu: institutionSubmenus,
   },
   {
     label: "Komunitas Guru",
@@ -263,6 +269,37 @@ export const masterMenus: MenuItem[] = [
     href: "/dashboard/billing",
   },
 ];
+
+export function isInstitutionHref(href?: string): boolean {
+  return !!href && (href === "/dashboard/institution" || href.startsWith("/dashboard/institution/"));
+}
+
+export interface ActiveContextPayload {
+  activeContext?: unknown;
+  institutions?: { id: number }[];
+}
+
+export function resolveActiveInstitutionId(data: ActiveContextPayload): number | null {
+  if (data.activeContext && data.activeContext !== "individual") {
+    return (data.activeContext as { institutionId: number }).institutionId;
+  }
+  return data.institutions?.[0]?.id ?? null;
+}
+
+export function resolveInstitutionHref(href: string, institutionId: number | null): string {
+  if (!institutionId) return "/dashboard";
+  const base = `/institusi/${institutionId}`;
+  const institutionMap: Record<string, string> = {
+    "/dashboard/institution": `${base}/dashboard`,
+    "/dashboard/institution/members": `/dashboard/institution/${institutionId}/operator`,
+    "/dashboard/institution/tpg": `${base}/dashboard/tpg`,
+    "/dashboard/institution/laporan-mengajar": `/dashboard/institution/${institutionId}/laporan-mengajar`,
+    "/dashboard/institution/approval": `${base}/dashboard/approval`,
+    "/dashboard/institution/langganan": `${base}/dashboard/langganan`,
+    "/dashboard/institution/settings": `${base}/dashboard/pengaturan`,
+  };
+  return institutionMap[href] ?? href;
+}
 
 export function resolveCategory(label: string): Category | null {
   const lower = label.toLowerCase();
@@ -338,8 +375,11 @@ export function getLucideIcon(label: string): any {
     "Daftar Kegiatan Eskul": List,
     "Laporan Eskul": FileBarChart,
     "Institusi": Building2,
+    "Overview Institusi": LayoutDashboard,
     "Manajemen Institusi": Building2,
     "Anggota Institusi": Users,
+    "Approval / Persetujuan": CheckCircle,
+    "Langganan & Billing": CreditCard,
     "Pengaturan Institusi": Settings,
     "Komunitas Guru": MessageCircle,
     "Keuangan": Wallet,

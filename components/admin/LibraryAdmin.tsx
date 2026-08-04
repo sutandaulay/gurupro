@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { Pagination } from "@/components/ui/pagination";
 import {
   BookOpen, GraduationCap, Brain, Code, FlaskConical, Globe,
   Lightbulb, Mic, Newspaper, PenTool, PieChart, Play,
@@ -61,6 +62,8 @@ export default function LibraryAdmin() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState("");
 
   // Upload state
@@ -83,18 +86,19 @@ export default function LibraryAdmin() {
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(page), limit: "20" });
+      const params = new URLSearchParams({ page: String(page), limit: String(pageSize) });
       if (search) params.set("search", search);
       const res = await apiFetch(`/api/admin/library/items?${params}`);
       const d = await res.json();
       if (d.data) {
         setItems(d.data);
         setTotalPages(d.pagination?.totalPages ?? 1);
+        setTotalItems(d.pagination?.total ?? 0);
       }
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, pageSize]);
 
   const fetchCategories = useCallback(async () => {
     const res = await apiFetch("/api/admin/library/categories");
@@ -502,13 +506,17 @@ export default function LibraryAdmin() {
                   </tbody>
                 </table>
               </div>
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 mt-4">
-                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                    className="px-3 py-1 border border-slate-200 rounded text-sm disabled:opacity-50">Prev</button>
-                  <span className="text-sm text-slate-500">{page} / {totalPages}</span>
-                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                    className="px-3 py-1 border border-slate-200 rounded text-sm disabled:opacity-50">Next</button>
+              {totalItems > 0 && (
+                <div className="mt-4">
+                  <Pagination
+                    page={page}
+                    pageSize={pageSize}
+                    total={totalItems}
+                    totalPages={totalPages}
+                    onPageChange={(p) => setPage(p)}
+                    onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                    loading={loading}
+                  />
                 </div>
               )}
             </>

@@ -1,0 +1,19 @@
+▲ Next.js 16.2.9 (Turbopack)
+- Local:         http://localhost:3003
+- Network:       http://192.168.18.4:3003
+- Environments: .env.local, .env
+✓ Ready in 1598ms
+- Experiments (use with caution):
+  ⨯ turbopackServerFastRefresh
+
+ GET /api/attendance/schedule/today 500 in 4.7s (next.js: 3.2s, proxy.ts: 574ms, application-code: 960ms)
+ GET /api/institutions 500 in 4.0s (next.js: 2.7s, proxy.ts: 14ms, application-code: 1236ms)
+ GET /api/subjects?school_id=test 500 in 1773ms (next.js: 1480ms, proxy.ts: 20ms, application-code: 273ms)
+ GET /api/attendance/schedule/today 500 in 292ms (next.js: 8ms, proxy.ts: 14ms, application-code: 270ms)
+ GET /api/institutions 500 in 264ms (next.js: 60ms, proxy.ts: 20ms, application-code: 184ms)
+ GET /api/attendance/schedule/today 500 in 503ms (next.js: 9ms, proxy.ts: 13ms, application-code: 481ms)
+ GET /api/institutions 500 in 407ms (next.js: 6ms, proxy.ts: 6ms, application-code: 395ms)
+ GET /api/subjects?school_id=test 500 in 263ms (next.js: 7ms, proxy.ts: 6ms, application-code: 251ms)
+ GET /api/attendance/schedule/today 500 in 301ms (next.js: 6ms, proxy.ts: 6ms, application-code: 288ms)
+ GET /api/institutions 200 in 241ms (next.js: 4ms, proxy.ts: 5ms, application-code: 232ms)
+ GET /api/subjects?school_id=ba967c7f-6395-4dbd-85c8-ffef17fc574d 403 in 351ms (next.js: 7ms, proxy.ts: 11ms, application-code: 333ms)

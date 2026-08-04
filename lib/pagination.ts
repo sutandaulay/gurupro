@@ -16,7 +16,8 @@ export interface PaginatedResponse<T> {
 }
 
 const DEFAULT_LIMIT = 25;
-const MAX_LIMIT = 100;
+export const MAX_PAGINATION_LIMIT = 100000;
+const MAX_LIMIT = MAX_PAGINATION_LIMIT;
 
 export function parsePagination(searchParams: URLSearchParams): PaginationParams {
   const rawPage = searchParams.get('page');
