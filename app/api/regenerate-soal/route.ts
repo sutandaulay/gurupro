@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { getUserPoinAccess } from "@/src/services/poin-service";
 import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
+import { enforceMarkdownLimits } from "@/lib/ai/limits";
 
 export async function POST(req: Request) {
   try {
@@ -163,7 +164,7 @@ Balas HANYA dalam format JSON (tanpa markdown):
         throw new Error("AI generation failed");
       }
 
-      const cleanText = text.replace(/```json|```/g, "").trim();
+      const cleanText = enforceMarkdownLimits(text.replace(/```json|```/g, "").trim());
       parsed = JSON.parse(cleanText);
     } catch (aiError: unknown) {
       const aiMsg = aiError instanceof Error ? aiError.message : String(aiError ?? "Unknown error");

@@ -9,6 +9,8 @@ import { requireSchoolAccess } from '@/lib/school-access'
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai'
 import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/services/poin-service'
 import { deductPoinFromAIResult } from '@/src/lib/ai-usage'
+import { getCurrentAcademicYear } from '@/lib/utils'
+import { enforceOutputLimits } from '@/lib/ai/limits'
 
 const genAI = process.env.GOOGLE_AI_API_KEY
   ? new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY)
@@ -136,7 +138,7 @@ export async function POST(req: Request) {
         // STEP 4: Parse JSON
         send({ step: 'saving', message: 'Menyimpan laporan...' })
 
-        const cleanJson = fullText
+        const cleanJson = enforceOutputLimits(fullText)
           .replace(/```json/g, '')
           .replace(/```/g, '')
           .trim()
@@ -426,7 +428,7 @@ interface LaporanPromptData {
 
 function buildLaporanPrompt(data: LaporanPromptData): string {
   const { guru, sekolah, pelatihan, evidenceSummary, skp, observasi, semester, catatanTambahan, kurikulum } = data
-  const tahunAjaran = '2024/2025'
+  const tahunAjaran = getCurrentAcademicYear()
 
   let skpSection = ''
   if (skp) {

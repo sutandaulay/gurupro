@@ -2,6 +2,7 @@ import { generateAIContentWithUsage } from "@/lib/ai";
 import { query } from "@/lib/db";
 import { getUserPoinAccess } from "@/src/services/poin-service";
 import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
+import { enforceMarkdownLimits } from "@/lib/ai/limits";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { jsonrepair as repair } from "jsonrepair";
@@ -160,7 +161,7 @@ Hasilkan seluruh dokumen PROSEM tersebut langsung dalam format Markdown dengan t
       if (!aiResult?.text) {
         throw new Error("AI mengembalikan respons kosong");
       }
-      const cleanMarkdown = aiResult.text.trim();
+      const cleanMarkdown = enforceMarkdownLimits(aiResult.text.trim());
       const docTitle = `Program Semester (Prosem) - ${mapel} ${kelas || ''} ${semesterLabel} ${tahun_ajaran || ''}`;
 
       parsed = {

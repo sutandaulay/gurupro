@@ -2,6 +2,7 @@ import { generateAIContentWithUsage } from '@/lib/ai';
 import { query } from '@/lib/db';
 import { getUserPoinAccess, logFailedPoinUsage } from '@/src/services/poin-service';
 import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
+import { enforceMarkdownLimits } from '@/lib/ai/limits';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { uploadToR2 } from '@/lib/r2';
@@ -119,7 +120,7 @@ export async function POST(req: Request) {
     try {
       aiResult = await generateAIContentWithUsage(prompt, SILABUS_SYSTEM_PROMPT, true);
 
-      silabusData = parseSilabusFromAIResponse(aiResult.text);
+      silabusData = parseSilabusFromAIResponse(enforceMarkdownLimits(aiResult.text));
     } catch (aiError: any) {
       console.error('Silabus AI generation failed:', aiError);
 

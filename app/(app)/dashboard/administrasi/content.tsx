@@ -927,9 +927,10 @@ function AdministrasiContent() {
             font-weight: bold !important;
             text-align: center !important;
           }
-          /* Margin halaman formal cetak */
+          /* Margin halaman formal cetak — standar dokumen Indonesia */
           @page {
-            margin: 2cm !important;
+            margin: 25mm 20mm 20mm 30mm !important;
+            size: A4;
           }
         }
       `}} />

@@ -2392,7 +2392,7 @@ function DashboardContent() {
           .sig-container { display: flex; justify-content: space-between; margin-top: 40px; page-break-inside: avoid; }
           .sig-box { text-align: center; width: 22%; font-size: 9.5pt; }
           @media print {
-            @page { size: landscape; margin: 15mm; }
+            @page { size: landscape; margin: 25mm 30mm 25mm 20mm; }
           }
         </style>
       </head>
@@ -4227,9 +4227,14 @@ function DashboardContent() {
     }, 100);
   };
 
-  const generatePrintLayout = (title: string, markdown: string) => {
+  const generatePrintLayout = (
+    title: string,
+    markdown: string,
+    opts?: { showPageNumber?: boolean; isDocx?: boolean }
+  ) => {
+    const { showPageNumber = false, isDocx = false } = opts || {};
     const activeSchool = schools.find((s: any) => s.id === selectedSchoolId);
-    
+
     // Markdown-to-HTML converter
     let bodyHtml = markdown
       .replace(/^### (.+)$/gm, '<h3 style="font-family: Arial, sans-serif; font-size: 13pt; color: #1e293b; margin-top: 12pt; margin-bottom: 4pt; font-weight: bold;">$1</h3>')
@@ -4293,35 +4298,47 @@ function DashboardContent() {
       </table>
     `;
 
+    const pageNumFooter = showPageNumber
+      ? `<div class="page-footer">Halaman <span style="mso-field-code:' PAGE \\* MERGEFORMAT '"></span> dari <span style="mso-field-code:' NUMPAGES \\* MERGEFORMAT '"></span></div>`
+      : '';
+
+    const pageMargin = isDocx
+      ? "@page { margin: 2.5cm 2cm 2cm 3cm; size: A4; }"
+      : "@page { margin: 25mm 20mm 20mm 30mm; size: A4; }";
+
     return `
       <!DOCTYPE html>
-      <html>
+      ${isDocx ? `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">` : '<html>'}
       <head>
         <meta charset="utf-8">
         <title>${title}</title>
         <style>
-          @page { size: A4; margin: 2cm; }
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b; padding: 10px; }
+          ${pageMargin}
+          * { box-sizing: border-box; }
+          body { font-family: 'Times New Roman', Times, serif; line-height: 1.6; color: #1e293b; margin: 0; padding: 0; }
           h1, h2, h3 { page-break-after: avoid; }
-          p { margin: 0 0 8pt 0; text-align: justify; }
+          p { margin: 0 0 8pt 0; text-align: justify; font-size: 12pt; }
           table { page-break-inside: avoid; width: 100%; border-collapse: collapse; margin-top: 8pt; margin-bottom: 8pt; }
           th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
           th { background-color: #f1f5f9; font-weight: bold; }
-          li { line-height: 1.6; margin-bottom: 4pt; }
+          li { line-height: 1.6; margin-bottom: 4pt; font-size: 12pt; }
+          .page-footer { position: fixed; bottom: 1.5cm; left: 0; right: 0; text-align: right; font-size: 9pt; color: #666; }
+          @media print { .page-footer { display: block; } }
         </style>
       </head>
       <body>
         ${kopSuratHtml}
-        <div style="margin-top: 10pt;">
+        <div style="padding: 20px 25px;">
           ${bodyHtml}
         </div>
+        ${pageNumFooter}
       </body>
       </html>
     `;
   };
 
   const downloadDocxClient = (title: string, markdown: string) => {
-    const htmlContent = generatePrintLayout(title, markdown);
+    const htmlContent = generatePrintLayout(title, markdown, { showPageNumber: true, isDocx: true });
     const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -4339,11 +4356,12 @@ function DashboardContent() {
     setLoadingProgress("Mempersiapkan ekspor PDF...");
     try {
       const html2pdf = await loadHtml2Pdf();
+      const htmlContent = generatePrintLayout(title, markdown, { showPageNumber: true, isDocx: false });
       const content = document.createElement('div');
-      content.innerHTML = generatePrintLayout(title, markdown);
-      
+      content.innerHTML = htmlContent;
+
       const opt = {
-        margin: [15, 15, 15, 15],
+        margin: [25, 20, 20, 30],
         filename: `${title.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
@@ -4373,32 +4391,44 @@ function DashboardContent() {
         if (s.opsi && Array.isArray(s.opsi)) {
           opsiHtml = s.opsi.map((o: string, oIdx: number) => {
             const prefix = /^[A-H][\.\)]\s?/.test(o) ? "" : `${letters[oIdx]}. `;
-            return `<p style="margin-left: 24pt; margin-top: 2pt; margin-bottom: 2pt;">${prefix}${o}</p>`;
+            return `<p class="opsi">${prefix}${o}</p>`;
           }).join('');
         } else if (s.tipe === 'jodoh' && s.opsi?.kiri) {
-          opsiHtml += `<table style="border-collapse: collapse; margin-left: 24pt; margin-top: 4pt; margin-bottom: 4pt; width: 80%;">`;
-          opsiHtml += `<tr><th style="border: 1px solid black; padding: 4px; background-color: #f2f2f2;">Kolom Kiri</th><th style="border: 1px solid black; padding: 4px; background-color: #f2f2f2;">Kolom Kanan</th></tr>`;
+          opsiHtml += `<table style="border-collapse:collapse;margin-left:24pt;margin-top:4pt;margin-bottom:4pt;width:80%;">`;
+          opsiHtml += `<tr><th style="border:1px solid #000;padding:4px;background:#f3f4f6;">Kolom Kiri</th><th style="border:1px solid #000;padding:4px;background:#f3f4f6;">Kolom Kanan</th></tr>`;
           const maxLen = Math.max(s.opsi.kiri.length, s.opsi.kanan?.length || 0);
           for (let i = 0; i < maxLen; i++) {
-            opsiHtml += `<tr><td style="border: 1px solid black; padding: 4px;">${s.opsi.kiri[i] || ""}</td><td style="border: 1px solid black; padding: 4px;">${s.opsi.kanan?.[i] || ""}</td></tr>`;
+            opsiHtml += `<tr><td style="border:1px solid #000;padding:4px;">${s.opsi.kiri[i] || ""}</td><td style="border:1px solid #000;padding:4px;">${s.opsi.kanan?.[i] || ""}</td></tr>`;
           }
           opsiHtml += `</table>`;
         } else if (s.tipe === 'tabel' && s.opsi?.headers) {
-          opsiHtml += `<table style="border-collapse: collapse; margin-left: 24pt; margin-top: 4pt; margin-bottom: 4pt; width: 90%;">`;
-          opsiHtml += `<tr>${s.opsi.headers.map((h: string) => `<th style="border: 1px solid black; padding: 4px; background-color: #f2f2f2;">${h}</th>`).join('')}</tr>`;
+          opsiHtml += `<table style="border-collapse:collapse;margin-left:24pt;margin-top:4pt;margin-bottom:4pt;width:90%;">`;
+          opsiHtml += `<tr>${s.opsi.headers.map((h: string) => `<th style="border:1px solid #000;padding:4px;background:#f3f4f6;">${h}</th>`).join('')}</tr>`;
           s.opsi.rows?.forEach((row: string[]) => {
-            opsiHtml += `<tr>${row.map(cell => `<td style="border: 1px solid black; padding: 4px;">${cell}</td>`).join('')}</tr>`;
+            opsiHtml += `<tr>${row.map(cell => `<td style="border:1px solid #000;padding:4px;">${cell}</td>`).join('')}</tr>`;
           });
           opsiHtml += `</table>`;
         } else if (s.tipe === 'sebab-akibat' && s.opsi?.pernyataan) {
-          opsiHtml += `<p style="margin-left: 24pt; margin-top: 2pt; margin-bottom: 2pt;"><strong>PERNYATAAN:</strong> ${s.opsi.pernyataan}</p>`;
-          opsiHtml += `<p style="margin-left: 24pt; margin-top: 2pt; margin-bottom: 2pt;"><strong>ALASAN:</strong> ${s.opsi.alasan}</p>`;
+          opsiHtml += `<p class="opsi"><strong>PERNYATAAN:</strong> ${s.opsi.pernyataan}</p>`;
+          opsiHtml += `<p class="opsi"><strong>ALASAN:</strong> ${s.opsi.alasan}</p>`;
+        } else if (s.tipe === 'bs') {
+          opsiHtml = `<p class="opsi"><strong>A.</strong> Benar &nbsp;&nbsp;&nbsp; <strong>B.</strong> Salah</p>`;
         }
 
         contentHtml += `
-          <div style="margin-bottom: 12pt;">
-            <p style="margin: 0; font-weight: bold;">${idx + 1}. ${s.pertanyaan} <span style="font-weight: normal; font-style: italic; font-size: 10pt; color: #555;">(Tipe: ${typeLabelsMap[s.tipe] || s.tipe})</span></p>
+          <div class="soal-item">
+            <div class="soal-header">
+              <strong>${idx + 1}.</strong> <span class="tipe-badge">${typeLabelsMap[s.tipe] || s.tipe}</span>
+              ${s.tingkat ? `<span class="tipe-badge">${s.tingkat}</span>` : ""}
+              ${s.kognitif ? `<span class="tipe-badge" style="background:#dbeafe;">${s.kognitif}</span>` : ""}
+              ${s.skor ? `<span class="tipe-badge" style="background:#f3e8ff;">Skor: ${s.skor}</span>` : ""}
+            </div>
+            <div class="pertanyaan">${s.pertanyaan}</div>
+            ${s.stimulus ? `<div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 10px;margin:6px 0;font-style:italic;font-size:10pt;"><strong>Stimulus:</strong> ${s.stimulus}</div>` : ""}
+            ${s.gambar ? `<div style="margin:6px 0;text-align:center;font-style:italic;color:#666;font-size:9pt;">[Gambar: ${s.gambar}]</div>` : ""}
+            ${s.gambarData ? `<div style="margin:6px 0;"><img src="${s.gambarData}" style="max-width:240px;height:auto;" /></div>` : ""}
             ${opsiHtml}
+            ${s.pembahasan ? `<div class="pembahasan"><strong>Pembahasan:</strong> ${s.pembahasan}</div>` : ""}
           </div>
         `;
       });
@@ -4413,10 +4443,10 @@ function DashboardContent() {
           kunciStr = String(s.kunci);
         }
         contentHtml += `
-          <div style="margin-bottom: 12pt; border-bottom: 1px dashed #ccc; padding-bottom: 6pt;">
-            <p style="margin: 0; font-weight: bold;">${idx + 1}. ${s.pertanyaan}</p>
-            <p style="margin: 4pt 0 0 0; color: green; font-weight: bold;">Kunci: ${kunciStr}</p>
-            ${s.pembahasan ? `<p style="margin: 2pt 0 0 0; color: #555; font-size: 10pt;">Pembahasan: ${s.pembahasan}</p>` : ""}
+          <div class="soal-item">
+            <div class="soal-header"><strong>${idx + 1}.</strong> ${s.pertanyaan}</div>
+            <div class="kunci-box"><strong>Kunci:</strong> ${kunciStr}</div>
+            ${s.pembahasan ? `<div class="pembahasan"><strong>Pembahasan:</strong> ${s.pembahasan}</div>` : ""}
           </div>
         `;
       });
@@ -4465,27 +4495,85 @@ function DashboardContent() {
 
     const filename = `${activeTab === 'soal' ? 'Soal' : activeTab === 'kunci' ? 'Kunci' : activeTab === 'kisikisi' ? 'Kisi_Kisi' : 'Analisis'}_${(data.mapel || "GuruPRO").replace(/[^a-zA-Z0-9]/g, "_")}.doc`;
 
+    const schoolName = data.namaSekolah || "GuruPRO";
+    const guruName = data.namaGuru || "Pendidik";
+    const jenjang = data.jenjang || "";
+    const kelas = data.kelas || "-";
+    const mapel = data.mapel || "Mata Pelajaran";
+    const kurikulum = data.kurikulumLabel || "Kurikulum Merdeka";
+    const jenis = data.jenisAsesmen || "Asesmen";
+    const today = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+    const kopTable = `
+    <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+      <tr>
+        <td style="width:50px;"></td>
+        <td style="text-align:center;vertical-align:middle;">
+          <h1 style="margin:0;font-size:16pt;font-weight:bold;color:#000;text-transform:uppercase;">${schoolName}</h1>
+          <p style="margin:2px 0;font-size:9pt;color:#555;">Alamat sekolah tidak tersedia</p>
+        </td>
+        <td style="width:50px;"></td>
+      </tr>
+    </table>
+    <div style="border-bottom:2px solid #000;margin-bottom:12px;"></div>`;
+
+    const identitasRows = [
+      ["Mata Pelajaran", mapel, "Jenis Asesmen", jenis],
+      ["Kelas / Jenjang", `Kelas ${kelas} (${jenjang})`, "Kurikulum", kurikulum],
+    ];
+    const identitasTable = `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
+      ${identitasRows.map(([l1, v1, l2, v2]) =>
+        `<tr>
+          <td style="width:130px;padding:3px 8px 3px 0;font-size:11pt;font-weight:bold;vertical-align:top;">${l1}</td>
+          <td style="padding:3px 0;font-size:11pt;vertical-align:top;">: ${v1}</td>
+          <td style="width:130px;padding:3px 8px 3px 0;font-size:11pt;font-weight:bold;vertical-align:top;">${l2}</td>
+          <td style="padding:3px 0;font-size:11pt;vertical-align:top;">: ${v2}</td>
+        </tr>`
+      ).join("")}
+    </table>`;
+
     const html = `
+      <!DOCTYPE html>
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
         <meta charset="utf-8">
-        <title>${data.jenisAsesmen || "Evaluasi"}</title>
+        <meta name=ProgId content=Word.Document>
+        <meta name=Generator content="GuruPRO AI">
+        <meta name=Originator content="Microsoft Word">
+        <title>${jenis} - ${mapel}</title>
+        <!--[if gte mso 9]><xml><o:DocumentProperties><o:Title>${jenis} - ${mapel}</o:Title><o:Author>GuruPRO</o:Author></o:DocumentProperties></xml><![endif]-->
         <style>
-          body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; }
-          table { border-collapse: collapse; width: 100%; }
-          th, td { border: 1px solid black; padding: 6px; }
+          @page { margin: 2.5cm 2cm 2cm 3cm; size: A4; }
+          * { box-sizing: border-box; }
+          body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; line-height: 1.5; margin: 0; padding: 0; }
+          h2 { font-size: 14pt; margin: 16px 0 10px; font-weight: bold; text-transform: uppercase; text-align: center; border-bottom: 1px solid #ccc; padding-bottom: 6px; }
+          h3 { font-size: 12pt; margin: 14px 0 8px; font-weight: bold; }
+          p { margin: 6px 0; text-align: justify; }
+          table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+          th, td { border: 1px solid #000; padding: 6px 8px; font-size: 11pt; vertical-align: top; }
+          th { background: #f3f4f6; font-weight: bold; text-align: center; }
+          .kop-section { margin-bottom: 16px; }
+          .soal-item { page-break-inside: avoid; margin-bottom: 16px; }
+          .soal-header { font-size: 12pt; margin-bottom: 6px; }
+          .pertanyaan { margin-bottom: 8px; text-align: justify; }
+          .opsi { margin-left: 20px; margin-bottom: 4px; }
+          .tipe-badge { background: #e5e7eb; padding: 1px 6px; border-radius: 3px; font-size: 9pt; }
+          .pembahasan { margin-top: 8px; padding: 8px; background: #f0fdf4; border-left: 3px solid #22c55e; font-size: 10pt; color: #166534; }
+          .kunci-box { margin-top: 6px; padding: 6px; background: #fefce8; border-left: 3px solid #f59e0b; font-size: 10pt; }
+          .page-footer { position: fixed; bottom: 1.5cm; left: 0; right: 0; text-align: right; font-size: 9pt; color: #666; }
+          @media print { .page-footer { display: block; } }
         </style>
       </head>
       <body>
-        <div style="text-align: center; margin-bottom: 20pt;">
-          <h2 style="margin: 0; font-family: Arial, sans-serif;">${(data.jenisAsesmen || "ASESSMEN").toUpperCase()}</h2>
-          <p style="margin: 4pt 0;"><strong>${data.mapel || "Mata Pelajaran"}</strong> | ${data.kurikulumLabel || "Kurikulum Merdeka"}</p>
-          <p style="margin: 2pt 0;">Kelas/Jenjang: Kelas ${data.kelas || "-"} (${data.jenjang || "-"})</p>
-          <p style="margin: 2pt 0;">Sekolah: ${data.namaSekolah || "Ecosystem GuruPRO"}</p>
-          <p style="margin: 2pt 0;">Guru: ${data.namaGuru || "Pendidik GuruPRO"}</p>
+        <div class="kop-section">
+          ${kopTable}
+          ${identitasTable}
+          <h2>${jenis}</h2>
         </div>
-        <hr style="border: 1px solid double black; margin-bottom: 20pt;" />
-        ${contentHtml}
+        <div class="soal-list">
+          ${contentHtml}
+        </div>
+        <div class="page-footer">Halaman <span style="mso-field-code:' PAGE \\* MERGEFORMAT '"></span> dari <span style="mso-field-code:' NUMPAGES \\* MERGEFORMAT '"></span></div>
       </body>
       </html>
     `;
@@ -4516,46 +4604,98 @@ function DashboardContent() {
       content.style.fontSize = "12pt";
       content.style.lineHeight = "1.5";
       content.style.color = "black";
-      content.style.padding = "20px";
 
       let contentHtml = "";
       const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+      const schoolName = data.namaSekolah || "GuruPRO";
+      const jenjang = data.jenjang || "";
+      const kelas = data.kelas || "-";
+      const mapel = data.mapel || "Mata Pelajaran";
+      const kurikulum = data.kurikulumLabel || "Kurikulum Merdeka";
+      const jenis = data.jenisAsesmen || "Asesmen";
+      const guru = data.namaGuru || "Pendidik";
+      const today = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+      const kopHtml = `
+      <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+        <tr>
+          <td style="width:50px;"></td>
+          <td style="text-align:center;vertical-align:middle;">
+            <h1 style="margin:0;font-size:16pt;font-weight:bold;color:#000;text-transform:uppercase;">${schoolName}</h1>
+            <p style="margin:2px 0;font-size:9pt;color:#555;">Alamat sekolah tidak tersedia</p>
+          </td>
+          <td style="width:50px;"></td>
+        </tr>
+      </table>
+      <div style="border-bottom:2px solid #000;margin-bottom:10px;"></div>
+
+      <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
+        <tr>
+          <td style="width:130px;padding:2px 8px 2px 0;font-size:11pt;font-weight:bold;">Mata Pelajaran</td>
+          <td style="padding:2px 0;font-size:11pt;">: ${mapel}</td>
+          <td style="width:130px;padding:2px 8px 2px 0;font-size:11pt;font-weight:bold;">Jenis Asesmen</td>
+          <td style="padding:2px 0;font-size:11pt;">: ${jenis}</td>
+        </tr>
+        <tr>
+          <td style="padding:2px 8px 2px 0;font-size:11pt;font-weight:bold;">Kelas / Jenjang</td>
+          <td style="padding:2px 0;font-size:11pt;">: Kelas ${kelas} (${jenjang})</td>
+          <td style="padding:2px 8px 2px 0;font-size:11pt;font-weight:bold;">Kurikulum</td>
+          <td style="padding:2px 0;font-size:11pt;">: ${kurikulum}</td>
+        </tr>
+        <tr>
+          <td style="padding:2px 8px 2px 0;font-size:11pt;font-weight:bold;">Guru</td>
+          <td style="padding:2px 0;font-size:11pt;">: ${guru}</td>
+          <td style="padding:2px 8px 2px 0;font-size:11pt;font-weight:bold;">Tanggal</td>
+          <td style="padding:2px 0;font-size:11pt;">: ${today}</td>
+        </tr>
+      </table>`;
 
       if (activeTab === 'soal') {
         soalList.forEach((s, idx) => {
           let opsiHtml = "";
           if (s.gambarData) {
-            opsiHtml += `<div style="margin: 10px 0 10px 24px;"><img src="${s.gambarData}" style="max-width: 240px; height: auto;" /></div>`;
+            opsiHtml += `<div style="margin:8px 0 8px 24px;"><img src="${s.gambarData}" style="max-width:240px;height:auto;" /></div>`;
           }
           if (s.opsi && Array.isArray(s.opsi)) {
             opsiHtml += s.opsi.map((o: string, oIdx: number) => {
               const prefix = /^[A-H][\.\)]\s?/.test(o) ? "" : `${letters[oIdx]}. `;
-              return `<p style="margin-left: 24px; margin-top: 3px; margin-bottom: 3px; font-size: 11pt;">${prefix}${o}</p>`;
+              return `<p class="opsi">${prefix}${o}</p>`;
             }).join('');
           } else if (s.tipe === 'jodoh' && s.opsi?.kiri) {
-            opsiHtml += `<table style="border-collapse: collapse; margin-left: 24px; margin-top: 6px; margin-bottom: 6px; width: 80%; border: 1px solid black;">`;
-            opsiHtml += `<tr><th style="border: 1px solid black; padding: 6px; background-color: #f2f2f2; text-align: left;">Kolom Kiri</th><th style="border: 1px solid black; padding: 6px; background-color: #f2f2f2; text-align: left;">Kolom Kanan</th></tr>`;
+            opsiHtml += `<table style="border-collapse:collapse;margin-left:24px;margin-top:4pt;margin-bottom:4pt;width:80%;">`;
+            opsiHtml += `<tr><th style="border:1px solid #000;padding:4px;background:#f3f4f6;">Kolom Kiri</th><th style="border:1px solid #000;padding:4px;background:#f3f4f6;">Kolom Kanan</th></tr>`;
             const maxLen = Math.max(s.opsi.kiri.length, s.opsi.kanan?.length || 0);
             for (let i = 0; i < maxLen; i++) {
-              opsiHtml += `<tr><td style="border: 1px solid black; padding: 6px;">${s.opsi.kiri[i] || ""}</td><td style="border: 1px solid black; padding: 6px;">${s.opsi.kanan?.[i] || ""}</td></tr>`;
+              opsiHtml += `<tr><td style="border:1px solid #000;padding:4px;">${s.opsi.kiri[i] || ""}</td><td style="border:1px solid #000;padding:4px;">${s.opsi.kanan?.[i] || ""}</td></tr>`;
             }
             opsiHtml += `</table>`;
           } else if (s.tipe === 'tabel' && s.opsi?.headers) {
-            opsiHtml += `<table style="border-collapse: collapse; margin-left: 24px; margin-top: 6px; margin-bottom: 6px; width: 90%; border: 1px solid black;">`;
-            opsiHtml += `<tr>${s.opsi.headers.map((h: string) => `<th style="border: 1px solid black; padding: 6px; background-color: #f2f2f2; text-align: left;">${h}</th>`).join('')}</tr>`;
+            opsiHtml += `<table style="border-collapse:collapse;margin-left:24px;margin-top:4pt;margin-bottom:4pt;width:90%;">`;
+            opsiHtml += `<tr>${s.opsi.headers.map((h: string) => `<th style="border:1px solid #000;padding:4px;background:#f3f4f6;">${h}</th>`).join('')}</tr>`;
             s.opsi.rows?.forEach((row: string[]) => {
-              opsiHtml += `<tr>${row.map(cell => `<td style="border: 1px solid black; padding: 6px;">${cell}</td>`).join('')}</tr>`;
+              opsiHtml += `<tr>${row.map(cell => `<td style="border:1px solid #000;padding:4px;">${cell}</td>`).join('')}</tr>`;
             });
             opsiHtml += `</table>`;
           } else if (s.tipe === 'sebab-akibat' && s.opsi?.pernyataan) {
-            opsiHtml += `<p style="margin-left: 24px; margin-top: 3px; margin-bottom: 3px;"><strong>PERNYATAAN:</strong> ${s.opsi.pernyataan}</p>`;
-            opsiHtml += `<p style="margin-left: 24px; margin-top: 3px; margin-bottom: 3px;"><strong>ALASAN:</strong> ${s.opsi.alasan}</p>`;
+            opsiHtml += `<p class="opsi"><strong>PERNYATAAN:</strong> ${s.opsi.pernyataan}</p>`;
+            opsiHtml += `<p class="opsi"><strong>ALASAN:</strong> ${s.opsi.alasan}</p>`;
+          } else if (s.tipe === 'bs') {
+            opsiHtml = `<p class="opsi"><strong>A.</strong> Benar &nbsp;&nbsp;&nbsp; <strong>B.</strong> Salah</p>`;
           }
 
           contentHtml += `
-            <div style="margin-bottom: 14px; page-break-inside: avoid;">
-              <p style="margin: 0; font-weight: bold;">${idx + 1}. ${s.pertanyaan} <span style="font-weight: normal; font-style: italic; font-size: 10pt; color: #555;">(Tipe: ${typeLabelsMap[s.tipe] || s.tipe})</span></p>
+            <div class="soal-item">
+              <div class="soal-header">
+                <strong>${idx + 1}.</strong> <span class="tipe-badge">${typeLabelsMap[s.tipe] || s.tipe}</span>
+                ${s.tingkat ? `<span class="tipe-badge">${s.tingkat}</span>` : ""}
+                ${s.kognitif ? `<span class="tipe-badge" style="background:#dbeafe;">${s.kognitif}</span>` : ""}
+                ${s.skor ? `<span class="tipe-badge" style="background:#f3e8ff;">Skor: ${s.skor}</span>` : ""}
+              </div>
+              <div class="pertanyaan">${s.pertanyaan}</div>
+              ${s.stimulus ? `<div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 10px;margin:6px 0;font-style:italic;font-size:10pt;"><strong>Stimulus:</strong> ${s.stimulus}</div>` : ""}
+              ${s.gambar ? `<div style="margin:6px 0;text-align:center;font-style:italic;color:#666;font-size:9pt;">[Gambar: ${s.gambar}]</div>` : ""}
               ${opsiHtml}
+              ${s.pembahasan ? `<div class="pembahasan"><strong>Pembahasan:</strong> ${s.pembahasan}</div>` : ""}
             </div>
           `;
         });
@@ -4570,39 +4710,39 @@ function DashboardContent() {
             kunciStr = String(s.kunci);
           }
           contentHtml += `
-            <div style="margin-bottom: 14px; page-break-inside: avoid; border-bottom: 1px dashed #ccc; padding-bottom: 8px;">
-              <p style="margin: 0; font-weight: bold;">${idx + 1}. ${s.pertanyaan}</p>
-              <p style="margin: 4px 0 0 0; color: green; font-weight: bold;">Kunci: ${kunciStr}</p>
-              ${s.pembahasan ? `<p style="margin: 2px 0 0 0; color: #555; font-size: 10pt; line-height: 1.4;">Pembahasan: ${s.pembahasan}</p>` : ""}
+            <div class="soal-item">
+              <div class="soal-header"><strong>${idx + 1}.</strong> ${s.pertanyaan}</div>
+              <div class="kunci-box"><strong>Kunci:</strong> ${kunciStr}</div>
+              ${s.pembahasan ? `<div class="pembahasan"><strong>Pembahasan:</strong> ${s.pembahasan}</div>` : ""}
             </div>
           `;
         });
       } else if (activeTab === 'kisikisi') {
         contentHtml += `
-          <table style="border-collapse: collapse; width: 100%; border: 1px solid black; font-size: 10pt;">
+          <table style="border-collapse:collapse;width:100%;">
             <thead>
-              <tr style="background-color: #f2f2f2;">
-                <th style="border: 1px solid black; padding: 4px; text-align: center; width: 30px;">No</th>
-                <th style="border: 1px solid black; padding: 4px; width: 60px;">Tipe</th>
-                <th style="border: 1px solid black; padding: 4px; width: 100px;">Elemen</th>
-                <th style="border: 1px solid black; padding: 4px;">Capaian Pembelajaran (CP)</th>
-                <th style="border: 1px solid black; padding: 4px;">Indikator Soal</th>
-                <th style="border: 1px solid black; padding: 4px; text-align: center; width: 40px;">Level</th>
-                <th style="border: 1px solid black; padding: 4px; text-align: center; width: 50px;">Kesulitan</th>
-                <th style="border: 1px solid black; padding: 4px; text-align: center; width: 40px;">Skor</th>
+              <tr style="background-color:#1E3A8A;">
+                <th style="border:1px solid #000;padding:4px;text-align:center;color:#fff;font-size:9pt;">No</th>
+                <th style="border:1px solid #000;padding:4px;color:#fff;font-size:9pt;">Tipe</th>
+                <th style="border:1px solid #000;padding:4px;color:#fff;font-size:9pt;">Elemen</th>
+                <th style="border:1px solid #000;padding:4px;color:#fff;font-size:9pt;">Capaian Pembelajaran (CP)</th>
+                <th style="border:1px solid #000;padding:4px;color:#fff;font-size:9pt;">Indikator Soal</th>
+                <th style="border:1px solid #000;padding:4px;color:#fff;font-size:9pt;text-align:center;">Level</th>
+                <th style="border:1px solid #000;padding:4px;color:#fff;font-size:9pt;text-align:center;">Kesulitan</th>
+                <th style="border:1px solid #000;padding:4px;color:#fff;font-size:9pt;text-align:center;">Skor</th>
               </tr>
             </thead>
             <tbody>
               ${soalList.map((s, idx) => `
                 <tr>
-                  <td style="border: 1px solid black; padding: 4px; text-align: center;">${idx + 1}</td>
-                  <td style="border: 1px solid black; padding: 4px;">${s.tipe}</td>
-                  <td style="border: 1px solid black; padding: 4px;">${s.elemen || "-"}</td>
-                  <td style="border: 1px solid black; padding: 4px;">${s.cp || "-"}</td>
-                  <td style="border: 1px solid black; padding: 4px;">${s.indikator || "-"}</td>
-                  <td style="border: 1px solid black; padding: 4px; text-align: center;">${s.kognitif}</td>
-                  <td style="border: 1px solid black; padding: 4px; text-align: center;">${s.tingkat}</td>
-                  <td style="border: 1px solid black; padding: 4px; text-align: center;">${s.skor || 1}</td>
+                  <td style="border:1px solid #000;padding:4px;text-align:center;font-size:9pt;">${idx + 1}</td>
+                  <td style="border:1px solid #000;padding:4px;font-size:9pt;">${s.tipe}</td>
+                  <td style="border:1px solid #000;padding:4px;font-size:9pt;">${s.elemen || "-"}</td>
+                  <td style="border:1px solid #000;padding:4px;font-size:9pt;">${s.cp || "-"}</td>
+                  <td style="border:1px solid #000;padding:4px;font-size:9pt;">${s.indikator || "-"}</td>
+                  <td style="border:1px solid #000;padding:4px;text-align:center;font-size:9pt;">${s.kognitif}</td>
+                  <td style="border:1px solid #000;padding:4px;text-align:center;font-size:9pt;">${s.tingkat}</td>
+                  <td style="border:1px solid #000;padding:4px;text-align:center;font-size:9pt;">${s.skor || 1}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -4610,31 +4750,99 @@ function DashboardContent() {
         `;
       } else if (activeTab === 'analisis') {
         contentHtml += `
-          <h3 style="font-family: Arial, sans-serif; margin-bottom: 12px;">Analisis Butir Soal</h3>
-          <table style="border-collapse: collapse; width: 100%; border: 1px solid black; font-size: 11pt; margin-bottom: 20px;">
-            <tr style="background-color: #f2f2f2;"><th style="border: 1px solid black; padding: 6px;">Kategori</th><th style="border: 1px solid black; padding: 6px; text-align: center;">Kuantitas</th><th style="border: 1px solid black; padding: 6px; text-align: center;">Persentase</th></tr>
-            <tr><td style="border: 1px solid black; padding: 6px; font-weight: bold;">Total Soal</td><td style="border: 1px solid black; padding: 6px; text-align: center; font-weight: bold;">${soalList.length}</td><td style="border: 1px solid black; padding: 6px; text-align: center; font-weight: bold;">100%</td></tr>
-            <tr><td style="border: 1px solid black; padding: 6px;">LOTS (C1-C3)</td><td style="border: 1px solid black; padding: 6px; text-align: center;">${lotsCount}</td><td style="border: 1px solid black; padding: 6px; text-align: center;">${lotsPct}%</td></tr>
-            <tr><td style="border: 1px solid black; padding: 6px;">HOTS (C4-C6)</td><td style="border: 1px solid black; padding: 6px; text-align: center;">${hotsCount}</td><td style="border: 1px solid black; padding: 6px; text-align: center;">${hotsPct}%</td></tr>
-            <tr><td style="border: 1px solid black; padding: 6px;">Tingkat Kesulitan: Mudah</td><td style="border: 1px solid black; padding: 6px; text-align: center;">${tingkatCount.mudah}</td><td style="border: 1px solid black; padding: 6px; text-align: center;">${mudahPct}%</td></tr>
-            <tr><td style="border: 1px solid black; padding: 6px;">Tingkat Kesulitan: Sedang</td><td style="border: 1px solid black; padding: 6px; text-align: center;">${tingkatCount.sedang}</td><td style="border: 1px solid black; padding: 6px; text-align: center;">${sedangPct}%</td></tr>
-            <tr><td style="border: 1px solid black; padding: 6px;">Tingkat Kesulitan: Sulit</td><td style="border: 1px solid black; padding: 6px; text-align: center;">${tingkatCount.sulit}</td><td style="border: 1px solid black; padding: 6px; text-align: center;">${sulitPct}%</td></tr>
+          <h3 style="font-family:Arial,sans-serif;margin-bottom:12px;font-size:14pt;">Analisis Butir Soal</h3>
+          <table style="border-collapse:collapse;width:100%;">
+            <thead>
+              <tr style="background-color:#1E3A8A;">
+                <th style="border:1px solid #000;padding:6px;color:#fff;font-size:10pt;">Kategori</th>
+                <th style="border:1px solid #000;padding:6px;color:#fff;font-size:10pt;text-align:center;">Kuantitas</th>
+                <th style="border:1px solid #000;padding:6px;color:#fff;font-size:10pt;text-align:center;">Persentase</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="border:1px solid #000;padding:6px;font-weight:bold;">Total Soal</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;font-weight:bold;">${soalList.length}</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;font-weight:bold;">100%</td>
+              </tr>
+              <tr style="background:#f9fafb;">
+                <td style="border:1px solid #000;padding:6px;">LOTS (C1-C3)</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;">${lotsCount}</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;">${lotsPct}%</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #000;padding:6px;">HOTS (C4-C6)</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;">${hotsCount}</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;">${hotsPct}%</td>
+              </tr>
+              <tr style="background:#f9fafb;">
+                <td style="border:1px solid #000;padding:6px;">Tingkat Kesulitan: Mudah</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;">${tingkatCount.mudah}</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;">${mudahPct}%</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #000;padding:6px;">Tingkat Kesulitan: Sedang</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;">${tingkatCount.sedang}</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;">${sedangPct}%</td>
+              </tr>
+              <tr style="background:#f9fafb;">
+                <td style="border:1px solid #000;padding:6px;">Tingkat Kesulitan: Sulit</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;">${tingkatCount.sulit}</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;">${sulitPct}%</td>
+              </tr>
+            </tbody>
           </table>
         `;
       }
 
-      content.innerHTML = `
-        <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid black; padding-bottom: 10px;">
-          <h2 style="margin: 0; font-family: Arial, sans-serif; font-size: 16pt; font-weight: bold;">${(data.jenisAsesmen || "EVALUASI DAN ASESMEN").toUpperCase()}</h2>
-          <p style="margin: 4px 0; font-size: 11pt;"><strong>${data.mapel || "Mata Pelajaran"}</strong> | ${data.kurikulumLabel || "Kurikulum Merdeka"}</p>
-          <p style="margin: 2px 0; font-size: 10pt;">Sekolah: ${data.namaSekolah || "Institusi GuruPRO"} | Guru: ${data.namaGuru || "Pendidik"}</p>
-          <p style="margin: 2px 0; font-size: 10pt;">Kelas/Jenjang: Kelas ${data.kelas || "-"} (${data.jenjang || "-"})</p>
-        </div>
-        ${contentHtml}
+      // Note: Word field codes work in DOCX but not in html2pdf (canvas-based).
+      // For DOCX downloads, Word field codes provide proper multi-page numbering.
+      // For PDF, the footer appears on the last page only (html2pdf limitation).
+      // Proper multi-page PDF numbering would require jsPDF direct manipulation.
+      const printHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${jenis} - ${mapel}</title>
+          <style>
+            @page { margin: 25mm 20mm 20mm 30mm; size: A4; }
+            * { box-sizing: border-box; }
+            body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; line-height: 1.5; margin: 0; padding: 20px 25px; }
+            h1 { font-size: 16pt; text-align: center; margin: 0 0 4px; font-weight: bold; text-transform: uppercase; }
+            h2 { font-size: 14pt; margin: 16px 0 10px; font-weight: bold; }
+            h3 { font-size: 12pt; margin: 14px 0 8px; font-weight: bold; }
+            p { margin: 6px 0; }
+            table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+            th, td { border: 1px solid #000; padding: 6px 8px; font-size: 11pt; vertical-align: top; }
+            th { background: #f3f4f6; font-weight: bold; text-align: center; }
+            .kop-section { margin-bottom: 16px; }
+            .soal-item { page-break-inside: avoid; margin-bottom: 16px; }
+            .soal-header { font-size: 12pt; margin-bottom: 4px; }
+            .pertanyaan { margin-bottom: 8px; text-align: justify; }
+            .opsi { margin-left: 24px; margin-bottom: 2px; }
+            .tipe-badge { background: #e5e7eb; padding: 1px 6px; border-radius: 3px; font-size: 9pt; }
+            .pembahasan { margin-top: 8px; padding: 8px; background: #f0fdf4; border-left: 3px solid #22c55e; font-size: 10pt; color: #166534; }
+            .kunci-box { margin-top: 6px; padding: 6px; background: #fefce8; border-left: 3px solid #f59e0b; font-size: 10pt; }
+            .page-footer { position: fixed; bottom: 15mm; right: 20mm; font-size: 9pt; color: #666; }
+            @media print { .page-footer { display: block; } body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="kop-section">
+            ${kopHtml}
+          </div>
+          <div class="soal-list">
+            ${contentHtml}
+          </div>
+          <div class="page-footer">Halaman <span style="mso-field-code:' PAGE \\* MERGEFORMAT '"></span> dari <span style="mso-field-code:' NUMPAGES \\* MERGEFORMAT '"></span></div>
+        </body>
+        </html>
       `;
+      content.innerHTML = printHtml;
 
       const opt = {
-        margin: [15, 12, 15, 12],
+        margin: [25, 20, 20, 30],
         filename: `${activeTab === 'soal' ? 'Soal' : activeTab === 'kunci' ? 'Kunci' : activeTab === 'kisikisi' ? 'Kisi_Kisi' : 'Analisis'}_${(data.mapel || "GuruPRO").replace(/[^a-zA-Z0-9]/g, "_")}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
@@ -4685,11 +4893,9 @@ function DashboardContent() {
       content.style.fontFamily = "'Times New Roman', serif";
       content.style.fontSize = "11pt";
       content.style.lineHeight = "1.4";
-      content.style.padding = "20px";
-      content.style.background = "white";
 
       const opt = {
-        margin: [10, 10, 10, 10],
+        margin: [25, 20, 20, 30],
         filename: `Kisi_Kisi_${(data.mapel || "GuruPRO").replace(/[^a-zA-Z0-9]/g, "_")}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
@@ -9321,8 +9527,33 @@ const renderJurnalModule = () => {
                   </div>
                 </div>
 
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 overflow-y-auto max-h-[500px] text-xs font-medium leading-relaxed text-slate-700 space-y-4 font-sans whitespace-pre-wrap">
-                  {generatedDoc.konten}
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 overflow-y-auto max-h-[500px] text-xs font-medium leading-relaxed text-slate-700 space-y-4 font-sans">
+                  {(() => {
+                    const md = generatedDoc.konten || '';
+                    if (!md) return null;
+                    let html = md
+                      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                      .replace(/^### (.+)$/gm, '<h3 class="text-xs font-bold text-slate-800 mt-3 mb-1">$1</h3>')
+                      .replace(/^## (.+)$/gm, '<h2 class="text-xs font-bold text-slate-800 border-b border-slate-200 pb-1 mt-3 mb-2">$1</h2>')
+                      .replace(/^# (.+)$/gm, '<h1 class="text-xs font-bold text-slate-900 mt-3 mb-2">$1</h1>')
+                      .replace(/^- (.+)$/gm, '<li class="list-disc ml-5 my-0.5">$1</li>')
+                      .replace(/^(\d+)\. (.+)$/gm, '<li class="list-decimal ml-5 my-0.5">$2</li>')
+                      .replace(/\n\n/g, "</p><p class='my-1.5 text-justify'>")
+                      .replace(/\n/g, "<br>");
+                    html = html.replace(/(<li class="list-disc[^>]*>.*?<\/li>\n?)+/g, '<ul class="my-2">$&</ul>');
+                    html = html.replace(/(<li class="list-decimal[^>]*>.*?<\/li>\n?)+/g, '<ol class="my-2">$&</ol>');
+                    html = html.replace(/\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g, (match: string, header: string, body: string) => {
+                      const headerCells = header.split('|').filter((c: string) => c.trim()).map((c: string) => `<th class="border border-slate-300 px-2 py-1 bg-slate-100 font-semibold text-xs text-center">${c.trim()}</th>`).join('');
+                      const bodyRows = body.trim().split('\n').map((row: string) => {
+                        const cells = row.split('|').filter((c: string) => c.trim() !== undefined).slice(1, -1).map((c: string) => `<td class="border border-slate-300 px-2 py-1 text-xs">${c.trim()}</td>`).join('');
+                        return `<tr>${cells}</tr>`;
+                      }).join('');
+                      return `<table class="w-full border-collapse border border-slate-300 my-3 text-xs"><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table>`;
+                    });
+                    return <div dangerouslySetInnerHTML={{ __html: html }} />;
+                  })()}
                 </div>
               </div>
             ) : viewingDoc ? (
@@ -9462,80 +9693,130 @@ const renderJurnalModule = () => {
     }
     const list = file.konten?.soalList || [];
     const meta = file.konten?.meta || {};
+    const sekolah = meta.namaSekolah || "GuruPRO";
+    const mapel = meta.mapel || "-";
+    const kelas = meta.kelas || "-";
+    const jenjang = meta.jenjang || "-";
+    const topik = meta.topik || "-";
+    const kurikulum = meta.kurikulum || "Kurikulum Merdeka";
+    const guru = meta.namaGuru || "-";
+    const today = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
-    let contentHtml = `
-      <html>
-      <head>
-        <title>${file.judul_dokumen}</title>
-        <style>
-          body { font-family: 'Times New Roman', serif; padding: 2rem; line-height: 1.5; color: black; }
-          .kop { text-align: center; border-bottom: 3px double black; padding-bottom: 10px; margin-bottom: 20px; }
-          .kop h2 { margin: 0; font-size: 18px; text-transform: uppercase; }
-          .kop p { margin: 2px 0; font-size: 12px; }
-          .meta-table { width: 100%; margin-bottom: 20px; font-size: 12px; border-collapse: collapse; }
-          .meta-table td { padding: 3px 0; }
-          .soal-item { margin-bottom: 15px; page-break-inside: avoid; }
-          .soal-text { font-weight: bold; margin-bottom: 5px; }
-          .opsi-list { list-style-type: none; padding-left: 20px; margin: 5px 0; }
-          .opsi-item { margin-bottom: 2px; }
-          .kunci-jawaban { font-style: italic; color: #444; font-size: 11px; margin-top: 3px; }
-          @media print {
-            body { padding: 0; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="kop">
-          <h2>${meta.namaSekolah || "KARTU SOAL UJIAN GURU"}</h2>
-          <p>Mata Pelajaran: ${meta.mapel || "-"} | Kelas: ${meta.kelas || "-"} | Topik: ${meta.topik || "-"}</p>
-        </div>
-        <table class="meta-table">
-          <tr>
-            <td width="15%">Mata Pelajaran</td><td width="2%">:</td><td width="33%">${meta.mapel || "-"}</td>
-            <td width="15%">Kurikulum</td><td width="2%">:</td><td width="33%">${meta.kurikulum || "Merdeka"}</td>
-          </tr>
-          <tr>
-            <td>Kelas / Jenjang</td><td>:</td><td>${meta.kelas || "-"} / ${meta.jenjang || "-"}</td>
-            <td>Topik / Bab</td><td>:</td><td>${meta.topik || "-"}</td>
-          </tr>
-        </table>
-        <hr/>
-        <div style="margin-top: 20px;">
-    `;
+    const letters = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
+    let soalHtml = "";
     list.forEach((s: any, idx: number) => {
-      let optionsHtml = "";
-      const opts = s.options || s.pilihan;
+      const opts = s.opsi || s.options || s.pilihan;
+      let opsiHtml = "";
       if (opts && Array.isArray(opts)) {
-        const letters = ["A", "B", "C", "D", "E"];
-        optionsHtml = `<ul class="opsi-list">`;
-        opts.forEach((opt: string, oIdx: number) => {
-          optionsHtml += `<li class="opsi-item">${letters[oIdx] || ""}. ${opt}</li>`;
-        });
-        optionsHtml += `</ul>`;
+        opsiHtml = opts.map((opt: string, oIdx: number) =>
+          `<p class="opsi">${letters[oIdx] || ""}. ${opt}</p>`
+        ).join("");
+      } else if (s.tipe === "bs") {
+        opsiHtml = `<p class="opsi"><strong>A.</strong> Benar &nbsp;&nbsp;&nbsp; <strong>B.</strong> Salah</p>`;
       }
 
-      contentHtml += `
+      soalHtml += `
         <div class="soal-item">
-          <div class="soal-text">${idx + 1}. ${s.pertanyaan || s.soal || ""}</div>
-          ${optionsHtml}
-          <div class="kunci-jawaban">Kunci Jawaban: ${s.kunci || s.jawaban || "-"}</div>
+          <div class="soal-header">
+            <strong>${idx + 1}.</strong> <span class="tipe-badge">${s.tipe || "pg"}</span>
+            ${s.tingkat ? `<span class="tipe-badge">${s.tingkat}</span>` : ""}
+            ${s.kognitif ? `<span class="tipe-badge" style="background:#dbeafe;">${s.kognitif}</span>` : ""}
+          </div>
+          <div class="pertanyaan">${s.pertanyaan || s.soal || ""}</div>
+          ${s.stimulus ? `<div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 10px;margin:6px 0;font-style:italic;font-size:10pt;"><strong>Stimulus:</strong> ${s.stimulus}</div>` : ""}
+          ${s.gambar ? `<div style="margin:6px 0;text-align:center;font-style:italic;color:#666;font-size:9pt;">[Gambar: ${s.gambar}]</div>` : ""}
+          ${s.gambarData ? `<div style="margin:6px 0;"><img src="${s.gambarData}" style="max-width:240px;height:auto;" /></div>` : ""}
+          ${opsiHtml}
+          ${s.kunci || s.jawaban ? `<div class="kunci-box"><strong>Kunci:</strong> ${s.kunci || s.jawaban}</div>` : ""}
+          ${s.pembahasan ? `<div class="pembahasan"><strong>Pembahasan:</strong> ${s.pembahasan}</div>` : ""}
         </div>
       `;
     });
 
-    contentHtml += `
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>${sekolah} - ${mapel}</title>
+        <style>
+          @page { margin: 25mm 20mm 20mm 30mm; size: A4; }
+          * { box-sizing: border-box; }
+          body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; line-height: 1.5; margin: 0; padding: 0; }
+          h1 { font-size: 16pt; text-align: center; margin: 0 0 4px; font-weight: bold; text-transform: uppercase; }
+          h2 { font-size: 14pt; margin: 16px 0 10px; font-weight: bold; }
+          p { margin: 6px 0; }
+          table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+          th, td { border: 1px solid #000; padding: 6px 8px; font-size: 11pt; vertical-align: top; }
+          th { background: #f3f4f6; font-weight: bold; }
+          .kop-section { margin-bottom: 16px; }
+          .soal-item { page-break-inside: avoid; margin-bottom: 16px; }
+          .soal-header { font-size: 12pt; margin-bottom: 4px; }
+          .pertanyaan { margin-bottom: 8px; text-align: justify; }
+          .opsi { margin-left: 24px; margin-bottom: 2px; }
+          .tipe-badge { background: #e5e7eb; padding: 1px 6px; border-radius: 3px; font-size: 9pt; }
+          .pembahasan { margin-top: 8px; padding: 8px; background: #f0fdf4; border-left: 3px solid #22c55e; font-size: 10pt; color: #166534; }
+          .kunci-box { margin-top: 6px; padding: 6px; background: #fefce8; border-left: 3px solid #f59e0b; font-size: 10pt; }
+          .page-footer { position: fixed; bottom: 15mm; right: 20mm; font-size: 9pt; color: #666; }
+          @media print { .page-footer { display: block; } body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="kop-section">
+          <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+            <tr>
+              <td style="width:50px;"></td>
+              <td style="text-align:center;vertical-align:middle;">
+                <h1 style="margin:0;font-size:16pt;font-weight:bold;color:#000;text-transform:uppercase;">${sekolah}</h1>
+                <p style="margin:2px 0;font-size:9pt;color:#555;">Alamat sekolah tidak tersedia</p>
+              </td>
+              <td style="width:50px;"></td>
+            </tr>
+          </table>
+          <div style="border-bottom:2px solid #000;margin-bottom:10px;"></div>
+
+          <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
+            <tr>
+              <td style="width:130px;padding:2px 8px 2px 0;font-size:11pt;font-weight:bold;">Mata Pelajaran</td>
+              <td style="padding:2px 0;font-size:11pt;">: ${mapel}</td>
+              <td style="width:130px;padding:2px 8px 2px 0;font-size:11pt;font-weight:bold;">Jenis Asesmen</td>
+              <td style="padding:2px 0;font-size:11pt;">: ${meta.jenisAsesmen || "Asesmen"}</td>
+            </tr>
+            <tr>
+              <td style="padding:2px 8px 2px 0;font-size:11pt;font-weight:bold;">Kelas / Jenjang</td>
+              <td style="padding:2px 0;font-size:11pt;">: Kelas ${kelas} (${jenjang})</td>
+              <td style="padding:2px 8px 2px 0;font-size:11pt;font-weight:bold;">Kurikulum</td>
+              <td style="padding:2px 0;font-size:11pt;">: ${kurikulum}</td>
+            </tr>
+            <tr>
+              <td style="padding:2px 8px 2px 0;font-size:11pt;font-weight:bold;">Topik</td>
+              <td style="padding:2px 0;font-size:11pt;">: ${topik}</td>
+              <td style="padding:2px 8px 2px 0;font-size:11pt;font-weight:bold;">Tanggal</td>
+              <td style="padding:2px 0;font-size:11pt;">: ${today}</td>
+            </tr>
+            <tr>
+              <td style="padding:2px 8px 2px 0;font-size:11pt;font-weight:bold;">Guru</td>
+              <td style="padding:2px 0;font-size:11pt;">: ${guru}</td>
+              <td></td>
+              <td></td>
+            </tr>
+          </table>
         </div>
-        <script>
-          window.onload = function() { window.print(); }
-        </script>
+
+        <div class="soal-list">
+          ${soalHtml}
+        </div>
+        <div class="page-footer">Halaman <span style="mso-field-code:' PAGE \\* MERGEFORMAT '"></span> dari <span style="mso-field-code:' NUMPAGES \\* MERGEFORMAT '"></span></div>
+        <script>window.onload = function() { window.print(); }</script>
       </body>
       </html>
     `;
 
-    printWindow.document.write(contentHtml);
+    printWindow.document.write(html);
     printWindow.document.close();
   };
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
 import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
+import { enforceOutputLimits } from "@/lib/ai/limits";
 
 export async function POST(req: Request) {
   try {
@@ -42,6 +43,7 @@ export async function POST(req: Request) {
     }
 
     const { description } = await req.json();
+    const safeDescription = enforceOutputLimits(description);
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "GEMINI_API_KEY tidak dikonfigurasi di environment (.env.local)" }, { status: 500 });
@@ -59,7 +61,7 @@ export async function POST(req: Request) {
       return `Simple educational illustration: ${desc}. Flat design, colorful, white background, no text.`;
     };
 
-    const enhancedPrompt = buildImageGenerationPrompt(description);
+    const enhancedPrompt = buildImageGenerationPrompt(safeDescription);
 
     // Call Imagen API
     const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
@@ -86,7 +88,7 @@ export async function POST(req: Request) {
 
     if (!response.ok || !responseText || responseText.trim() === '') {
       console.log('[Imagen REST API] Error or empty response, retrying with simplified prompt...');
-      const simplePrompt = buildSimpleImageGenerationPrompt(description);
+      const simplePrompt = buildSimpleImageGenerationPrompt(safeDescription);
       const retryPayload = {
         instances: [{ prompt: simplePrompt }],
         parameters: { sampleCount: 1, aspectRatio: '1:1' }

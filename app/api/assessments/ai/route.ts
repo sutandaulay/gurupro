@@ -2,6 +2,7 @@ import { generateAIContentWithUsage } from "@/lib/ai";
 import { query } from "@/lib/db";
 import { getUserPoinAccess, logFailedPoinUsage } from "@/src/services/poin-service";
 import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
+import { enforceMarkdownLimits } from "@/lib/ai/limits";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -78,7 +79,7 @@ Harap berikan respons dalam JSON dengan format persis seperti ini:
     let aiResult: Awaited<ReturnType<typeof generateAIContentWithUsage>> | null = null;
     try {
       aiResult = await generateAIContentWithUsage(prompt);
-      const cleanText = (aiResult.text || '').trim();
+      const cleanText = enforceMarkdownLimits((aiResult.text || '').trim());
       if (!cleanText) {
         throw new Error("AI generation returned empty response");
       }

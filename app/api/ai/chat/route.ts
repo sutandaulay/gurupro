@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { generateChatResponse, estimateCost } from '@/lib/ai/generators';
 import { getUserPoinAccess, logFailedPoinUsage } from '@/src/services/poin-service';
 import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
+import { enforceOutputLimits } from '@/lib/ai/limits';
 
 const prisma = new PrismaClient();
 
@@ -169,7 +170,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      response: result.data?.response || 'Maaf, saya tidak bisa memproses permintaan Anda saat ini.',
+      response: enforceOutputLimits(result.data?.response) || 'Maaf, saya tidak bisa memproses permintaan Anda saat ini.',
       session_id: chatSessionId,
       action: result.data?.action || null,
       suggestions: result.data?.suggestions || [],

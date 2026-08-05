@@ -4,6 +4,7 @@ import { getActivePricingPlans } from "@/lib/settings";
 import { cookies } from "next/headers";
 import { getUserPoinAccess, logFailedPoinUsage } from "@/src/services/poin-service";
 import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
+import { enforceOutputLimits } from "@/lib/ai/limits";
 
 export async function POST(req: Request) {
   try {
@@ -83,7 +84,7 @@ ${messages.slice(-6).map(m => `${m.role === 'user' ? 'User' : 'Asisten'}: ${m.co
 Asisten:`;
 
     const reply = await generateAIContentWithUsage(systemPrompt, undefined, false); // isJson=false for free text
-    const cleanReply = reply.text.replace(/```markdown|```/g, "").trim();
+    const cleanReply = enforceOutputLimits(reply.text.replace(/```markdown|```/g, "").trim());
 
     // Deduct Poin based on actual usage (non-admin)
     if (role !== "admin") {

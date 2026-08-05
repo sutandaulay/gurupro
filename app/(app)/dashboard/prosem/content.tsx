@@ -32,6 +32,36 @@ export default function ProsemPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const convertMarkdownToHtml = (md: string): string => {
+    if (!md) return "";
+    let html = md
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" class="rounded-xl max-w-full my-3 shadow-sm border border-slate-200 mx-auto block" />')
+      .replace(/^### (.+)$/gm, '<h3 class="text-sm font-bold text-slate-800 mt-3 mb-1.5">$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2 class="text-base font-bold text-slate-800 border-b border-slate-200 pb-1 mt-4 mb-2">$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1 class="text-lg font-bold text-slate-900 border-b-2 border-slate-300 pb-1.5 mt-5 mb-3 uppercase text-center">$1</h1>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/^- (.+)$/gm, '<li class="list-disc ml-5 my-0.5 text-xs">$1</li>')
+      .replace(/^(\d+)\. (.+)$/gm, '<li class="list-decimal ml-5 my-0.5 text-xs">$2</li>')
+      .replace(/\n\n/g, "</p><p class='my-1.5 text-xs text-justify text-slate-700'>")
+      .replace(/\n/g, "<br>");
+    html = html.replace(/(<li class="list-disc ml-5 my-0.5 text-xs">.*?<\/li>\n?)+/g, '<ul class="my-2 ml-1">$&</ul>');
+    html = html.replace(/(<li class="list-decimal ml-5 my-0.5 text-xs">.*?<\/li>\n?)+/g, '<ol class="my-2 ml-1">$&</ol>');
+    html = html.replace(/\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g, (match: string, header: string, body: string) => {
+      const headerCells = header.split('|').filter((c: string) => c.trim()).map((c: string) => `<th class="border border-slate-300 px-2 py-1 bg-slate-100 font-semibold text-xs text-center">${c.trim()}</th>`).join('');
+      const headerRow = `<tr>${headerCells}</tr>`;
+      const bodyRows = body.trim().split('\n').map((row: string) => {
+        const cells = row.split('|').filter((c: string) => c.trim() !== undefined).slice(1, -1).map((c: string) => `<td class="border border-slate-300 px-2 py-1 text-xs">${c.trim()}</td>`).join('');
+        return `<tr>${cells}</tr>`;
+      }).join('');
+      return `<table class="w-full border-collapse border border-slate-300 my-3 text-xs"><thead>${headerRow}</thead><tbody>${bodyRows}</tbody></table>`;
+    });
+    return `<div class="text-xs text-slate-700 leading-relaxed font-sans">${html}</div>`;
+  };
+
   // Token Modal State
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [tokenShortfall, setTokenShortfall] = useState(0);
@@ -271,7 +301,33 @@ export default function ProsemPage() {
                       </p>
                     </div>
                     <button
-                      onClick={() => window.print()}
+                      onClick={() => {
+                        const printWindow = window.open("", "_blank");
+                        if (!printWindow) return;
+                        const md = result.konten || '';
+                        let bodyHtml = md
+                          .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                          .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                          .replace(/^### (.+)$/gm, '<h3 style="font-family:Times New Roman,serif;font-size:13pt;color:#1e293b;margin-top:12pt;margin-bottom:4pt;font-weight:bold;">$1</h3>')
+                          .replace(/^## (.+)$/gm, '<h2 style="font-family:Times New Roman,serif;font-size:15pt;color:#1e3a8a;margin-top:18pt;margin-bottom:6pt;border-bottom:1.5px solid #1e3a8a;padding-bottom:2pt;font-weight:bold;">$1</h2>')
+                          .replace(/^# (.+)$/gm, '<h1 style="font-family:Times New Roman,serif;font-size:18pt;color:#1e3a8a;text-align:center;margin-top:24pt;margin-bottom:12pt;text-transform:uppercase;font-weight:bold;">$1</h1>')
+                          .replace(/^- (.+)$/gm, '<li style="font-family:Times New Roman,serif;font-size:11pt;color:#334155;margin-left:20pt;margin-bottom:4pt;line-height:1.6;">$1</li>')
+                          .replace(/^(\d+)\. (.+)$/gm, '<li style="font-family:Times New Roman,serif;font-size:11pt;color:#334155;margin-left:20pt;margin-bottom:4pt;line-height:1.6;list-style:decimal;">$2</li>')
+                          .replace(/\n\n/g, "</p><p style='font-family:Times New Roman,serif;font-size:11pt;color:#334155;line-height:1.6;text-align:justify;margin:6pt 0;'>")
+                          .replace(/\n/g, "<br>");
+                        bodyHtml = bodyHtml.replace(/(<li[^>]*>.*?<\/li>\n?)+/g, (m) => `<ul style='margin:6pt 0;padding-left:20pt;'>${m}</ul>`);
+                        bodyHtml = bodyHtml.replace(/\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g, (match: string, header: string, body: string) => {
+                          const headerCells = header.split('|').filter((c: string) => c.trim()).map((c: string) => `<th style="border:1px solid #000;padding:4pt 6pt;background:#f3f4f6;font-weight:bold;text-align:center;font-size:10pt;">${c.trim()}</th>`).join('');
+                          const bodyRows = body.trim().split('\n').map((row: string) => {
+                            const cells = row.split('|').filter((c: string) => c.trim() !== undefined).slice(1, -1).map((c: string) => `<td style="border:1px solid #000;padding:4pt 6pt;font-size:10pt;">${c.trim()}</td>`).join('');
+                            return `<tr>${cells}</tr>`;
+                          }).join('');
+                          return `<table style="width:100%;border-collapse:collapse;margin:8pt 0;font-family:Times New Roman,serif;"><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table>`;
+                        });
+                        printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${result.judul || 'PROSEM'}</title><style>@page{margin:25mm 20mm 20mm 30mm;size:A4;}*{box-sizing:border-box;}body{font-family:'Times New Roman',Times,serif;font-size:11pt;color:#000;line-height:1.6;padding:0;margin:0;}h1{font-size:16pt;text-align:center;margin:0 0 6pt;text-transform:uppercase;font-weight:bold;}h2{font-size:14pt;margin:16pt 0 8pt;font-weight:bold;border-bottom:1.5px solid #1e3a8a;padding-bottom:2pt;}p{margin:6pt 0;text-align:justify;}.page-footer{position:fixed;bottom:15mm;right:20mm;font-size:9pt;color:#666;}</style></head><body><h1>${activeSchool?.nama_sekolah || 'GuruPRO'}</h1><p style="text-align:center;font-size:10pt;color:#555;">${formData.mapel} • Semester ${formData.semester} • ${formData.minggu_efektif} Minggu Efektif</p><hr style="border:1.5px solid #000;margin:8pt 0 16pt;"><div>${bodyHtml}</div><div class="page-footer">Halaman <span style="mso-field-code:' PAGE \\* MERGEFORMAT '"></span> dari <span style="mso-field-code:' NUMPAGES \\* MERGEFORMAT '"></span></div><script>window.onload=function(){window.print();}</script></body></html>`);
+                        printWindow.document.close();
+                      }}
                       className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 transition"
                     >
                       🖨️ Print
@@ -312,10 +368,8 @@ export default function ProsemPage() {
                     </div>
                   )}
 
-                  <div className="prose max-w-none">
-                    <pre className="whitespace-pre-wrap text-sm text-slate-700 font-sans bg-slate-50 p-4 rounded-xl border border-slate-200 overflow-x-auto">
-                      {result.konten}
-                    </pre>
+                  <div className="prose max-w-none overflow-x-auto">
+                    <div dangerouslySetInnerHTML={{ __html: convertMarkdownToHtml(result.konten || '') }} />
                   </div>
                 </>
               )}

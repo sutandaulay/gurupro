@@ -58,16 +58,20 @@ function InfoRow({ label, value }: { label: string; value: string | null }) {
 }
 
 function PrintHeader({ report }: { report: ReportDetail }) {
+  const sekolah = report.sekolah?.nama_sekolah || 'GuruPRO';
   return (
     <div className="print-only print-header">
-      <div className="text-center mb-6 border-b-2 border-black pb-4">
-        <h1 className="text-xl font-bold uppercase">Laporan Harian Guru</h1>
-        {report.sekolah?.nama_sekolah && (
-          <p className="text-sm font-semibold mt-1">{report.sekolah.nama_sekolah}</p>
-        )}
-        <p className="text-sm mt-1">{report.tanggal_formatted}</p>
-        <p className="text-sm capitalize">{report.hari}</p>
-      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12pt' }}>
+        <tr>
+          <td style={{ width: '50px', verticalAlign: 'middle' }}></td>
+          <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+            <h1 style={{ margin: 0, fontSize: '16pt', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>{sekolah}</h1>
+            <p style={{ margin: '2pt 0', fontSize: '9pt', color: '#555' }}>Laporan Harian Guru — {report.tanggal_formatted}</p>
+          </td>
+          <td style={{ width: '50px', verticalAlign: 'middle' }}></td>
+        </tr>
+      </table>
+      <hr style={{ border: '1.5px solid #000', margin: '0 0 12pt' }} />
     </div>
   )
 }
@@ -367,15 +371,19 @@ function LaporanHarianDetailContent() {
 
       {/* Print Styles */}
       <style jsx global>{`
+        @page {
+          margin: 25mm 20mm 20mm 30mm;
+          size: A4;
+        }
         @media print {
           body {
             background: white !important;
             color: black !important;
-            font-size: 12pt;
+            font-size: 11pt;
+            line-height: 1.6;
             margin: 0;
             padding: 0;
           }
-
           .no-print { display: none !important; }
           .print-only { display: block !important; }
           .print-hide { display: none !important; }
@@ -413,7 +421,7 @@ function LaporanHarianDetailContent() {
           }
 
           @page {
-            margin: 2cm 1.5cm;
+            margin: 25mm 20mm 20mm 30mm;
           }
         }
 

@@ -2,6 +2,7 @@ import { generateAIContentWithUsage } from "@/lib/ai";
 import { query } from "@/lib/db";
 import { getUserPoinAccess, logFailedPoinUsage } from "@/src/services/poin-service";
 import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
+import { enforceMarkdownLimits } from "@/lib/ai/limits";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { jsonrepair as repair } from "jsonrepair";
@@ -133,7 +134,7 @@ Hasilkan seluruh dokumen PROTA tersebut langsung dalam format Markdown dengan ta
     try {
       aiResult = await generateAIContentWithUsage(prompt, undefined, false);
       const text = aiResult.text as string || "";
-      const cleanMarkdown = text.trim();
+      const cleanMarkdown = enforceMarkdownLimits(text.trim());
 
       if (!text || text.trim() === "") {
         throw new Error("AI mengembalikan respons kosong");

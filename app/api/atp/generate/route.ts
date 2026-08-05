@@ -2,6 +2,7 @@ import { generateAIContentWithUsage } from "@/lib/ai";
 import { query } from "@/lib/db";
 import { getUserPoinAccess, logFailedPoinUsage } from "@/src/services/poin-service";
 import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
+import { enforceMarkdownLimits } from "@/lib/ai/limits";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { jsonrepair as repair } from "jsonrepair";
@@ -187,7 +188,7 @@ Hasilkan seluruh dokumen ATP LENGKAP tersebut langsung dalam format Markdown yan
     let aiResult: Awaited<ReturnType<typeof generateAIContentWithUsage>> | null = null;
     try {
       aiResult = await generateAIContentWithUsage(prompt, undefined, false); // isJson=false
-      const cleanMarkdown = (aiResult.text || '').trim();
+      const cleanMarkdown = enforceMarkdownLimits((aiResult.text || '').trim());
 
       if (!cleanMarkdown) {
         throw new Error("AI mengembalikan respons kosong");

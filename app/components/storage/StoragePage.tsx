@@ -867,7 +867,7 @@ export default function StoragePage() {
         <meta charset="utf-8">
         <title>${title}</title>
         <style>
-          @page { size: A4; margin: 2cm; }
+          @page { size: A4; margin: 25mm 20mm 20mm 30mm; }
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b; padding: 10px; }
           h1, h2, h3 { page-break-after: avoid; }
           p { margin: 0 0 8pt 0; text-align: justify; }
