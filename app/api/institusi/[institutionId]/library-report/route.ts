@@ -22,9 +22,9 @@ export async function GET(
 
     // Get all teachers in institution
     const teacherQuery = `
-      SELECT im.app_user_id::uuid as teacher_id, u.nama_lengkap
+      SELECT im.app_user_id as teacher_id, u.nama_lengkap
       FROM institution_members im
-      JOIN users u ON u.id = im.app_user_id::uuid
+      JOIN users u ON u.id::text = im.app_user_id
       WHERE im.institution_id = $1
     `;
 

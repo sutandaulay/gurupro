@@ -48,7 +48,7 @@ export async function GET(
               ) AS roles
        FROM institution_members im
        JOIN cms_users cu ON cu.id = im.user_id
-       LEFT JOIN users u ON u.id = im.app_user_id::uuid
+       LEFT JOIN users u ON u.id::text = im.app_user_id
        WHERE im.institution_id = $1
        ORDER BY im.created_at DESC`,
       [instId]

@@ -23,8 +23,8 @@ export async function GET(req: Request) {
               u.nama_lengkap as guru_nama
        FROM data_raport_nilai_mapel dnrm
        LEFT JOIN subjects sb ON sb.id = dnrm.mapel_id
-        LEFT JOIN institution_members im ON im.app_user_id::uuid = dnrm.guru_mapel_member_id
-        LEFT JOIN users u ON u.id = im.app_user_id::uuid
+        LEFT JOIN institution_members im ON im.app_user_id::text = dnrm.guru_mapel_member_id::text
+        LEFT JOIN users u ON u.id::text = im.app_user_id
        WHERE dnrm.data_raport_id = $1
        ORDER BY sb.nama_mapel ASC`,
       [dataRaportId]

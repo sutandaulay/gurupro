@@ -42,7 +42,7 @@ export async function POST(
     `SELECT im.app_user_id, im.status, im.institution_id,
             u.email, u.nama_lengkap, u.whatsapp
      FROM institution_members im
-     JOIN users u ON u.id = im.app_user_id::uuid
+     JOIN users u ON u.id::text = im.app_user_id
      WHERE im.id = $1 AND im.institution_id = $2`,
     [memberId, instId]
   )
