@@ -264,7 +264,7 @@ export async function getWaliKelasAssignmentsWithDetails(
        c.school_id as kelas_school_id
      FROM wali_kelas_assignments wa
      LEFT JOIN classes c ON wa.kelas_id = c.id
-      LEFT JOIN institution_members im ON im.id = wa.wali_kelas_member_id
+      LEFT JOIN institution_members im ON im.id::text = wa.wali_kelas_member_id::text
       LEFT JOIN users im_user ON im_user.id::text = im.app_user_id
      ${whereClause}
      ORDER BY wa.created_at DESC`,
