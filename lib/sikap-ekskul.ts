@@ -105,7 +105,7 @@ export async function insertPenilaianSikap(
     const fallback = await query(
       `SELECT 1 FROM classes c
        WHERE c.id = $1 AND c.wali_kelas_user_id = (
-         SELECT im.app_user_id FROM institution_members im WHERE im.id = $2
+         SELECT im.app_user_id::uuid FROM institution_members im WHERE im.id = $2
        )
        LIMIT 1`,
       [input.kelasId, actorMemberId]
@@ -622,7 +622,7 @@ export async function upsertCatatanWaliKelas(
     const fallback = await query(
       `SELECT 1 FROM classes c
        WHERE c.id = $1 AND c.wali_kelas_user_id = (
-         SELECT im.app_user_id FROM institution_members im WHERE im.id = $2
+         SELECT im.app_user_id::uuid FROM institution_members im WHERE im.id = $2
        )
        LIMIT 1`,
       [input.kelasId, actorMemberId]
