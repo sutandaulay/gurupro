@@ -9,7 +9,7 @@ async function getOverviewData(institutionId: number) {
                 COUNT(*) FILTER (WHERE status = 'invited')::int AS menunggu,
                 COUNT(*) FILTER (WHERE status = 'left')::int AS nonaktif,
                 COUNT(*) FILTER (WHERE status = 'rejected')::int AS ditolak
-         FROM institution_members
+         FROM public.institution_members
          WHERE institution_id = $1`,
         [institutionId]
       ),
@@ -17,8 +17,8 @@ async function getOverviewData(institutionId: number) {
 
     const guruRes = await query(
       `SELECT COUNT(*)::int AS total_guru
-       FROM institution_members im
-       JOIN institution_members_role imr ON imr.parent_id = im.id
+       FROM public.institution_members im
+       JOIN public.institution_members_role imr ON imr.parent_id = im.id
        WHERE im.institution_id = $1 AND im.status = 'active' AND imr.value = 'guru'`,
       [institutionId]
     );

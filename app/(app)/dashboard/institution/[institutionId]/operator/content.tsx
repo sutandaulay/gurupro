@@ -1,10 +1,8 @@
 "use client"
+import React from "react"
 import { apiFetch } from "@/lib/api-client";
 import { Pagination, usePagedItems } from "@/components/ui/pagination";
-
-import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import { useDashboardParams } from "../../../_shared/params-context"
+import { useRouter, useParams } from "next/navigation"
 import { Button, Card, Badge, Spinner } from "@/app/components/ui"
 import { Input, Select, Label } from "@/app/components/ui/form"
 import { useToast } from "@/app/components/ui/toast"
@@ -36,6 +34,9 @@ interface Member {
   roles: { role: string }[]
   assigned_mapel: { mapel: string }[]
   assigned_kelas: { kelas: string }[]
+  sub_role: string | null
+  wali_kelas_of: string | null
+  ekskul_name: string | null
 }
 
 const statusVariant: Record<string, "success" | "warning" | "error" | "info" | "default"> = {
@@ -55,10 +56,10 @@ const roleLabel: Record<string, string> = {
 }
 
 export default function OperatorDashboardPage() {
-  const params = useDashboardParams()
-  const router = useRouter()
-  const toast = useToast()
-  const institutionId = params.institutionId as string
+  const params = useParams();
+  const router = useRouter();
+  const toast = useToast();
+  const institutionId = params.institutionId as string;
   const instId = parseInt(institutionId, 10)
 
   const [institution, setInstitution] = useState<Institution | null>(null)
@@ -117,6 +118,7 @@ export default function OperatorDashboardPage() {
         total={members.length}
         active={activeMembers.length}
         invited={invitedMembers.length}
+        unassigned={activeMembers.filter((m) => m.assigned_mapel.length === 0 && m.assigned_kelas.length === 0).length}
       />
 
       <ActionBar
@@ -134,12 +136,14 @@ export default function OperatorDashboardPage() {
       ) : error ? (
         <div className="text-center py-20 text-red-600">{error}</div>
       ) : (
-        <MembersTable
-          members={members}
-          onEdit={(m) => setShowEditModal(m)}
-          onResetPassword={(m) => setShowResetPwModal(m)}
-          onRefresh={fetchData}
-        />
+        <>
+          <MembersTable
+            members={members}
+            onEdit={(m) => setShowEditModal(m)}
+            onResetPassword={(m) => setShowResetPwModal(m)}
+            onRefresh={fetchData}
+          />
+        </>
       )}
 
       {showAddModal && (
@@ -233,10 +237,12 @@ function StatsCards({
   total,
   active,
   invited,
+  unassigned,
 }: {
   total: number
   active: number
   invited: number
+  unassigned: number
 }) {
   const stats = [
     { label: "Total Anggota", value: total, color: "text-gray-900" },
@@ -245,14 +251,33 @@ function StatsCards({
   ]
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-      {stats.map((s) => (
-        <Card key={s.label} className="p-4 sm:p-5">
-          <p className="text-sm text-gray-500">{s.label}</p>
-          <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
-        </Card>
-      ))}
-    </div>
+    <>
+      {unassigned > 0 && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <p className="text-sm font-semibold text-amber-800">
+                  {unassigned} guru belum ter-assign kelas/mapel
+                </p>
+                <p className="text-xs text-amber-600 mt-0.5">
+                  Klik &quot;Edit&quot; pada guru yang bersangkutan untuk assign kelas &amp; mapel.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        {stats.map((s) => (
+          <Card key={s.label} className="p-4 sm:p-5">
+            <p className="text-sm text-gray-500">{s.label}</p>
+            <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+          </Card>
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -349,6 +374,12 @@ function MembersTable({
                         ))
                       ) : (
                         <span className="text-gray-400">—</span>
+                      )}
+                      {m.sub_role === "wali_kelas" && (
+                        <Badge variant="info">WK ({m.wali_kelas_of || "—"})</Badge>
+                      )}
+                      {m.sub_role === "pembina_ekskul" && (
+                        <Badge variant="warning">PE ({m.ekskul_name || "—"})</Badge>
                       )}
                     </div>
                   </td>
@@ -705,6 +736,9 @@ function EditAssignmentModal({
   const toast = useToast()
   const [mapel, setMapel] = useState(member.assigned_mapel.map((a) => a.mapel).join(", "))
   const [kelas, setKelas] = useState(member.assigned_kelas.map((a) => a.kelas).join(", "))
+  const [subRole, setSubRole] = useState((member as any).sub_role || "")
+  const [waliKelasOf, setWaliKelasOf] = useState((member as any).wali_kelas_of || "")
+  const [ekskulName, setEkskulName] = useState((member as any).ekskul_name || "")
   const [saving, setSaving] = useState(false)
 
   const handleSave = async () => {
@@ -713,7 +747,7 @@ function EditAssignmentModal({
       const res = await apiFetch(`/api/institution/${member.institution_id}/members/${member.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mapel, kelas }),
+        body: JSON.stringify({ mapel, kelas, subRole, waliKelasOf, ekskulName }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -744,6 +778,44 @@ function EditAssignmentModal({
           value={kelas}
           onChange={(e) => setKelas(e.target.value)}
         />
+
+        {/* Sub-role Assignment */}
+        <div className="border-t border-gray-200 pt-4">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Sub-Role</h4>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium text-gray-500 block mb-1">Penugasan Sub-Role</label>
+              <select
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 focus:outline-none"
+                value={subRole}
+                onChange={(e) => setSubRole(e.target.value)}
+              >
+                <option value="">Tidak Ada Sub-Role</option>
+                <option value="wali_kelas">Wali Kelas</option>
+                <option value="pembina_ekskul">Pembina Ekskul</option>
+              </select>
+            </div>
+            {subRole === "wali_kelas" && (
+              <Input
+                label="Kelas Wali"
+                placeholder="Contoh: VII-A, X-MIPA-1"
+                value={waliKelasOf}
+                onChange={(e) => setWaliKelasOf(e.target.value)}
+                helperText="Nama kelas yang diasuh sebagai Wali Kelas"
+              />
+            )}
+            {subRole === "pembina_ekskul" && (
+              <Input
+                label="Nama Ekskul"
+                placeholder="Contoh: Pramuka, PMR, Basket"
+                value={ekskulName}
+                onChange={(e) => setEkskulName(e.target.value)}
+                helperText="Nama ekstrakurikuler yang diasuh"
+              />
+            )}
+          </div>
+        </div>
+
         <div className="flex justify-end gap-3 pt-2">
           <Button variant="secondary" onClick={onClose}>Batal</Button>
           <Button variant="primary" onClick={handleSave} loading={saving}>Simpan</Button>
@@ -884,17 +956,25 @@ function DapodikExportCard({ institutionId, academicYear }: { institutionId: num
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
         <div>
           <Label>Semester</Label>
-          <Select value={semester} onChange={(e: any) => setSemester(e.target.value)}>
-            <option value="ganjil">Ganjil</option>
-            <option value="genap">Genap</option>
-          </Select>
+          <Select
+            value={semester}
+            options={[
+              { value: "ganjil", label: "Ganjil" },
+              { value: "genap", label: "Genap" },
+            ]}
+            onChange={(e) => setSemester(e.target.value as "ganjil" | "genap")}
+          />
         </div>
         <div>
           <Label>Versi Dapodik</Label>
-          <Select value={version} onChange={(e: any) => setVersion(e.target.value)}>
-            <option value="2025">2025</option>
-            <option value="2024">2024</option>
-          </Select>
+          <Select
+            value={version}
+            options={[
+              { value: "2025", label: "2025" },
+              { value: "2024", label: "2024" },
+            ]}
+            onChange={(e) => setVersion(e.target.value)}
+          />
         </div>
       </div>
       <Button variant="primary" size="md" onClick={handleExport} disabled={exporting}>

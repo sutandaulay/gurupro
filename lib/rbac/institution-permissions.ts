@@ -16,23 +16,37 @@ function cacheKey(userId: number, institutionId: number): string {
 }
 
 export async function getUserInstitutionRole(
-  userId: number,
+  userId: number | string,
   institutionId: number,
   cache?: RoleCache
 ): Promise<string[] | null> {
-  const key = cacheKey(userId, institutionId)
+  const numId = typeof userId === 'string' ? parseInt(userId, 10) : userId
+  const key = cacheKey(numId, institutionId)
   if (cache?.has(key)) {
     return cache.get(key) ?? null
   }
 
   try {
-    const result = await query(
-      `SELECT imr.value
-       FROM institution_members im
-       JOIN institution_members_role imr ON imr.parent_id = im.id
-       WHERE im.user_id = $1 AND im.institution_id = $2 AND im.status = 'active'`,
-      [userId, institutionId]
-    )
+    // Try UUID (app_user_id) first, then integer (user_id)
+    let result: any
+    if (typeof userId === 'string' && userId.length > 10) {
+      result = await query(
+        `SELECT imr.value
+         FROM public.institution_members im
+         JOIN public.institution_members_role imr ON imr.parent_id = im.id
+         WHERE im.app_user_id = $1 AND im.institution_id = $2 AND im.status = 'active'`,
+        [userId, institutionId]
+      )
+    }
+    if (!result || result.rows.length === 0) {
+      result = await query(
+        `SELECT imr.value
+         FROM public.institution_members im
+         JOIN public.institution_members_role imr ON imr.parent_id = im.id
+         WHERE im.user_id = $1 AND im.institution_id = $2 AND im.status = 'active'`,
+        [numId || 0, institutionId]
+      )
+    }
 
     if (result.rows.length === 0) {
       cache?.set(key, null)
@@ -49,7 +63,7 @@ export async function getUserInstitutionRole(
 }
 
 export async function isInstitutionMember(
-  userId: number,
+  userId: number | string,
   institutionId: number,
   cache?: RoleCache
 ): Promise<boolean> {
@@ -58,7 +72,7 @@ export async function isInstitutionMember(
 }
 
 export async function canViewAllTeachers(
-  userId: number,
+  userId: number | string,
   institutionId: number,
   cache?: RoleCache
 ): Promise<boolean> {

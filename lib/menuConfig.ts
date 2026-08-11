@@ -134,13 +134,13 @@ export const categoryThemes: Record<Category, CategoryTheme> = {
 };
 
 export const institutionSubmenus: MenuItem["submenu"] = [
-  { label: "Overview Institusi", href: "/dashboard/institution", desc: "Ringkasan data institusi" },
-  { label: "Anggota Institusi", href: "/dashboard/institution/members", desc: "Kelola guru, undang, dan role" },
-  { label: "Rekap TPG", href: "/dashboard/institution/tpg", desc: "Rekap tunjangan profesi guru" },
-  { label: "Laporan Mengajar", href: "/dashboard/institution/laporan-mengajar" },
-  { label: "Approval / Persetujuan", href: "/dashboard/institution/approval" },
-  { label: "Langganan & Billing", href: "/dashboard/institution/langganan" },
-  { label: "Pengaturan Institusi", href: "/dashboard/institution/settings" },
+  { label: "Overview Institusi", href: "/institusi/ID/dashboard", desc: "Ringkasan data institusi" },
+  { label: "Manajemen Guru", href: "/institusi/ID/dashboard/guru", desc: "Kelola guru, undang, dan role" },
+  { label: "Rekap TPG", href: "/institusi/ID/dashboard/tpg", desc: "Rekap tunjangan profesi guru" },
+  { label: "Laporan Mengajar", href: "/institusi/ID/dashboard/laporan-mengajar" },
+  { label: "Approval / Persetujuan", href: "/institusi/ID/dashboard/approval" },
+  { label: "Langganan & Billing", href: "/institusi/ID/dashboard/langganan" },
+  { label: "Pengaturan Institusi", href: "/institusi/ID/dashboard/pengaturan" },
 ];
 
 export const masterMenus: MenuItem[] = [

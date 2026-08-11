@@ -80,6 +80,12 @@ const allMenuItems = [
         roles: ["kepala_sekolah", "wakasek"],
       },
       {
+        label: "Proses Mengajar",
+        href: "review-proses",
+        icon: IconClipboardCheck,
+        roles: ["kepala_sekolah", "wakasek"],
+      },
+      {
         label: "Overview",
         href: "dashboard",
         icon: IconLayoutDashboard,

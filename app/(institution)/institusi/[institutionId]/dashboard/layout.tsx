@@ -52,6 +52,7 @@ const PAGE_ROLE_MAP: Record<string, string[]> = {
   "kanban":         ["kepala_sekolah", "wakasek"],
   "pkg":            ["kepala_sekolah", "wakasek"],
   "akreditasi":     ["kepala_sekolah", "wakasek"],
+  "review-proses":  ["kepala_sekolah", "wakasek"],
   "wakasek":       ["kepala_sekolah", "wakasek"],
   "bendahara":      ["kepala_sekolah", "bendahara"],
   "operator":       ["kepala_sekolah", "operator", "admin_sekolah"],

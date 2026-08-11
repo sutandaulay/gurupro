@@ -1,5 +1,5 @@
 // RBAC handled by parent institution/layout.tsx
-export default function OperatorDashboardLayout({
+export default function BendaharaDashboardLayout({
   children,
 }: {
   children: React.ReactNode
