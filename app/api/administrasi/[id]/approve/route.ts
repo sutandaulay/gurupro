@@ -32,15 +32,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     let institutionId = doc.institution_id;
     if (institutionId) {
       const roleRes = await query(
-        `SELECT imr.value FROM institution_members im
-         JOIN institution_members_role imr ON imr.parent_id = im.id
+        `SELECT imr.value FROM public.institution_members im
+         JOIN public.institution_members_role imr ON imr.parent_id = im.id
          WHERE im.app_user_id = $1 AND im.institution_id = $2 AND im.status = 'active'`,
         [sessionData.id, institutionId]
       );
       const roles = roleRes.rows.map((r: any) => r.value);
 
-      const instRes = await query(`SELECT approval_layer_config FROM institutions WHERE id = $1`, [institutionId]);
-      const layer = instRes.rows[0]?.approval_layer_config || "single";
+      // approval_layer_config tidak selalu ada di skema — fallback aman ke 'single'
+      let layer = "single";
+      try {
+        const instRes = await query(
+          `SELECT approval_layer_config FROM institutions WHERE id = $1`,
+          [institutionId]
+        );
+        layer = instRes.rows[0]?.approval_layer_config || "single";
+      } catch {
+        layer = "single";
+      }
 
       let hasPermission = false;
       if (roles.includes("kepala_sekolah")) hasPermission = true;
@@ -78,8 +87,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
        SET approval_status = $1,
            approval_note = COALESCE($2, approval_note),
            approved_by = $3,
-           approved_at = NOW(),
-           updated_at = NOW()
+           approved_at = NOW()
        WHERE id = $4 AND approval_status = 'pending'
        RETURNING id, approval_status, approval_note`,
       [newStatus, catatan || null, sessionData.id, id]

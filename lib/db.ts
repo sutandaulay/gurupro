@@ -1015,8 +1015,8 @@ const initDb = async () => {
           v_role VARCHAR(20);
         BEGIN
           SELECT imr.value INTO v_role
-      FROM institution_members im
-      JOIN institution_members_role imr ON imr.parent_id = im.id
+      FROM public.institution_members im
+      JOIN public.institution_members_role imr ON imr.parent_id = im.id
       WHERE im.app_user_id::uuid = p_member_id
         AND imr.value = 'guru'
           LIMIT 1;
@@ -1457,6 +1457,95 @@ const initDb = async () => {
       await pool.query('CREATE INDEX IF NOT EXISTS idx_exec_dashboard_cache ON executive_dashboard_cache (institution_id, week_start)');
     } catch (err) {
       console.error('Failed to create executive_dashboard_cache table:', err);
+    }
+
+    // 36f-2. Command Center — Feature flags per institusi (§6.2 rollout bertahap)
+    // Tabel BARU untuk menyalakan/mematikan fitur Kepsek/Wakasek per institusi secara mandiri.
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS institution_feature_flags (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          institution_id INTEGER NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+          feature_key VARCHAR(100) NOT NULL,
+          enabled BOOLEAN NOT NULL DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (institution_id, feature_key)
+        )
+      `);
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_institution_feature_flags_inst ON institution_feature_flags (institution_id)');
+    } catch (err) {
+      console.error('Failed to create institution_feature_flags table:', err);
+    }
+
+    // 36f-3. Tier 2 — Kanban Task Management (Kepala Sekolah / Wakasek)
+    // Tabel BARU, tidak menyentuh sistem lama. Tugas internal pimpinan institusi
+    // (opsional assignee) dengan alur kanban: backlog -> in_progress -> done.
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS kanban_tasks (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          institution_id INTEGER NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+          title VARCHAR(255) NOT NULL,
+          description TEXT,
+          column_key VARCHAR(20) NOT NULL DEFAULT 'backlog' CHECK (column_key IN ('backlog','in_progress','done')),
+          priority VARCHAR(10) NOT NULL DEFAULT 'medium' CHECK (priority IN ('low','medium','high')),
+          due_date DATE,
+          assignee_id UUID REFERENCES users(id) ON DELETE SET NULL,
+          created_by UUID NOT NULL REFERENCES users(id),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_kanban_tasks_institution ON kanban_tasks (institution_id, column_key)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_kanban_tasks_assignee ON kanban_tasks (assignee_id)');
+    } catch (err) {
+      console.error('Failed to create kanban_tasks table:', err);
+    }
+
+    // 36f-4. Tier 3 — Modul Akreditasi & Pengawasan
+    // Tabel BARU, tidak menyentuh sistem lama. Standar akreditasi (8 standar
+    // nasional) + indikator per standar + progres pengisian per institusi.
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS akreditasi_standar (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          kode VARCHAR(20) NOT NULL UNIQUE,
+          nama VARCHAR(255) NOT NULL,
+          deskripsi TEXT,
+          urutan INTEGER NOT NULL DEFAULT 0,
+          is_active BOOLEAN NOT NULL DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS akreditasi_item (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          standar_id UUID NOT NULL REFERENCES akreditasi_standar(id) ON DELETE CASCADE,
+          kode VARCHAR(20) NOT NULL,
+          nama VARCHAR(255) NOT NULL,
+          petunjuk TEXT,
+          urutan INTEGER NOT NULL DEFAULT 0,
+          is_active BOOLEAN NOT NULL DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (standar_id, kode)
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS akreditasi_status (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          institution_id INTEGER NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+          item_id UUID NOT NULL REFERENCES akreditasi_item(id) ON DELETE CASCADE,
+          status VARCHAR(20) NOT NULL DEFAULT 'belum' CHECK (status IN ('belum','proses','lengkap')),
+          catatan TEXT,
+          updated_by UUID REFERENCES users(id),
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (institution_id, item_id)
+        )
+      `);
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_akreditasi_status_inst ON akreditasi_status (institution_id)');
+    } catch (err) {
+      console.error('Failed to create akreditasi tables:', err);
     }
 
     // 36g. Sprint 4.4 — Well-Being Check-In (independen, agregasi ANONIM)

@@ -9,6 +9,14 @@ import {
   IconCheck,
   IconCreditCard,
   IconSettings,
+  IconActivity,
+  IconGauge,
+  IconFileText,
+  IconAlertTriangle,
+  IconClipboardCheck,
+  IconLayoutKanban,
+  IconChartBar,
+  IconShieldCheck,
   IconX,
 } from "@tabler/icons-react";
 
@@ -24,6 +32,54 @@ const allMenuItems = [
     section: "Utama",
     items: [
       {
+        label: "Command Center",
+        href: "command-center",
+        icon: IconGauge,
+        roles: ["kepala_sekolah", "wakasek"],
+      },
+      {
+        label: "Ringkasan Laporan",
+        href: "ringkasan",
+        icon: IconActivity,
+        roles: ["kepala_sekolah", "wakasek"],
+      },
+      {
+        label: "Draf Surat AI",
+        href: "surat",
+        icon: IconFileText,
+        roles: ["kepala_sekolah", "wakasek"],
+      },
+      {
+        label: "Smart Alert",
+        href: "alerts",
+        icon: IconAlertTriangle,
+        roles: ["kepala_sekolah", "wakasek"],
+      },
+      {
+        label: "Approval Queue",
+        href: "queue",
+        icon: IconClipboardCheck,
+        roles: ["kepala_sekolah", "wakasek"],
+      },
+      {
+        label: "Kanban Task",
+        href: "kanban",
+        icon: IconLayoutKanban,
+        roles: ["kepala_sekolah", "wakasek"],
+      },
+      {
+        label: "PKG Digital",
+        href: "pkg",
+        icon: IconChartBar,
+        roles: ["kepala_sekolah", "wakasek"],
+      },
+      {
+        label: "Akreditasi",
+        href: "akreditasi",
+        icon: IconShieldCheck,
+        roles: ["kepala_sekolah", "wakasek"],
+      },
+      {
         label: "Overview",
         href: "dashboard",
         icon: IconLayoutDashboard,
@@ -33,6 +89,12 @@ const allMenuItems = [
         label: "Manajemen Guru",
         href: "guru",
         icon: IconUsers,
+        roles: ["kepala_sekolah", "operator"],
+      },
+      {
+        label: "Aktivitas Guru",
+        href: "aktivitas",
+        icon: IconActivity,
         roles: ["kepala_sekolah", "operator"],
       },
       {
@@ -50,7 +112,19 @@ const allMenuItems = [
         label: "Approval / Persetujuan",
         href: "approval",
         icon: IconCheck,
-        roles: ["kepala_sekolah"],
+        roles: ["kepala_sekolah", "wakasek"],
+      },
+      {
+        label: "Review Raport",
+        href: "wakasek",
+        icon: IconCheck,
+        roles: ["kepala_sekolah", "wakasek"],
+      },
+      {
+        label: "Keuangan Poin",
+        href: "bendahara",
+        icon: IconCreditCard,
+        roles: ["kepala_sekolah", "bendahara"],
       },
       {
         label: "Langganan & Billing",

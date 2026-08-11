@@ -53,6 +53,18 @@ export async function proxy(request: NextRequest) {
   // For API routes, we don't redirect - let the API handle auth errors
   // This allows the API to return proper JSON error responses
 
+  // Pass the requested pathname to the institution dashboard layout so its
+  // page-level RBAC (PAGE_ROLE_MAP) still works on direct URL visits.
+  if (pathname.startsWith("/institusi/")) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-invoke-path", pathname);
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+  }
+
   return NextResponse.next();
 }
 

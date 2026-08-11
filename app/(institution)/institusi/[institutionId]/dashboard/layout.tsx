@@ -1,7 +1,9 @@
 import { requireSession } from "@/lib/session";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { query } from "@/lib/db";
 import InstitutionShell from "@/app/components/institution/InstitutionShell";
+import { ToastProvider } from "@/app/components/ui/toast";
 
 interface Props {
   children: React.ReactNode;
@@ -29,8 +31,8 @@ async function getUserRoles(
   try {
     const result = await query(
       `SELECT imr.value
-       FROM institution_members im
-       JOIN institution_members_role imr ON imr.parent_id = im.id
+       FROM public.institution_members im
+       JOIN public.institution_members_role imr ON imr.parent_id = im.id
        WHERE im.app_user_id = $1 AND im.institution_id = $2 AND im.status = 'active'`,
       [appUserId, institutionId]
     );
@@ -39,6 +41,27 @@ async function getUserRoles(
     return [];
   }
 }
+
+// Page-level RBAC: which roles can access which pages
+const PAGE_ROLE_MAP: Record<string, string[]> = {
+  "command-center": ["kepala_sekolah", "wakasek"],
+  "ringkasan":      ["kepala_sekolah", "wakasek"],
+  "surat":          ["kepala_sekolah", "wakasek"],
+  "alerts":         ["kepala_sekolah", "wakasek"],
+  "queue":          ["kepala_sekolah", "wakasek"],
+  "kanban":         ["kepala_sekolah", "wakasek"],
+  "pkg":            ["kepala_sekolah", "wakasek"],
+  "akreditasi":     ["kepala_sekolah", "wakasek"],
+  "wakasek":       ["kepala_sekolah", "wakasek"],
+  "bendahara":      ["kepala_sekolah", "bendahara"],
+  "operator":       ["kepala_sekolah", "operator", "admin_sekolah"],
+  "aktivitas":     ["kepala_sekolah", "wakasek", "operator", "admin_sekolah", "bendahara"],
+  "tpg":            ["kepala_sekolah", "wakasek", "operator", "admin_sekolah"],
+  "approval":       ["kepala_sekolah", "wakasek", "operator", "admin_sekolah"],
+  "langganan":      ["kepala_sekolah", "operator", "admin_sekolah", "bendahara"],
+  "pengaturan":     ["kepala_sekolah", "operator", "admin_sekolah"],
+  "guru":           ["kepala_sekolah", "wakasek", "operator", "admin_sekolah", "bendahara", "guru"],
+};
 
 export default async function InstitutionDashboardLayout({
   children,
@@ -64,17 +87,39 @@ export default async function InstitutionDashboardLayout({
 
   const roles = await getUserRoles(session.id, instId);
   const allowed = roles.some(
-    (r) => r === "kepala_sekolah" || r === "operator"
+    (r) =>
+      r === "kepala_sekolah" ||
+      r === "operator" ||
+      r === "wakasek" ||
+      r === "bendahara" ||
+      r === "admin_sekolah" ||
+      r === "guru"
   );
   if (!allowed) redirect("/dashboard");
 
+  // Page-level RBAC: check specific page access
+  const headersList = await headers();
+  const pathname = headersList.get("x-invoke-path") || headersList.get("referer") || "";
+  const match = pathname.match(/\/institusi\/\d+\/dashboard(?:\/([^/]+))?/);
+  const page = match?.[1] || ""; // "" means /institusi/[id]/dashboard (overview — all allowed)
+
+  if (page && page in PAGE_ROLE_MAP) {
+    const allowedRoles = PAGE_ROLE_MAP[page];
+    const hasAccess = roles.some((r) => allowedRoles.includes(r));
+    if (!hasAccess) {
+      redirect(`/institusi/${instId}/dashboard`);
+    }
+  }
+
   return (
-    <InstitutionShell
-      institutionId={instId}
-      institutionName={inst.name}
-      userRoles={roles}
-    >
-      {children}
-    </InstitutionShell>
+    <ToastProvider>
+      <InstitutionShell
+        institutionId={instId}
+        institutionName={inst.name}
+        userRoles={roles}
+      >
+        {children}
+      </InstitutionShell>
+    </ToastProvider>
   );
 }
