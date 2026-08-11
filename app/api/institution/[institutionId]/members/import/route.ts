@@ -180,13 +180,21 @@ export async function POST(
 
       const membership = await createInvitation(appUser.id, cmsUserId, instId)
 
+      const publicMemberRes = await query(
+        `INSERT INTO public.institution_members (app_user_id, institution_id, status, joined_at, created_at, updated_at)
+         VALUES ($1, $2, 'invited', NULL, NOW(), NOW())
+         RETURNING id`,
+        [appUser.id, instId]
+      )
+      const publicMemberId = publicMemberRes.rows[0]?.id ?? membership.id
+
       if (row.mapel) {
         const mapelList = row.mapel.split(',').map((m: string) => m.trim()).filter(Boolean)
         for (const m of mapelList) {
           await query(
-            `INSERT INTO institution_members_assigned_mapel (_order, _parent_id, id, mapel)
-             VALUES ((SELECT COALESCE(MAX(_order), 0) + 1 FROM institution_members_assigned_mapel WHERE _parent_id = $1), $1, gen_random_uuid()::text, $2)`,
-            [membership.id, m]
+            `INSERT INTO public.institution_members_assigned_mapel (_order, _parent_id, id, mapel)
+             VALUES ((SELECT COALESCE(MAX(_order), 0) + 1 FROM public.institution_members_assigned_mapel WHERE _parent_id = $1), $1, gen_random_uuid()::text, $2)`,
+            [publicMemberId, m]
           )
         }
       }
@@ -195,9 +203,9 @@ export async function POST(
         const kelasList = row.kelas.split(',').map((k: string) => k.trim()).filter(Boolean)
         for (const k of kelasList) {
           await query(
-            `INSERT INTO institution_members_assigned_kelas (_order, _parent_id, id, kelas)
-             VALUES ((SELECT COALESCE(MAX(_order), 0) + 1 FROM institution_members_assigned_kelas WHERE _parent_id = $1), $1, gen_random_uuid()::text, $2)`,
-            [membership.id, k]
+            `INSERT INTO public.institution_members_assigned_kelas (_order, _parent_id, id, kelas)
+             VALUES ((SELECT COALESCE(MAX(_order), 0) + 1 FROM public.institution_members_assigned_kelas WHERE _parent_id = $1), $1, gen_random_uuid()::text, $2)`,
+            [publicMemberId, k]
           )
         }
       }

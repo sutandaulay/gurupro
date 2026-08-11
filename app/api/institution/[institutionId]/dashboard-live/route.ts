@@ -135,7 +135,7 @@ export async function GET(
       return true; // will be enriched below
     });
 
-    // Check dari institution_members_assigned_mapel & assigned_kelas
+    // Check dari public.institution_members_assigned_mapel & assigned_kelas
     const unassignedRes = await query(
       `SELECT im.app_user_id AS guru_id, u.nama_lengkap AS nama
        FROM public.institution_members im
@@ -144,9 +144,12 @@ export async function GET(
        WHERE im.institution_id = $1 AND im.status = 'active'
          AND imr.value = 'guru'
          AND NOT EXISTS (
-           SELECT 1 FROM teacher_institution_assignments tia
-           WHERE tia.institution_id = im.institution_id
-             AND tia.teacher_id::text = im.app_user_id
+           SELECT 1 FROM public.institution_members_assigned_mapel am
+           WHERE am._parent_id = im.id
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM public.institution_members_assigned_kelas ak
+           WHERE ak._parent_id = im.id
          )`,
       [instId]
     );

@@ -1478,6 +1478,33 @@ const initDb = async () => {
       console.error('Failed to create institution_feature_flags table:', err);
     }
 
+    // 36f-2b. Assignment Mapel & Kelas per member — source of truth schema PUBLIC.
+    // Dulu hanya ada di schema `payload` (migrasi Payload) sehingga GET/PATCH/import
+    // yang membaca/menulis dengan id PUBLIC tidak pernah match (FK payload). Diasilkan
+    // di public agar satu universe dengan RBAC (public.institution_members).
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS public.institution_members_assigned_mapel (
+          _order INTEGER NOT NULL,
+          _parent_id INTEGER NOT NULL REFERENCES public.institution_members(id) ON DELETE CASCADE,
+          id VARCHAR NOT NULL PRIMARY KEY,
+          mapel VARCHAR NOT NULL
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS public.institution_members_assigned_kelas (
+          _order INTEGER NOT NULL,
+          _parent_id INTEGER NOT NULL REFERENCES public.institution_members(id) ON DELETE CASCADE,
+          id VARCHAR NOT NULL PRIMARY KEY,
+          kelas VARCHAR NOT NULL
+        )
+      `);
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_public_im_assigned_mapel_parent ON public.institution_members_assigned_mapel (_parent_id, _order)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_public_im_assigned_kelas_parent ON public.institution_members_assigned_kelas (_parent_id, _order)');
+    } catch (err) {
+      console.error('Failed to create public institution_members assignment tables:', err);
+    }
+
     // 36f-3. Tier 2 — Kanban Task Management (Kepala Sekolah / Wakasek)
     // Tabel BARU, tidak menyentuh sistem lama. Tugas internal pimpinan institusi
     // (opsional assignee) dengan alur kanban: backlog -> in_progress -> done.

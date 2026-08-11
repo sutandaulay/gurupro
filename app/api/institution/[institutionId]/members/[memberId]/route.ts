@@ -59,28 +59,28 @@ export async function PATCH(
   }
 
   if (body.mapel !== undefined) {
-    await query(`DELETE FROM institution_members_assigned_mapel WHERE _parent_id = $1`, [memId])
+    await query(`DELETE FROM public.institution_members_assigned_mapel WHERE _parent_id = $1`, [memId])
     const mapelList = typeof body.mapel === 'string'
       ? body.mapel.split(',').map((m: string) => m.trim()).filter(Boolean)
       : Array.isArray(body.mapel) ? body.mapel.filter(Boolean) : []
     for (const m of mapelList) {
       await query(
-        `INSERT INTO institution_members_assigned_mapel (_order, _parent_id, id, mapel)
-         VALUES ((SELECT COALESCE(MAX(_order), 0) + 1 FROM institution_members_assigned_mapel WHERE _parent_id = $1), $1, gen_random_uuid()::text, $2)`,
+        `INSERT INTO public.institution_members_assigned_mapel (_order, _parent_id, id, mapel)
+         VALUES ((SELECT COALESCE(MAX(_order), 0) + 1 FROM public.institution_members_assigned_mapel WHERE _parent_id = $1), $1, gen_random_uuid()::text, $2)`,
         [memId, m]
       )
     }
   }
 
   if (body.kelas !== undefined) {
-    await query(`DELETE FROM institution_members_assigned_kelas WHERE _parent_id = $1`, [memId])
+    await query(`DELETE FROM public.institution_members_assigned_kelas WHERE _parent_id = $1`, [memId])
     const kelasList = typeof body.kelas === 'string'
       ? body.kelas.split(',').map((k: string) => k.trim()).filter(Boolean)
       : Array.isArray(body.kelas) ? body.kelas.filter(Boolean) : []
     for (const k of kelasList) {
       await query(
-        `INSERT INTO institution_members_assigned_kelas (_order, _parent_id, id, kelas)
-         VALUES ((SELECT COALESCE(MAX(_order), 0) + 1 FROM institution_members_assigned_kelas WHERE _parent_id = $1), $1, gen_random_uuid()::text, $2)`,
+        `INSERT INTO public.institution_members_assigned_kelas (_order, _parent_id, id, kelas)
+         VALUES ((SELECT COALESCE(MAX(_order), 0) + 1 FROM public.institution_members_assigned_kelas WHERE _parent_id = $1), $1, gen_random_uuid()::text, $2)`,
         [memId, k]
       )
     }

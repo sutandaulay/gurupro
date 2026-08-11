@@ -140,11 +140,11 @@ export async function getContextFilters(userId: string): Promise<ContextFilter> 
 
   const [mapelResult, kelasResult] = await Promise.all([
     query(
-      'SELECT mapel FROM institution_members_assigned_mapel WHERE _parent_id = $1',
+      'SELECT mapel FROM public.institution_members_assigned_mapel WHERE _parent_id = $1',
       [member.id]
     ),
     query(
-      'SELECT kelas FROM institution_members_assigned_kelas WHERE _parent_id = $1',
+      'SELECT kelas FROM public.institution_members_assigned_kelas WHERE _parent_id = $1',
       [member.id]
     ),
   ]);
