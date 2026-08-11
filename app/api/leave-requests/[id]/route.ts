@@ -46,7 +46,7 @@ export async function PATCH(
     // User hanya bisa mengakses izin di institusi yang mereka miliki akses
     const membersResult = await query(`
       SELECT im.*, imr.value as "role"
-      FROM payload.institution_members im
+      FROM public.institution_members im
       LEFT JOIN payload.institution_members_role imr ON imr.parent_id = im.id
       WHERE im.app_user_id = $1 AND im.institution_id = $2
     `, [session.user.id, existingRequest.institutionId]);
@@ -219,7 +219,7 @@ export async function GET(
     if (session.user.role !== 'admin') {
       const membersResult2 = await query(`
         SELECT im.*, imr.value as "role"
-        FROM payload.institution_members im
+        FROM public.institution_members im
         LEFT JOIN payload.institution_members_role imr ON imr.parent_id = im.id
         WHERE im.app_user_id = $1 AND im.institution_id = $2
       `, [session.user.id, leaveRequest.institutionId]);

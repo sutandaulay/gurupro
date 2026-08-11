@@ -96,6 +96,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Mata pelajaran wajib diisi' }, { status: 400 });
     }
 
+    // Auto-retrieve CP from structured DB if not provided
+    let resolvedCP = capaianPembelajaran;
+    if (!resolvedCP) {
+      try {
+        const { determineJalur, getCPCached, formatCPForPrompt } = await import('@/lib/cp-retrieval');
+        const jalur = determineJalur({ jenjang, paiMode: pai_mode, kurikulum });
+        const cpRecord = await getCPCached({
+          mapel: resolvedMapel,
+          jenjang,
+          fase,
+          jalur,
+          tipePendidikan: jalur === 'kneelmenag' ? 'madrasah' : 'reguler',
+        });
+        if (cpRecord) {
+          resolvedCP = formatCPForPrompt(cpRecord);
+        }
+      } catch (cpErr) {
+        // CP retrieval is best-effort — continue without it
+        console.warn('[Silabus] CP auto-retrieval failed:', cpErr);
+      }
+    }
+
     // Build prompt
     const prompt = buildSilabusPrompt({
       sekolah: school_name,
@@ -106,7 +128,7 @@ export async function POST(req: Request) {
       fase,
       kelas,
       semester: semester as 1 | 2,
-      capaianPembelajaran,
+      capaianPembelajaran: resolvedCP,
       jumlahMingguEfektif,
       kurikulum,
       dimensi8,

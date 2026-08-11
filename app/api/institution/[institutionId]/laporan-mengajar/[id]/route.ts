@@ -40,10 +40,10 @@ export async function GET(
               c.id as class_id, c.nama_kelas as kelas_nama,
               s.id as subject_id, s.nama_mapel as mapel_nama,
               sch.id as school_id, sch.nama_sekolah as sekolah_nama,
-              im.user_id as guru_user_id
+              im.app_user_id as guru_user_id
        FROM teacher_journals tj
-       JOIN institution_members im ON im.user_id = tj.user_id AND im.status = 'active'
-       JOIN users u ON u.id = tj.user_id
+       JOIN public.institution_members im ON im.app_user_id::text = tj.user_id::text AND im.status = 'active'
+       LEFT JOIN users u ON u.id::text = tj.user_id::text
        JOIN classes c ON c.id = tj.class_id
        JOIN subjects s ON s.id = tj.subject_id
        LEFT JOIN schools sch ON sch.id = tj.school_id

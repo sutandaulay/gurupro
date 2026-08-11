@@ -63,7 +63,7 @@ async function testEndpointSecurity() {
     console.log('🔐 Test 1: Access to institution members without proper permissions...');
     const memberAccessTest = await client.query(`
       SELECT COUNT(*) as count
-      FROM payload.institution_members im
+      FROM public.institution_members im
       WHERE im.institution_id = $1
     `, [inst1.id]);
     console.log(`   Members in Inst 1: ${memberAccessTest.rows[0].count} (Direct DB access for testing purposes)`);
@@ -115,7 +115,7 @@ async function testEndpointSecurity() {
     // Ambil institusi tempat user1 aktif
     const userInstResult = await client.query(`
       SELECT institution_id
-      FROM payload.institution_members
+      FROM public.institution_members
       WHERE app_user_id = $1
       LIMIT 1
     `, [user1.id]);
@@ -148,7 +148,7 @@ async function testEndpointSecurity() {
     // Cek role spesifik untuk user
     const userRolesResult = await client.query(`
       SELECT imr.value as role
-      FROM payload.institution_members im
+      FROM public.institution_members im
       JOIN payload.institution_members_role imr ON imr.parent_id = im.id
       WHERE im.app_user_id = $1
     `, [user1.id]);
@@ -158,7 +158,7 @@ async function testEndpointSecurity() {
     // Cek apakah user dengan role tertentu bisa mengakses endpoint tertentu
     const isAdminOrOperatorResult = await client.query(`
       SELECT COUNT(*) as count
-      FROM payload.institution_members im
+      FROM public.institution_members im
       JOIN payload.institution_members_role imr ON imr.parent_id = im.id
       WHERE im.app_user_id = $1 AND imr.value IN ('admin_sekolah', 'operator', 'kepala_sekolah')
     `, [user1.id]);

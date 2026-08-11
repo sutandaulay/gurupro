@@ -86,7 +86,7 @@ export async function GET(
     const countParams = [instId, ...params.slice(1)]
     const countResult = await query(
       `SELECT COUNT(*) FROM teacher_journals tj
-       JOIN institution_members im ON im.user_id = tj.user_id AND im.status = 'active'
+       JOIN public.institution_members im ON im.app_user_id = tj.user_id::text AND im.status = 'active'
        JOIN classes c ON c.id = tj.class_id
        WHERE im.institution_id = $1 ${dateFilter}`,
       params
@@ -102,8 +102,8 @@ export async function GET(
               sch.nama_sekolah as sekolah,
               tj.custom_values
        FROM teacher_journals tj
-       JOIN institution_members im ON im.user_id = tj.user_id AND im.status = 'active'
-       JOIN users u ON u.id = tj.user_id
+       JOIN public.institution_members im ON im.app_user_id = tj.user_id::text AND im.status = 'active'
+       JOIN users u ON u.id::text = tj.user_id::text
        JOIN classes c ON c.id = tj.class_id
        JOIN subjects s ON s.id = tj.subject_id
        LEFT JOIN schools sch ON sch.id = tj.school_id

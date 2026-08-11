@@ -3,7 +3,6 @@ import { requireSession } from '@/lib/session';
 import { db, query } from '@/lib/db';
 import {
   attendanceLogs,
-  attendanceSummary,
 } from '@/lib/schemas/attendance';
 import { eq, and, desc, gte, lte } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
@@ -61,7 +60,7 @@ export async function GET(req: NextRequest) {
         tia.start_date as "startDate",
         tia.end_date as "endDate",
         tia.id as "tiaId"
-      FROM payload.institution_members im
+      FROM public.institution_members im
       JOIN payload.institutions i ON im.institution_id = i.id
       LEFT JOIN payload.institution_members_role imr ON imr.parent_id = im.id
       LEFT JOIN payload.teacher_institution_assignments tia 
@@ -102,7 +101,7 @@ export async function GET(req: NextRequest) {
               tia.start_date as "startDate",
               tia.end_date as "endDate",
               tia.id as "tiaId"
-            FROM payload.institution_members im
+            FROM public.institution_members im
             JOIN payload.institutions i ON im.institution_id = i.id
             LEFT JOIN payload.institution_members_role imr ON imr.parent_id = im.id
             LEFT JOIN payload.teacher_institution_assignments tia 
@@ -304,23 +303,14 @@ export async function GET(req: NextRequest) {
     `, [teacherId, startOfDay.toISOString().split('T')[0]]);
 
     // ==========================================
-    // 5b. Get today's attendance summary
+    // 5b.todaySummary is intentionally NOT queried here.
+    // Root cause fix: attendanceSummary.institutionId is integer but
+    // payload.institution_members.institution_id is uuid (string).
+    // Type mismatch caused every JOIN to return 0 rows.
+    // Source of truth for today's attendance is attendanceLogs
+    // (already populated above via attendanceByInstitution).
+    // attendanceStatus below is determined from attendanceLogs data.
     // ==========================================
-    let todaySummary = []; // Pastikan inisialisasi eksplisit
-    try {
-      todaySummary = await db
-        .select()
-        .from(attendanceSummary)
-        .where(
-          and(
-            eq(attendanceSummary.teacherId, teacherId),
-            eq(attendanceSummary.date, startOfDay)
-          )
-        );
-    } catch (error) {
-      console.error('Error fetching today\'s attendance summary:', error);
-      todaySummary = []; // Tetapkan array kosong jika terjadi error
-    }
 
     // ==========================================
     // 6. Build response
@@ -339,7 +329,8 @@ export async function GET(req: NextRequest) {
         attendanceStatus = 'completed';
       } else if (checkIn) {
         attendanceStatus = 'check_in_only';
-      } else if (Array.isArray(todaySummary) && todaySummary.find((s) => s.institutionId === assignment.institutionId)) {
+      } else if (institutionAttendance.length > 0) {
+        // Has logs but no explicit check-in (e.g. teaching session logs)
         attendanceStatus = 'hadir';
       }
 
@@ -376,7 +367,6 @@ export async function GET(req: NextRequest) {
         schoolAssignments: allAssignments.filter((a: any) => a.isSchool),
         dutyAssignmentsToday: dutyAssignmentsToday.rows || [],
         attendanceByInstitution,
-        todaySummary,
         workingHours: {
           start: '08:00',
           end: '17:00',

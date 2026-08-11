@@ -245,8 +245,8 @@ export async function sendTeachingReportNotification(params: TeachingReportNotif
     // Query kepala_sekolah and wakasek from this institution
     const leaders = await query(
       `SELECT u.id, u.email, u.whatsapp, u.nama_lengkap, imr.value as role
-       FROM institution_members im
-       JOIN institution_members_role imr ON imr.parent_id = im.id
+       FROM public.institution_members im
+       JOIN public.institution_members_role imr ON imr.parent_id = im.id
        JOIN users u ON u.id = im.user_id
        WHERE im.institution_id = $1
          AND im.status = 'active'

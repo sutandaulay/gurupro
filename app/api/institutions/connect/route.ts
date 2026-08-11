@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     const cmsUserId = cmsUser.rows[0].id;
 
     const existingMember = await query(
-      `SELECT id, status FROM payload.institution_members WHERE user_id = $1 AND institution_id = $2 LIMIT 1`,
+      `SELECT id, status FROM public.institution_members WHERE user_id = $1 AND institution_id = $2 LIMIT 1`,
       [cmsUserId, institution.id]
     );
 
@@ -113,8 +113,8 @@ export async function POST(req: Request) {
     const appUserName = appUserResult.rows[0]?.nama_lengkap || 'Seorang guru';
 
     const adminsResult = await query(
-      `SELECT im.app_user_id FROM institution_members im
-       JOIN institution_members_role imr ON imr.parent_id = im.id
+      `SELECT im.app_user_id FROM public.institution_members im
+       JOIN public.institution_members_role imr ON imr.parent_id = im.id
        WHERE im.institution_id = $1
          AND im.status = 'active'
          AND imr.value IN ('operator', 'admin_sekolah', 'kepala_sekolah')

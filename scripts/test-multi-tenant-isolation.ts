@@ -39,7 +39,7 @@ async function testMultiTenantIsolation() {
     // Ambil user dari institusi A
     const usersInInstAResult = await client.query(`
       SELECT im.app_user_id as user_id, u.nama_lengkap
-      FROM payload.institution_members im
+      FROM public.institution_members im
       JOIN users u ON u.id = im.app_user_id::uuid
       WHERE im.institution_id = $1
       LIMIT 1
@@ -56,7 +56,7 @@ async function testMultiTenantIsolation() {
     // Ambil user dari institusi B
     const usersInInstBResult = await client.query(`
       SELECT im.app_user_id as user_id, u.nama_lengkap
-      FROM payload.institution_members im
+      FROM public.institution_members im
       JOIN users u ON u.id = im.app_user_id::uuid
       WHERE im.institution_id = $1
       LIMIT 1
@@ -75,7 +75,7 @@ async function testMultiTenantIsolation() {
     
     const testDataAccess = await client.query(`
       SELECT COUNT(*) as count
-      FROM payload.institution_members im
+      FROM public.institution_members im
       WHERE im.app_user_id = $1 AND im.institution_id = $2
     `, [userFromInstA.user_id, instB.id]); // User dari A mencoba mengakses data di B
     
@@ -87,7 +87,7 @@ async function testMultiTenantIsolation() {
     
     const testRoleAccess = await client.query(`
       SELECT COUNT(*) as count
-      FROM payload.institution_members im
+      FROM public.institution_members im
       JOIN payload.institution_members_role imr ON imr.parent_id = im.id
       WHERE im.app_user_id = $1 AND im.institution_id = $2
     `, [userFromInstA.user_id, instB.id]); // User dari A mencoba mengakses role di B
@@ -123,7 +123,7 @@ async function testMultiTenantIsolation() {
     
     const testMembersAccess = await client.query(`
       SELECT COUNT(*) as count
-      FROM payload.institution_members im
+      FROM public.institution_members im
       WHERE im.institution_id = $1
       AND im.app_user_id != $2  -- Selain user itu sendiri
     `, [instB.id, userFromInstA.user_id]); // User dari A mencoba mengakses anggota di B
@@ -134,7 +134,7 @@ async function testMultiTenantIsolation() {
     // Coba akses detail anggota - ini akan dilakukan oleh aplikasi melalui endpoint
     const testSpecificMemberAccess = await client.query(`
       SELECT COUNT(*) as count
-      FROM payload.institution_members im
+      FROM public.institution_members im
       WHERE im.institution_id = $1
       AND im.app_user_id = $2
     `, [instB.id, userFromInstA.user_id]);

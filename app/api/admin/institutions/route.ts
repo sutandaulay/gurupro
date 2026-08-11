@@ -29,7 +29,7 @@ export async function GET(req: Request) {
 
     let institutionsQuery = `
       SELECT i.*,
-        (SELECT COUNT(*) FROM payload.institution_members im WHERE im.institution_id = i.id AND im.status = 'active') as member_count
+        (SELECT COUNT(*) FROM public.institution_members im WHERE im.institution_id = i.id AND im.status = 'active') as member_count
       FROM payload.institutions i
     `;
     const params: any[] = [];

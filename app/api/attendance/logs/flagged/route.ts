@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { requireSession } from '@/lib/session';
 import { db } from '@/lib/db';
 import { parsePagination, paginationMeta, offset } from '@/lib/pagination';
 import { attendanceLogs, institutions, schools } from '@/lib/schemas/attendance';
@@ -15,12 +14,9 @@ const FLAG_REASON_OPTIONS = [
 
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const session = await requireSession();
 
-    const userRole = session.user.role || 'guru';
+    const userRole = session.role || 'guru';
     if (!['admin', 'kepala_sekolah', 'wakasek', 'operator'].includes(userRole)) {
       return NextResponse.json({ error: 'Forbidden: Role admin diperlukan' }, { status: 403 });
     }
@@ -125,12 +121,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const session = await requireSession();
 
-    const userRole = session.user.role || 'guru';
+    const userRole = session.role || 'guru';
     if (!['admin', 'kepala_sekolah', 'wakasek', 'operator'].includes(userRole)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

@@ -147,7 +147,7 @@ async function processPaymentSuccess(transactionId: string) {
   const tx = txRes.rows[0];
 
   // Idempotency check - already processed
-  if (tx.status === "PAID" || tx.status === "ACTIVATED") {
+  if (tx.status === "ACTIVATED") {
     console.log(`[WEBHOOK] Transaction ${transactionId} already processed`);
     return;
   }
@@ -155,9 +155,9 @@ async function processPaymentSuccess(transactionId: string) {
   const userId = tx.user_id;
   const planId = tx.plan_id;
 
-  // Mark transaction as PAID
+  // Mark transaction as ACTIVATED (subscription + poin auto-granted below)
   await query(
-    `UPDATE transactions SET status = 'PAID', updated_at = NOW() WHERE id = $1`,
+    `UPDATE transactions SET status = 'ACTIVATED', updated_at = NOW() WHERE id = $1`,
     [tx.id]
   );
 

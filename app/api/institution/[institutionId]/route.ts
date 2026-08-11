@@ -7,15 +7,17 @@ async function checkPermission(institutionId: number): Promise<NextResponse | nu
     const session = await requireSession()
     const result = await query(
       `SELECT imr.value
-       FROM institution_members im
-       JOIN institution_members_role imr ON imr.parent_id = im.id
+       FROM public.institution_members im
+       JOIN public.institution_members_role imr ON imr.parent_id = im.id
        WHERE im.app_user_id = $1 AND im.institution_id = $2 AND im.status = 'active'`,
       [session.id, institutionId]
     )
     if (result.rows.length === 0) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
-    const allowed = result.rows.some((r: any) => r.value === 'operator' || r.value === 'admin_sekolah')
+    const allowed = result.rows.some((r: any) =>
+      r.value === 'operator' || r.value === 'admin_sekolah' || r.value === 'kepala_sekolah' || r.value === 'wakasek'
+    )
     if (!allowed) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }

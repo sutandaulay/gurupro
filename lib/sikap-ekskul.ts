@@ -44,17 +44,63 @@ export interface PresensiSnapshot {
   alpa: number;
 }
 
+/**
+ * Get presence snapshot (sakit/izin/alpa) for ONE student OR a batch of students
+ * in the same class & periode.
+ *
+ * - Single mode: pass a single siswaId string -> returns one PresensiSnapshot
+ *   (backwards compatible with previous signature).
+ * - Batch mode: pass an array of siswaIds -> performs ONE query using
+ *   `student_id = ANY($2::uuid[])` and returns a `Record<siswaId, PresensiSnapshot>`
+ *   (zero-fill for students without any attendance record).
+ *
+ * This is the single source of truth for per-student presence counts; the batch
+ * path exists so a whole class can be rendered without N+1 queries.
+ */
 export async function getPresensiSnapshot(
-  siswaId: string,
+  siswaId: string | string[],
   kelasId: string,
   periode: string
-): Promise<PresensiSnapshot> {
+): Promise<PresensiSnapshot | Record<string, PresensiSnapshot>> {
   // Parse periode: "2025/2026-ganjil" or similar format
   const match = periode.match(/(\d{4})\/(\d{4})-(\w+)/);
   if (!match) {
+    if (Array.isArray(siswaId)) {
+      const empty: Record<string, PresensiSnapshot> = {};
+      for (const id of siswaId) empty[id] = { sakit: 0, izin: 0, alpa: 0 };
+      return empty;
+    }
     return { sakit: 0, izin: 0, alpa: 0 };
   }
   const [, tahunAjar, , semester] = match;
+
+  if (Array.isArray(siswaId)) {
+    if (siswaId.length === 0) return {};
+    const result = await query(
+      `SELECT sa.student_id,
+         COUNT(*) FILTER (WHERE sa.status = 'sakit') as sakit,
+         COUNT(*) FILTER (WHERE sa.status = 'izin') as izin,
+         COUNT(*) FILTER (WHERE sa.status = 'alpa') as alpa
+       FROM student_attendance sa
+       JOIN schedules sch ON sch.id = sa.schedule_id
+       JOIN tahun_ajaran ta ON ta.nama LIKE $1
+       WHERE sa.student_id = ANY($2::uuid[])
+         AND sch.class_id = $3
+         AND ta.semester = $4
+       GROUP BY sa.student_id`,
+      [`%${tahunAjar}%`, siswaId, kelasId, semester]
+    );
+    const map: Record<string, PresensiSnapshot> = {};
+    for (const id of siswaId) map[id] = { sakit: 0, izin: 0, alpa: 0 };
+    for (const row of result.rows) {
+      map[row.student_id] = {
+        sakit: parseInt(row.sakit || '0', 10),
+        izin: parseInt(row.izin || '0', 10),
+        alpa: parseInt(row.alpa || '0', 10),
+      };
+    }
+    return map;
+  }
 
   const result = await query(
     `SELECT
@@ -104,9 +150,7 @@ export async function insertPenilaianSikap(
     // Fallback: check classes.wali_kelas_user_id (legacy system from Master Data checkbox)
     const fallback = await query(
       `SELECT 1 FROM classes c
-       WHERE c.id = $1 AND c.wali_kelas_user_id = (
-         SELECT im.app_user_id::uuid FROM institution_members im WHERE im.id = $2
-       )
+       WHERE c.id = $1 AND c.wali_kelas_user_id = $2::uuid
        LIMIT 1`,
       [input.kelasId, actorMemberId]
     );
@@ -128,7 +172,7 @@ export async function insertPenilaianSikap(
   const result = await query(
     `INSERT INTO penilaian_sikap
      (siswa_id, kelas_id, periode, varian, penilaian_per_dimensi, deskripsi_umum, dinilai_oleh)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::uuid)
      RETURNING *`,
     [
       input.siswaId,
@@ -364,8 +408,9 @@ export async function getEkstrakurikuler(
     params.push(filters.kelasId);
   }
   if (filters.pembinaMemberId) {
-    conditions.push(`e.pembina_member_id = $${idx++}`);
+    conditions.push(`(e.pembina_member_id = $${idx} OR e.pembina_user_id = $${idx})`);
     params.push(filters.pembinaMemberId);
+    idx++;
   }
   if (filters.schoolId) {
     conditions.push(`c.school_id = $${idx++}`);
@@ -435,13 +480,17 @@ export async function insertPenilaianEkstrakurikuler(
 ): Promise<PenilaianEkstrakurikulerResponse> {
   // RBAC: Validate actor is the pembina for this ekskul
   const ekskulCheck = await query(
-    'SELECT pembina_member_id FROM ekstrakurikuler WHERE id = $1',
+    'SELECT pembina_member_id, pembina_user_id FROM ekstrakurikuler WHERE id = $1',
     [input.ekstrakurikulerId]
   );
   if (!ekskulCheck.rows.length) {
     throw new Error('Ekstrakurikuler tidak ditemukan');
   }
-  if (ekskulCheck.rows[0].pembina_member_id !== actorMemberId) {
+  const ekskul = ekskulCheck.rows[0];
+  const isPembina =
+    ekskul.pembina_member_id === actorMemberId ||
+    ekskul.pembina_user_id === actorMemberId;
+  if (!isPembina) {
     throw new Error('Hanya pembina ekstrakurikuler ini yang bisa mengisi penilaian');
   }
 
@@ -621,9 +670,7 @@ export async function upsertCatatanWaliKelas(
     // Fallback: check classes.wali_kelas_user_id (legacy system from Master Data checkbox)
     const fallback = await query(
       `SELECT 1 FROM classes c
-       WHERE c.id = $1 AND c.wali_kelas_user_id = (
-         SELECT im.app_user_id::uuid FROM institution_members im WHERE im.id = $2
-       )
+       WHERE c.id = $1 AND c.wali_kelas_user_id = $2::uuid
        LIMIT 1`,
       [input.kelasId, actorMemberId]
     );

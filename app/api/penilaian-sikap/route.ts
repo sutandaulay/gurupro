@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     if (!memberResult.docs.length) {
       return NextResponse.json({ error: 'Member tidak ditemukan atau tidak aktif' }, { status: 403 });
     }
-    const actorMemberId = String(memberResult.docs[0].id);
+    const actorMemberId = String(memberResult.docs[0].appUserId || memberResult.docs[0].id);
 
     const body = await req.json();
     const input = PenilaianSikapCreateSchema.parse(body);
@@ -108,7 +108,7 @@ export async function PUT(req: Request) {
     if (!memberResult.docs.length) {
       return NextResponse.json({ error: 'Member tidak ditemukan atau tidak aktif' }, { status: 403 });
     }
-    const actorMemberId = String(memberResult.docs[0].id);
+    const actorMemberId = String(memberResult.docs[0].appUserId || memberResult.docs[0].id);
 
     const body = await req.json();
     const input = PenilaianSikapUpdateSchema.parse(body);

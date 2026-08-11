@@ -10,6 +10,10 @@
 import PDFDocument from 'pdfkit';
 import type { SilabusOutput } from '@/lib/schemas/silabus';
 import { truncateText } from '@/lib/ai/validation-utils';
+import {
+  BRAND_DISCLAIMER,
+  formatTanggalIndonesia,
+} from './document-shared';
 
 // ============================================
 // PDF EXPORT
@@ -32,6 +36,24 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
     const pageWidth = doc.page.width;
     const pageHeight = doc.page.height;
     const contentWidth = pageWidth - 80;
+
+    // Page numbering
+    let pageNum = 1;
+    const addPageNumber = () => {
+      doc.font('Helvetica').fontSize(8).fillColor('#9CA3AF');
+      doc.text(
+        `Halaman ${pageNum}`,
+        40,
+        pageHeight - 25,
+        { align: 'center', width: contentWidth }
+      );
+      doc.fillColor('#000');
+    };
+    addPageNumber();
+    doc.on('pageAdded', () => {
+      pageNum++;
+      addPageNumber();
+    });
 
     // Colors
     const primaryColor = '#1E3A8A';
@@ -274,15 +296,6 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
       { width: colWidths.minggu, align: 'center' }
     );
 
-    // Footer
-    doc.fontSize(6).fillColor('#9CA3AF');
-    doc.text(
-      `Dokumen ini digenerate oleh GuruPRO AI | ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`,
-      40,
-      pageHeight - 25,
-      { align: 'center', width: contentWidth }
-    );
-
     doc.end();
   });
 }
@@ -414,6 +427,18 @@ export async function generateSilabusDocBuffer(data: SilabusOutput): Promise<Buf
       color: #9CA3AF;
       margin-top: 15px;
     }
+    .page-footer {
+      position: fixed;
+      bottom: 1.5cm;
+      left: 0;
+      right: 0;
+      text-align: right;
+      font-size: 9pt;
+      color: #666;
+    }
+    @media print {
+      .page-footer { display: block; }
+    }
   </style>
 </head>
 <body>
@@ -503,12 +528,9 @@ export async function generateSilabusDocBuffer(data: SilabusOutput): Promise<Buf
   </div>
 
   <div class="footer">
-    Dokumen ini digenerate oleh GuruPRO AI | ${new Date().toLocaleDateString('id-ID', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })}
+    ${BRAND_DISCLAIMER} | ${formatTanggalIndonesia(new Date())}
   </div>
+<div class="page-footer">Halaman <span style="mso-field-code:' PAGE \\* MERGEFORMAT '"></span> dari <span style="mso-field-code:' NUMPAGES \\* MERGEFORMAT '"></span></div>
 </body>
 </html>
   `;

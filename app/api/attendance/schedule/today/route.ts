@@ -129,6 +129,7 @@ export async function GET() {
         id: row.id,
         institutionId: row.institution_id ? row.institution_id.toString() : (row.school_id || '1'),
         subjectId: row.subject_id,
+        subjectName: row.nama_mapel,
         className: row.nama_kelas,
         startTime: row.jam_mulai.slice(0, 5),
         endTime: row.jam_selesai.slice(0, 5),

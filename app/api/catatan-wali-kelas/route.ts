@@ -64,7 +64,10 @@ export async function POST(req: Request) {
     if (!memberResult.docs.length) {
       return NextResponse.json({ error: 'Member tidak ditemukan atau tidak aktif' }, { status: 403 });
     }
-    const actorMemberId = String(memberResult.docs[0].id);
+    // institution-members.id is an integer PK (Payload); the app-side "member
+    // id" columns (ditulis_oleh, wali_kelas_member_id, app_user_id coupling)
+    // actually store users.id — so use appUserId, not the integer id.
+    const actorMemberId = String(memberResult.docs[0].appUserId || memberResult.docs[0].id);
 
     const body = await req.json();
     const input = CatatanWaliKelasCreateSchema.parse(body);
@@ -104,7 +107,7 @@ export async function PUT(req: Request) {
     if (!memberResult.docs.length) {
       return NextResponse.json({ error: 'Member tidak ditemukan atau tidak aktif' }, { status: 403 });
     }
-    const actorMemberId = String(memberResult.docs[0].id);
+    const actorMemberId = String(memberResult.docs[0].appUserId || memberResult.docs[0].id);
 
     const body = await req.json();
     const { id, catatan } = body;
@@ -133,7 +136,7 @@ export async function PUT(req: Request) {
     }
 
     const result = await query(
-      `UPDATE catatan_wali_kelas SET catatan = $1, updated_at = now() WHERE id = $2 RETURNING *`,
+      `UPDATE catatan_wali_kelas SET catatan = $1, updated_at = now() WHERE id = $2::uuid RETURNING *`,
       [catatan, id]
     );
 

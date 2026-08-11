@@ -77,6 +77,7 @@ function AdminPageContent() {
 
   // Search States
   const [userSearch, setUserSearch] = useState("");
+  const [userStatusFilter, setUserStatusFilter] = useState("all");
   const [txSearch, setTxSearch] = useState("");
 
   // Edit User States
@@ -112,8 +113,10 @@ function AdminPageContent() {
   // Toast hook
   const { addToast } = useToast();
 
-  // Pagers (client-side pagination)
-  const usersPager = usePagedItems(users, 25);
+  // User pagination (server-side)
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [usersPageSize] = useState(25);
   const referralsPager = usePagedItems(referralsList, 25);
   const payoutRequestsPager = usePagedItems(payoutRequestsList, 25);
   const ratioHistoryPager = usePagedItems(ratioHistory, 25);
@@ -303,12 +306,13 @@ function AdminPageContent() {
   const fetchUsers = async (queryStr = "") => {
     setIsLoadingUsers(true);
     try {
-      const res = await apiFetch(`/api/admin/users?q=${encodeURIComponent(queryStr)}`);
+      const res = await apiFetch(`/api/admin/users?q=${encodeURIComponent(queryStr)}&status=${userStatusFilter}&page=${usersPage}&limit=${usersPageSize}`);
       if (res.ok) {
         const data = await res.json();
         const usersList = Array.isArray(data) ? data : (data.users || []);
         setUsers(usersList);
         setTotalUsersCount(data.total ?? usersList.length);
+        setUsersTotal(data.total ?? 0);
       } else {
         let errMsg = "Gagal memuat daftar pengguna";
         try {
@@ -1075,23 +1079,32 @@ function AdminPageContent() {
             </button>
           </div>
 
-          {/* Search Inputs */}
+          {/* Search & Filter */}
           {activeTab === "users" ? (
-            <form onSubmit={handleSearchUsers} className="flex gap-2 w-full sm:w-auto">
-              <input
-                type="text"
-                value={userSearch}
-                onChange={(e) => setUserSearch(e.target.value)}
-                placeholder="Cari username, email, nama, whatsapp..."
-                className="px-3.5 py-1.5 border border-slate-200 rounded-xl text-xs outline-none bg-white font-medium text-slate-800 w-full sm:w-60"
-              />
-              <button
-                type="submit"
-                className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+            <div className="flex gap-2 items-center">
+              <select
+                value={userStatusFilter}
+                onChange={(e) => { setUserStatusFilter(e.target.value); setUsersPage(1); fetchUsers(userSearch); }}
+                className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs outline-none bg-white font-bold text-slate-700"
               >
-                Cari
-              </button>
-            </form>
+                <option value="all">Semua</option>
+                <option value="active">Aktif</option>
+                <option value="blocked">Diblokir</option>
+                <option value="pro">PRO</option>
+                <option value="free">Free</option>
+              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setUsersPage(1); fetchUsers(userSearch); } }}
+                  placeholder="Cari nama, email, WA..."
+                  className="pl-8 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs outline-none bg-white font-medium text-slate-800 w-52"
+                />
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+              </div>
+            </div>
           ) : activeTab === "transactions" ? (
             <form onSubmit={handleSearchTx} className="flex gap-2 w-full sm:w-auto">
               <input
@@ -1138,7 +1151,7 @@ function AdminPageContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
-                    {usersPager.pagedItems.map((user) => {
+                    {users.map((user) => {
                       const isEditing = editingUserId === user.id;
                       return (
                         <tr key={user.id} className="hover:bg-slate-50/50">
@@ -1338,12 +1351,54 @@ function AdminPageContent() {
                                 </button>
                               </div>
                             ) : (
-                              <button
-                                onClick={() => startEditUser(user)}
-                                className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition cursor-pointer"
-                              >
-                                Edit Akun
-                              </button>
+                              <div className="flex flex-col gap-1">
+                                <button
+                                  onClick={() => startEditUser(user)}
+                                  className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition cursor-pointer"
+                                >
+                                  Edit Akun
+                                </button>
+                                {user.is_active !== false ? (
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm(`Blokir ${user.nama_lengkap || user.email}? User tidak akan bisa login.`)) return;
+                                      const res = await apiFetch("/api/admin/users", {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ action: "block", userId: user.id }),
+                                      });
+                                      if (res.ok) {
+                                        setSuccessMsg("User berhasil diblokir");
+                                        fetchUsers(userSearch);
+                                      } else {
+                                        setErrorMsg("Gagal memblokir user");
+                                      }
+                                    }}
+                                    className="text-[10px] font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-xl transition cursor-pointer"
+                                  >
+                                    Blokir
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={async () => {
+                                      const res = await apiFetch("/api/admin/users", {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ action: "unblock", userId: user.id }),
+                                      });
+                                      if (res.ok) {
+                                        setSuccessMsg("User berhasil diaktifkan kembali");
+                                        fetchUsers(userSearch);
+                                      } else {
+                                        setErrorMsg("Gagal mengaktifkan user");
+                                      }
+                                    }}
+                                    className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl transition cursor-pointer"
+                                  >
+                                    Aktifkan
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -1352,15 +1407,17 @@ function AdminPageContent() {
                   </tbody>
                 </table>
               )}
-              {usersPager.total > 0 && (
-                <div className="px-5 pb-4">
+              {usersTotal > 0 && (
+                <div className="px-5 pb-4 flex items-center justify-between">
+                  <p className="text-[10px] text-slate-400 font-semibold">
+                    Menampilkan {users.length} dari {usersTotal.toLocaleString("id-ID")} pengguna
+                  </p>
                   <Pagination
-                    page={usersPager.page}
-                    pageSize={usersPager.pageSize}
-                    total={usersPager.total}
-                    totalPages={usersPager.totalPages}
-                    onPageChange={(p) => usersPager.reset(p)}
-                    onPageSizeChange={(s) => { usersPager.setPageSize(s); usersPager.reset(1); }}
+                    page={usersPage}
+                    pageSize={usersPageSize}
+                    total={usersTotal}
+                    totalPages={Math.ceil(usersTotal / usersPageSize)}
+                    onPageChange={(p) => { setUsersPage(p); fetchUsers(userSearch); }}
                   />
                 </div>
               )}

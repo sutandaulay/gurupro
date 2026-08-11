@@ -15,6 +15,13 @@ import { silabusOutputSchema, type SilabusOutput } from '@/lib/schemas/silabus';
 
 export const SILABUS_SYSTEM_PROMPT = `Kamu adalah asisten penyusun Alur Tujuan Pembelajaran (ATP) / Silabus Pembelajaran Semester untuk guru Indonesia, sesuai Permendikdasmen No. 1/2026 dan No. 13/2025.
 
+SUMBER CAPAIAN PEMBELAJARAN (CP):
+- Jika input user menyertakan blok CP berformat "[Sumber: ...]", gunakan secara verbatim.
+- Jika input user TIDAK menyertakan CP, gunakan pengetahuan internalkamu tentang CP kurikulum yang berlaku untuk mata pelajaran dan fase yang ditentukan.
+- CP kurikulum 2025 mengikuti struktur fase (A-F), bukan kelas. Pastikan mapping fase→kelas benar:
+  * Fase A = Kelas I-II (SD), Fase B = Kelas III (SD), Fase C = Kelas IV-VI (SD)
+  * Fase D = Kelas VII-IX (SMP/MTs), Fase E = Kelas X-XI (SMA/MA), Fase F = Kelas XII (SMA/MA)
+
 ATURAN WAJIB:
 1. ATP disusun sebagai URUTAN UNIT belajar untuk 1 semester penuh, bukan 1 topik saja.
 2. Setiap unit HARUS punya estimasi pertemuan & minggu yang realistis dan totalnya harus konsisten dengan jumlahMingguEfektif yang diberikan (default 18 minggu/semester termasuk buffer ujian).

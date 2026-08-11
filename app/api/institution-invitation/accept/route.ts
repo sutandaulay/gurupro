@@ -24,7 +24,7 @@ export async function GET(req: Request) {
 
     const memberResult = await query(
       `SELECT im.id, im.status, im.institution_id, i.name as institution_name
-       FROM payload.institution_members im
+       FROM public.institution_members im
        JOIN institutions i ON i.id = im.institution_id
        WHERE im.app_user_id = $1 AND im.status = 'invited'
        LIMIT 1`,

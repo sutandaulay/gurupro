@@ -16,7 +16,7 @@ export async function POST(
 
     const member = await query(
       `SELECT im.app_user_id, im.status, i.name as institution_name
-       FROM institution_members im
+       FROM public.institution_members im
        JOIN institutions i ON i.id = im.institution_id
        WHERE im.id = $1
        LIMIT 1`,

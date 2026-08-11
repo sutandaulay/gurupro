@@ -92,7 +92,7 @@ export async function POST(req: Request) {
         SELECT 
           im.id,
           im.institution_id as "institutionId"
-        FROM payload.institution_members im
+        FROM public.institution_members im
         LEFT JOIN payload.institution_members_role imr ON imr.parent_id = im.id
         WHERE im.app_user_id = $1 
           AND im.institution_id = $2

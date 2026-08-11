@@ -4,8 +4,11 @@ import { query } from '@/lib/db';
 
 /**
  * GET /api/wali-kelas/my-classes
- * Returns classes where current user is the homeroom teacher (wali kelas)
- * based on classes.wali_kelas_user_id (set from Master Data checkbox)
+ * Returns classes where current user is the homeroom teacher (wali kelas),
+ * covering BOTH:
+ *  - classes.wali_kelas_user_id (set from Master Data checkbox)
+ *  - wali_kelas_assignments.wali_kelas_member_id (assignment module, active only)
+ * This avoids the "assignment list empty vs institution_members" mismatch.
  */
 export async function GET(req: Request) {
   try {
@@ -16,9 +19,17 @@ export async function GET(req: Request) {
     }
     const session = JSON.parse(sessionCookie);
 
-    // Get classes where current user is set as wali kelas (from Master Data)
+    // Union of Master Data path + assignment path
     const result = await query(
-      'SELECT id, nama_kelas FROM classes WHERE wali_kelas_user_id = $1 ORDER BY nama_kelas ASC',
+      `SELECT DISTINCT c.id, c.nama_kelas
+       FROM classes c
+       WHERE c.wali_kelas_user_id = $1
+          OR c.id IN (
+             SELECT DISTINCT kelas_id
+             FROM wali_kelas_assignments
+             WHERE wali_kelas_member_id = $1 AND status = 'aktif'
+          )
+       ORDER BY c.nama_kelas ASC`,
       [session.id]
     );
 

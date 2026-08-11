@@ -330,6 +330,17 @@ export async function generateLkpdPdfBuffer(lkpdData: LKPDOutput, title: string)
 
     const { identitas, petunjukPengerjaan, tujuanKegiatan, aktivitas, refleksiSingkat } = lkpdData;
 
+    // Page numbering
+    let pageNum = 1;
+    const addPageNumber = () => {
+      doc.font("Helvetica").fontSize(8).fillColor("#999");
+      doc.text(`Halaman ${pageNum}`, 50, doc.page.height - 40, { align: "center", width: 510 });
+      doc.fillColor("#000");
+    };
+    addPageNumber();
+    // @ts-ignore - PDFKit custom event
+    doc.on("pageAdded", () => { pageNum++; addPageNumber(); });
+
     // Header
     doc.font("Helvetica-Bold").fontSize(14).text("LEMBAR KERJA PESERTA DIDIK (LKPD)", { align: "center" });
     doc.moveDown(0.5);
@@ -402,7 +413,7 @@ export async function generateLkpdPdfBuffer(lkpdData: LKPDOutput, title: string)
 
     // Footer
     doc.moveDown(1);
-    doc.font("Helvetica").fontSize(8).text("* LKPD ini dirancang untuk aktivitas ${lkpdData.identitas.namaSiswa ? 'mandiri' : 'berkelompok'} siswa", { align: "center" });
+    doc.font("Helvetica").fontSize(8).text("* LKPD ini dirancang untuk aktivitas belajar kelompok", { align: "center" });
 
     doc.end();
   });
@@ -578,8 +589,9 @@ export function generateLkpdDocBuffer(lkpdData: LKPDOutput, title: string): Buff
       ${refleksiHtml}
 
       <div style="text-align: center; margin-top: 20pt; font-family: Arial, sans-serif; font-size: 8pt; color: #666;">
-        LKPD ini dirancang untuk aktivitas ${jenisAktivitasText(identitas.namaSiswa ? 'individu' : 'kelompok')}
+        LKPD ini dirancang untuk aktivitas belajar kelompok
       </div>
+      <div style="position: fixed; bottom: 1.5cm; right: 2cm; font-size: 9pt; color: #666;">Halaman <span style="mso-field-code:' PAGE \\* MERGEFORMAT '"></span> dari <span style="mso-field-code:' NUMPAGES \\* MERGEFORMAT '"></span></div>
     </body>
     </html>
   `;
@@ -631,17 +643,6 @@ function generateAktivitasSpaceHtml(act: Aktivitas): string {
   }
 }
 
-/**
- * Get human-readable activity type text
- */
-function jenisAktivitasText(jenis: string): string {
-  const map: Record<string, string> = {
-    individu: 'mandiri/individu',
-    kelompok: 'berkelompok',
-  };
-  return map[jenis] || 'mandiri';
-}
-
 // ============================================
 // LAPORAN EVALUASI LKPD EXPORT TEMPLATES
 // Evaluation Report for School Leadership
@@ -673,7 +674,6 @@ export async function generateLaporanEvaluasiPdfBuffer(
 
     const { identitas, ringkasanEksekutif, capaianPerKKTP, temuanUtama, siswaPerluPerhatian, rekomendasiTindakLanjut } = data;
 
-    // Header - Official school letter format
     doc.font("Helvetica-Bold").fontSize(16).text("LAPORAN EVALUASI LKPD", { align: "center" });
     doc.font("Helvetica").fontSize(11).text("Untuk perhatian Bapak/Ibu Kepala Sekolah/Wakasek", { align: "center" });
     doc.moveDown(1);
@@ -807,6 +807,23 @@ export async function generateLaporanEvaluasiPdfBuffer(
 
     doc.moveDown(1.5);
 
+    // Page counter for numbering
+    let pageNum = 1;
+    // @ts-ignore - PDFKit custom event
+    doc.on('pageAdded', () => { pageNum++; });
+
+    // Footer per page
+    const addFooter = () => {
+      const bottomY = doc.page.height - 30;
+      doc.font("Helvetica").fontSize(8).fillColor("gray");
+      doc.text(`Halaman ${pageNum} | Dokumen ini dihasilkan oleh GuruPRO AI`, 50, bottomY, {
+        width: 510,
+        align: "center",
+      });
+      doc.fillColor("black");
+    };
+    addFooter();
+
     // Signature section
     const sigY = doc.y;
     doc.text("_______________________________", 350, sigY);
@@ -820,7 +837,7 @@ export async function generateLaporanEvaluasiPdfBuffer(
     // Footer
     doc.moveDown(2);
     doc.font("Helvetica").fontSize(8).fillColor("gray");
-    doc.text("Dokumen ini dibuat dengan GuruPRO AI", { align: "center" });
+    doc.text("Dokumen ini dihasilkan oleh GuruPRO AI", { align: "center" });
 
     doc.end();
   });
@@ -933,7 +950,7 @@ export function generateLaporanEvaluasiDocBuffer(
       </div>
 
       <div class="footer">
-        <p>Dokumen ini dibuat dengan GuruPRO AI</p>
+        <p>Dokumen ini dihasilkan oleh GuruPRO AI</p>
       </div>
     </body>
     </html>

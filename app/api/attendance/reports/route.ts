@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { requireSession } from '@/lib/session';
 import { db, query } from '@/lib/db';
 import {
   attendanceSummary,
@@ -48,20 +47,20 @@ function getPeriodDates(period: string) {
 }
 
 async function getDataScope(session: any) {
-  const userRoleRow = await query('SELECT role FROM users WHERE id = $1', [session.user.id]);
-  const userRole = userRoleRow.rows[0]?.role || session.user.role || 'guru';
+  const userRoleRow = await query('SELECT role FROM users WHERE id = $1', [session.id]);
+  const userRole = userRoleRow.rows[0]?.role || session.role || 'guru';
 
   const membersResult = await query(
     `SELECT institution_id as "institutionId"
-     FROM payload.institution_members
+     FROM public.institution_members
      WHERE app_user_id = $1 AND status = 'active'`,
-    [session.user.id]
+    [session.id]
   );
   const institutionIds = membersResult.rows.map((m: any) => Number(m.institutionId));
 
   const ownedSchools = await db.select({ id: schools.id })
     .from(schools)
-    .where(eq(schools.userId, session.user.id));
+    .where(eq(schools.userId, session.id));
   const schoolIds = ownedSchools.map(s => s.id);
 
   return { userRole, institutionIds, schoolIds };
@@ -69,10 +68,7 @@ async function getDataScope(session: any) {
 
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const session = await requireSession();
 
     const url = new URL(req.url);
     const queryParams = Object.fromEntries(url.searchParams.entries());
@@ -90,7 +86,7 @@ export async function GET(req: Request) {
 
     // Role-based access
     if (!['admin', 'kepala_sekolah', 'wakasek', 'operator'].includes(userRole)) {
-      targetTeacherId = session.user.id;
+      targetTeacherId = session.id;
     }
 
     // Admin: if no institution filter set, show nothing until user picks one

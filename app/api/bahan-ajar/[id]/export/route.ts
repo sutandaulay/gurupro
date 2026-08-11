@@ -269,6 +269,7 @@ function generateDocContent(
     .aktivitas { margin: 8px 0; padding: 8px; border: 1px solid #ddd; }
     .rubrik { font-size: 10pt; background: #fffde7; padding: 8px; margin-top: 8px; }
     @media print { body { padding: 0; } }
+    .page-footer { position: fixed; bottom: 1.5cm; right: 2cm; font-size: 9pt; color: #666; }
   </style>
 </head>
 <body>
@@ -290,6 +291,7 @@ function generateDocContent(
     <p>Dokumen ini dihasilkan oleh <strong>GuruPRO AI</strong></p>
     <p>Dicetak pada ${today}</p>
   </div>
+<div class="page-footer">Halaman <span style="mso-field-code:' PAGE \\* MERGEFORMAT '"></span> dari <span style="mso-field-code:' NUMPAGES \\* MERGEFORMAT '"></span></div>
 </body>
 </html>`;
 }
@@ -429,7 +431,8 @@ function escapeHtml(str: string | null | undefined): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 // ==========================================

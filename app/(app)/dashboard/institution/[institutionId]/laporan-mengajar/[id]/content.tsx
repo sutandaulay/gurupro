@@ -2,7 +2,6 @@
 import { apiFetch } from "@/lib/api-client";
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { useDashboardParams } from "../../../../_shared/params-context"
 import { Button, Card, Badge, Spinner } from "@/app/components/ui"
 
 interface JournalDetail {
@@ -41,9 +40,8 @@ function SectionCard({ title, content }: { title: string; content: string | null
 }
 
 export default function InstitutionLaporanMengajarDetailPage() {
-  const params = useDashboardParams()
   const routeParams = useParams()
-  const institutionId = params.institutionId as string
+  const institutionId = routeParams.institutionId as string
   const id = routeParams.id as string
   const [report, setReport] = useState<JournalDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -131,7 +129,7 @@ export default function InstitutionLaporanMengajarDetailPage() {
           </div>
           <div>
             <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Status</p>
-            <Badge variant={report.status === 'Final' ? 'green' : 'yellow'}>{report.status}</Badge>
+            <Badge variant={report.status === 'Final' ? 'success' : 'warning'}>{report.status}</Badge>
           </div>
         </div>
       </Card>

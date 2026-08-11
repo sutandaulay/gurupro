@@ -1,7 +1,18 @@
 /**
  * Kisi-kisi Generator Utility
  * Generates formatted Kisi-kisi documents for export
+ * Standar dokumen resmi Indonesia
  */
+
+import {
+  buildKopSekolahHTML,
+  buildIdentitasTableHTML,
+  buildSignatureBlockHTML,
+  buildDocumentFooterHTML,
+  buildWordDocTemplate,
+  escapeHtml,
+  formatTanggalIndonesia,
+} from './document-shared';
 
 export interface KisikisiOptions {
   includeTipe: boolean;
@@ -16,6 +27,7 @@ export interface KisikisiOptions {
   includeSchoolHeader: boolean;
   signatureName: string;
   signatureDate: string;
+  guruNip?: string;
 }
 
 export interface MetaInfo {
@@ -26,6 +38,8 @@ export interface MetaInfo {
   jenjang?: string;
   schoolName?: string;
   schoolAddress?: string;
+  schoolNpsn?: string;
+  schoolLogo?: string;
   teacherName?: string;
   namaGuru?: string;
   namaSekolah?: string;
@@ -69,109 +83,109 @@ export function generateKisikisiHTML(
   const {
     includeTipe, includeMateri, includeCP, includeTP,
     includeIndikator, includeLevel, includeKesulitan, includeKunci, includeSkor,
-    includeSchoolHeader, signatureName, signatureDate
+    includeSchoolHeader, signatureName, signatureDate, guruNip,
   } = options;
 
-  let headerHtml = "";
+  // --- Kop Sekolah ---
+  let kopHtml = '';
   if (includeSchoolHeader) {
-    headerHtml = `
-      <div style="text-align: center; margin-bottom: 20px;">
-        <h1 style="font-size: 16pt; font-weight: bold; margin: 0;">${meta.schoolName || meta.namaSekolah || 'Nama Sekolah'}</h1>
-        <p style="margin: 2px 0; font-size: 10pt;">${meta.schoolAddress || 'Alamat Sekolah'}</p>
-      </div>
-      <hr style="border: 2px solid black; margin-bottom: 15px;" />
-    `;
+    kopHtml = buildKopSekolahHTML({
+      nama_sekolah: meta.schoolName || meta.namaSekolah || 'Nama Sekolah',
+      alamat: meta.schoolAddress,
+      npsn: meta.schoolNpsn,
+      logo: meta.schoolLogo,
+    });
   }
 
+  // --- Meta info bar ---
+  const metaBarHtml = `
+  <p style="text-align:center;font-size:10pt;margin:8px 0 12px;">
+    <strong>Mata Pelajaran:</strong> ${escapeHtml(meta.mapel || '-')} |
+    <strong>Kelas:</strong> ${escapeHtml(meta.kelas || '-')} |
+    <strong>Kurikulum:</strong> ${escapeHtml(meta.kurikulum || '-')} |
+    <strong>Jenjang:</strong> ${escapeHtml(meta.jenjang || '-')}
+  </p>`;
+
+  // --- Table headers ---
   const headerColumns = [
-    includeTipe ? '<th style="border: 1px solid black; padding: 8px; background: #f0f0f0; font-size: 9pt;">Tipe Soal</th>' : '',
-    '<th style="border: 1px solid black; padding: 8px; background: #f0f0f0; font-size: 9pt;">No</th>',
-    includeMateri ? '<th style="border: 1px solid black; padding: 8px; background: #f0f0f0; font-size: 9pt;">Materi Pokok</th>' : '',
-    includeCP ? '<th style="border: 1px solid black; padding: 8px; background: #f0f0f0; font-size: 9pt;">Capaian Pembelajaran</th>' : '',
-    includeTP ? '<th style="border: 1px solid black; padding: 8px; background: #f0f0f0; font-size: 9pt;">Tujuan Pembelajaran</th>' : '',
-    includeIndikator ? '<th style="border: 1px solid black; padding: 8px; background: #f0f0f0; font-size: 9pt;">Indikator</th>' : '',
-    includeLevel ? '<th style="border: 1px solid black; padding: 8px; background: #f0f0f0; font-size: 9pt;">Level (Bloom)</th>' : '',
-    includeKesulitan ? '<th style="border: 1px solid black; padding: 8px; background: #f0f0f0; font-size: 9pt;">Tingkat Kesukaran</th>' : '',
-    includeKunci ? '<th style="border: 1px solid black; padding: 8px; background: #f0f0f0; font-size: 9pt;">Kunci Jawaban</th>' : '',
-    includeSkor ? '<th style="border: 1px solid black; padding: 8px; background: #f0f0f0; font-size: 9pt;">Skor</th>' : '',
+    includeTipe ? '<th style="border:1px solid #000;padding:8px;background:#f3f4f6;font-size:9pt;text-align:center;font-weight:bold;vertical-align:middle;">Tipe Soal</th>' : '',
+    '<th style="border:1px solid #000;padding:8px;background:#f3f4f6;font-size:9pt;text-align:center;font-weight:bold;vertical-align:middle;">No</th>',
+    includeMateri ? '<th style="border:1px solid #000;padding:8px;background:#f3f4f6;font-size:9pt;font-weight:bold;vertical-align:middle;">Materi Pokok</th>' : '',
+    includeCP ? '<th style="border:1px solid #000;padding:8px;background:#f3f4f6;font-size:9pt;font-weight:bold;vertical-align:middle;">Capaian Pembelajaran</th>' : '',
+    includeTP ? '<th style="border:1px solid #000;padding:8px;background:#f3f4f6;font-size:9pt;font-weight:bold;vertical-align:middle;">Tujuan Pembelajaran</th>' : '',
+    includeIndikator ? '<th style="border:1px solid #000;padding:8px;background:#f3f4f6;font-size:9pt;font-weight:bold;vertical-align:middle;">Indikator</th>' : '',
+    includeLevel ? '<th style="border:1px solid #000;padding:8px;background:#f3f4f6;font-size:9pt;text-align:center;font-weight:bold;vertical-align:middle;">Level (Bloom)</th>' : '',
+    includeKesulitan ? '<th style="border:1px solid #000;padding:8px;background:#f3f4f6;font-size:9pt;text-align:center;font-weight:bold;vertical-align:middle;">Tingkat Kesukaran</th>' : '',
+    includeKunci ? '<th style="border:1px solid #000;padding:8px;background:#f3f4f6;font-size:9pt;text-align:center;font-weight:bold;vertical-align:middle;">Kunci Jawaban</th>' : '',
+    includeSkor ? '<th style="border:1px solid #000;padding:8px;background:#f3f4f6;font-size:9pt;text-align:center;font-weight:bold;vertical-align:middle;">Skor</th>' : '',
   ].filter(Boolean).join('');
 
+  // --- Table rows ---
   const rows = soalList.map((soal, idx) => {
+    const rowBg = idx % 2 === 0 ? '#fff' : '#f9fafb';
     const cells = [
-      includeTipe ? `<td style="border: 1px solid black; padding: 6px; font-size: 9pt;">${getTypeLabel(soal.tipe)}</td>` : '',
-      `<td style="border: 1px solid black; padding: 6px; font-size: 9pt; text-align: center;">${idx + 1}</td>`,
-      includeMateri ? `<td style="border: 1px solid black; padding: 6px; font-size: 9pt;">${soal.elemen || '-'}</td>` : '',
-      includeCP ? `<td style="border: 1px solid black; padding: 6px; font-size: 9pt;">${soal.cp || '-'}</td>` : '',
-      includeTP ? `<td style="border: 1px solid black; padding: 6px; font-size: 9pt;">${soal.tp || '-'}</td>` : '',
-      includeIndikator ? `<td style="border: 1px solid black; padding: 6px; font-size: 9pt;">${soal.indikator || '-'}</td>` : '',
-      includeLevel ? `<td style="border: 1px solid black; padding: 6px; font-size: 9pt; text-align: center;">${soal.kognitif || '-'}</td>` : '',
-      includeKesulitan ? `<td style="border: 1px solid black; padding: 6px; font-size: 9pt; text-align: center;">${(soal.tingkat || '-').charAt(0).toUpperCase()}</td>` : '',
-      includeKunci ? `<td style="border: 1px solid black; padding: 6px; font-size: 9pt; text-align: center;">${formatKunci(soal.kunci)}</td>` : '',
-      includeSkor ? `<td style="border: 1px solid black; padding: 6px; font-size: 9pt; text-align: center;">${soal.skor || 1}</td>` : '',
+      includeTipe ? `<td style="border:1px solid #000;padding:6px;font-size:9pt;vertical-align:top;background:${rowBg};">${escapeHtml(getTypeLabel(soal.tipe))}</td>` : '',
+      `<td style="border:1px solid #000;padding:6px;font-size:9pt;text-align:center;vertical-align:middle;background:${rowBg};">${idx + 1}</td>`,
+      includeMateri ? `<td style="border:1px solid #000;padding:6px;font-size:9pt;vertical-align:top;background:${rowBg};">${escapeHtml(soal.elemen || '-')}</td>` : '',
+      includeCP ? `<td style="border:1px solid #000;padding:6px;font-size:9pt;vertical-align:top;background:${rowBg};">${escapeHtml(soal.cp || '-')}</td>` : '',
+      includeTP ? `<td style="border:1px solid #000;padding:6px;font-size:9pt;vertical-align:top;background:${rowBg};">${escapeHtml(soal.tp || '-')}</td>` : '',
+      includeIndikator ? `<td style="border:1px solid #000;padding:6px;font-size:9pt;vertical-align:top;background:${rowBg};">${escapeHtml(soal.indikator || '-')}</td>` : '',
+      includeLevel ? `<td style="border:1px solid #000;padding:6px;font-size:9pt;text-align:center;vertical-align:middle;background:${rowBg};">${escapeHtml(soal.kognitif || '-')}</td>` : '',
+      includeKesulitan ? `<td style="border:1px solid #000;padding:6px;font-size:9pt;text-align:center;vertical-align:middle;background:${rowBg};">${(soal.tingkat || '-').charAt(0).toUpperCase()}</td>` : '',
+      includeKunci ? `<td style="border:1px solid #000;padding:6px;font-size:9pt;text-align:center;vertical-align:middle;background:${rowBg};">${escapeHtml(formatKunci(soal.kunci))}</td>` : '',
+      includeSkor ? `<td style="border:1px solid #000;padding:6px;font-size:9pt;text-align:center;vertical-align:middle;background:${rowBg};">${soal.skor || 1}</td>` : '',
     ].filter(Boolean).join('');
     return `<tr>${cells}</tr>`;
   }).join('');
 
-  const signatureHtml = `
-    <div style="margin-top: 40px; page-break-inside: avoid;">
-      <table style="width: 100%; border: none; margin-top: 30px;">
-        <tr>
-          <td style="width: 60%; border: none;"></td>
-          <td style="width: 40%; border: none; text-align: center;">
-            <p style="font-size: 10pt; margin: 0;">${signatureDate || new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            <p style="font-size: 10pt; margin: 0;">Guru Mata Pelajaran,</p>
-            <div style="height: 60px;"></div>
-            <p style="font-size: 10pt; margin: 0; text-decoration: underline;">${signatureName || meta.teacherName || meta.namaGuru || '_____________________'}</p>
-          </td>
-        </tr>
-      </table>
-    </div>
-  `;
+  const tableHtml = `
+  <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+    <thead>
+      <tr>${headerColumns}</tr>
+    </thead>
+    <tbody>
+      ${rows}
+    </tbody>
+  </table>`;
 
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Kisi-Kisi - ${meta.mapel || 'Mata Pelajaran'}</title>
-      <style>
-        @page { size: landscape; margin: 1cm; }
-        body { font-family: 'Times New Roman', serif; font-size: 11pt; margin: 0; padding: 20px; }
-        h2 { text-align: center; font-size: 14pt; margin-bottom: 5px; }
-        .meta-info { text-align: center; font-size: 10pt; margin-bottom: 15px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid black; }
-        .no-print { display: none; }
-        @media print {
-          body { padding: 0; }
-          .no-print { display: none !important; }
-        }
-      </style>
-    </head>
-    <body>
-      ${headerHtml}
+  // --- Signature ---
+  const signatureHtml = buildSignatureBlockHTML({
+    guruNama: signatureName || meta.teacherName || meta.namaGuru || '_____________________',
+    guruNip: guruNip,
+    kepalaNama: '_____________________',
+    kepalaNip: undefined,
+    lokasi: meta.schoolName || meta.namaSekolah || '',
+    tanggal: signatureDate || formatTanggalIndonesia(new Date()),
+  });
 
-      <h2>KISI-KISI PENULISAN SOAL</h2>
-      <p class="meta-info">
-        <strong>Mata Pelajaran:</strong> ${meta.mapel || '-'} |
-        <strong>Kelas/Semester:</strong> ${meta.kelas || '-'} |
-        <strong>Kurikulum:</strong> ${meta.kurikulum || '-'} |
-        <strong>Jenjang:</strong> ${meta.jenjang || '-'}
-      </p>
+  // --- Footer ---
+  const footerHtml = buildDocumentFooterHTML({
+    showPageNumber: false,
+    showDisclaimer: true,
+    showDate: false,
+  });
 
-      <table>
-        <thead>
-          <tr>${headerColumns}</tr>
-        </thead>
-        <tbody>
-          ${rows}
-        </tbody>
-      </table>
+  // --- Title & meta ---
+  const titleHtml = `
+  <div style="text-align:center;margin-bottom:12px;">
+    <h2 style="font-size:14pt;font-weight:bold;text-transform:uppercase;margin:0 0 4px;">KISI-KISI PENULISAN SOAL</h2>
+  </div>`;
 
-      ${signatureHtml}
-    </body>
-    </html>
-  `;
+  // --- Body ---
+  const body = `
+  ${kopHtml}
+
+  ${titleHtml}
+
+  ${metaBarHtml}
+
+  ${tableHtml}
+
+  ${signatureHtml}
+
+  ${footerHtml}`;
+
+  return buildWordDocTemplate(body, `Kisi-Kisi - ${meta.mapel || 'Mata Pelajaran'}`);
 }
 
 export function generateKisikisiDocx(
@@ -179,15 +193,10 @@ export function generateKisikisiDocx(
   meta: MetaInfo,
   options: KisikisiOptions
 ): string {
-  // Generate HTML with Word-compatible markup
-  const html = generateKisikisiHTML(soalList, meta, options);
-  // Return the same HTML as docx (browser will handle conversion)
-  return html;
+  return generateKisikisiHTML(soalList, meta, options);
 }
 
 export function downloadKisikisiPdf(html: string, filename: string): void {
-  // This will be called from the dashboard with html2pdf
-  // The actual PDF generation happens in the dashboard
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -213,7 +222,7 @@ function formatKunci(kunci: string | string[] | object[] | undefined): string {
     if (typeof kunci[0] === 'string') {
       return (kunci as string[]).join(', ');
     }
-    return JSON.stringify(kunci).substring(0, 50);
+    return (kunci as object[]).map(k => JSON.stringify(k)).join(', ').substring(0, 80);
   }
   return String(kunci);
 }
@@ -230,5 +239,5 @@ export const defaultKisikisiOptions: KisikisiOptions = {
   includeSkor: true,
   includeSchoolHeader: true,
   signatureName: '',
-  signatureDate: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+  signatureDate: formatTanggalIndonesia(new Date()),
 };

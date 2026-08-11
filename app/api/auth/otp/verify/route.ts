@@ -1,9 +1,11 @@
 import { query } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { hashPassword } from "@/lib/auth";
-import crypto from "crypto";
+import { getClientIP } from "@/lib/auth-utils";
+import * as crypto from "crypto";
 
 export async function POST(req: Request) {
+  const clientIP = getClientIP(req);
   try {
     const { email, userId, otp, password, purpose = "password_reset", checkoutPlan = "" } = await req.json();
 
@@ -150,7 +152,7 @@ export async function POST(req: Request) {
 
             // Create institution membership
             const memberCheck = await query(
-              "SELECT id FROM payload.institution_members WHERE app_user_id = $1 AND institution_id = $2 LIMIT 1",
+              "SELECT id FROM public.institution_members WHERE app_user_id = $1 AND institution_id = $2 LIMIT 1",
               [user.id, invitation.institution_id]
             );
 
@@ -191,7 +193,7 @@ export async function POST(req: Request) {
             await query(
               `INSERT INTO audit_trails (user_id, aksi, deskripsi, ip_address)
                VALUES ($1, $2, $3, $4)`,
-              [user.id, "Gabung Institusi", `Akun digabung ke institusi ID ${invitation.institution_id} via undangan`, "127.0.0.1"]
+              [user.id, "Gabung Institusi", `Akun digabung ke institusi ID ${invitation.institution_id} via undangan`, clientIP]
             );
           }
         }
@@ -206,7 +208,7 @@ export async function POST(req: Request) {
       // Check memberships count for context switcher
       const membershipRes = await query(
         `SELECT COUNT(*) as count 
-         FROM payload.institution_members 
+         FROM public.institution_members 
          WHERE app_user_id = $1 AND status = 'active'`,
         [user.id]
       );
@@ -257,7 +259,7 @@ export async function POST(req: Request) {
       await query(
         `INSERT INTO audit_trails (user_id, aksi, deskripsi, ip_address)
          VALUES ($1, $2, $3, $4)`,
-        [user.id, "Reset Password", "Reset password sukses via OTP verifikasi", "127.0.0.1"]
+        [user.id, "Reset Password", "Reset password sukses via OTP verifikasi", clientIP]
       );
 
       return NextResponse.json({

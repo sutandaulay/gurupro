@@ -31,7 +31,7 @@ async function computeCrossInstitution(
   // Guru mengajar di banyak institusi
   const assignmentsResult = await pgQuery(`
     SELECT institution_id as "institutionId"
-    FROM payload.institution_members
+    FROM public.institution_members
     WHERE app_user_id = $1 AND status = 'active'
   `, [teacherId]);
   const assignments = assignmentsResult.rows;

@@ -187,3 +187,9 @@ export function Divider({ text, className = "" }: DividerProps) {
     </div>
   );
 }
+
+/* re-export form components */
+export { Label, Input, TextInput, PasswordInput, Select, Textarea, Checkbox, PasswordStrength } from "./form";
+export type { LabelProps, InputProps, PasswordInputProps, SelectProps, TextareaProps, CheckboxProps } from "./form";
+
+export { Modal } from "./form";

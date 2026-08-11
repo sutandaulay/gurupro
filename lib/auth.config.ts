@@ -16,9 +16,10 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account }) {
       console.log("[Auth] signIn callback:", { provider: account?.provider, email: user?.email });
 
-      // If user object has no id, we can't proceed reliably
-      // Let NextAuth create the session anyway; jwt/session callbacks handle the rest
       if (!user) return true;
+
+      // Cast user to allow dynamic id assignment (NextAuth types don't reflect runtime)
+      const mutableUser = user as { id?: string; email?: string; name?: string };
 
       if (account?.provider === "google" && user.email) {
         try {
@@ -28,50 +29,62 @@ export const authOptions: NextAuthOptions = {
           );
           console.log("[Auth] Existing user check:", { found: existing.rows.length });
 
-          const displayName = user.name?.trim()
+          const displayName = mutableUser.name?.trim()
             || (user.email && user.email.split("@")[0])
             || "GuruPRO User";
 
           if (existing.rows.length === 0) {
             const selfRefCode = "GPRO-" + Math.random().toString(36).substring(2, 7).toUpperCase();
 
-            const result = await query(
-              `INSERT INTO users (
-                 email, nama_lengkap, role, is_active, created_at,
-                 email_verified, phone_verified,
-                 referral_code, quota_poin_total,
-                 subscription_start, subscription_end, status_langganan,
-                 account_type
-               )
-               VALUES ($1, $2, 'guru', true, NOW(), true, false, $3, $4,
-                 CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 'free',
-                 'individual')
-               RETURNING id`,
-              [user.email.toLowerCase(), displayName, selfRefCode, DEFAULT_TOKEN_ALLOCATION]
-            );
+            try {
+              const result = await query(
+                `INSERT INTO users (
+                   email, nama_lengkap, role, is_active, created_at,
+                   email_verified, phone_verified,
+                   referral_code, quota_poin_total,
+                   subscription_start, subscription_end, status_langganan,
+                   account_type
+                 )
+                 VALUES ($1, $2, 'guru', true, NOW(), true, false, $3, $4,
+                   CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 'free',
+                   'individual')
+                 ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+                 RETURNING id`,
+                [user.email.toLowerCase(), displayName, selfRefCode, DEFAULT_TOKEN_ALLOCATION]
+              );
 
-            // Ensure user.id is set before returning
-            if (result.rows[0]?.id) {
-              user.id = result.rows[0].id;
+              if (result.rows[0]?.id) {
+                mutableUser.id = result.rows[0].id;
+              }
+              console.log("[Auth] New Google user created:", { id: mutableUser.id, tokens: DEFAULT_TOKEN_ALLOCATION });
+
+              await query(
+                `INSERT INTO audit_trails (user_id, aksi, deskripsi, ip_address)
+                 VALUES ($1, $2, $3, $4)`,
+                [mutableUser.id, 'Registrasi Google OAuth', 'Akun baru dibuat via Google Sign-In', 'system']
+              );
+            } catch (insertErr: any) {
+              if (insertErr?.code === '23505') {
+                const existingUser = await query(
+                  "SELECT id FROM users WHERE email = $1",
+                  [user.email.toLowerCase()]
+                );
+                if (existingUser.rows[0]?.id) {
+                  mutableUser.id = existingUser.rows[0].id;
+                }
+                console.log("[Auth] Race condition handled — existing user:", { id: mutableUser.id });
+              } else {
+                throw insertErr;
+              }
             }
-            console.log("[Auth] New Google user created:", { id: user.id, tokens: DEFAULT_TOKEN_ALLOCATION });
-
-            await query(
-              `INSERT INTO audit_trails (user_id, aksi, deskripsi, ip_address)
-               VALUES ($1, $2, $3, $4)`,
-              [user.id, 'Registrasi Google OAuth', 'Akun baru dibuat via Google Sign-In', 'system']
-            );
           } else {
-            // Ensure user.id is set for existing users too
-            if (!user.id && existing.rows[0]?.id) {
-              user.id = existing.rows[0].id;
+            if (!mutableUser.id && existing.rows[0]?.id) {
+              mutableUser.id = existing.rows[0].id;
             }
-            console.log("[Auth] Existing user:", { id: user.id });
+            console.log("[Auth] Existing user:", { id: mutableUser.id });
           }
         } catch (err) {
           console.error("[Auth] signIn DB error:", err);
-          // Still allow sign-in; user.id may already be set by NextAuth from OAuth token
-          // or jwt callback will use token.sub as fallback
         }
       }
       return true;
@@ -127,5 +140,10 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET ?? (() => {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('NEXTAUTH_SECRET environment variable is required in production');
+    }
+    return 'dev-secret-do-not-use-in-production';
+  })(),
 };

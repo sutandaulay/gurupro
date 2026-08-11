@@ -10,7 +10,8 @@
       "Bash(node -e \"const{Client}=require\\('pg'\\);const c=new Client\\('postgresql://postgres:nus4nt4r4@localhost:5432/gurupro_db'\\);c.connect\\(\\).then\\(\\(\\)=>c.query\\(\\\\\"SELECT conname,pg_get_constraintdef\\(oid\\) FROM pg_constraint WHERE conrelid='user_school_assignments'::regclass\\\\\"\\)\\).then\\(r=>{console.log\\(JSON.stringify\\(r.rows\\)\\);c.end\\(\\)}\\).catch\\(e=>{console.error\\(e.message\\);process.exit\\(1\\)}\\)\")",
       "Bash(node -e \"const{Client}=require\\('pg'\\);const c=new Client\\('postgresql://postgres:nus4nt4r4@localhost:5432/gurupro_db'\\);c.connect\\(\\).then\\(\\(\\)=>c.query\\(\\\\\"SELECT conname,pg_get_constraintdef\\(oid\\) FROM pg_constraint WHERE conrelid IN \\('user_school_assignments'::regclass,'ekstrakurikuler'::regclass\\)\\\\\"\\)\\).then\\(r=>{console.log\\(JSON.stringify\\(r.rows\\)\\);c.end\\(\\)}\\).catch\\(e=>{console.error\\(e.message\\);process.exit\\(1\\)}\\)\")",
       "Bash(node -e \"const{Client}=require\\('pg'\\);const c=new Client\\('postgresql://postgres:nus4nt4r4@localhost:5432/gurupro_db'\\);c.connect\\(\\).then\\(\\(\\)=>c.query\\(\\\\\"SELECT conname,pg_get_constraintdef\\(oid\\) FROM pg_constraint WHERE conrelid='ekstrakurikuler'::regclass\\\\\"\\)\\).then\\(r=>{console.log\\(JSON.stringify\\(r.rows\\)\\);c.end\\(\\)}\\).catch\\(e=>{console.error\\(e.message\\);process.exit\\(1\\)}\\)\")",
-      "Bash(curl -s -b \"gurupro_session={\\\\\"id\\\\\":\\\\\"invalid\\\\\"}\" http://localhost:3000/api/wali-kelas)"
+      "Bash(curl -s -b \"gurupro_session={\\\\\"id\\\\\":\\\\\"invalid\\\\\"}\" http://localhost:3000/api/wali-kelas)",
+      "Bash(python3 fix_seed.py)"
     ]
   }
 }

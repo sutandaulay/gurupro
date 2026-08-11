@@ -26,8 +26,8 @@ export async function GET(req: Request) {
     // Semua institusi yang punya member kepala_sekolah/wakasek aktif
     const instRes = await query(
       `SELECT DISTINCT im.institution_id AS id
-       FROM institution_members im
-       JOIN institution_members_role imr ON imr.parent_id = im.id
+       FROM public.institution_members im
+       JOIN public.institution_members_role imr ON imr.parent_id = im.id
        WHERE im.status = 'active'
          AND imr.value IN ('kepala_sekolah','wakasek')`
     );

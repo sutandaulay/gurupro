@@ -23,8 +23,8 @@ async function requireAdmin() {
 
 async function isOperatorOfInstitution(userId: string, institutionId: number): Promise<boolean> {
   const result = await query(
-    `SELECT im.id FROM institution_members im
-     JOIN institution_members_role imr ON imr.parent_id = im.id
+    `SELECT im.id FROM public.institution_members im
+     JOIN public.institution_members_role imr ON imr.parent_id = im.id
      WHERE im.app_user_id = $1 AND im.institution_id = $2
        AND im.status = 'active'
        AND imr.value IN ('operator', 'admin_sekolah', 'kepala_sekolah')

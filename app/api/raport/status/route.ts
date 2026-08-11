@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { requireSchoolAccess } from '@/lib/school-access';
 import { parsePagination, offset, wrapResponse } from '@/lib/pagination';
 import { ubahStatus } from '@/lib/raport/repository';
+import { getOwnedWaliKelasClassIds } from '@/lib/wali-kelas/dashboard';
 import type { StatusRaport, RoleChangedBy } from '@/lib/raport/repository';
 
 function isValidUUID(str: string): boolean {
@@ -36,6 +37,14 @@ export async function GET(req: Request) {
     } catch {
       return NextResponse.json({ error: 'Session tidak valid' }, { status: 401 });
     }
+    const userId = session.id;
+
+    // RBAC: daftar raport hanya bisa dilihat oleh wali kelas untuk kelas yang
+    // menjadi tanggung jawabnya (server-side, bukan klaim client).
+    const ownedClassIds = await getOwnedWaliKelasClassIds(userId);
+    if (ownedClassIds.length === 0) {
+      return NextResponse.json(wrapResponse([], 0, pag));
+    }
 
     const tableCheck = await query(`
       SELECT
@@ -57,6 +66,10 @@ export async function GET(req: Request) {
     const whereClauses: string[] = [];
     const params: any[] = [];
     let paramIdx = 1;
+
+    // SCOPING: hanya raport kelas yang dimiliki user ini sebagai wali kelas.
+    whereClauses.push(`dr.kelas_id = ANY($${paramIdx++}::uuid[])`);
+    params.push(ownedClassIds);
 
     if (kelasId) {
       if (!isValidUUID(kelasId)) {
@@ -173,7 +186,7 @@ export async function POST(req: Request) {
     const userId = session.id;
 
     const body = await req.json();
-    const { data_raport_id, new_status, changed_by_role } = body;
+    const { data_raport_id, new_status } = body;
 
     if (!data_raport_id || !new_status) {
       return NextResponse.json({ error: 'data_raport_id dan new_status wajib diisi' }, { status: 400 });
@@ -187,12 +200,32 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Use the repository function for status transition (single source of truth)
+    // RBAC: status raport HANYA boleh diubah oleh wali kelas kelas tsb.
+    // Otoritas diturunkan dari SESSION (server) — bukan dari role yang diklaim
+    // client di body — sehingga role lain ('guru_mapel', 'admin', dst.) tidak
+    // bisa melewati cek kepemilikan dengan mengubah payload.
+    const kelasRes = await query(
+      'SELECT kelas_id FROM data_raport WHERE id = $1',
+      [data_raport_id]
+    );
+    if (!kelasRes.rows.length) {
+      return NextResponse.json({ error: 'Data raport tidak ditemukan' }, { status: 404 });
+    }
+    const ownedClassIds = await getOwnedWaliKelasClassIds(userId);
+    if (!ownedClassIds.includes(kelasRes.rows[0].kelas_id)) {
+      return NextResponse.json(
+        { error: 'Forbidden: Anda bukan wali kelas untuk kelas ini' },
+        { status: 403 }
+      );
+    }
+
+    // Use the repository function for status transition (single source of truth).
+    // Karena hanya wali kelas yang boleh bertindak, role dicatat sebagai 'wali_kelas'.
     const result = await ubahStatus(
       data_raport_id,
       new_status as StatusRaport,
       userId,
-      changed_by_role as RoleChangedBy
+      'wali_kelas' as RoleChangedBy
     );
 
     if (!result.success) {

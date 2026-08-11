@@ -26,7 +26,7 @@ export async function POST(
     // Verify the membership belongs to this user and is in 'invited' status
     const member = await query(
       `SELECT im.id, im.status, i.name as institution_name
-       FROM institution_members im
+       FROM public.institution_members im
        JOIN institutions i ON i.id = im.institution_id
        WHERE im.id = $1 AND im.app_user_id = $2
        LIMIT 1`,

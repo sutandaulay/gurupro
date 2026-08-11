@@ -42,7 +42,7 @@ export async function autoCloseTeachingSessions() {
         const assignmentResult = await query(`
           SELECT tia.weekly_schedule as "weeklySchedule"
           FROM payload.teacher_institution_assignments tia
-          JOIN payload.institution_members im ON im.user_id = tia.teacher_id_id AND im.institution_id = tia.institution_id_id
+          JOIN public.institution_members im ON im.app_user_id = tia.teacher_id_id AND im.institution_id = tia.institution_id_id
           WHERE im.app_user_id = $1 AND im.status = 'active' AND tia.status = 'aktif'
           LIMIT 1
         `, [session.teacherId, session.institutionId]);

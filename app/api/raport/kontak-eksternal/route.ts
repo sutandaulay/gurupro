@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     const kelasNama = kelasRes.rows[0]?.nama_kelas || '';
 
     const guruRes = await query(
-      `SELECT u.nama_lengkap FROM institution_members im
+      `SELECT u.nama_lengkap FROM public.institution_members im
        JOIN users u ON u.id = im.app_user_id
        WHERE im.app_user_id = $1`,
       [guruMapelMemberId]

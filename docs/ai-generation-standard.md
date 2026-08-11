@@ -350,11 +350,76 @@ Lihat implementasi referensi di:
 
 ---
 
-## 7. Revisi History
+## 7. Capaian Pembelajaran (CP) — Structured Data
+
+### 7.1 Sumber Data
+
+CP kurikulum disimpan di tabel `capaian_pembelajaran` (migration `17_create_capaian_pembelajaran.sql`).
+
+**Sumber regulasi:**
+
+| Kode | Regulasi | Jalur | Jenjang |
+|------|----------|-------|---------|
+| `046/2025` | Kepka BSKAP 046/H/KR/2025 | `kemendikdasmen` | SD, SMP, SMA |
+| `9941/2025` | Kep Dirjen Pendis 9941/2025 | `kneelmenag` | RA, MI, MTs, MA, MAPK |
+| `020/2026` | Kepka BKPDM 020/2026 (override) | `kemendikdasmen` | SD–SMA (Agama) |
+
+**Override logic:** Untuk mapel Agama Umum (Islam, Hindu, Buddha, Khonghucu), `020/2026` mengesampingkan `046/2025`. Query menggunakan `ORDER BY (versi = '020/2026') DESC` agar versi override diutamakan. Agama Kristen & Katolik dari `020/2026` belum tersedia karena tabel multi-kolom tidak bisa di-OCR dengan baik — perlu input manual.
+
+### 7.2 Struktur Tabel
+
+```sql
+capaian_pembelajaran (
+  sumber_regulasi, jalur, jenjang, tipe_pendidikan,
+  mapel_kode, mapel_nama, fase, kelas_umum,
+  elemen JSONB  -- Array<{ nama_elemen, capaian_pembelajaran }>
+)
+```
+
+### 7.3 Retrieval API
+
+Gunakan `lib/cp-retrieval.ts`:
+
+```typescript
+import { getCPCached, determineJalur, formatCPForPrompt } from '@/lib/cp-retrieval';
+
+// 1. Tentukan jalur berdasarkan konteks
+const jalur = determineJalur({ jenjang: 'SMA', paiMode: null, kurikulum: 'merdeka' });
+// → 'kemendikdasmen'
+
+// 2. Ambil CP dari DB
+const cp = await getCPCached({ mapel: 'MATEMATIKA', jenjang: 'SMA', fase: 'E', jalur });
+// → CPRecord | null
+
+// 3. Format untuk prompt AI
+const cpText = formatCPForPrompt(cp);
+// → "[Sumber: Kepka BSKAP 046/H/KR/2025 | II | SMA Fase E | X-XI]\n**Bilangan**: ..."
+```
+
+### 7.4 Wiring di Route API
+
+```typescript
+// app/api/silabus/generate/route.ts
+let resolvedCP = capaianPembelajaran; // dari input user
+if (!resolvedCP) {
+  const { determineJalur, getCPCached, formatCPForPrompt } = await import('@/lib/cp-retrieval');
+  const jalur = determineJalur({ jenjang, paiMode: pai_mode, kurikulum });
+  const cpRecord = await getCPCached({ mapel: resolvedMapel, jenjang, fase, jalur, ... });
+  if (cpRecord) resolvedCP = formatCPForPrompt(cpRecord);
+}
+```
+
+CP retrieval bersifat best-effort. Jika tabel belum ada atau query gagal, route tetap melanjutkan tanpa CP (fallback ke knowledge model).
+
+---
+
+## 8. Revisi History
 
 | Versi | Tanggal | Perubahan |
 |--------|---------|-----------|
 | 1.0 | 14 Juli 2026 | Initial release |
+| 1.1 | 7 Agustus 2026 | Tambah Section 7: CP structured data retrieval |
+| 1.2 | 7 Agustus 2026 | Tambah migration 20: agama umum dari 020/2026 (Islam, Hindu, Buddha, Khonghucu); override logic via ORDER BY |
 
 ---
 

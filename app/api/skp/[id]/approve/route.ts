@@ -29,8 +29,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           const inst = instRes.rows[0]
           // Cari peran pengguna pada institusi ini
           const roleRes = await query(
-            `SELECT imr.value FROM institution_members im
-             JOIN institution_members_role imr ON imr.parent_id = im.id
+            `SELECT imr.value FROM public.institution_members im
+             JOIN public.institution_members_role imr ON imr.parent_id = im.id
              WHERE im.app_user_id = $1 AND im.institution_id = $2 AND im.status = 'active'`,
             [sessionData.id, inst.id]
           )

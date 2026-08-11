@@ -8,8 +8,8 @@ async function checkPermission(institutionId: number): Promise<NextResponse | nu
     const session = await requireSession()
     const result = await query(
       `SELECT imr.value
-       FROM institution_members im
-       JOIN institution_members_role imr ON imr.parent_id = im.id
+       FROM public.institution_members im
+       JOIN public.institution_members_role imr ON imr.parent_id = im.id
        WHERE im.app_user_id = $1 AND im.institution_id = $2 AND im.status = 'active'`,
       [session.id, institutionId]
     )
@@ -41,7 +41,7 @@ export async function POST(
   const memberResult = await query(
     `SELECT im.app_user_id, im.status, im.institution_id,
             u.email, u.nama_lengkap, u.whatsapp
-     FROM institution_members im
+     FROM public.institution_members im
      JOIN users u ON u.id::text = im.app_user_id
      WHERE im.id = $1 AND im.institution_id = $2`,
     [memberId, instId]

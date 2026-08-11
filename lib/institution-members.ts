@@ -119,7 +119,7 @@ export async function approveConnectionRequest(
     }
 
     await client.query(
-      `INSERT INTO institution_members_role ("order", parent_id, value)
+      `INSERT INTO payload.institution_members_role ("order", parent_id, value)
        VALUES ($1, $2, 'guru')
        ON CONFLICT DO NOTHING`,
       [1, memberId]
@@ -358,7 +358,7 @@ Tim GuruPRO`;
 
 export async function getUserActiveMemberships(appUserId: string): Promise<InstitutionMemberRow[]> {
   const result = await query(
-    `SELECT im.* FROM payload.institution_members im
+    `SELECT im.* FROM public.institution_members im
      WHERE im.app_user_id = $1 AND im.status = 'active'`,
     [appUserId]
   );
@@ -381,14 +381,14 @@ export async function hasActiveIndividualSubscription(userId: string): Promise<b
 
 export async function getUserAccountMode(userId: string): Promise<AccountMode> {
   const hasInvited = await query(
-    `SELECT id FROM payload.institution_members
+    `SELECT id FROM public.institution_members
      WHERE app_user_id = $1 AND status = 'invited'
      LIMIT 1`,
     [userId]
   );
 
   const hasActive = await query(
-    `SELECT id FROM payload.institution_members
+    `SELECT id FROM public.institution_members
      WHERE app_user_id = $1 AND status = 'active'
      LIMIT 1`,
     [userId]

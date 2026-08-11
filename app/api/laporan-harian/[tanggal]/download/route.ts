@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
+import {
+  escapeHtml,
+  formatTanggalIndonesia,
+  getTahunAjaranDariTanggal,
+  getSemesterDariTanggal,
+  buildKopSekolahHTML,
+  buildIdentitasTableHTML,
+  buildSignatureBlockHTML,
+  buildDocumentFooterHTML,
+  buildWordDocTemplate,
+  BRAND_DISCLAIMER,
+} from '@/lib/export/document-shared';
 
 const prisma = new PrismaClient();
 
@@ -27,19 +39,18 @@ export async function GET(
 
     const userDb = await prisma.users.findUnique({
       where: { id: user.id },
-      select: { role: true, status_langganan: true, subscription_end: true },
+      select: { role: true, status_langganan: true, subscription_end: true, nama_lengkap: true, nip: true },
     });
 
     const isPro = userDb?.status_langganan && userDb.status_langganan !== 'free';
-    const isExpired = isPro && userDb.subscription_end && new Date(userDb.subscription_end).getTime() < Date.now();
+    const isExpired = isPro && userDb?.subscription_end && new Date(userDb.subscription_end).getTime() < Date.now();
 
-    if (isExpired && userDb.role !== 'admin') {
-      return NextResponse.json({ error: 'Masa aktif langganan Anda telah berakhir. Perpanjang paket Anda untuk mencetak atau mengunduh laporan harian.' }, { status: 403 });
+    if (isExpired && userDb?.role !== 'admin') {
+      return NextResponse.json({ error: 'Masa aktif langganan Anda telah berakhir.' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
     const sekolahId = searchParams.get('sekolah_id');
-
     const { tanggal } = await params;
     const date = new Date(tanggal);
     if (isNaN(date.getTime())) {
@@ -51,15 +62,10 @@ export async function GET(
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
-    const guru = await prisma.users.findUnique({
-      where: { id: user.id },
-      select: { nama_lengkap: true },
-    });
-
     const sekolah = sekolahId
       ? await prisma.schools.findUnique({
           where: { id: sekolahId },
-          select: { nama_sekolah: true, nama_kepala_sekolah: true, nip_kepala_sekolah: true },
+          select: { nama_sekolah: true, alamat: true, npsn: true, logo: true, nama_kepala_sekolah: true, nip_kepala_sekolah: true },
         })
       : null;
 
@@ -87,11 +93,11 @@ export async function GET(
 
     const attendance = aggregateAttendance(sessions);
 
-    const html = generateDocHtml(user, guru, sekolah, tanggal, journals, attendance);
+    const html = generateDocHtml(user, userDb, sekolah, date, journals, attendance);
 
     return new Response(html, {
       headers: {
-        'Content-Type': 'application/vnd.ms-word',
+        'Content-Type': 'application/msword',
         'Content-Disposition': `attachment; filename="LaporanHarian_${tanggal}.doc"`,
       },
     });
@@ -103,145 +109,146 @@ export async function GET(
 
 function generateDocHtml(
   user: any,
-  guru: { nama_lengkap: string | null } | null,
-  sekolah: { nama_sekolah: string | null; nama_kepala_sekolah: string | null; nip_kepala_sekolah: string | null } | null,
-  tanggal: string,
+  guru: { nama_lengkap: string | null; nip: string | null } | null,
+  sekolah: { nama_sekolah: string | null; alamat: string | null; npsn: string | null; logo: string | null; nama_kepala_sekolah: string | null; nip_kepala_sekolah: string | null } | null,
+  date: Date,
   journals: any[],
   attendance: { hadir: number; izin: number; sakit: number; alpha: number; total: number }
 ): string {
-  const date = new Date(tanggal);
   const hari = date.toLocaleDateString('id-ID', { weekday: 'long' });
-  const tanggalFormatted = date.toLocaleDateString('id-ID', {
-    day: 'numeric', month: 'long', year: 'numeric',
+  const tanggalFormatted = formatTanggalIndonesia(date);
+  const tahunAjaran = getTahunAjaranDariTanggal(date);
+  const semester = getSemesterDariTanggal(date);
+  const semesterLabel = semester === 'ganjil' ? 'Ganjil' : 'Genap';
+  const todayFormatted = formatTanggalIndonesia(new Date());
+
+  // Fallback nama sekolah
+  const namaSekolah = sekolah?.nama_sekolah || 'GuruPRO';
+  if (!sekolah?.nama_sekolah) {
+    console.warn('[laporan-harian] Sekolah tidak ditemukan, menggunakan fallback "GuruPRO"');
+  }
+
+  // --- Kop Sekolah ---
+  const kopHtml = buildKopSekolahHTML({
+    nama_sekolah: namaSekolah,
+    alamat: sekolah?.alamat,
+    npsn: sekolah?.npsn,
+    logo: sekolah?.logo,
   });
 
-  const entriesHtml = journals.map((j, idx) => `
-    <div class="entry">
-      <h3>${idx + 1}. ${escapeHtml(j.subjects.nama_mapel)} — Kelas ${escapeHtml(j.classes.nama_kelas)}</h3>
-      <table class="meta-table">
-        <tr><td>Jam</td><td>: ${j.schedules?.jam_mulai || '-'} - ${j.schedules?.jam_selesai || '-'}</td></tr>
-        <tr><td>Materi</td><td>: ${escapeHtml(j.materi_pembelajaran)}</td></tr>
-        <tr><td>Tujuan Pembelajaran</td><td>: ${escapeHtml(j.tujuan_pembelajaran)}</td></tr>
-        <tr><td>Aktivitas</td><td>: ${escapeHtml(j.aktivitas_pembelajaran)}</td></tr>
-        ${j.media_pembelajaran ? `<tr><td>Media</td><td>: ${escapeHtml(j.media_pembelajaran)}</td></tr>` : ''}
-        ${j.asesmen_pembelajaran ? `<tr><td>Asesmen</td><td>: ${escapeHtml(j.asesmen_pembelajaran)}</td></tr>` : ''}
-        ${j.refleksi_guru ? `<tr><td>Refleksi</td><td>: ${escapeHtml(j.refleksi_guru)}</td></tr>` : ''}
-        ${j.tindak_lanjut ? `<tr><td>Tindak Lanjut</td><td>: ${escapeHtml(j.tindak_lanjut)}</td></tr>` : ''}
+  // --- Identitas ---
+  const identitasRows: [string, string][] = [
+    ['Hari / Tanggal', `${hari}, ${tanggalFormatted}`],
+    ['Nama Guru', escapeHtml(guru?.nama_lengkap || user.nama_lengkap || '-')],
+    ['NIP', guru?.nip || '-'],
+    ['Total Sesi Mengajar', `${journals.length} sesi`],
+    ['Semester', semesterLabel],
+    ['Tahun Pelajaran', tahunAjaran],
+  ];
+  const identitasHtml = buildIdentitasTableHTML(identitasRows, { col1Width: 170 });
+
+  // --- Entries ---
+  const entriesHtml = journals.map((j, idx) => {
+    const lines: { label: string; value: string }[] = [
+      { label: 'Jam', value: `${j.schedules?.jam_mulai || '-'} - ${j.schedules?.jam_selesai || '-'}` },
+      { label: 'Mata Pelajaran', value: escapeHtml(j.subjects.nama_mapel) },
+      { label: 'Kelas', value: escapeHtml(j.classes.nama_kelas) },
+      { label: 'Materi', value: escapeHtml(j.materi_pembelajaran || '-') },
+      { label: 'Tujuan Pembelajaran', value: escapeHtml(j.tujuan_pembelajaran || '-') },
+      { label: 'Aktivitas', value: escapeHtml(j.aktivitas_pembelajaran || '-') },
+    ];
+    if (j.media_pembelajaran) lines.push({ label: 'Media', value: escapeHtml(j.media_pembelajaran) });
+    if (j.asesmen_pembelajaran) lines.push({ label: 'Asesmen', value: escapeHtml(j.asesmen_pembelajaran) });
+    if (j.refleksi_guru) lines.push({ label: 'Refleksi', value: escapeHtml(j.refleksi_guru) });
+    if (j.tindak_lanjut) lines.push({ label: 'Tindak Lanjut', value: escapeHtml(j.tindak_lanjut) });
+
+    const metaRows = lines
+      .map(([label, value]) =>
+        `<tr><td style="width:160px;padding:3px 8px 3px 0;font-size:11pt;font-weight:bold;vertical-align:top;">${escapeHtml(label)}</td><td style="padding:3px 0;font-size:11pt;vertical-align:top;">: ${value}</td></tr>`
+      )
+      .join('\n');
+
+    return `
+    <div class="entry" style="margin-bottom:20px;page-break-inside:avoid;">
+      <h3 style="font-size:12pt;margin-bottom:8px;font-weight:bold;border-bottom:1px solid #000;padding-bottom:4px;">
+        ${idx + 1}. ${escapeHtml(j.subjects.nama_mapel)} — Kelas ${escapeHtml(j.classes.nama_kelas)}
+      </h3>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+        ${metaRows}
       </table>
-    </div>
-  `).join('\n');
+    </div>`;
+  }).join('\n');
 
-  const todayFormatted = new Date().toLocaleDateString('id-ID', {
-    day: 'numeric', month: 'long', year: 'numeric',
+  // --- Kehadiran ---
+  const kehadiranHtml = `
+  <div style="margin-bottom:20px;page-break-inside:avoid;">
+    <h3 style="font-size:12pt;margin-bottom:8px;font-weight:bold;">Rekapitulasi Kehadiran Siswa</h3>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="padding:6px 10px;border:1px solid #000;background:#f3f4f6;font-size:11pt;text-align:center;font-weight:bold;">Hadir</th>
+          <th style="padding:6px 10px;border:1px solid #000;background:#f3f4f6;font-size:11pt;text-align:center;font-weight:bold;">Izin</th>
+          <th style="padding:6px 10px;border:1px solid #000;background:#f3f4f6;font-size:11pt;text-align:center;font-weight:bold;">Sakit</th>
+          <th style="padding:6px 10px;border:1px solid #000;background:#f3f4f6;font-size:11pt;text-align:center;font-weight:bold;">Alpha</th>
+          <th style="padding:6px 10px;border:1px solid #000;background:#f3f4f6;font-size:11pt;text-align:center;font-weight:bold;">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:6px 10px;border:1px solid #000;text-align:center;font-size:11pt;">${attendance.hadir}</td>
+          <td style="padding:6px 10px;border:1px solid #000;text-align:center;font-size:11pt;">${attendance.izin}</td>
+          <td style="padding:6px 10px;border:1px solid #000;text-align:center;font-size:11pt;">${attendance.sakit}</td>
+          <td style="padding:6px 10px;border:1px solid #000;text-align:center;font-size:11pt;">${attendance.alpha}</td>
+          <td style="padding:6px 10px;border:1px solid #000;text-align:center;font-size:11pt;">${attendance.total}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
+
+  // --- Tanda Tangan ---
+  const signatureHtml = buildSignatureBlockHTML({
+    guruNama: guru?.nama_lengkap || user.nama_lengkap || '-',
+    guruNip: guru?.nip,
+    kepalaNama: sekolah?.nama_kepala_sekolah || '_____________________',
+    kepalaNip: sekolah?.nip_kepala_sekolah,
+    lokasi: namaSekolah !== 'GuruPRO' ? namaSekolah : undefined,
+    tanggal: tanggalFormatted,
   });
 
-  const namaKS = sekolah?.nama_kepala_sekolah || '_____________________';
-  const nipKS = sekolah?.nip_kepala_sekolah || '_____________________';
+  // --- Footer ---
+  const footerHtml = buildDocumentFooterHTML({
+    showPageNumber: false,
+    showDisclaimer: true,
+    showDate: true,
+    tanggal: todayFormatted,
+  });
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Laporan Harian Guru - ${tanggal}</title>
-  <style>
-    @page { margin: 2.5cm 3cm; size: A4; }
-    * { box-sizing: border-box; }
-    body { font-family: 'Times New Roman', serif; max-width: 100%; padding: 0; margin: 0; line-height: 1.6; font-size: 12pt; color: #000; }
-    h1 { text-align: center; font-size: 16pt; margin-bottom: 4px; font-weight: bold; text-transform: uppercase; }
-    h2 { font-size: 13pt; margin-top: 20px; margin-bottom: 10px; font-weight: bold; }
-    h3 { font-size: 12pt; margin-top: 16px; margin-bottom: 8px; font-weight: bold; }
-    p { margin: 6px 0; text-align: justify; }
-    .header { text-align: center; margin-bottom: 30px; }
-    .header-line { border-bottom: 2px solid #000; margin-top: 6px; margin-bottom: 20px; }
-    .meta-table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; }
-    .meta-table td { padding: 3px 6px; vertical-align: top; font-size: 12pt; }
-    .meta-table td:first-child { width: 140px; font-weight: bold; }
-    .entry { margin-bottom: 20px; page-break-inside: avoid; }
-    .entry h3 { border-bottom: 1px solid #ccc; padding-bottom: 4px; }
-    .identitas-box { margin-bottom: 20px; padding: 12px; border: 1px solid #000; page-break-inside: avoid; }
-    .identitas-box h3 { margin-top: 0; text-align: center; }
-    .attendance-box { margin-bottom: 20px; padding: 12px; border: 1px solid #000; page-break-inside: avoid; }
-    .attendance-box h3 { margin-top: 0; text-align: center; }
-    .attendance-table { width: 100%; border-collapse: collapse; margin: 8px 0 4px; }
-    .attendance-table th, .attendance-table td { border: 1px solid #000; padding: 6px 10px; text-align: center; font-size: 12pt; }
-    .attendance-table th { font-weight: bold; }
-    .footer { margin-top: 40px; text-align: center; font-size: 10pt; }
-    .signature { margin-top: 30px; }
-    .signature-table { width: 100%; margin-top: 20px; }
-    .signature-table td { width: 50%; text-align: center; vertical-align: top; }
-    .signature-space { height: 80px; }
-    @media print { body { padding: 0; } }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>Laporan Harian Guru</h1>
-    ${sekolah?.nama_sekolah ? `<p style="text-indent:0;text-align:center;font-size:13pt;font-weight:bold;">${escapeHtml(sekolah.nama_sekolah)}</p>` : ''}
-    <p style="text-indent:0;text-align:center;">${hari}, ${tanggalFormatted}</p>
-    <div class="header-line"></div>
+  // --- Body ---
+  const body = `
+  <div style="text-align:center;margin-bottom:16px;">
+    <h1 style="font-size:16pt;font-weight:bold;text-transform:uppercase;margin:0 0 4px;">Laporan Harian Guru</h1>
+    <p style="margin:0;font-size:12pt;">Semester ${semesterLabel} Tahun Pelajaran ${tahunAjaran}</p>
   </div>
 
-  <div class="identitas-box">
-    <h3>Identitas Guru</h3>
-    <table class="meta-table">
-      <tr><td>Nama</td><td>: ${escapeHtml(guru?.nama_lengkap || user.nama_lengkap || '-')}</td></tr>
-      <tr><td>Sekolah</td><td>: ${escapeHtml(sekolah?.nama_sekolah || '-')}</td></tr>
-      <tr><td>Total Sesi Mengajar</td><td>: ${journals.length} sesi</td></tr>
-    </table>
+  ${kopHtml}
+
+  <div>
+    <h3 style="font-size:12pt;margin-bottom:8px;font-weight:bold;">Identitas Guru</h3>
+    ${identitasHtml}
   </div>
 
-  <div class="attendance-box">
-    <h3>Rekapitulasi Kehadiran Siswa</h3>
-    <table class="attendance-table">
-      <tr>
-        <th>Hadir</th><th>Izin</th><th>Sakit</th><th>Alpha</th><th>Total</th>
-      </tr>
-      <tr>
-        <td>${attendance.hadir}</td>
-        <td>${attendance.izin}</td>
-        <td>${attendance.sakit}</td>
-        <td>${attendance.alpha}</td>
-        <td>${attendance.total}</td>
-      </tr>
-    </table>
+  ${kehadiranHtml}
+
+  <div>
+    <h3 style="font-size:12pt;margin-bottom:8px;font-weight:bold;">Detail Kegiatan Mengajar</h3>
+    ${entriesHtml}
   </div>
 
-  ${entriesHtml}
+  ${signatureHtml}
 
-  <div class="signature">
-    <div class="header-line" style="margin-top:30px;"></div>
-    <table class="signature-table">
-      <tr>
-        <td>
-          <p>Mengetahui,<br/>Kepala Sekolah</p>
-          <div class="signature-space"></div>
-          <p style="text-decoration:underline;font-weight:bold;">${escapeHtml(namaKS)}</p>
-          <p>NIP. ${escapeHtml(nipKS)}</p>
-        </td>
-        <td>
-          <p>Guru,</p>
-          <div class="signature-space"></div>
-          <p style="text-decoration:underline;font-weight:bold;">${escapeHtml(guru?.nama_lengkap || user.nama_lengkap || '_____________________')}</p>
-        </td>
-      </tr>
-    </table>
-  </div>
+  ${footerHtml}`;
 
-  <div class="footer">
-    <p style="text-indent:0;text-align:center;">Dicetak pada ${todayFormatted}</p>
-    <p style="text-indent:0;text-align:center;"><em>Dokumen ini dihasilkan oleh GuruPRO</em></p>
-  </div>
-</body>
-</html>`;
-}
-
-function escapeHtml(str: string): string {
-  if (!str) return '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return buildWordDocTemplate(body, `Laporan Harian - ${tanggalFormatted}`);
 }
 
 function normalizeAttendance(data: unknown): { hadir: number; izin: number; sakit: number; alpha: number; total: number } {

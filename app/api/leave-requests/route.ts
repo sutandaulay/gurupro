@@ -95,7 +95,7 @@ export async function POST(req: Request) {
         // Cek institution assignment sebagai fallback
         const assignmentResult = await query(`
           SELECT institution_id as "institutionId"
-          FROM payload.institution_members
+          FROM public.institution_members
           WHERE app_user_id = $1 AND status = 'active'
           LIMIT 1
         `, [session.user.id]);

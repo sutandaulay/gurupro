@@ -304,7 +304,56 @@ export function PasswordStrength({ password }: PasswordStrengthProps) {
           />
         ))}
       </div>
-      <p className={`mt-1 text-xs font-medium ${labelColor}`}>{label}</p>
     </div>
   );
 }
+
+/* ─── Modal ─── */
+
+interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: string;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+  size?: "sm" | "md" | "lg" | "xl";
+}
+
+export function Modal({ isOpen, onClose, title, children, footer, size = "md" }: ModalProps) {
+  if (!isOpen) return null;
+
+  const sizeMap = { sm: "max-w-sm", md: "max-w-lg", lg: "max-w-2xl", xl: "max-w-4xl" };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div
+        className="fixed inset-0 bg-black/50 -z-10"
+        onClick={onClose}
+      />
+      <div className={`bg-white rounded-xl shadow-2xl w-full ${sizeMap[size]} max-h-[90vh] flex flex-col`}>
+        {title && (
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-1"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+        <div className="px-6 py-5 overflow-y-auto flex-1">
+          {children}
+        </div>
+        {footer && (
+          <div className="px-6 py-4 border-t border-gray-100">
+            {footer}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

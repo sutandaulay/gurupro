@@ -15,7 +15,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     const instId = Number(topicRes.rows[0].institution_id);
     const memberRes = await query(
-      `SELECT 1 FROM institution_members WHERE app_user_id = $1 AND institution_id = $2 AND status = 'active' LIMIT 1`,
+      `SELECT 1 FROM public.institution_members WHERE app_user_id = $1 AND institution_id = $2 AND status = 'active' LIMIT 1`,
       [session.id, instId]
     );
     if (memberRes.rows.length === 0) return NextResponse.json({ error: "Forbidden" }, { status: 403 });

@@ -43,10 +43,10 @@ export async function GET(
               u.whatsapp AS whatsapp,
               COALESCE(
                 (SELECT json_agg(imr.value)
-                 FROM institution_members_role imr WHERE imr.parent_id = im.id),
+                 FROM public.institution_members_role imr WHERE imr.parent_id = im.id),
                 '[]'::json
               ) AS roles
-       FROM institution_members im
+       FROM public.institution_members im
        JOIN cms_users cu ON cu.id = im.user_id
        LEFT JOIN users u ON u.id::text = im.app_user_id
        WHERE im.institution_id = $1
@@ -122,7 +122,7 @@ export async function POST(
 
     // 3. Cek apakah sudah terdaftar sebagai anggota di lembaga ini
     const existingMembership = await query(
-      `SELECT id FROM payload.institution_members WHERE user_id = $1 AND institution_id = $2 LIMIT 1`,
+      `SELECT id FROM public.institution_members WHERE user_id = $1 AND institution_id = $2 LIMIT 1`,
       [cmsUserId, instId]
     );
 

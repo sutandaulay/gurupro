@@ -54,6 +54,8 @@ const InstitutionMembers: CollectionConfig = {
         { label: "Admin Sekolah", value: "admin_sekolah" },
         { label: "Bendahara", value: "bendahara" },
         { label: "Guru", value: "guru" },
+        { label: "Wali Kelas", value: "wali_kelas" },
+        { label: "Pembina Ekskul", value: "pembina_ekskul" },
       ],
     },
     {
@@ -99,6 +101,35 @@ const InstitutionMembers: CollectionConfig = {
       label: "Joined At",
       admin: {
         readOnly: true,
+      },
+    },
+    {
+      name: "subRole",
+      type: "select",
+      label: "Sub-Role",
+      options: [
+        { label: "Tidak Ada", value: "" },
+        { label: "Wali Kelas", value: "wali_kelas" },
+        { label: "Pembina Ekskul", value: "pembina_ekskul" },
+      ],
+      admin: {
+        description: "Penugasan sub-role tambahan di luar role utama",
+      },
+    },
+    {
+      name: "waliKelasOf",
+      type: "text",
+      label: "Wali Kelas Untuk Kelas",
+      admin: {
+        description: "Nama kelas yang menjadi tanggung jawab Wali Kelas, contoh: VII-A, X-MIPA-1",
+      },
+    },
+    {
+      name: "ekskulName",
+      type: "text",
+      label: "Nama Ekskul",
+      admin: {
+        description: "Nama ekstrakurikuler yang diasuh oleh Pembina Ekskul",
       },
     },
   ],

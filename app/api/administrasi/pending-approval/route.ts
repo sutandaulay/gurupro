@@ -16,8 +16,8 @@ export async function GET(req: Request) {
     // Cari institusi tempat user punya role kepala_sekolah/wakasek
     const memberRes = await query(
       `SELECT im.institution_id, ARRAY_AGG(imr.value) AS roles
-       FROM institution_members im
-       JOIN institution_members_role imr ON imr.parent_id = im.id
+       FROM public.institution_members im
+       JOIN public.institution_members_role imr ON imr.parent_id = im.id
        WHERE im.app_user_id = $1 AND im.status = 'active'
          AND imr.value IN ('kepala_sekolah','wakasek')
        GROUP BY im.institution_id`,

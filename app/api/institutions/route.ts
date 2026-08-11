@@ -69,7 +69,7 @@ export async function GET() {
 
       // Ensure user is institution_member
       const memberCheck = await pgQuery(
-        "SELECT id FROM payload.institution_members WHERE app_user_id = $1 AND institution_id = $2 LIMIT 1",
+        "SELECT id FROM public.institution_members WHERE app_user_id = $1 AND institution_id = $2 LIMIT 1",
         [userId, instId]
       );
       
@@ -98,7 +98,7 @@ export async function GET() {
               i.attendance_settings_attendance_radius_meters as radius_meters, 
               i.attendance_settings_qr_code_enabled as qr_enabled
        FROM payload.institutions i
-       JOIN payload.institution_members im ON im.institution_id = i.id
+       JOIN public.institution_members im ON im.institution_id = i.id
        WHERE im.app_user_id = $1 AND im.status = 'active'`,
       [userId]
     );

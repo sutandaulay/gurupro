@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { requireSession } from '@/lib/session';
 import ExcelJS from 'exceljs';
 import { z } from 'zod';
 import { db, query } from '@/lib/db';
@@ -48,20 +47,20 @@ function getPeriodDates(period: string) {
 }
 
 async function getDataScope(session: any) {
-  const userRoleRow = await query('SELECT role FROM users WHERE id = $1', [session.user.id]);
-  const userRole = userRoleRow.rows[0]?.role || session.user.role || 'guru';
+  const userRoleRow = await query('SELECT role FROM users WHERE id = $1', [session.id]);
+  const userRole = userRoleRow.rows[0]?.role || session.role || 'guru';
 
   const membersResult = await query(
     `SELECT institution_id as "institutionId"
-     FROM payload.institution_members
+     FROM public.institution_members
      WHERE app_user_id = $1 AND status = 'active'`,
-    [session.user.id]
+    [session.id]
   );
   const institutionIds = membersResult.rows.map((m: any) => Number(m.institutionId));
 
   const ownedSchools = await db.select({ id: schools.id })
     .from(schools)
-    .where(eq(schools.userId, session.user.id));
+    .where(eq(schools.userId, session.id));
   const schoolIds = ownedSchools.map(s => s.id);
 
   return { userRole, institutionIds, schoolIds };
@@ -78,10 +77,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const session = await requireSession();
 
     const url = new URL(req.url);
     const queryParams = Object.fromEntries(url.searchParams.entries());
@@ -96,7 +92,7 @@ export async function GET(req: Request) {
 
     let targetTeacherId = validatedParams.teacherId;
     if (!['admin', 'kepala_sekolah', 'wakasek', 'operator'].includes(userRole)) {
-      targetTeacherId = session.user.id;
+      targetTeacherId = session.id;
     }
 
     if (userRole === 'admin' && !targetTeacherId && institutionIds.length === 0 && schoolIds.length === 0) {
@@ -278,11 +274,17 @@ export async function GET(req: Request) {
         record.teachingSessionsCompleted || 0,
         record.lateMinutes || 0,
         record.faceMatchScore != null
-          ? `Face: ${record.faceMatchScore}% | Liveness: ${record.livenessPassed ? '✓' : '✗'}`
+          ? `Face: ${record.faceMatchScore}% | Liveness: ${record.livenessPassed ? 'Ya' : 'Tidak'}`
           : '',
         record.catatan || '',
       ]);
       row.height = 16;
+
+      // Zebra striping
+      const bg = index % 2 === 0 ? 'FFFFFFFF' : 'FFF9FAFB';
+      row.eachCell({ includeEmpty: false }, (cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      });
     });
 
     ws.columns.forEach((col, i) => {
@@ -310,6 +312,9 @@ export async function GET(req: Request) {
         }
       });
     });
+
+    // Column freeze on detail sheet
+    ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 1, activeCell: 'A2' }];
 
     const buffer = await wb.xlsx.writeBuffer();
     const filename = `laporan-presensi-${format(startDate, 'yyyy-MM-dd')}-${format(endDate, 'yyyy-MM-dd')}.xlsx`;

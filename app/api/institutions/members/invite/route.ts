@@ -32,8 +32,8 @@ export async function POST(req: Request) {
 
     // Verify operator has permission to manage members
     const operator = await query(
-      `SELECT im.id FROM institution_members im
-       JOIN institution_members_role imr ON imr.parent_id = im.id
+      `SELECT im.id FROM public.institution_members im
+       JOIN public.institution_members_role imr ON imr.parent_id = im.id
        WHERE im.app_user_id = $1 AND im.institution_id = $2
          AND im.status = 'active'
          AND imr.value IN ('operator', 'admin_sekolah')
@@ -95,7 +95,7 @@ export async function POST(req: Request) {
 
     // Check if already a member of this institution (by app_user_id OR cms user_id)
     const existingMember = await query(
-      `SELECT id, status FROM institution_members
+      `SELECT id, status FROM public.institution_members
        WHERE institution_id = $1
          AND (app_user_id = $2 OR user_id = $3)
        LIMIT 1`,

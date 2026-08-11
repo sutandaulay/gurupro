@@ -45,14 +45,14 @@ export async function GET(req: Request) {
     if (targetTeacherId !== session.user.id && (session.user.role || '') !== 'admin') {
       const membersResult = await query(`
         SELECT institution_id as "institutionId"
-        FROM payload.institution_members
+        FROM public.institution_members
         WHERE app_user_id = $1 AND status = 'active'
       `, [session.user.id]);
       const userInstitutionMembers = membersResult.rows;
 
       const assignmentsResult = await query(`
         SELECT institution_id as "institutionId"
-        FROM payload.institution_members
+        FROM public.institution_members
         WHERE app_user_id = $1 AND status = 'active'
       `, [targetTeacherId]);
       const teacherAssignments = assignmentsResult.rows;
@@ -88,7 +88,7 @@ export async function GET(req: Request) {
     // Ambil institusi aktif tempat guru mengajar
     const assignmentsResult2 = await query(`
       SELECT institution_id as "institutionId", id as "assignmentId"
-      FROM payload.institution_members
+      FROM public.institution_members
       WHERE app_user_id = $1 AND status = 'active'
     `, [targetTeacherId]);
     const teacherAssignments = assignmentsResult2.rows;

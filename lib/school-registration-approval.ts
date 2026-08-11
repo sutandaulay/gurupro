@@ -74,7 +74,7 @@ export async function approveSchoolRegistration(registration: any) {
 
   if (cmsUserId) {
     const existingMembership = await query(
-      `SELECT id FROM payload.institution_members WHERE user_id = $1 AND institution_id = $2 LIMIT 1`,
+      `SELECT id FROM public.institution_members WHERE user_id = $1 AND institution_id = $2 LIMIT 1`,
       [cmsUserId, newInstitutionId]
     );
 
@@ -108,7 +108,7 @@ export async function approveSchoolRegistration(registration: any) {
          JOIN users u ON u.id = usa.userId
          WHERE s.npsn = $1
            AND NOT EXISTS (
-             SELECT 1 FROM payload.institution_members im
+             SELECT 1 FROM public.institution_members im
              WHERE im.app_user_id = usa.userId
                AND im.institution_id = $2
            )`,

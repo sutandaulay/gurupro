@@ -15,8 +15,8 @@ export async function GET(req: Request) {
 
     const memberRes = await query(
       `SELECT im.app_user_id as member_id
-       FROM institution_members im
-       JOIN institution_members_role imr ON imr.parent_id = im.id
+       FROM public.institution_members im
+       JOIN public.institution_members_role imr ON imr.parent_id = im.id
        WHERE im.app_user_id = $1 AND imr.value = 'guru' AND im.status = 'active'
        LIMIT 1`,
       [userId]

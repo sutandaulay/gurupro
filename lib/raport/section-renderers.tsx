@@ -1,4 +1,6 @@
-import type { LayoutSection, VarianTampilan } from './schemas';
+// NOTE: This is a preview-only component.
+// The actual document export uses lib/export/teaching-report.ts and app/api/raport/download/route.ts
+// which generate proper print-ready DOCX with kop sekolah, signature blocks, and page numbers.
 
 // =============================================
 // DUMMY DATA — only for preview in builder

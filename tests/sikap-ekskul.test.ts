@@ -67,6 +67,52 @@ describe('getPresensiSnapshot', () => {
   })
 })
 
+describe('getPresensiSnapshot (batch mode)', () => {
+  it('mengembalikan snapshot per siswa dalam SATU query (tanpa N+1)', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        { student_id: 'siswa-1', sakit: 2, izin: 1, alpa: 0 },
+        { student_id: 'siswa-2', sakit: 0, izin: 0, alpa: 3 },
+      ],
+    })
+
+    const result = await getPresensiSnapshot(['siswa-1', 'siswa-2'], 'kelas-1', '2025/2026-ganjil')
+
+    expect(result).toEqual({
+      'siswa-1': { sakit: 2, izin: 1, alpa: 0 },
+      'siswa-2': { sakit: 0, izin: 0, alpa: 3 },
+    })
+    expect(mockQuery).toHaveBeenCalledTimes(1)
+    const [sql, params] = mockQuery.mock.calls[0]
+    expect(sql).toContain('ANY($2::uuid[])')
+    expect(params[0]).toBe('%2025%')
+    expect(params[3]).toBe('ganjil')
+  })
+
+  it('zero-fill siswa tanpa record presensi', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] })
+
+    const result = await getPresensiSnapshot(['a', 'b'], 'kelas-1', '2025/2026-ganjil')
+
+    expect(result).toEqual({
+      a: { sakit: 0, izin: 0, alpa: 0 },
+      b: { sakit: 0, izin: 0, alpa: 0 },
+    })
+  })
+
+  it('mengembalikan {} untuk daftar kosong tanpa query', async () => {
+    const result = await getPresensiSnapshot([], 'kelas-1', '2025/2026-ganjil')
+    expect(result).toEqual({})
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('mengembalikan peta zero-fill jika periode invalid', async () => {
+    const result = await getPresensiSnapshot(['a'], 'kelas-1', 'invalid-format')
+    expect(result).toEqual({ a: { sakit: 0, izin: 0, alpa: 0 } })
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+})
+
 describe('insertPenilaianSikap', () => {
   const validInput = {
     siswaId: '11111111-1111-1111-1111-111111111111',

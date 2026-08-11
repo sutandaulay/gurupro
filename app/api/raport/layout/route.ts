@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     if (!created_by_wali_kelas_member_id) {
       // Fallback: cari institution_members.id dari session user
       const memberLookup = await query(
-        `SELECT id FROM institution_members WHERE app_user_id = $1 AND status = 'active' LIMIT 1`,
+        `SELECT id FROM public.institution_members WHERE app_user_id = $1 AND status = 'active' LIMIT 1`,
         [userId]
       );
       if (memberLookup.rows.length > 0) {

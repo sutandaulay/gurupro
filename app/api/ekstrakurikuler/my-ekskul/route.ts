@@ -30,7 +30,7 @@ export async function GET(req: Request) {
     if (!memberResult.docs.length) {
       return NextResponse.json({ error: 'Member tidak ditemukan' }, { status: 403 });
     }
-    const memberId = String(memberResult.docs[0].id);
+    const memberId = String(memberResult.docs[0].appUserId || memberResult.docs[0].id);
 
     // Get ekskul for this pembina
     const { data: ekskulList } = await getEkstrakurikuler({ pembinaMemberId: memberId });

@@ -405,7 +405,7 @@ export async function POST(request: NextRequest) {
           };
 
           query(
-            `SELECT institution_id FROM payload.institution_members
+            `SELECT institution_id FROM public.institution_members
              WHERE app_user_id = $1 AND status = 'active'
              LIMIT 1`,
             [guruId]

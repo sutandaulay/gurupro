@@ -40,7 +40,7 @@ async function testERaportFeature() {
     // Ambil institusi tempat guru aktif
     const instResult = await client.query(`
       SELECT im.institution_id, i.name
-      FROM payload.institution_members im
+      FROM public.institution_members im
       JOIN payload.institutions i ON i.id = im.institution_id
       WHERE im.app_user_id = $1
       LIMIT 1
@@ -154,7 +154,7 @@ async function testERaportFeature() {
       // Cek apakah user ini terdaftar di institusi lain
       const userInOtherInstResult = await client.query(`
         SELECT COUNT(*) as count
-        FROM payload.institution_members
+        FROM public.institution_members
         WHERE app_user_id = $1 AND institution_id = $2
       `, [guru.id, otherInstitution.id]);
       
@@ -168,7 +168,7 @@ async function testERaportFeature() {
         const schoolsInOtherInstResult = await client.query(`
           SELECT sch.id, sch.nama_sekolah
           FROM schools sch
-          JOIN payload.institution_members im ON im.user_id = sch.user_id
+          JOIN public.institution_members im ON im.user_id = sch.user_id
           WHERE im.app_user_id = $1 AND im.institution_id = $2
         `, [guru.id, otherInstitution.id]);
         

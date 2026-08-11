@@ -189,7 +189,7 @@ async function main() {
 
     // Check if already member
     const existing = await client.query(`
-      SELECT id FROM payload.institution_members
+      SELECT id FROM public.institution_members
       WHERE app_user_id = $1 AND institution_id = $2
     `, [appUserId, instId]);
 

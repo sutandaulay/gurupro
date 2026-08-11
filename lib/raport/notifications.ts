@@ -184,7 +184,7 @@ export async function sendRaportNotification(
       const guruMapelRes = await query(
         `SELECT DISTINCT im.app_user_id as member_id, u.nama_lengkap, u.email, u.whatsapp
          FROM data_raport_nilai_mapel nm
-          JOIN institution_members im ON nm.guru_mapel_member_id::text = im.app_user_id
+          JOIN public.institution_members im ON nm.guru_mapel_member_id::text = im.app_user_id
          JOIN users u ON u.id::text = im.app_user_id
          WHERE nm.data_raport_id = $1`,
         [raportId]
@@ -230,7 +230,7 @@ export async function sendRaportNotification(
       const allGuruRes = await query(
         `SELECT DISTINCT im.app_user_id as member_id, u.nama_lengkap, u.email, u.whatsapp
          FROM data_raport_nilai_mapel nm
-          JOIN institution_members im ON nm.guru_mapel_member_id::text = im.app_user_id
+          JOIN public.institution_members im ON nm.guru_mapel_member_id::text = im.app_user_id
          JOIN users u ON u.id::text = im.app_user_id
          WHERE nm.data_raport_id = $1`,
         [raportId]

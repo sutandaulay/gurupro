@@ -26,7 +26,7 @@ export async function POST(
     // Fetch the membership record
     const member = await query(
       `SELECT im.*, i.name as institution_name
-       FROM institution_members im
+       FROM public.institution_members im
        JOIN institutions i ON i.id = im.institution_id
        WHERE im.id = $1
        LIMIT 1`,
@@ -45,8 +45,8 @@ export async function POST(
     // Check authorization: user can leave own membership, operator can remove anyone
     const isOwn = membership.app_user_id === userId;
     const isOperator = await query(
-      `SELECT im.id FROM institution_members im
-       JOIN institution_members_role imr ON imr.parent_id = im.id
+      `SELECT im.id FROM public.institution_members im
+       JOIN public.institution_members_role imr ON imr.parent_id = im.id
        WHERE im.app_user_id = $1 AND im.institution_id = $2
          AND im.status = 'active'
          AND imr.value IN ('operator', 'admin_sekolah')
@@ -95,8 +95,8 @@ export async function POST(
     // Notify institution admins
     try {
       const adminsResult = await query(
-        `SELECT im.app_user_id FROM institution_members im
-         JOIN institution_members_role imr ON imr.parent_id = im.id
+        `SELECT im.app_user_id FROM public.institution_members im
+         JOIN public.institution_members_role imr ON imr.parent_id = im.id
          WHERE im.institution_id = $1
            AND im.status = 'active'
            AND imr.value IN ('operator', 'admin_sekolah', 'kepala_sekolah')

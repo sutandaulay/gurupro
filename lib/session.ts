@@ -29,6 +29,16 @@ function parseSession(data?: string): SessionData | null {
   }
 }
 
+function sessionCookieOptions(maxAge: number = 60 * 60 * 24 * 7) {
+  const isProd = process.env.NODE_ENV === 'production';
+  // Secure only in production, unless explicitly overridden
+  const secure = isProd && process.env.SESSION_COOKIE_SECURE !== 'false';
+  // In production (HTTPS), sameSite must be 'none' for cross-origin
+  // In development (HTTP), use 'lax'
+  const sameSite: 'lax' | 'none' = isProd ? 'none' : 'lax';
+  return { httpOnly: true, secure, sameSite, maxAge, path: '/' };
+}
+
 export async function getSession(): Promise<SessionData | null> {
   // 1. Try gurupro_session cookie first (set by manual login)
   const cookieStore = await cookies();
@@ -56,13 +66,7 @@ export async function getSession(): Promise<SessionData | null> {
 
         // Also set gurupro_session cookie so subsequent requests are faster
         try {
-          cookieStore.set('gurupro_session', JSON.stringify(sessionData), {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax', // CSRF protection
-            maxAge: 60 * 60 * 24 * 7,
-            path: '/',
-          });
+          cookieStore.set('gurupro_session', JSON.stringify(sessionData), sessionCookieOptions());
         } catch {
           // cookies().set() may not be available in all contexts, ignore
         }
@@ -91,20 +95,18 @@ export async function getActiveContext(): Promise<ActiveContext | undefined> {
 }
 
 export async function setActiveContext(context: ActiveContext): Promise<void> {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('gurupro_session')?.value;
-  if (!sessionCookie) return;
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('gurupro_session')?.value;
+    if (!sessionCookie) return;
 
-  const session = JSON.parse(sessionCookie);
-  session.activeContext = context;
+    const session = JSON.parse(sessionCookie);
+    session.activeContext = context;
 
-  cookieStore.set('gurupro_session', JSON.stringify(session), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax', // CSRF protection
-    maxAge: 60 * 60 * 24 * 7,
-    path: '/',
-  });
+    cookieStore.set('gurupro_session', JSON.stringify(session), sessionCookieOptions());
+  } catch (err) {
+    console.error('setActiveContext failed:', err);
+  }
 }
 
 export async function setDefaultSessionCookie(
@@ -115,13 +117,7 @@ export async function setDefaultSessionCookie(
     activeContext: 'individual',
   };
 
-  (await cookies()).set('gurupro_session', JSON.stringify(data), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax', // CSRF protection
-    maxAge: 60 * 60 * 24 * 7,
-    path: '/',
-  });
+  (await cookies()).set('gurupro_session', JSON.stringify(data), sessionCookieOptions());
 }
 
 export async function getContextFilters(userId: string): Promise<ContextFilter> {

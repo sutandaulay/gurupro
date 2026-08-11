@@ -80,7 +80,7 @@ export async function POST(request: Request) {
 
     // 4. Create institution_members record if it doesn't exist
     const existingMember = await query(
-      `SELECT id FROM institution_members
+      `SELECT id FROM public.institution_members
        WHERE institution_id = $1 AND app_user_id = $2
        LIMIT 1`,
       [inv.institution_id, userId]

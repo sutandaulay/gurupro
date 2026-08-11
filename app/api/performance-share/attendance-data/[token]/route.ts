@@ -59,7 +59,7 @@ export async function GET(
     // Untuk sementara, kita ambil semua institusi aktif tempat guru mengajar
     const assignmentsResult = await query(`
       SELECT institution_id as "institutionId"
-      FROM payload.institution_members
+      FROM public.institution_members
       WHERE app_user_id = $1 AND status = 'active'
     `, [teacherId]);
     const teacherAssignments = assignmentsResult.rows;

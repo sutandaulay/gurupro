@@ -1,11 +1,11 @@
 "use client";
 import { apiFetch } from "@/lib/api-client";
 
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import AppIcon from "@/app/components/ui/AppIcon";
-import { getLucideIcon, resolveCategory } from "@/lib/menuConfig";
+import { getLucideIcon, resolveCategory, resolveInstitutionHref, resolveActiveInstitutionId, isInstitutionHref } from "@/lib/menuConfig";
 
 type SubItem = {
   label: string;
@@ -168,6 +168,60 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
   const pathname = usePathname();
   const router = useRouter();
 
+  const [isWaliKelas, setIsWaliKelas] = useState<boolean | null>(null);
+  const [activeInstitutionId, setActiveInstitutionId] = useState<number | null>(null);
+  const [institutionLoaded, setInstitutionLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch('/api/auth/active-context')
+      .then(async (res) => {
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json();
+          setActiveInstitutionId(resolveActiveInstitutionId(data));
+        }
+        setInstitutionLoaded(true);
+      })
+      .catch(() => { if (!cancelled) { setActiveInstitutionId(null); setInstitutionLoaded(true); } });
+    return () => { cancelled = true; };
+  }, []);
+
+  // "Status Raport" hanya dikelola wali kelas → sembunyikan submenu bagi yg
+  // bukan wali kelas (belum punya kelas yang ditugaskan kepadanya).
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch('/api/wali-kelas/my-classes')
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        setIsWaliKelas(!!(res.ok && (body.data?.length ?? 0) > 0));
+      })
+      .catch(() => {
+        if (!cancelled) setIsWaliKelas(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const visibleMenuItems: MenuItem[] = useMemo(() => {
+    if (isWaliKelas === null) return menuItems;
+    return menuItems.map((item) => {
+      // Hide institution menu until institution context is loaded
+      if (item.label === "Institusi" && !institutionLoaded) {
+        return { ...item, submenu: [] };
+      }
+      if (item.label !== "Raport" || !item.submenu) return item;
+      return {
+        ...item,
+        submenu: item.submenu.filter(
+          (sub) => !(sub as SubItem).label?.startsWith("Status Raport") || isWaliKelas
+        ),
+      };
+    });
+  }, [isWaliKelas, institutionLoaded]);
+
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
   const isDropdownActive = (item: MenuItem): boolean => {
@@ -201,7 +255,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
     <div className="relative hidden lg:block w-full">
       <nav className="flex h-12 bg-white border-b border-gray-200 px-6 sticky top-0 z-50 max-w-[1400px] mx-auto">
         <div className="flex items-center gap-1 w-full overflow-x-auto thin-scrollbar">
-          {menuItems.map((item) => {
+          {visibleMenuItems.map((item) => {
             const active = isDropdownActive(item);
             const Icon = getLucideIcon(item.label);
 
@@ -323,8 +377,13 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
                       return (
                         <a
                           key={s.label}
-                          href={s.href}
-                          onClick={(e) => { e.preventDefault(); router.push(s.href); }}
+                          href={isInstitutionHref(s.href) ? resolveInstitutionHref(s.href, activeInstitutionId) : s.href}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            router.push(isInstitutionHref(s.href)
+                              ? resolveInstitutionHref(s.href, activeInstitutionId)
+                              : s.href);
+                          }}
                           className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer whitespace-nowrap ${
                             sActive
                               ? "bg-violet-50 text-violet-700"

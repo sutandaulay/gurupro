@@ -1,8 +1,8 @@
 'use client'
 import { apiFetch } from "@/lib/api-client";
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { useDashboardParams } from "../../../_shared/params-context"
+import { useRouter, useParams } from 'next/navigation'
+// useDashboardParams removed — uses useParams directly for Pathway B
 import { Button, Card, Badge, Spinner } from "@/app/components/ui"
 import { Pagination } from "@/components/ui/pagination"
 
@@ -34,7 +34,7 @@ function formatDate(dateStr: string): string {
 }
 
 export default function InstitutionLaporanMengajarPage() {
-  const params = useDashboardParams()
+  const params = useParams()
   const router = useRouter()
   const institutionId = params.institutionId as string
   const [filter, setFilter] = useState('month')
@@ -45,6 +45,17 @@ export default function InstitutionLaporanMengajarPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
   const [pageSize, setPageSize] = useState(20)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const qs = new URLSearchParams(window.location.search)
+    const period = qs.get('period')
+    const guruId = qs.get('guru_id')
+    if (period && ['today', 'week', 'month', 'all'].includes(period)) {
+      setFilter(period)
+    }
+    if (guruId) setGuruFilter(guruId)
+  }, [])
 
   const fetchData = useCallback(async () => {
     if (!institutionId) return
@@ -162,7 +173,7 @@ export default function InstitutionLaporanMengajarPage() {
                   <div key={report.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <Badge variant={report.status === 'Final' ? 'green' : 'yellow'} size="sm">
+                        <Badge variant={report.status === 'Final' ? 'success' : 'warning'}>
                           {report.status}
                         </Badge>
                         <span className="text-xs text-slate-400">

@@ -8,7 +8,7 @@ import { getSession } from "@/lib/session";
 
 async function listInstitusiUser(userId: string): Promise<number[]> {
   const res = await query(
-    `SELECT DISTINCT institution_id FROM institution_members
+    `SELECT DISTINCT institution_id FROM public.institution_members
      WHERE app_user_id = $1 AND status = 'active'`,
     [userId]
   );

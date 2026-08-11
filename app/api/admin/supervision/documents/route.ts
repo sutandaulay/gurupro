@@ -32,8 +32,8 @@ export async function GET(req: Request) {
     if (!isAuthorized) {
       const membershipCheck = await query(
         `SELECT imr.value
-         FROM institution_members im
-         JOIN institution_members_role imr ON imr.parent_id = im.id
+         FROM public.institution_members im
+         JOIN public.institution_members_role imr ON imr.parent_id = im.id
          WHERE im.app_user_id = $1 AND im.status = 'active'
          AND (imr.value = 'kepala_sekolah' OR imr.value = 'wakasek')`,
         [userId]

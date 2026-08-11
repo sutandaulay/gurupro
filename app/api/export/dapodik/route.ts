@@ -22,8 +22,8 @@ export async function GET(req: Request) {
 
     // Validasi akses: admin, operator, kepala_sekolah, wakasek di institusi tsb
     const memberRes = await query(
-      `SELECT imr.value FROM institution_members im
-       JOIN institution_members_role imr ON imr.parent_id = im.id
+      `SELECT imr.value FROM public.institution_members im
+       JOIN public.institution_members_role imr ON imr.parent_id = im.id
        WHERE im.app_user_id = $1 AND im.institution_id = $2 AND im.status = 'active'`,
       [session.user.id, institutionId]
     );

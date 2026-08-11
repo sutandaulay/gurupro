@@ -34,6 +34,7 @@ interface ClassSession {
   id: string;
   institutionId: string;
   subjectId: string;
+  subjectName?: string;
   className: string;
   classId?: string;
   startTime: string; // Format HH:MM
@@ -66,7 +67,6 @@ export default function TeachingAttendancePage() {
   const { data: session } = useSession();
   const [schedules, setSchedules] = useState<ScheduleSlot[]>([]);
   const [institutions, setInstitutions] = useState<Institution[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
   const [confirmingSwitch, setConfirmingSwitch] = useState<{ from: string; to: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,28 +79,22 @@ export default function TeachingAttendancePage() {
         setLoading(true);
         
         // Simulasi API call untuk mendapatkan jadwal mengajar hari ini
-        const [scheduleRes, institutionRes, subjectRes] = await Promise.all([
+        const [scheduleRes, institutionRes] = await Promise.all([
           apiFetch('/api/attendance/schedule/today'),
-          apiFetch('/api/institutions'),
-          apiFetch('/api/subjects')
+          apiFetch('/api/institutions')
         ]);
 
-        if (!scheduleRes.ok || !institutionRes.ok || !subjectRes.ok) {
-          throw new Error('Gagal mengambil data jadwal, institusi, atau mata pelajaran');
+        if (!scheduleRes.ok || !institutionRes.ok) {
+          throw new Error('Gagal mengambil data jadwal atau institusi');
         }
 
-        const [scheduleData, institutionData, subjectData] = await Promise.all([
+        const [scheduleData, institutionData] = await Promise.all([
           scheduleRes.json(),
-          institutionRes.json(),
-          subjectRes.json()
+          institutionRes.json()
         ]);
 
         // Proses data dan tambahkan status
-        const today = new Date();
         const now = new Date();
-        const currentHour = now.getHours().toString().padStart(2, '0');
-        const currentMin = now.getMinutes().toString().padStart(2, '0');
-        const currentTimeStr = `${currentHour}:${currentMin}`;
 
         const processedSchedules: ScheduleSlot[] = scheduleData.map((slot: any) => {
           const startTime = new Date();
@@ -124,19 +118,18 @@ export default function TeachingAttendancePage() {
           
           // Tambahkan informasi institusi atau sekolah
           const institution = institutionData.find((inst: Institution) => inst.id === slot.institutionId);
-          const subject = subjectData.find((subj: Subject) => subj.id === slot.subjectId);
-          
+          const subjectName = slot.subjectName;
+
           return {
             ...slot,
             institution,
-            subject,
+            subject: subjectName ? { id: slot.subjectId, name: subjectName } : undefined,
             status,
           };
         });
 
         setSchedules(processedSchedules);
         setInstitutions(institutionData);
-        setSubjects(subjectData);
       } catch (err: any) {
         console.error('Error fetching teaching attendance data:', err);
         setError(err.message || 'Terjadi kesalahan saat mengambil data');
@@ -490,7 +483,9 @@ export default function TeachingAttendancePage() {
                    const institution = schedule.schoolId 
                      ? null 
                      : institutions.find(inst => inst.id === schedule.institutionId);
-                   const subject = subjects.find(subj => subj.id === schedule.subjectId);
+                   const subject = schedule.subject ?? (schedule.subjectName 
+                     ? { id: schedule.subjectId, name: schedule.subjectName } 
+                     : undefined);
                    
                    return (
                      <Card key={schedule.id} className="p-4">

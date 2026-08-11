@@ -40,7 +40,7 @@ async function testWaliKelasTPGFeatures() {
     // Ambil institusi tempat guru aktif
     const instResult = await client.query(`
       SELECT im.institution_id, i.name
-      FROM payload.institution_members im
+      FROM public.institution_members im
       JOIN payload.institutions i ON i.id = im.institution_id
       WHERE im.app_user_id = $1
       LIMIT 1

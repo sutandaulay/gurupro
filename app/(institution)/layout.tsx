@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "../(app)/globals.css";
+import Providers from "@/app/(app)/providers";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -55,7 +56,7 @@ export default async function InstitutionRootLayout({
         <meta name="apple-mobile-web-app-title" content="GuruPRO AI" />
       </head>
       <body className="font-sans min-h-full flex flex-col bg-neutral-50 text-neutral-900 selection:bg-primary-600 selection:text-white">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
