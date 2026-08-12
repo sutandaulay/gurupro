@@ -1,0 +1,602 @@
+[
+  {
+    "mapel": "Islam",
+    "fase": "A",
+    "kelas": "I-II",
+    "elemen": [
+      {
+        "nama_elemen": "Al-Our'an Hadis",
+        "capaian_pembelajaran": "Membaca dan membedakan huruf hijaiah berharakat, huruf hijaiah bersambung: menghafal Surah al-Fatihah, beberapa surah pendek Al-Our'an, dan hadis tentang kebersihan"
+      },
+      {
+        "nama_elemen": "Akidah",
+        "capaian_pembelajaran": "Menjelaskan dan meyakini rukun iman, iman kepada Allah Swt., beberapa asmaulhusna, dan iman kepada malaikat"
+      },
+      {
+        "nama_elemen": "Akhlak",
+        "capaian_pembelajaran": "Menerapkan akhlak terhadap Allah Swt. dengan menyucikan dan memuji-Nya, dan akhlak terhadap diri sendiri"
+      },
+      {
+        "nama_elemen": "Fikih",
+        "capaian_pembelajaran": "Menerapkan rukun Islam, syahadatain, tata cara bersuci, salat fardu, zikir dan berdoa setelah salat"
+      },
+      {
+        "nama_elemen": "Sejarah Peradaban Islam",
+        "capaian_pembelajaran": "Menceritakan kisah keteladanan beberapa nabi dan rasul"
+      }
+    ]
+  },
+  {
+    "mapel": "Islam",
+    "fase": "B",
+    "kelas": "III-IV",
+    "elemen": [
+      {
+        "nama_elemen": "Al-Our'an Hadis",
+        "capaian_pembelajaran": "Membaca, menulis, dan membedakan huruf hijaiah bersambung, menghafal dan menjelaskan beberapa surah pendek, hadis tentang kewajiban salat dan menjaga hubungan baik dengan sesama"
+      },
+      {
+        "nama_elemen": "Akidah",
+        "capaian_pembelajaran": "Menjelaskan dan meyakini sifat-sifat Allah Swt., iman kepada kitab-kitab Allah Swt., beberapa asmaulhusna, dan iman kepada rasul-rasul Allah Swt"
+      },
+      {
+        "nama_elemen": "Akhlak",
+        "capaian_pembelajaran": "Menerapkan akhlak terhadap Allah Swt. dengan berbaik sangka kepada-Nya, akhlak terhadap orang tua, keluarga, dan guru"
+      },
+      {
+        "nama_elemen": "Fikih",
+        "capaian_pembelajaran": "Menerapkan azan dan ikamah, salat jumat dan salat sunah, menjelaskan balig dan tanggung jawab yang menyertainya (taklif)"
+      },
+      {
+        "nama_elemen": "Sejarah Peradaban Islam",
+        "capaian_pembelajaran": "Menceritakan dan menjelaskan kisah Nabi Muhammad saw. sebelum dan sesudah menjadi rasul periode Makkah"
+      }
+    ]
+  },
+  {
+    "mapel": "Islam",
+    "fase": "C",
+    "kelas": "V-VI",
+    "elemen": [
+      {
+        "nama_elemen": "Al-Our'an Hadis",
+        "capaian_pembelajaran": "Membaca, menulis, dan membedakan huruf hijaiah bersambung, menjelaskan beberapa surah pendek dan hadis tentang berbuat baik kepada orang tua, guru, dan teman"
+      },
+      {
+        "nama_elemen": "Akidah",
+        "capaian_pembelajaran": "Menjelaskan dan meyakini beberapa asmaulhusna, iman kepada hari akhir, iman kepada gada' dan gadar"
+      },
+      {
+        "nama_elemen": "Akhlak",
+        "capaian_pembelajaran": "Menerapkan akhlak terhadap Allah Swt. dengan berdoa dan bertawakal kepada-Nya, akhlak terhadap teman, tetangga, non-muslim, hewan, dan tumbuhan"
+      },
+      {
+        "nama_elemen": "Fikih",
+        "capaian_pembelajaran": "Menerapkan puasa wajib dan sunah, makanan minuman yang halal dan haram, zakat, infak, sedekah, dan wakaf"
+      },
+      {
+        "nama_elemen": "Sejarah Peradaban Islam",
+        "capaian_pembelajaran": "Menceritakan dan menjelaskan kisah Nabi Muhammad saw. periode Madinah dan khulafaurasyidin"
+      }
+    ]
+  },
+  {
+    "mapel": "Islam",
+    "fase": "D",
+    "kelas": "VII-IX",
+    "elemen": [
+      {
+        "nama_elemen": "Al-Our'an Hadis",
+        "capaian_pembelajaran": "Membaca, menghafal, menulis, dan menjelaskan ayat Al- Our'an tentang pentingnya iman, takwa, toleransi, cinta tanah air, semangat keilmuan, dan sabar dalam menghadapi musibah dan ujian beserta hadis terkait"
+      },
+      {
+        "nama_elemen": "Akidah",
+        "capaian_pembelajaran": "Meyakini dan merefleksikan rukun iman dan hal-hal yang dapat meneguhkan iman"
+      },
+      {
+        "nama_elemen": "Akhlak",
+        "capaian_pembelajaran": "Menerapkan makna ikhlas, bersyukur kepada Allah Swt., cinta rasul, cinta ilmu, cinta lingkungan, cinta diri sendiri dan sesama"
+      },
+      {
+        "nama_elemen": "Fikih",
+        "capaian_pembelajaran": "Menerapkan ketentuan sujud di luar rukun salat, rukhsah dalam ibadah, kewajiban terhadap jenazah, haji dan umrah, penyembelihan hewan, kurban, akikah, dan wakaf"
+      },
+      {
+        "nama_elemen": "Sejarah Peradaban Islam",
+        "capaian_pembelajaran": "Merefleksikan sejarah dan peran Kekhalifahan Islam pasca Khulafaur Rasyidin dan sejarah masuknya Islam di Indonesia"
+      }
+    ]
+  },
+  {
+    "mapel": "Islam",
+    "fase": "E",
+    "kelas": "X-XI",
+    "elemen": [
+      {
+        "nama_elemen": "Al-Our'an Hadis",
+        "capaian_pembelajaran": "Membaca, menghafal, menulis, dan menganalisis ayat Al- Our'an tentang perintah berlomba-lomba dalam kebaikan, larangan pergaulan bebas, dan zina beserta hadis terkait"
+      },
+      {
+        "nama_elemen": "Akidah",
+        "capaian_pembelajaran": "Meyakini dan merefleksikan beberapa cabang iman (syu‘ab al- iman)"
+      },
+      {
+        "nama_elemen": "Akhlak",
+        "capaian_pembelajaran": "Menerapkan manfaat menghindari penyakit hati"
+      },
+      {
+        "nama_elemen": "Fikih",
+        "capaian_pembelajaran": "Menerapkan dan merefleksikan sumber hukum Islam, pentingnya menjaga lima prinsip dasar hukum Islam (al- kulliyat al-khamsah), ekonomi syariah, dan wakaf"
+      },
+      {
+        "nama_elemen": "Sejarah Peradaban Islam",
+        "capaian_pembelajaran": "Merefleksikan peran tokoh ulama dalam penyebaran Islam di Indonesia"
+      }
+    ]
+  },
+  {
+    "mapel": "Islam",
+    "fase": "F",
+    "kelas": "XII",
+    "elemen": [
+      {
+        "nama_elemen": "Al-Our'an Hadis",
+        "capaian_pembelajaran": "Membaca, menghafal, menulis, dan merefleksikan ayat Al- Our'an tentang pentingnya berpikir kritis, ilmu pengetahuan dan teknologi, memelihara kehidupan manusia, dan moderasi beragama beserta hadis terkait"
+      },
+      {
+        "nama_elemen": "Akidah",
+        "capaian_pembelajaran": "Meyakini dan merefleksikan beberapa cabang iman (syu‘ab al- iman), keterkaitan antara iman, Islam, dan ihsan"
+      },
+      {
+        "nama_elemen": "Akhlak",
+        "capaian_pembelajaran": "Menerapkan manfaat menghindari penyakit sosial, merefleksikan adab bermasyarakat dan etika digital dalam Islam"
+      },
+      {
+        "nama_elemen": "Fikih",
+        "capaian_pembelajaran": "Menerapkan dan merefleksikan ketentuan khotbah, tablig dan dakwah, ekonomi syariah, wakaf, munakahat, dan mawaris"
+      },
+      {
+        "nama_elemen": "Sejarah Peradaban Islam",
+        "capaian_pembelajaran": "Merefleksikan peran tokoh ulama Indonesia dalam perkembangan peradaban Islam di dunia dan peran organisasi-organisasi Islam di Indonesia"
+      }
+    ]
+  },
+  {
+    "mapel": "Hindu",
+    "fase": "A",
+    "kelas": "I-II",
+    "elemen": [
+      {
+        "nama_elemen": "Kitab Suci Weda",
+        "capaian_pembelajaran": "Mengenali Kitab Ramayana dan Kitab Mahabharata"
+      },
+      {
+        "nama_elemen": "Sraddha dan Bhakti",
+        "capaian_pembelajaran": "Memahami Hyang Widhi Wasa sebagai pencipta dan sumber hidup"
+      },
+      {
+        "nama_elemen": "Susila",
+        "capaian_pembelajaran": "Mengenali Subha Karma dan Asubha Karma, serta Tri Kaya Parisudha"
+      },
+      {
+        "nama_elemen": "Acara",
+        "capaian_pembelajaran": "Mengenali Dainika Upasana dan sarana persembahyangan"
+      },
+      {
+        "nama_elemen": "Sejarah Agama Hindu",
+        "capaian_pembelajaran": "Mengenali Kerajaan-kerajaan Hindu di Indonesia"
+      }
+    ]
+  },
+  {
+    "mapel": "Hindu",
+    "fase": "B",
+    "kelas": "III-IV",
+    "elemen": [
+      {
+        "nama_elemen": "Kitab Suci Weda",
+        "capaian_pembelajaran": "Mengenali Kitab Purana"
+      },
+      {
+        "nama_elemen": "Sraddha dan Bhakti",
+        "capaian_pembelajaran": "Memahami Hyang Widhi Wasa sebagai Tri Murti dan Cadu Sakti"
+      },
+      {
+        "nama_elemen": "Susila",
+        "capaian_pembelajaran": "Menerapkan Ajaran Tri Parartha dan Catur Paramitha"
+      },
+      {
+        "nama_elemen": "Acara",
+        "capaian_pembelajaran": "Mengenali Hari Suci dan Tempat Suci Agama Hindu sesuai kearifan lokal"
+      },
+      {
+        "nama_elemen": "Sejarah Agama Hindu",
+        "capaian_pembelajaran": "Mengenali Tokoh Penyebar Agama Hindu di Indonesia"
+      }
+    ]
+  },
+  {
+    "mapel": "Hindu",
+    "fase": "C",
+    "kelas": "V-VI",
+    "elemen": [
+      {
+        "nama_elemen": "Kitab Suci Weda",
+        "capaian_pembelajaran": "Memahami Kitab Weda Sruti dan Kitab Weda Smrti"
+      },
+      {
+        "nama_elemen": "Sraddha dan Bhakti",
+        "capaian_pembelajaran": "Memahami Bhuana Agung dan Bhuana Alit"
+      },
+      {
+        "nama_elemen": "Susila",
+        "capaian_pembelajaran": "Menerapkan ajaran Catur Guru dan Catur Asrama"
+      },
+      {
+        "nama_elemen": "Acara",
+        "capaian_pembelajaran": "Menjelaskan Parica Yajria dan Manggalaning Yajaa"
+      },
+      {
+        "nama_elemen": "Sejarah Agama Hindu",
+        "capaian_pembelajaran": "Menceritakan Sejarah Perkembangan Agama Hindu di Indonesia"
+      }
+    ]
+  },
+  {
+    "mapel": "Hindu",
+    "fase": "D",
+    "kelas": "VII-IX",
+    "elemen": [
+      {
+        "nama_elemen": "Kitab Suci Weda",
+        "capaian_pembelajaran": "Menerapkan ajaran Kitab Upaweda, Kitab Wedangga, dan Nibandha"
+      },
+      {
+        "nama_elemen": "Sraddha dan Bhakti",
+        "capaian_pembelajaran": "Memahami Atman, Asta Aiswarya, dan Catur Marga"
+      },
+      {
+        "nama_elemen": "Susila",
+        "capaian_pembelajaran": "Menerapkan nilai-nilai ajaran Tri Hita Karana, Catur Purusa Artha, serta Parica Yama Brata dan Parica Niyama Brata"
+      },
+      {
+        "nama_elemen": "Acara",
+        "capaian_pembelajaran": "Mempraktikkan Upakara, Dharma Gita, serta Parica Yajia"
+      },
+      {
+        "nama_elemen": "Sejarah Agama Hindu",
+        "capaian_pembelajaran": "Merefleksikan Sejarah Perkembangan Agama Hindu di Asia"
+      }
+    ]
+  },
+  {
+    "mapel": "Hindu",
+    "fase": "E",
+    "kelas": "X-XI",
+    "elemen": [
+      {
+        "nama_elemen": "Kitab Suci Weda",
+        "capaian_pembelajaran": "Menganalisis nilai-nilai ajaran Kitab Manawa Dharmasastra"
+      },
+      {
+        "nama_elemen": "Sraddha dan Bhakti",
+        "capaian_pembelajaran": "Menerapkan nilai-nilai ajaran Karmaphala dan Punarbhawa"
+      },
+      {
+        "nama_elemen": "Susila",
+        "capaian_pembelajaran": "Menganalisis peran Catur Warna"
+      },
+      {
+        "nama_elemen": "Acara",
+        "capaian_pembelajaran": "Menganalisis nilai-nilai Yajia dalam Ramayana dan Mahabhrata"
+      },
+      {
+        "nama_elemen": "Sejarah Agama Hindu",
+        "capaian_pembelajaran": "Menganalisis corak Keagamaan Hindu di dunia"
+      }
+    ]
+  },
+  {
+    "mapel": "Hindu",
+    "fase": "F",
+    "kelas": "XII",
+    "elemen": [
+      {
+        "nama_elemen": "Kitab Suci Weda",
+        "capaian_pembelajaran": "Merefleksikan nilai-nilai universal dari Kodifikasi Kitab Suci Weda dan Ajaran dalam Kitab Upanisad"
+      },
+      {
+        "nama_elemen": "Sraddha dan Bhakti",
+        "capaian_pembelajaran": "Merefleksikan nilai-nilai ajaran Darsana dan Moksa"
+      },
+      {
+        "nama_elemen": "Susila",
+        "capaian_pembelajaran": "Merefleksikan konsep Keluarga Sukhinah dan Karakter Kepemimpinan Hindu"
+      },
+      {
+        "nama_elemen": "Acara",
+        "capaian_pembelajaran": "Merefleksikan nilai-nilai Seni Keagamaan Hindu serta Yogacara dalam Mantra, Yantra, dan Tantra"
+      },
+      {
+        "nama_elemen": "Sejarah Agama Hindu",
+        "capaian_pembelajaran": "Menganalisis Sejarah Organisasi Keagamaan Hindu di Indonesia"
+      }
+    ]
+  },
+  {
+    "mapel": "Buddha",
+    "fase": "A",
+    "kelas": "I-II",
+    "elemen": [
+      {
+        "nama_elemen": "Sejarah Buddha",
+        "capaian_pembelajaran": "Memadukan pemahaman identitas diri dan keluarga dengan apresiasi terhadap keragaman identitas dan budaya teman- teman di lingkungan rumah, sekolah, dan rumah ibadah untuk meninjau dan menulis ulang paradigma pluralisme yang inklusif dan harmonis dalam perbedaan identitas dan budaya teman-temannya di lingkungan rumah, sekolah, dan rumah ibadah. Merefleksikan sifat-sifat kehidupan para bodhisattva, para Buddha, murid Buddha, dan tokoh buddhis inspiratif untuk menghasilkan pola pikir dan perilaku dalam menyayangi diri sendiri melalui pemeliharaan kesehatan fisik dan batin yang holistik, serta menemukan budaya komunikasi yang hormat dan bijaksana di lingkungannya berdasarkan kebijaksanaan dari kisah jataka yang dapat diterapkan dalam konteks kehidupan kontemporer"
+      },
+      {
+        "nama_elemen": "Ritual",
+        "capaian_pembelajaran": "Menyimpulkan identitas agama Buddha dengan keberadaan beragam identitas agama dan kepercayaan lain dalam konteks kelompok sosialnya. Meninjau dan menulis ulang makna simbol-simbol keagamaan Buddha dengan simbol agama dan kepercayaan lain yang ditemui di lingkungan rumah dan sekolahnya, sehingga dapat membangun pemahaman tentang keragaman"
+      },
+      {
+        "nama_elemen": "Etika",
+        "capaian_pembelajaran": "Memadukan praktik aturan dan sopan santun dengan prinsip- prinsip pergaulan yang harmonis di lingkungan rumah, sekolah, dan tempat ibadah. Merefleksikan proses musyawarah sederhana untuk mufakat di lingkungan sekolah dengan nilai- nilai empat sifat luhur, hukum karma, dan Pancasila dasar negara, guna merefleksikan perilaku moderat yang mendukung kehidupan bersama"
+      }
+    ]
+  },
+  {
+    "mapel": "Buddha",
+    "fase": "B",
+    "kelas": "III-IV",
+    "elemen": [
+      {
+        "nama_elemen": "Sejarah Buddha",
+        "capaian_pembelajaran": "Menganalisis identitas Buddha Sakyamuni, sebagai dasar keyakinan terhadap Agama Buddha. Mengevaluasi dengan membandingkan secara hormat budaya dan bahasa dalam agama Buddha serta memiliki keterbukaan untuk menghargai perbedaan identitas dan budaya orang lain di lingkungan tempat tinggalnya. Mengadaptasi keteladanan Buddha Sakyamuni dalam menghargai sesama manusia untuk mengkreasi strategi inovatif dalam menyelesaikan masalah pergaulan di lingkungan terdekatnya, lingkungan sekolah dan rumah ibadah"
+      },
+      {
+        "nama_elemen": "Ritual",
+        "capaian_pembelajaran": "Mengklasifikasi doa Buddhis dalam kegiatan sehari-hari menganalisis keterkaitan mendasar dengan keyakinan kepada Ketuhanan Yang Maha Esa dan Triratna. Mengevaluasi identitas masing-masing aliran atau tradisi dalam agama Buddha dengan membandingkan keunikan dan persamaan nilai-nilainya, dan mensintesis pemahaman satu kesatuan untuk mengkreasi model praktis bersatu dalam perbedaan yang dapat diimplementasikan dalam komunitas yang beragam"
+      },
+      {
+        "nama_elemen": "Etika",
+        "capaian_pembelajaran": "Merefleksikan nilai-nilai Pancasila Buddhis dengan menganalisis keterkaitan fundamental berlandaskan pada nilai-nilai Hukum Sebab Akibat yang Saling Bergantungan untuk mengintegrasikan prinsip-prinsip tersebut dalam melaksanakan aturan dan sopan santun secara konsisten dan bermakna. Mengevaluasi efektivitas implementasi kesempurnaan (parami), sikap tolong menolong antarsesama kemudian mensintesis pendekatan holistik untuk menyelesaikan masalah sosial, kebersihan, dan kelestarian lingkungan secara musyawarah mufakat di rumah, sekolah, dan rumah ibadah yang mengkreasi model kehidupan moderat dan ramah anak di rumah, sekolah, dan rumah ibadah sebagai manifestasi autentik keyakinan terhadap agama Buddha"
+      }
+    ]
+  },
+  {
+    "mapel": "Buddha",
+    "fase": "C",
+    "kelas": "V-VI",
+    "elemen": [
+      {
+        "nama_elemen": "Sejarah Buddha",
+        "capaian_pembelajaran": "Menganalisis strategi Buddha Sakyamuni dalam menghadapi hambatan untuk meraih kesuksesan dan mengadaptasi pendekatan tersebut untuk mengatasi tantangan personal mereka. Mengevaluasi efektivitas cara Buddha Sakyamuni menyelesaikan masalah kehidupan individu dan sosial, kemudian mengkreasi solusi inovatif berdasarkan kebijaksanaan tersebut untuk konteks modern. Mengintegrasikan konsep dasar musyawarah mufakat dalam kehidupan Buddha Sakyamuni dengan mensintesis prinsip tersebut dalam praktik pengambilan keputusan demokratis di lingkungan keluarga, sekolah, dan masyarakat"
+      },
+      {
+        "nama_elemen": "Ritual",
+        "capaian_pembelajaran": "Menganalisis keragaman upacara puja dan meditasi ketenangan dari berbagai aliran atau tradisi agama Buddha. Merefleksikan sikap bersatu dalam perbedaan dengan berperan serta melakukan dialog moderasi beragama"
+      },
+      {
+        "nama_elemen": "Etika",
+        "capaian_pembelajaran": "Menganalisis nilai-nilai Buddhadharma, Pancasila Buddhis, dan nilai-nilai Pancasila dasar negara berlandaskan pada nilai- nilai Hukum Sebab Akibat yang Saling Bergantungan. Menerapkan hak dan kewajiban, permasalahan dan solusinya di rumah, sekolah, dan rumah ibadah sebagai dasar keyakinan terhadap agama Buddha, melalui pembelajaran ramah anak serta mencerminkan kehidupan yang moderat"
+      }
+    ]
+  },
+  {
+    "mapel": "Buddha",
+    "fase": "D",
+    "kelas": "VII-IX",
+    "elemen": [
+      {
+        "nama_elemen": "Sejarah Buddha",
+        "capaian_pembelajaran": "Merefleksikan sifat-sifat Buddha Sakyamuni, para penyokong Buddha, murid-murid utama, tokoh Buddhis inspiratif, peristiwa monumental setelah Buddha Sakyamuni Parinibbana, untuk diteladan dan dilestarikan dalam kehidupan sehari-hari dengan bijaksana dalam berperilaku terhadap diri sendiri, sesama manusia, masyarakat, dan lingkungan sekitar"
+      },
+      {
+        "nama_elemen": "Ritual",
+        "capaian_pembelajaran": "Merefleksikan meditasi hidup berkesadaran, budaya menghormat (puja), hari raya agama Buddha, tempat-tempat ziarah Agama Buddha, melakukan ziarah ke tempat suci agama Buddha, kunjungan ke tempat ibadah agama dan kepercayaan lain, menghargai tradisi agama Buddha di Indonesia, dan melakukan dialog kerukunan umat beragama"
+      },
+      {
+        "nama_elemen": "Etika",
+        "capaian_pembelajaran": "Merefleksikan nilai-nilai ajaran moralitas, jalan Bodhisattva yaitu Pannadika Bodhisattva, Saddhadika Bodhisattva, Viriyadika Bodhisattva; hukum karma dan kelahiran kembali, hak dan kewajiban moral terhadap sesama dan lingkungan, untuk mewujudkan kehidupan yang harmonis sebagai warga negara dalam menentukan sikap terhadap kesetaraan gender, pergaulan dan permasalahan remaja di lingkungan sekitar melalui pembelajaran ramah anak serta mencerminkan kehidupan yang moderat"
+      }
+    ]
+  },
+  {
+    "mapel": "Buddha",
+    "fase": "E",
+    "kelas": "X-XI",
+    "elemen": [
+      {
+        "nama_elemen": "Sejarah Buddha",
+        "capaian_pembelajaran": "Menganalisa penyiaran agama Buddha. Merefleksikan perjuangan pelaku sejarah agama Buddha masa kini untuk diteladani dalam kehidupan"
+      },
+      {
+        "nama_elemen": "Ritual",
+        "capaian_pembelajaran": "Menerapkan praktik meditasi ketenangan batin (samatha). Merefleksikan pengalaman meditasi. Menciptakan rutinitas meditasi personal sebagai pendekatan autentik untuk memperkuat batin dan keyakinan terhadap Dharma"
+      },
+      {
+        "nama_elemen": "Etika",
+        "capaian_pembelajaran": "Merefleksikan nilai-nilai moderasi beragama berdasarkan Buddhadharma dalam menghadapi fenomena kehidupan sebagai dasar dalam memaknai fenomena dan masalah kehidupan. Menggeneralisasi nilai-nilai Hukum Kebenaran Mutlak dalam pengembangan ilmu pengetahuan dan teknologi"
+      }
+    ]
+  },
+  {
+    "mapel": "Buddha",
+    "fase": "F",
+    "kelas": "XII",
+    "elemen": [
+      {
+        "nama_elemen": "Sejarah Buddha",
+        "capaian_pembelajaran": "Merefleksikan sikap tokoh pendukung agama Buddha, pelaku sejarah Buddhis lokal, nasional, dan dunia masa kini. Membandingkan budaya Buddhis, keragaman agama, maupun bangsa. Merefleksikan pola komunikasi lintas budaya, lintas aliran atau tradisi agama Buddha dengan bersikap bijaksana dan terbuka"
+      },
+      {
+        "nama_elemen": "Ritual",
+        "capaian_pembelajaran": "Mempraktikkan meditasi pandangan terang dan hidup berkesadaran dalam kehidupan sehari-hari. Merefleksikan upacara keagamaan disertai keyakinan dan kebijaksanaan serta menghargai orang lain yang melakukan ritual keagamaan sesuai dengan agama dan kepercayaannya. Membandingkan nilai-nilai agama Buddha dengan kearifan lokal. Merefleksikan diri sebagai individu yang beragama dengan berperan aktif dalam kegiatan aksi sosial dan budaya dalam kehidupan bermasyarakat, berbangsa, dan bernegara"
+      },
+      {
+        "nama_elemen": "Etika",
+        "capaian_pembelajaran": "Membuktikan dengan prinsip dasar, alam semesta dan aam kehidupan berdasarkan nilai-nilai Hukum Kebenaran Mutlak, Empat Kebenaran Mulia, Hukum Karma, Punarbhava, Hukum Tiga Corak Universal, dan Hukum Sebab Musabab Yang Saling Bergantungan. Memecahkan dengan prinsip dasar masalah kehidupan perekonomian di dunia dan isu-isu global, dengan kebijaksanaan melalui pembelajaran ramah anak serta mencerminkan kehidupan yang moderat"
+      }
+    ]
+  },
+  {
+    "mapel": "Khonghucu",
+    "fase": "A",
+    "kelas": "I-II",
+    "elemen": [
+      {
+        "nama_elemen": "Sejarah Suci",
+        "capaian_pembelajaran": "Menjelaskan riwayat dan keluarga Nabi Kongzi (LF); menginterpretasikan Kisah Keteladanan Anak Berbakti"
+      },
+      {
+        "nama_elemen": "Kitab Suci",
+        "capaian_pembelajaran": "Menjelaskan ayat-ayat suci yang terdapat dalam kitab Bakti (Xiaojing #4), Sishu (U4) dan Wujing (££) yang berkaitan dengan kisah anak berbakti dan keteladanan Nabi Kongzi (fl)"
+      },
+      {
+        "nama_elemen": "Keimanan",
+        "capaian_pembelajaran": "Menjelaskan konsep Tian (X) dalam agama Khonghucu bahwa manusia diciptakan Tian (X) melalui kedua orang tua, menginterpretasikan peran keberadaan leluhur dalam kehidupan manusia serta Nabi Kongzi (#LF) sebagai genta rohani Tian (X), Tian Zhi Mudué (RZ KE)"
+      },
+      {
+        "nama_elemen": "Tata Ibadah",
+        "capaian_pembelajaran": "Menerapkan sikap dalam berdoa dan menghormat, sembahyang kepada Tian (X), Nabi Kongzi (fL-¥), dan leluhur serta perlengkapan sembahyang di altar"
+      },
+      {
+        "nama_elemen": "Perilaku Junzi (BF)",
+        "capaian_pembelajaran": "Menerapkan sikap bakti dan hormat kepada orang tua sebagai wujud hormat kepada Tian (X), pembiasaan berdoa sebelum maupun sesudah beraktivitas, dan sikap toleransi dengan teman, serta sikap tanggung jawab terhadap kebutuhan diri sendiri"
+      }
+    ]
+  },
+  {
+    "mapel": "Khonghucu",
+    "fase": "B",
+    "kelas": "III-IV",
+    "elemen": [
+      {
+        "nama_elemen": "Sejarah Suci",
+        "capaian_pembelajaran": "Menjelaskan tentang watak sejati (xing ff) menurut pendapat Mengzi (TT), Zhu Xi (KE) sebagai tokoh pembaharuan agama Khonghucu (Rujido f5 #0), keteladanan ibunda Nabi Kongzi (LT ), ibunda Mengzi (Z7), ibunda Ouyang Xiu (®FH{&), dan ibunda Yue Féi (57K), menginterpretasikan sikap teladan dari murid- murid Nabi Kongzi (LF), riwayat Nabi Kongzi (fLF) sebagai Genta Rohani Tian (X) (Tian Zhi Mudué KZ AH),"
+      },
+      {
+        "nama_elemen": "Kitab Suci",
+        "capaian_pembelajaran": "Menjelaskan bagian-bagian kitab suci yang pokok (Sisha IH) dan yang mendasari (Wujing 7.48), ayat dalam kitab Sishu (JB ) yang berkaitan dengan delapan kebajikan (bade AZ), menginterpretasikan tiga kesukaan yang membawa faedah dan tiga kesukaan yang membawa celaka"
+      },
+      {
+        "nama_elemen": "Keimanan",
+        "capaian_pembelajaran": "Menjelaskan makna persembahyangan kepada Tian (X), Nabi Kongzi (LT), para suci (shénming #8) dan leluhur, tanda- tanda khusus menjelang wafat Nabi Kongzi (LT), menginterpretasikan cita-cita mulia dan semangat belajar Nabi Kongzi (LF); menerapkan nilai-nilai delapan keimanan (bachéngzhéngui A WR)"
+      },
+      {
+        "nama_elemen": "Tata Ibadah",
+        "capaian_pembelajaran": "Menjelaskan peralatan dan perlengkapan sembahyang, penataan altar leluhur, menerapkan sikap berdoa (bao xin bade PW LA), tata cara pelaksanaan ibadah kepada Tian (X), Nabi Kongzi (fLF), para suci (shénming #8) dan leluhur di kelenteng/klenteng/bio/miao (J&) dan litang (LE)"
+      },
+      {
+        "nama_elemen": "Perilaku Junzi (BF)",
+        "capaian_pembelajaran": "Menerapkan sikap dan perilaku luhur Nabi Kongzi (fL-F), teladan murid-murid Nabi Kongzi (LT), menghargai waktu, berhati-hati, saling mengasihi sesama manusia, perilaku sesuai dengan delapan kebajikan (badeA1£), mudah bergaul tanpa membeda-bedakan, berani mengakui kesalahan dan memperbaiki diri"
+      }
+    ]
+  },
+  {
+    "mapel": "Khonghucu",
+    "fase": "C",
+    "kelas": "V-VI",
+    "elemen": [
+      {
+        "nama_elemen": "Sejarah Suci",
+        "capaian_pembelajaran": "Menjelaskan wahyu Tian (X) yang diterima oleh para nabi dan raja suci, tokoh-tokoh Rujiao (ff#) serta sumbangsih pemikirannya, sejarah perkembangan agama Khonghucu di Indonesia"
+      },
+      {
+        "nama_elemen": "Kitab Suci",
+        "capaian_pembelajaran": "Menginterpretasikan ayat-ayat dalam kitab Sishu (H+) dan Wujing (££) tentang Nabi Kongzi (LT) sebagai Tian Zhi Muduo (RZ AH), persaudaraan dalam pergaulan, rasa cinta tanah air, empat pantangan siwu (117), dan yang berhubungan dengan konsep sancai (=F)"
+      },
+      {
+        "nama_elemen": "Keimanan",
+        "capaian_pembelajaran": "Menginterpretasikan bahwa sembahyang adalah pokok dari agama, definisi iman, hukum yinyang (FAH) sebagai dasar hukum alam semesta, konsep Tiga Dasar Kenyataan (sancai = #)"
+      },
+      {
+        "nama_elemen": "Tata Ibadah",
+        "capaian_pembelajaran": "Menginterpretasikan hari raya/sembahyang kepada Tian (X), Nabi Kongzi (LT), shénming (#8), dan leluhur sebagai wujud kesusilaan (Ii #L); menjelaskan perlengkapan dan peralatan sembahyang sehingga menumbuhkan keimanan dan kepribadian luhur"
+      },
+      {
+        "nama_elemen": "Perilaku Junzi (£TF)",
+        "capaian_pembelajaran": "Menerapkan sikap cinta kasih kepada seluruh makhluk ciptaan Tian (X), cinta tanah air, hidup tepasalira dan harmonis kepada sesama, bakti kepada Tiandiren (X#A), prinsip empat pantangan (siwu P7) dan lima hubungan kemasyarakatan (within EC) dalam keseharian"
+      }
+    ]
+  },
+  {
+    "mapel": "Khonghucu",
+    "fase": "D",
+    "kelas": "VII-IX",
+    "elemen": [
+      {
+        "nama_elemen": "Sejarah Suci",
+        "capaian_pembelajaran": "Menginterpretasikan rangkaian wahyu dalam agama Khonghucu dari nabi purba, raja suci sampai dengan Nabi Kongzi (LF), keteladanan murid-murid Nabi Kongzi (LT) dan orang-orang besar, serta perkembangan kehidupan beragama dan bernegara di Indonesia"
+      },
+      {
+        "nama_elemen": "Kitab Suci",
+        "capaian_pembelajaran": "Menginterpretasikan teks kitab Sishu (JB) dan Wujing (££) serta Xiaojing (#4) sebagai sumber pengetahuan yang melandasi sejarah suci, keimanan, tata ibadah dan keteladanan perilaku Junzi (£ 7)"
+      },
+      {
+        "nama_elemen": "Keimanan",
+        "capaian_pembelajaran": "Menganalisis siifat-sifat kebajikan Tian (X), kenabian Nabi Kongzi (LF), dan watak sejati (xing 14)"
+      },
+      {
+        "nama_elemen": "Tata Ibadah",
+        "capaian_pembelajaran": "Menerapkan ritual keagamaan kepada Tian (X), di (#) dan ren (A)"
+      },
+      {
+        "nama_elemen": "Perilaku Junzi (BF)",
+        "capaian_pembelajaran": "Menerapkan perilaku sesuai dengan predikat yang diembannya baik sebagai diri pribadi, bagian dari keluarga, masyarakat, bangsa, negara dan dunia dengan berpedoman pada Dizigui (5% FM), wiichang FH dan delapan kebajikan (badé /\\7%)"
+      }
+    ]
+  },
+  {
+    "mapel": "Khonghucu",
+    "fase": "E",
+    "kelas": "X-XI",
+    "elemen": [
+      {
+        "nama_elemen": "Sejarah Suci",
+        "capaian_pembelajaran": "Menerapkan keteladanan kisah hidup murid Nabi Kongzi (LT ): menganalisis sejarah perkembangan agama Khonghucu di Indonesia"
+      },
+      {
+        "nama_elemen": "Kitab Suci",
+        "capaian_pembelajaran": "Menginterpretasikan ayat dalam kitab Sishu (U3) dan kitab Wijing (11) yang berhubungan dengan konsep yinyang (FHFH)"
+      },
+      {
+        "nama_elemen": "Keimanan",
+        "capaian_pembelajaran": "Merefleksikan kebesaran jalan suci Tian (Tiandao Xi#), kekuasaan hukum suci Tian (Tianli XH), makna diturunkannya wahyu Tian (X) dalam agama Khonghucu, konsep dasar dan prinsip yinyang (FABH)"
+      },
+      {
+        "nama_elemen": "Tata Ibadah",
+        "capaian_pembelajaran": "Memaknai hakikat dan makna ibadah (Cheng, Xin, Zhong, Jing/Iman, Percaya, Satya, Sujud) dan persembahyangan kepada Tian (X)"
+      },
+      {
+        "nama_elemen": "Perilaku Junzi (EF)",
+        "capaian_pembelajaran": "_44 - Merefleksikan hakikat dan sifat dasar manusia, serta sikap harmoni dalam perbedaan"
+      }
+    ]
+  },
+  {
+    "mapel": "Khonghucu",
+    "fase": "F",
+    "kelas": "XII",
+    "elemen": [
+      {
+        "nama_elemen": "Sejarah Suci",
+        "capaian_pembelajaran": "Menganalisis prinsip moral yang diajarkan Mengzi (d+), kisah Raja Suci Yao (5%) dan Shun (%), kisah Nabi Yi Yin (FF), jabatan yang pernah diemban oleh Nabi Kongzi (fL-f) pada zaman chungiu (%7k), serta kontribusi dan situs sejarah ajaran Khonghucu di Indonesia dan dunia"
+      },
+      {
+        "nama_elemen": "Kitab Suci",
+        "capaian_pembelajaran": "Menganalisis fase perkembangan kitab suci yang pokok (Sishu PUB), kitab suci yang mendasari (Wujing 145), menerapkan ayat suci mengenai wiichang (fL%) dan wulun (TB)"
+      },
+      {
+        "nama_elemen": "Keimanan",
+        "capaian_pembelajaran": "Memaknai bahwa manusia sebagai co-creator yang diciptakan oleh Tian (X) dan Nabi Kongzi (LT) sebagai Tian Zhi Muduo ( KZ AH); menganalisis makna sikap hidup zhongshu (BA) sebagai pedoman hidup di dunia, serta teladan para nabi, shénming (#51), dan leluhur"
+      },
+      {
+        "nama_elemen": "Tata Ibadah",
+        "capaian_pembelajaran": "Memaknai ritual dan makna persembahyangan kepada Tian (X ), nabi, shénming (#8), leluhur dan makna agamis hari raya keagamaan, serta menjelaskan atribut rohaniwan Khonghucu"
+      },
+      {
+        "nama_elemen": "Perilaku Junzi (£T)",
+        "capaian_pembelajaran": "Merefleksikan perilaku bakti (xiao #) sebagai pokok kebajikan, perilaku cinta kasih, kebenaran, semangat belajar, dan konsep kebersamaan agung (datong KI)"
+      }
+    ]
+  }
+]

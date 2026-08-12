@@ -3,11 +3,11 @@ import { query } from "@/lib/db";
 import { requireSession } from "@/lib/session";
 import { isInstitutionFeatureEnabled } from "@/lib/feature-flags";
 import {
-  GoogleGenerativeAI,
   HarmCategory,
   HarmBlockThreshold,
 } from "@google/generative-ai";
 import { enforceOutputLimits } from "@/lib/ai/limits";
+import { getGeminiClient } from "@/lib/ai/generators";
 
 // =====================================================
 // AI Draf Surat — Kepala Sekolah & Wakasek
@@ -17,10 +17,6 @@ import { enforceOutputLimits } from "@/lib/ai/limits";
 // =====================================================
 
 const LEADER_ROLES = ["kepala_sekolah", "wakasek"];
-
-const genAI = process.env.GOOGLE_AI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY)
-  : null;
 
 async function getLeaderRoles(appUserId: string, institutionId: number): Promise<string[]> {
   const res = await query(
@@ -124,9 +120,10 @@ export async function GET(
       );
     }
     const school = await getSchoolHeader(instId);
+    const aiClient = await getGeminiClient();
     return NextResponse.json({
       featureEnabled: true,
-      aiConfigured: Boolean(genAI),
+      aiConfigured: Boolean(aiClient),
       school,
     });
   } catch (error: any) {
@@ -157,7 +154,8 @@ export async function POST(
         { status: 403 }
       );
     }
-    if (!genAI) {
+    const aiClient = await getGeminiClient();
+    if (!aiClient) {
       return NextResponse.json(
         { error: "AI service not configured" },
         { status: 500 }
@@ -187,8 +185,8 @@ export async function POST(
         try {
           send({ step: "generating", message: "AI menyusun draf surat..." });
 
-          const model = genAI!.getGenerativeModel({
-            model: "gemini-1.5-flash",
+          const model = aiClient.genAI.getGenerativeModel({
+            model: aiClient.modelName,
             safetySettings: [
               { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
               { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },

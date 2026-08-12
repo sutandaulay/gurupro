@@ -174,7 +174,7 @@ export default function AiRingkasanContent() {
 
           {!aiConfigured ? (
             <div className="p-4 rounded-lg text-sm bg-amber-50 text-amber-700 border border-amber-200">
-              AI service belum dikonfigurasi di server (GOOGLE_AI_API_KEY tidak tersedia).
+              AI service belum dikonfigurasi di server (Gemini API key belum tersedia).
             </div>
           ) : (
             <div className="flex items-center gap-3">

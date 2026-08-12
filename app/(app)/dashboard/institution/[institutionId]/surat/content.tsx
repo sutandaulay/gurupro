@@ -267,7 +267,7 @@ export default function AiSuratContent() {
               </button>
               {!aiConfigured && (
                 <span className="text-sm text-amber-600">
-                  AI belum dikonfigurasi (GOOGLE_AI_API_KEY tidak tersedia).
+                  AI belum dikonfigurasi (Gemini API key belum tersedia).
                 </span>
               )}
             </div>

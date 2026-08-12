@@ -6,15 +6,12 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { requireSchoolAccess } from '@/lib/school-access'
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai'
+import { HarmCategory, HarmBlockThreshold } from '@google/generative-ai'
+import { getGeminiClient } from '@/lib/ai/generators'
 import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/services/poin-service'
 import { deductPoinFromAIResult } from '@/src/lib/ai-usage'
 import { getCurrentAcademicYear } from '@/lib/utils'
 import { enforceOutputLimits } from '@/lib/ai/limits'
-
-const genAI = process.env.GOOGLE_AI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY)
-  : null
 
 // POST /api/ai/laporan-kinerja - Generate laporan kinerja
 export async function POST(req: Request) {
@@ -60,7 +57,8 @@ export async function POST(req: Request) {
     )
   }
 
-  if (!genAI) {
+  const aiClient = await getGeminiClient()
+  if (!aiClient) {
     return NextResponse.json(
       { error: 'AI service not configured' },
       { status: 500 }
@@ -110,8 +108,8 @@ export async function POST(req: Request) {
         send({ step: 'generating', message: 'AI menyusun narasi laporan...' })
 
         // STEP 3: Generate with Gemini streaming
-        const model = genAI.getGenerativeModel({
-          model: 'gemini-1.5-flash',
+        const model = aiClient.genAI.getGenerativeModel({
+          model: aiClient.modelName,
           safetySettings: [
             { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
             { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },

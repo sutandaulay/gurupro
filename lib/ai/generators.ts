@@ -11,11 +11,27 @@ import { truncateText } from './validation-utils';
 import { getAIConfig } from '@/lib/settings';
 
 // Inisialisasi Gemini AI dari config admin panel (dengan fallback ke env agar kompatibel)
-async function getGenAI() {
+export async function getGeminiClient(): Promise<{
+  genAI: GoogleGenerativeAI;
+  modelName: string;
+} | null> {
   const config = await getAIConfig();
-  const apiKey = config.gemini.api_key || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || '';
+  const apiKey =
+    config.gemini.api_key ||
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+    process.env.GOOGLE_AI_API_KEY ||
+    '';
   if (!apiKey) return null;
-  return { genAI: new GoogleGenerativeAI(apiKey), modelName: config.gemini.model_name || 'gemini-2.5-flash' };
+  return {
+    genAI: new GoogleGenerativeAI(apiKey),
+    modelName: config.gemini.model_name || 'gemini-2.5-flash',
+  };
+}
+
+// Inisialisasi Gemini AI dari config admin panel (dengan fallback ke env agar kompatibel)
+async function getGenAI() {
+  return getGeminiClient();
 }
 
 // Timeout untuk mencegah generate menggantung (terutama selesai-mengajar yang memanggil AI berkali-kali)

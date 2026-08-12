@@ -145,7 +145,7 @@ export async function generateAIContent(
 
   // 2. GOOGLE GEMINI SENDER
   if (vendor === "gemini") {
-    const apiKey = config.gemini.api_key;
+    const apiKey = config.gemini.api_key || process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_AI_API_KEY || "";
     console.log("[AI SERVICE] Gemini config - API Key exists:", !!apiKey, "Model:", config.gemini.model_name);
     if (!apiKey) throw new Error("GEMINI_API_KEY tidak dikonfigurasi di admin panel.");
 
@@ -443,7 +443,7 @@ export async function generateAIContentWithUsage(
 
   // 2. GOOGLE GEMINI SENDER
   if (vendor === "gemini") {
-    const apiKey = config.gemini.api_key;
+    const apiKey = config.gemini.api_key || process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_AI_API_KEY || "";
     if (!apiKey) throw new Error("GEMINI_API_KEY tidak dikonfigurasi di admin panel.");
 
     const genAI = new GoogleGenerativeAI(apiKey);
