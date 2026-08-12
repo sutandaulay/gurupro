@@ -19,6 +19,7 @@ import {
 } from "@tabler/icons-react";
 import dynamic from "next/dynamic";
 import { useTokenError, parseTokenError } from "@/app/hooks/useTokenError";
+import MarkdownContent from "./MarkdownContent";
 
   const PoinHabisModal = dynamic(() => import("@/app/components/ui/PoinHabisModal"), { ssr: false });
 
@@ -375,14 +376,19 @@ Silakan ketik pertanyaan Anda atau gunakan aksi cepat di bawah!`,
                     <span>AI Assistant</span>
                   </div>
                 )}
-                <div
-                  className={`text-sm whitespace-pre-wrap ${
-                    message.role === "user" ? "text-white" : "text-slate-700"
-                  }`}
-                  style={{ whiteSpace: "pre-wrap" }}
-                >
-                  {message.content}
-                </div>
+                {message.role === "assistant" ? (
+                  <MarkdownContent
+                    content={message.content}
+                    variant="light"
+                  />
+                ) : (
+                  <div
+                    className="text-sm text-white whitespace-pre-wrap"
+                    style={{ whiteSpace: "pre-wrap" }}
+                  >
+                    {message.content}
+                  </div>
+                )}
 
                 {message.action?.type === 'finance_parse' && (
                   <div className="mt-3 bg-indigo-50 border border-indigo-100 rounded-xl p-3 space-y-2">

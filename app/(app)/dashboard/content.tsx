@@ -21,6 +21,7 @@ import OnboardingWizard from "@/components/onboarding/OnboardingWizard";
 import StreakIndicator from "@/components/streaks/StreakIndicator";
 import MorningBriefingCard from "@/components/morning-briefing/MorningBriefingCard";
 import VoiceTextInput from "@/components/voice/VoiceTextInput";
+import RichMarkdown from "@/components/ai/RichMarkdown";
 import MobileHomeMenu from "@/app/components/mobile/MobileHomeMenu";
 import MobileBottomNav from "@/app/components/mobile/MobileBottomNav";
 import AppIcon from "@/app/components/ui/AppIcon";
@@ -458,6 +459,12 @@ function DashboardContent() {
   const [isGeneratingAssessRubric, setIsGeneratingAssessRubric] = useState<boolean>(false);
   const [assessAILearningGoal, setAssessAILearningGoal] = useState<string>("");
   const [assessAIKurikulum, setAssessAIKurikulum] = useState<string>("merdeka");
+  const [assessAIResult, setAssessAIResult] = useState<{
+    rubrik?: string;
+    soal?: { pertanyaan: string; pilihan: string[]; kunci_jawaban: string }[];
+    saran_pedagogis?: string;
+    raw?: string;
+  } | null>(null);
   const [activeSupervisionTab, setActiveSupervisionTab] = useState<"nilai" | "jurnal_doc" | "rpp_doc" | "audit">("nilai");
   const [showSchoolSelectorModal, setShowSchoolSelectorModal] = useState<boolean>(false);
 
@@ -2780,7 +2787,7 @@ function DashboardContent() {
       });
       const data = await res.json();
       if (res.ok) {
-        alert(`=== RUBRIK PENILAIAN AI ===\n${data.rubrik}\n\n=== SOAL ASESMEN ===\n${data.soal.map((s: any, i: number) => `${i+1}. ${s.pertanyaan}\n${s.pilihan.join("\n")}\nKunci: ${s.kunci_jawaban}`).join("\n\n")}\n\n=== REKOMENDASI PEDAGOGIS ===\n${data.saran_pedagogis}`);
+        setAssessAIResult(data && (data.rubrik || data.soal || data.raw) ? data : null);
         showSuccess("AI berhasil merancang asesmen & rubrik!");
         fetchProfile(); // reload token limit
       } else {
@@ -8489,6 +8496,83 @@ const renderJurnalModule = () => {
                   {isGeneratingAssessRubric ? "AI Merumuskan..." : "⚡ Rancang via AI (1 Poin)"}
                 </button>
               </div>
+
+              {/* Hasil Asesmen AI */}
+              {assessAIResult && (
+                <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-3.5 bg-indigo-900 text-white">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">✨</span>
+                      <h4 className="text-xs font-bold uppercase tracking-wider">Hasil Rancangan AI</h4>
+                    </div>
+                    <button
+                      onClick={() => setAssessAIResult(null)}
+                      className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition cursor-pointer text-xs"
+                      title="Tutup"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="p-5 space-y-5 max-h-[32rem] overflow-y-auto">
+                    {/* Rubrik */}
+                    {(assessAIResult.rubrik || assessAIResult.raw) && (
+                      <div>
+                        <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                          Rubrik Penilaian
+                        </h5>
+                        <div className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap bg-slate-50 rounded-xl p-3">
+                          {assessAIResult.rubrik || assessAIResult.raw}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Soal */}
+                    {assessAIResult.soal && assessAIResult.soal.length > 0 && (
+                      <div>
+                        <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                          Bank Soal ({assessAIResult.soal.length})
+                        </h5>
+                        <div className="space-y-3">
+                          {assessAIResult.soal.map((s, i) => (
+                            <div key={i} className="border border-slate-200 rounded-xl p-3 space-y-2">
+                              <div className="text-xs font-semibold text-slate-800">
+                                {i + 1}. {s.pertanyaan}
+                              </div>
+                              {s.pilihan && s.pilihan.length > 0 && (
+                                <ul className="space-y-0.5">
+                                  {s.pilihan.map((opt, j) => (
+                                    <li key={j} className="text-xs text-slate-600 ml-3 flex gap-1">
+                                      <span>•</span>
+                                      <span>{opt}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                              {s.kunci_jawaban && (
+                                <div className="text-[11px] text-emerald-700 font-semibold">
+                                  Kunci: {s.kunci_jawaban}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Saran Pedagogis */}
+                    {assessAIResult.saran_pedagogis && (
+                      <div>
+                        <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                          Rekomendasi Pedagogis
+                        </h5>
+                        <div className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap bg-amber-50 border border-amber-100 rounded-xl p-3">
+                          {assessAIResult.saran_pedagogis}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Buku Nilai Utama */}
@@ -9528,32 +9612,7 @@ const renderJurnalModule = () => {
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-2xl p-5 overflow-y-auto max-h-[500px] text-xs font-medium leading-relaxed text-slate-700 space-y-4 font-sans">
-                  {(() => {
-                    const md = generatedDoc.konten || '';
-                    if (!md) return null;
-                    let html = md
-                      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-                      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                      .replace(/^### (.+)$/gm, '<h3 class="text-xs font-bold text-slate-800 mt-3 mb-1">$1</h3>')
-                      .replace(/^## (.+)$/gm, '<h2 class="text-xs font-bold text-slate-800 border-b border-slate-200 pb-1 mt-3 mb-2">$1</h2>')
-                      .replace(/^# (.+)$/gm, '<h1 class="text-xs font-bold text-slate-900 mt-3 mb-2">$1</h1>')
-                      .replace(/^- (.+)$/gm, '<li class="list-disc ml-5 my-0.5">$1</li>')
-                      .replace(/^(\d+)\. (.+)$/gm, '<li class="list-decimal ml-5 my-0.5">$2</li>')
-                      .replace(/\n\n/g, "</p><p class='my-1.5 text-justify'>")
-                      .replace(/\n/g, "<br>");
-                    html = html.replace(/(<li class="list-disc[^>]*>.*?<\/li>\n?)+/g, '<ul class="my-2">$&</ul>');
-                    html = html.replace(/(<li class="list-decimal[^>]*>.*?<\/li>\n?)+/g, '<ol class="my-2">$&</ol>');
-                    html = html.replace(/\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g, (match: string, header: string, body: string) => {
-                      const headerCells = header.split('|').filter((c: string) => c.trim()).map((c: string) => `<th class="border border-slate-300 px-2 py-1 bg-slate-100 font-semibold text-xs text-center">${c.trim()}</th>`).join('');
-                      const bodyRows = body.trim().split('\n').map((row: string) => {
-                        const cells = row.split('|').filter((c: string) => c.trim() !== undefined).slice(1, -1).map((c: string) => `<td class="border border-slate-300 px-2 py-1 text-xs">${c.trim()}</td>`).join('');
-                        return `<tr>${cells}</tr>`;
-                      }).join('');
-                      return `<table class="w-full border-collapse border border-slate-300 my-3 text-xs"><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table>`;
-                    });
-                    return <div dangerouslySetInnerHTML={{ __html: html }} />;
-                  })()}
+                  <RichMarkdown content={generatedDoc.konten || ''} />
                 </div>
               </div>
             ) : viewingDoc ? (

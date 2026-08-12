@@ -1,4 +1,5 @@
 import { generateAIContentWithUsage } from '@/lib/ai';
+import { silabusToMarkdown } from '@/lib/ai/silabus-markdown';
 import { query } from '@/lib/db';
 import { getUserPoinAccess, logFailedPoinUsage } from '@/src/services/poin-service';
 import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
@@ -194,6 +195,7 @@ export async function POST(req: Request) {
           userId,
           docTitle,
           JSON.stringify({
+            markdown: silabusToMarkdown(silabusData),
             identitas: silabusData.identitas,
             capaianPembelajaran: silabusData.capaianPembelajaran,
             alurTujuanPembelajaran: silabusData.alurTujuanPembelajaran,

@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { useTeacherStore, useKurikulumStore } from '@/lib/stores';
 import dynamic from 'next/dynamic';
 import PoinHabisModal from '@/app/components/ui/PoinHabisModal';
+import RichMarkdown from '@/components/ai/RichMarkdown';
 
 export default function ProtaPage() {
   const {
@@ -31,36 +32,6 @@ export default function ProtaPage() {
   const [result, setResult] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const convertMarkdownToHtml = (md: string): string => {
-    if (!md) return "";
-    let html = md
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" class="rounded-xl max-w-full my-3 shadow-sm border border-slate-200 mx-auto block" />')
-      .replace(/^### (.+)$/gm, '<h3 class="text-sm font-bold text-slate-800 mt-3 mb-1.5">$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2 class="text-base font-bold text-slate-800 border-b border-slate-200 pb-1 mt-4 mb-2">$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1 class="text-lg font-bold text-slate-900 border-b-2 border-slate-300 pb-1.5 mt-5 mb-3 uppercase text-center">$1</h1>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/^- (.+)$/gm, '<li class="list-disc ml-5 my-0.5 text-xs">$1</li>')
-      .replace(/^(\d+)\. (.+)$/gm, '<li class="list-decimal ml-5 my-0.5 text-xs">$2</li>')
-      .replace(/\n\n/g, "</p><p class='my-1.5 text-xs text-justify text-slate-700'>")
-      .replace(/\n/g, "<br>");
-    html = html.replace(/(<li class="list-disc ml-5 my-0.5 text-xs">.*?<\/li>\n?)+/g, '<ul class="my-2 ml-1">$&</ul>');
-    html = html.replace(/(<li class="list-decimal ml-5 my-0.5 text-xs">.*?<\/li>\n?)+/g, '<ol class="my-2 ml-1">$&</ol>');
-    html = html.replace(/\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g, (match: string, header: string, body: string) => {
-      const headerCells = header.split('|').filter((c: string) => c.trim()).map((c: string) => `<th class="border border-slate-300 px-2 py-1 bg-slate-100 font-semibold text-xs text-center">${c.trim()}</th>`).join('');
-      const headerRow = `<tr>${headerCells}</tr>`;
-      const bodyRows = body.trim().split('\n').map((row: string) => {
-        const cells = row.split('|').filter((c: string) => c.trim() !== undefined).slice(1, -1).map((c: string) => `<td class="border border-slate-300 px-2 py-1 text-xs">${c.trim()}</td>`).join('');
-        return `<tr>${cells}</tr>`;
-      }).join('');
-      return `<table class="w-full border-collapse border border-slate-300 my-3 text-xs"><thead>${headerRow}</thead><tbody>${bodyRows}</tbody></table>`;
-    });
-    return `<div class="text-xs text-slate-700 leading-relaxed font-sans">${html}</div>`;
-  };
 
   // Token Modal State
   const [showTokenModal, setShowTokenModal] = useState(false);
@@ -344,9 +315,7 @@ export default function ProtaPage() {
                     </div>
                   )}
 
-                  <div className="prose max-w-none overflow-x-auto">
-                    <div dangerouslySetInnerHTML={{ __html: convertMarkdownToHtml(result.konten || '') }} />
-                  </div>
+                  <RichMarkdown content={result.konten || ''} />
                 </>
               )}
             </div>
