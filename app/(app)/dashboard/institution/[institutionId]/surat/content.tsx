@@ -172,6 +172,128 @@ export default function AiSuratContent() {
     }
   };
 
+  const isPlaceholder = (v?: string) =>
+    !v || /^\s*\[.*\]\s*$/.test(v || "") || /^[-_.●\s]+$/.test(v || "");
+
+  const Placeholder = ({ value, label }: { value?: string; label: string }) =>
+    isPlaceholder(value) ? (
+      <span className="inline-block border-b border-dotted border-gray-400 min-w-[10rem] text-gray-500">
+        {label}
+      </span>
+    ) : (
+      <span>{value}</span>
+    );
+
+  const renderSurat = (r: SuratResult) => {
+    const tanggalValue = isPlaceholder(r.tanggal) ? (
+      <Placeholder value={r.tanggal} label="tanggal" />
+    ) : (
+      <span>{r.tanggal}</span>
+    );
+    const kepadaName = isPlaceholder(r.kepada) ? (
+      <Placeholder value={r.kepada} label="tujuan surat" />
+    ) : (
+      <span>{r.kepada}</span>
+    );
+    const penutupStandar =
+      "Demikian surat ini kami sampaikan. Atas perhatian dan kerja samanya, kami ucapkan terima kasih.";
+    return (
+      <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+        {/* Kop surat */}
+        <div className="px-10 pt-8 text-center">
+          <div className="text-xl font-bold text-gray-900 uppercase tracking-wide leading-snug">
+            {school?.nama_sekolah || "—"}
+          </div>
+          <div className="text-xs text-gray-600 mt-1 max-w-xl mx-auto">
+            {school?.alamat || ""}
+          </div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            NPSN: {school?.npsn || "-"}
+            {school?.academic_year_active ? ` | Tahun Ajaran: ${school.academic_year_active}` : ""}
+          </div>
+        </div>
+        {/* Garis ganda kop */}
+        <div className="px-0 mt-3">
+          <div className="border-b-2 border-gray-900" />
+          <div className="border-b border-gray-800 mt-0.5" />
+        </div>
+
+        {/* Header surat: nomor/lampiran/perihal kiri, tanggal kanan */}
+        <div className="px-10 pt-6 flex justify-between gap-6 text-sm text-gray-800">
+          <div className="space-y-0.5">
+            <p>
+              Nomor: <Placeholder value={r.nomor_surat} label="Nomor Surat" />
+            </p>
+            <p>
+              Lampiran: <Placeholder value={r.lampiran} label="Jumlah lampiran" />
+            </p>
+            <p>
+              Perihal: <span className="font-semibold">{r.perihal || "—"}</span>
+            </p>
+          </div>
+          <div className="text-right whitespace-nowrap">{tanggalValue}</div>
+        </div>
+
+        {/* Kepada */}
+        <div className="px-10 mt-8 text-sm text-gray-800 leading-relaxed">
+          <p>Kepada Yth.</p>
+          <p>{kepadaName}</p>
+          <p className="mt-2">di Tempat</p>
+        </div>
+
+        {/* Pembuka */}
+        {!isPlaceholder(r.pembuka) && (
+          <div className="px-10 mt-6 text-sm text-gray-800 leading-relaxed text-justify">
+            <p>{r.pembuka}</p>
+          </div>
+        )}
+
+        {/* Isi */}
+        {(r.isi || []).length > 0 && (
+          <div className="px-10 mt-4 text-sm text-gray-800 leading-relaxed text-justify space-y-4">
+            {r.isi.map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
+          </div>
+        )}
+
+        {/* Penutup + kalimat standar */}
+        <div className="px-10 mt-4 text-sm text-gray-800 leading-relaxed text-justify">
+          {!isPlaceholder(r.penutup) && <p>{r.penutup}</p>}
+          <p className={r.penutup ? "mt-4" : ""}>{penutupStandar}</p>
+        </div>
+
+        {/* Tembusan */}
+        {(r.tembusan || []).length > 0 && (
+          <div className="px-10 mt-10 text-sm text-gray-800 leading-relaxed">
+            <p className="font-semibold">Tembusan:</p>
+            <ol className="list-decimal list-inside mt-1 space-y-0.5">
+              {r.tembusan.map((t, i) => (
+                <li key={i}>{t}</li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        {/* Tanda tangan */}
+        <div className="px-10 py-8 flex justify-end">
+          <div className="w-56 text-center text-sm text-gray-800">
+            <p className="mb-1">{isPlaceholder(r.penandatangan) ? "Kepala Sekolah" : r.penandatangan}</p>
+            <div className="border-b border-gray-500 h-16" />
+            <div className="flex justify-center gap-1">
+              <span className="underline">
+                {isPlaceholder(r.penandatangan)
+                  ? school?.nama_kepala_sekolah || "Kepala Sekolah"
+                  : r.penandatangan}
+              </span>
+            </div>
+            {!isPlaceholder(r.nip) && r.nip !== "-" && <p className="mt-1">NIP. {r.nip}</p>}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       <div>
@@ -292,9 +414,7 @@ export default function AiSuratContent() {
                 </button>
               </div>
               <div className="px-5 py-6">
-                <pre className="whitespace-pre-wrap font-serif text-sm text-gray-800 leading-relaxed">
-                  {buildSuratText(result)}
-                </pre>
+                {result && renderSurat(result)}
               </div>
             </div>
           )}

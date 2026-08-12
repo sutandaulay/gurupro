@@ -95,9 +95,7 @@ export default function HandoutPreview({
 
       {/* Handout Content */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <div className="prose prose-sm max-w-none">
-          <HandoutContent content={handout} />
-        </div>
+        <HandoutContent content={handout} />
       </div>
     </div>
   );
@@ -114,83 +112,118 @@ interface HandoutContentProps {
 function HandoutContent({ content }: HandoutContentProps) {
   // Parse and render the handout content
   const lines = content.split("\n");
+  const blocks: React.ReactNode[] = [];
+  let listStack: { type: "ul" | "ol"; items: React.ReactNode[] }[] = [];
 
-  return (
-    <div className="space-y-3">
-      {lines.map((line, index) => {
-        const trimmed = line.trim();
-
-        // Empty line
-        if (!trimmed) {
-          return <div key={index} className="h-2" />;
-        }
-
-        // Heading 1
-        if (trimmed.startsWith("# ")) {
-          return (
-            <h1
-              key={index}
-              className="text-lg font-bold text-gray-900 mt-4 mb-2 pb-1 border-b border-gray-200"
-            >
-              {renderFormattedText(trimmed.slice(2))}
-            </h1>
-          );
-        }
-
-        // Heading 2
-        if (trimmed.startsWith("## ")) {
-          return (
-            <h2
-              key={index}
-              className="text-base font-bold text-gray-800 mt-3 mb-1"
-            >
-              {renderFormattedText(trimmed.slice(3))}
-            </h2>
-          );
-        }
-
-        // Heading 3
-        if (trimmed.startsWith("### ")) {
-          return (
-            <h3
-              key={index}
-              className="text-sm font-semibold text-gray-700 mt-2 mb-1"
-            >
-              {renderFormattedText(trimmed.slice(4))}
-            </h3>
-          );
-        }
-
-        // Unordered list item
-        if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-          return (
-            <li key={index} className="text-sm text-gray-600 ml-4">
-              {renderFormattedText(trimmed.slice(2))}
-            </li>
-          );
-        }
-
-        // Ordered list item
-        if (/^\d+\.\s/.test(trimmed)) {
-          const match = trimmed.match(/^(\d+)\.\s(.+)$/);
-          if (match) {
-            return (
-              <li key={index} className="text-sm text-gray-600 ml-4">
-                {renderFormattedText(match[2])}
-              </li>
-            );
-          }
-        }
-
-        // Regular paragraph
-        return (
-          <p key={index} className="text-sm text-gray-600 leading-relaxed">
-            {renderFormattedText(trimmed)}
-          </p>
+  const flushList = () => {
+    for (const list of listStack) {
+      if (list.type === "ol") {
+        blocks.push(
+          <ol key={blocks.length} className="list-decimal list-inside space-y-1 ml-1">
+            {list.items}
+          </ol>
         );
-      })}
-    </div>
-  );
+      } else {
+        blocks.push(
+          <ul key={blocks.length} className="list-disc list-inside space-y-1 ml-1">
+            {list.items}
+          </ul>
+        );
+      }
+    }
+    listStack = [];
+  };
+
+  const renderBlock = (index: number, trimmed: string) => {
+    // Heading 1
+    if (trimmed.startsWith("# ")) {
+      return (
+        <h1
+          key={index}
+          className="text-lg font-bold text-gray-900 mt-5 mb-2 pb-1 border-b-2 border-gray-800"
+        >
+          {renderFormattedText(trimmed.slice(2))}
+        </h1>
+      );
+    }
+
+    // Heading 2
+    if (trimmed.startsWith("## ")) {
+      return (
+        <h2
+          key={index}
+          className="text-base font-bold text-gray-800 mt-4 mb-1"
+        >
+          {renderFormattedText(trimmed.slice(3))}
+        </h2>
+      );
+    }
+
+    // Heading 3
+    if (trimmed.startsWith("### ")) {
+      return (
+        <h3
+          key={index}
+          className="text-sm font-semibold text-gray-700 mt-3 mb-1"
+        >
+          {renderFormattedText(trimmed.slice(4))}
+        </h3>
+      );
+    }
+
+    // Unordered list item
+    if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      listStack.push({
+        type: "ul",
+        items: [
+          <li key={index} className="text-sm text-gray-700 leading-relaxed">
+            {renderFormattedText(trimmed.slice(2))}
+          </li>,
+        ],
+      });
+      return null;
+    }
+
+    // Ordered list item
+    if (/^\d+\.\s/.test(trimmed)) {
+      const match = trimmed.match(/^(\d+)\.\s(.+)$/);
+      if (match) {
+        listStack.push({
+          type: "ol",
+          items: [
+            <li key={index} className="text-sm text-gray-700 leading-relaxed">
+              {renderFormattedText(match[2])}
+            </li>,
+          ],
+        });
+        return null;
+      }
+    }
+
+    // Regular paragraph (justify)
+    return (
+      <p key={index} className="text-sm text-gray-700 leading-relaxed text-justify">
+        {renderFormattedText(trimmed)}
+      </p>
+    );
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+
+    // Empty line — flush current list, add spacing
+    if (!trimmed) {
+      flushList();
+      blocks.push(<div key={`sp-${i}`} className="h-2" />);
+      continue;
+    }
+
+    const block = renderBlock(i, trimmed);
+    if (block !== null) blocks.push(block);
+  }
+  flushList();
+
+  return <div className="space-y-1">{blocks}</div>;
 }
 
 // ============================================

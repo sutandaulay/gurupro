@@ -31,6 +31,17 @@ interface RingkasanResult {
   rekomendasi: { judul: string; detail: string }[];
 }
 
+function formatTanggalId(dateStr?: string) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -202,56 +213,103 @@ export default function AiRingkasanContent() {
 
           {result && (
             <div className="space-y-5">
-              <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <h2 className="font-semibold text-gray-900 mb-2">Ringkasan Eksekutif</h2>
-                <p className="text-sm text-gray-700 leading-relaxed">{result.ringkasan_eksekutif}</p>
+              {/* Dokumen A4 */}
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                {/* Kop dokumen */}
+                <div className="px-10 pt-8 text-center">
+                  <div className="text-xl font-bold text-gray-900 uppercase tracking-wide leading-snug">
+                    {preview?.institusi || "Ringkasan Eksekutif"}
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">
+                    {preview?.jenjang ? `Jenjang ${preview.jenjang}` : ""}
+                    {preview?.tahunAjaran ? ` · Tahun Ajaran ${preview.tahunAjaran}` : ""}
+                    {preview?.tanggal ? ` · per ${formatTanggalId(preview.tanggal)}` : ""}
+                  </div>
+                </div>
+                <div className="px-0 mt-3">
+                  <div className="border-b-2 border-gray-900" />
+                  <div className="border-b border-gray-800 mt-0.5" />
+                </div>
+
+                {/* Isi dokumen */}
+                <div className="px-10 py-6">
+                  <div className="text-center text-sm font-semibold text-gray-800 tracking-wider mb-5">
+                    RINGKASAN EKSEKUTIF
+                  </div>
+
+                  <div className="text-sm text-gray-800 leading-relaxed text-justify">
+                    {result.ringkasan_eksekutif}
+                  </div>
+
+                  {result.poin_positif.length > 0 && (
+                    <div className="mt-6">
+                      <h3 className="flex items-center gap-2 text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">
+                        <span className="w-4 h-1 bg-emerald-500 rounded-full inline-block" />
+                        Capaian Positif
+                      </h3>
+                      <ul className="space-y-1.5">
+                        {result.poin_positif.map((p, i) => (
+                          <li key={i} className="text-sm text-gray-700 flex gap-2">
+                            <span className="text-emerald-600 flex-shrink-0">•</span>
+                            <span>{p}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {result.area_perhatian.length > 0 && (
+                    <div className="mt-6">
+                      <h3 className="flex items-center gap-2 text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">
+                        <span className="w-4 h-1 bg-amber-500 rounded-full inline-block" />
+                        Area Perhatian
+                      </h3>
+                      <ul className="space-y-1.5">
+                        {result.area_perhatian.map((p, i) => (
+                          <li key={i} className="text-sm text-gray-700 flex gap-2">
+                            <span className="text-amber-600 flex-shrink-0">•</span>
+                            <span>{p}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {result.rekomendasi.length > 0 && (
+                    <div className="mt-6">
+                      <h3 className="flex items-center gap-2 text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">
+                        <span className="w-4 h-1 bg-violet-500 rounded-full inline-block" />
+                        Rekomendasi Tindakan
+                      </h3>
+                      <div className="space-y-3">
+                        {result.rekomendasi.map((r, i) => (
+                          <div
+                            key={i}
+                            className="border-l-2 border-violet-200 pl-3"
+                          >
+                            <div className="text-sm font-semibold text-gray-900">
+                              {i + 1}. {r.judul}
+                            </div>
+                            {r.detail && (
+                              <p className="mt-0.5 text-sm text-gray-600">{r.detail}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {result.poin_positif.length > 0 && (
-                <div className="bg-green-50 rounded-xl border border-green-200 p-5">
-                  <h3 className="font-semibold text-green-800 text-sm mb-2">Capaian Positif</h3>
-                  <ul className="space-y-1.5">
-                    {result.poin_positif.map((p, i) => (
-                      <li key={i} className="text-sm text-green-700 flex gap-2">
-                        <span>•</span>
-                        <span>{p}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {result.area_perhatian.length > 0 && (
-                <div className="bg-amber-50 rounded-xl border border-amber-200 p-5">
-                  <h3 className="font-semibold text-amber-800 text-sm mb-2">Area Perhatian</h3>
-                  <ul className="space-y-1.5">
-                    {result.area_perhatian.map((p, i) => (
-                      <li key={i} className="text-sm text-amber-700 flex gap-2">
-                        <span>•</span>
-                        <span>{p}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {result.rekomendasi.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="px-5 py-4 border-b border-gray-100">
-                    <h3 className="font-semibold text-gray-900">Rekomendasi Tindakan</h3>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {result.rekomendasi.map((r, i) => (
-                      <div key={i} className="px-5 py-4">
-                        <div className="font-medium text-gray-900 text-sm">
-                          {i + 1}. {r.judul}
-                        </div>
-                        {r.detail && <p className="mt-1 text-sm text-gray-600">{r.detail}</p>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Aksi */}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800"
+                >
+                  Cetak / Simpan PDF
+                </button>
+              </div>
             </div>
           )}
         </>

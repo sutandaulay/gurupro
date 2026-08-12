@@ -374,125 +374,163 @@ export default function ViewLaporanKinerjaPage() {
       </div>
 
       {content ? (
-        <div className="space-y-8">
-          {/* Identitas */}
-          {content.identitas && (
-            <div className="bg-muted/50 rounded-xl p-6">
-              <h2 className="font-semibold mb-4">Identitas Guru</h2>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Nama:</span>
-                  <span className="ml-2 font-medium">{content.identitas.nama}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Mata Pelajaran:</span>
-                  <span className="ml-2">{content.identitas.mata_pelajaran}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Kelas:</span>
-                  <span className="ml-2">{content.identitas.kelas}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Periode:</span>
-                  <span className="ml-2">{content.identitas.periode}</span>
-                </div>
-              </div>
+        <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+          {/* Kop dokumen */}
+          <div className="px-10 pt-8 text-center">
+            <div className="text-xl font-bold text-gray-900 uppercase tracking-wide leading-snug">
+              {content?.identitas?.sekolah || "Laporan Kinerja"}
             </div>
-          )}
+            <div className="text-xs text-gray-600 mt-1">
+              {content?.identitas?.periode || `Semester ${laporan.semester === 'ganjil' ? 'Ganjil' : 'Genap'}`}
+            </div>
+          </div>
+          <div className="px-0 mt-3">
+            <div className="border-b-2 border-gray-900" />
+            <div className="border-b border-gray-800 mt-0.5" />
+          </div>
 
-          {/* SKP Section */}
-          {skpData && skpData.indikator_list?.length > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-              <h2 className="font-semibold text-blue-800 mb-4">📋 Rencana SKP Tahunan</h2>
-              <div className="space-y-2">
-                {skpData.indikator_list.map((ind: any) => (
-                  <div key={ind.id} className="flex items-center justify-between text-sm bg-white/70 rounded-lg p-2">
-                    <div>
-                      <span className="font-medium">{ind.kode}</span>
-                      <span className="ml-2">{ind.indikator_nama}</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      Target: {ind.target_self} evidence
-                    </span>
+          <div className="px-10 py-6 space-y-8">
+            {/* Identitas */}
+            {content.identitas && (
+              <div>
+                <h2 className="flex items-center gap-2 text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">
+                  <span className="w-4 h-1 bg-violet-500 rounded-full inline-block" />
+                  Identitas Guru
+                </h2>
+                <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                  <div className="flex">
+                    <span className="text-gray-500 w-36 flex-shrink-0">Nama</span>
+                    <span className="font-medium text-justify">{content.identitas.nama}</span>
                   </div>
-                ))}
+                  <div className="flex">
+                    <span className="text-gray-500 w-36 flex-shrink-0">Mata Pelajaran</span>
+                    <span>{content.identitas.mata_pelajaran}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="text-gray-500 w-36 flex-shrink-0">Kelas</span>
+                    <span>{content.identitas.kelas}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="text-gray-500 w-36 flex-shrink-0">Sekolah</span>
+                    <span>{content.identitas.sekolah}</span>
+                  </div>
+                  <div className="flex col-span-2">
+                    <span className="text-gray-500 w-36 flex-shrink-0">Periode</span>
+                    <span>{content.identitas.periode}</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Observasi Results */}
-          {observasiList.length > 0 && (
-            <div>
-              <h2 className="text-lg font-semibold mb-4">👁️ Hasil Observasi Kinerja</h2>
-              <div className="space-y-4">
-                {observasiList.map((obs) => {
-                  const ratings = obs.indikator_ratings || []
-                  const obsAvg = ratings.length > 0
-                    ? (ratings.reduce((s, r) => s + (Number(r.rating) || 0), 0) / ratings.length)
-                    : 0
-                  return (
-                    <div key={obs.id} className="bg-card border rounded-xl p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">
-                            {new Date(obs.tanggal_observasi).toLocaleDateString('id-ID', {
-                              day: 'numeric', month: 'long', year: 'numeric'
-                            })}
-                          </span>
-                          <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">
-                            {obs.jenis === 'kelas' ? 'Observasi Kelas' : obs.jenis}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className={cn('w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold', ratingColor(Math.round(obsAvg)))}>
-                            {obsAvg.toFixed(1)}
+            {/* Ringkasan naratif */}
+            {content.ringkasan_singkat && (
+              <div>
+                <h2 className="flex items-center gap-2 text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">
+                  <span className="w-4 h-1 bg-violet-500 rounded-full inline-block" />
+                  Ringkasan
+                </h2>
+                <p className="text-sm text-gray-800 leading-relaxed text-justify">
+                  {content.ringkasan_singkat}
+                </p>
+              </div>
+            )}
+
+            {/* SKP Section */}
+            {skpData && skpData.indikator_list?.length > 0 && (
+              <div>
+                <h2 className="flex items-center gap-2 text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">
+                  <span className="w-4 h-1 bg-blue-500 rounded-full inline-block" />
+                  Rencana SKP Tahunan
+                </h2>
+                <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
+                  {skpData.indikator_list.map((ind: any) => (
+                    <div key={ind.id} className="flex items-center justify-between text-sm px-4 py-2.5 bg-white">
+                      <div className="flex gap-2">
+                        <span className="font-medium">{ind.kode}</span>
+                        <span className="text-gray-700">{ind.indikator_nama}</span>
+                      </div>
+                      <span className="text-xs text-gray-500 flex-shrink-0">
+                        Target: {ind.target_self} evidence
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Observasi Results */}
+            {observasiList.length > 0 && (
+              <div>
+                <h2 className="flex items-center gap-2 text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">
+                  <span className="w-4 h-1 bg-blue-500 rounded-full inline-block" />
+                  Hasil Observasi Kinerja
+                </h2>
+                <div className="space-y-3">
+                  {observasiList.map((obs) => {
+                    const ratings = obs.indikator_ratings || []
+                    const obsAvg = ratings.length > 0
+                      ? (ratings.reduce((s, r) => s + (Number(r.rating) || 0), 0) / ratings.length)
+                      : 0
+                    return (
+                      <div key={obs.id} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">
+                              {new Date(obs.tanggal_observasi).toLocaleDateString('id-ID', {
+                                day: 'numeric', month: 'long', year: 'numeric'
+                              })}
+                            </span>
+                            <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">
+                              {obs.jenis === 'kelas' ? 'Observasi Kelas' : obs.jenis}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className={cn('w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold', ratingColor(Math.round(obsAvg)))}>
+                              {obsAvg.toFixed(1)}
+                            </div>
                           </div>
                         </div>
+                        {obs.indikator_ratings && (
+                          <div className="grid grid-cols-3 gap-2 mb-2">
+                            {obs.indikator_ratings.map((r: any) => (
+                              <div key={r.id} className="flex items-center gap-1 text-xs bg-gray-50 rounded p-1.5">
+                                <span className="font-medium">{r.kode}</span>
+                                <span className={cn('w-4 h-4 rounded flex items-center justify-center text-white text-[10px] font-bold', ratingColor(r.rating))}>
+                                  {r.rating}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {obs.suasana_pembelajaran && (
+                          <p className="text-sm text-gray-600 mt-2">{obs.suasana_pembelajaran}</p>
+                        )}
+                        {obs.rekomendasi && (
+                          <div className="mt-2 text-sm bg-amber-50 border border-amber-200 rounded-lg p-2">
+                            <span className="font-medium text-amber-800">Rekomendasi:</span>
+                            <span className="text-amber-700 ml-1">{obs.rekomendasi}</span>
+                          </div>
+                        )}
                       </div>
-                      {obs.indikator_ratings && (
-                        <div className="grid grid-cols-3 gap-2 mb-2">
-                          {obs.indikator_ratings.map((r: any) => (
-                            <div key={r.id} className="flex items-center gap-1 text-xs bg-muted/30 rounded p-1.5">
-                              <span className="font-medium">{r.kode}</span>
-                              <span className={cn('w-4 h-4 rounded flex items-center justify-center text-white text-[10px] font-bold', ratingColor(r.rating))}>
-                                {r.rating}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {obs.suasana_pembelajaran && (
-                        <p className="text-sm text-muted-foreground mt-2">{obs.suasana_pembelajaran}</p>
-                      )}
-                      {obs.rekomendasi && (
-                        <div className="mt-2 text-sm bg-amber-50 border border-amber-200 rounded-lg p-2">
-                          <span className="font-medium text-amber-800">Rekomendasi:</span>
-                          <span className="text-amber-700 ml-1">{obs.rekomendasi}</span>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* AI Generated Sections */}
-          {content.sections?.map((section, index) => (
-            <section key={index}>
-              <h2 className="text-lg font-semibold mb-3">{section.heading}</h2>
-              <div className="text-muted-foreground leading-relaxed whitespace-pre-line">
-                {section.content}
-              </div>
-            </section>
-          ))}
-
-          {content.ringkasan_singkat && (
-            <div className="bg-violet-50 border border-violet-200 rounded-xl p-4">
-              <h3 className="font-medium text-violet-800 mb-2">📌 Ringkasan</h3>
-              <p className="text-violet-700">{content.ringkasan_singkat}</p>
-            </div>
-          )}
+            {/* AI Generated Sections */}
+            {content.sections?.map((section, index) => (
+              <section key={index}>
+                <h2 className="flex items-center gap-2 text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">
+                  <span className="w-4 h-1 bg-violet-500 rounded-full inline-block" />
+                  {section.heading}
+                </h2>
+                <div className="text-sm text-gray-800 leading-relaxed text-justify whitespace-pre-line">
+                  {section.content}
+                </div>
+              </section>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="bg-muted rounded-xl p-8 text-center">
