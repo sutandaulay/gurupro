@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { buildSignedSessionCookie } from '@/lib/session-sign';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/headers', () => ({
@@ -88,7 +89,7 @@ beforeEach(() => {
   vi.mocked(cookies).mockImplementation(async () => ({
     get: (name: string) =>
       name === 'gurupro_session' && sessionUserId
-        ? { value: JSON.stringify({ id: sessionUserId, role: 'guru', activeContext: 'institution' }) }
+        ? { value: buildSignedSessionCookie({ id: sessionUserId, role: 'guru', activeContext: 'institution' }) }
         : undefined,
     set: () => {},
   }));

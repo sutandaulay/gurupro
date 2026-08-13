@@ -125,24 +125,30 @@ export async function performLogin(input: LoginInput): Promise<LoginResult> {
     };
   }
 
-  // Multi-school check + institution role
+  // Multi-school check + institution roles
   const membershipRes = await query(
-    `SELECT institution_id,
-            COALESCE(
-              (SELECT imr.value FROM public.institution_members_role imr WHERE imr.parent_id = public_institution_members.id LIMIT 1),
-              'guru'
-            ) AS institution_role
-     FROM (
-       SELECT id, institution_id, created_at
-       FROM public.institution_members
-       WHERE app_user_id = $1 AND status = 'active'
-       ORDER BY created_at DESC
-       LIMIT 1
-     ) AS public_institution_members`,
+    `SELECT
+       im.id,
+       im.institution_id,
+       im.created_at,
+       COALESCE(
+         (SELECT array_agg(imr.value ORDER BY imr.id)
+          FROM public.institution_members_role imr
+          WHERE imr.parent_id = im.id),
+         ARRAY['guru']
+       ) AS institution_roles
+     FROM public.institution_members im
+     WHERE im.app_user_id = $1 AND im.status = 'active'
+     ORDER BY im.created_at DESC
+     LIMIT 1`,
     [user.id]
   );
+  const member = membershipRes.rows[0];
   const activeMembershipsCount = membershipRes.rows.length;
-  const primaryRole = membershipRes.rows[0]?.institution_role || user.role || "guru";
+  const institutionRoles: string[] = Array.isArray(member?.institution_roles)
+    ? member.institution_roles
+    : [];
+  const primaryRole = institutionRoles[0] || user.role || "guru";
 
   let activeContext: "individual" | { institutionId: number } = "individual";
   let targetRedirectUrl = "/dashboard";
@@ -150,14 +156,45 @@ export async function performLogin(input: LoginInput): Promise<LoginResult> {
   if (user.role === "admin") {
     targetRedirectUrl = "/admin";
   } else if (activeMembershipsCount === 1) {
-    const instId = membershipRes.rows[0].institution_id;
+    const instId = member.institution_id;
     activeContext = { institutionId: instId };
     targetRedirectUrl = `/institusi/${instId}/dashboard`;
-  } else if (activeMembershipsCount >= 2) {
-    targetRedirectUrl = checkoutPlan ? `/select-context?checkout=${checkoutPlan}` : "/select-context";
+  } else if (activeMembershipsCount === 0) {
+    targetRedirectUrl = checkoutPlan ? "/dashboard/billing?checkout=" + checkoutPlan : "/dashboard";
+  } else {
+    // >=2 memberships: prefer restoring the last institution used
+    const lastRes = await query(
+      "SELECT last_institution_id FROM users WHERE id = $1",
+      [user.id]
+    );
+    const lastInstId = lastRes.rows[0]?.last_institution_id;
+    if (lastInstId != null && Number(member.institution_id) !== Number(lastInstId)) {
+      const stillMember = await query(
+        `SELECT 1 FROM public.institution_members
+         WHERE app_user_id = $1 AND institution_id = $2 AND status = 'active'`,
+        [user.id, lastInstId]
+      );
+      if (stillMember.rows.length > 0) {
+        activeContext = { institutionId: Number(lastInstId) };
+        targetRedirectUrl = `/institusi/${lastInstId}/dashboard`;
+      } else {
+        // last institution is stale — direct to selector, clear it next login
+        activeContext = "individual";
+        targetRedirectUrl = checkoutPlan ? `/select-context?checkout=${checkoutPlan}` : "/select-context";
+      }
+    } else {
+      targetRedirectUrl = checkoutPlan ? `/select-context?checkout=${checkoutPlan}` : "/select-context";
+    }
   }
 
-  await setDefaultSessionCookie({ id: String(user.id), role: primaryRole, activeContext });
+  await setDefaultSessionCookie({
+    id: String(user.id),
+    role: primaryRole,
+    roles: institutionRoles,
+    lastInstitutionId:
+      activeContext === "individual" ? null : activeContext.institutionId,
+    activeContext,
+  });
 
   return {
     redirectUrl: targetRedirectUrl,

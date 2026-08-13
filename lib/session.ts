@@ -3,30 +3,20 @@ import { query } from '@/lib/db';
 import { getUserActiveMemberships } from '@/lib/institution-members';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
+import {
+  buildSignedSessionCookie,
+  parseSignedSession,
+  type ActiveContext,
+  type SessionData,
+} from '@/lib/session-sign';
 
-export type ActiveContext =
-  | 'individual'
-  | { institutionId: number };
-
-export interface SessionData {
-  id: string;
-  role: string;
-  activeContext?: ActiveContext;
-}
+export type { ActiveContext, SessionData } from '@/lib/session-sign';
+export { buildSignedSessionCookie } from '@/lib/session-sign';
 
 export interface ContextFilter {
   institutionId: number | null;
   assignedMapel: string[];
   assignedKelas: string[];
-}
-
-function parseSession(data?: string): SessionData | null {
-  if (!data) return null;
-  try {
-    return JSON.parse(data) as SessionData;
-  } catch {
-    return null;
-  }
 }
 
 function sessionCookieOptions(maxAge: number = 60 * 60 * 24 * 7) {
@@ -43,7 +33,7 @@ export async function getSession(): Promise<SessionData | null> {
   // 1. Try gurupro_session cookie first (set by manual login)
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get('gurupro_session')?.value;
-  const parsed = parseSession(sessionCookie);
+  const parsed = parseSignedSession(sessionCookie);
   if (parsed?.id) {
     return parsed;
   }
@@ -66,7 +56,7 @@ export async function getSession(): Promise<SessionData | null> {
 
         // Also set gurupro_session cookie so subsequent requests are faster
         try {
-          cookieStore.set('gurupro_session', JSON.stringify(sessionData), sessionCookieOptions());
+          cookieStore.set('gurupro_session', buildSignedSessionCookie(sessionData), sessionCookieOptions());
         } catch {
           // cookies().set() may not be available in all contexts, ignore
         }
@@ -86,6 +76,24 @@ export async function requireSession(): Promise<SessionData> {
   if (!session) {
     throw new Error('Unauthorized');
   }
+
+  // Server-side validation: confirm the user still exists & is active, and
+  // resolve the authoritative role from DB (cookie role is signed, but DB is
+  // source of truth in case of role changes / deactivation).
+  try {
+    const userRes = await query(
+      'SELECT id, role, is_active FROM users WHERE id = $1',
+      [session.id]
+    );
+    if (userRes.rows.length === 0 || userRes.rows[0].is_active === false) {
+      throw new Error('Unauthorized');
+    }
+    session.role = userRes.rows[0].role || session.role || 'guru';
+  } catch (err) {
+    if ((err as Error).message === 'Unauthorized') throw err;
+    // DB hiccup — signed session cookie still trusted as a safe fallback
+  }
+
   return session;
 }
 
@@ -100,24 +108,41 @@ export async function setActiveContext(context: ActiveContext): Promise<void> {
     const sessionCookie = cookieStore.get('gurupro_session')?.value;
     if (!sessionCookie) return;
 
-    const session = JSON.parse(sessionCookie);
-    session.activeContext = context;
+    const parsed = parseSignedSession(sessionCookie);
+    if (!parsed?.id) return;
 
-    cookieStore.set('gurupro_session', JSON.stringify(session), sessionCookieOptions());
+    parsed.activeContext = context;
+
+    // Persist last institution used so subsequent logins can restore it
+    if (context === 'individual') {
+      parsed.lastInstitutionId = null;
+    } else {
+      parsed.lastInstitutionId = context.institutionId;
+      try {
+        await query(
+          'UPDATE users SET last_institution_id = $1 WHERE id = $2',
+          [context.institutionId, parsed.id]
+        );
+      } catch {
+        // non-fatal — cookie still tracks the context
+      }
+    }
+
+    cookieStore.set('gurupro_session', buildSignedSessionCookie(parsed), sessionCookieOptions());
   } catch (err) {
     console.error('setActiveContext failed:', err);
   }
 }
 
 export async function setDefaultSessionCookie(
-  sessionData: Omit<SessionData, 'activeContext'>,
+  sessionData: SessionData & { activeContext?: ActiveContext },
 ): Promise<void> {
   const data: SessionData = {
     ...sessionData,
-    activeContext: 'individual',
+    activeContext: sessionData.activeContext ?? 'individual',
   };
 
-  (await cookies()).set('gurupro_session', JSON.stringify(data), sessionCookieOptions());
+  (await cookies()).set('gurupro_session', buildSignedSessionCookie(data), sessionCookieOptions());
 }
 
 export async function getContextFilters(userId: string): Promise<ContextFilter> {

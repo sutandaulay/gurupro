@@ -21,6 +21,7 @@ import { POST as resetPasswordHandler } from "@/app/api/institution/[institution
 import { GET as membersGet } from "@/app/api/institution/[institutionId]/members/route";
 import { grantUserTokens, grantAddonTokens, evaluateTokenAccess } from "@/lib/token-system";
 import { getUserAccountMode } from "@/lib/institution-members";
+import { buildSignedSessionCookie } from "@/lib/session-sign";
 
 // ==========================================
 // MOCK COOKIES
@@ -57,8 +58,8 @@ vi.mock("@/lib/notifications", () => {
 
 // Helper untuk setup headers request
 function createSessionHeaders(userId: string) {
-  const session = { id: userId, role: "guru", activeContext: "individual" };
-  const encoded = encodeURIComponent(JSON.stringify(session));
+  const session = { id: userId, role: "guru", activeContext: "individual" as const };
+  const encoded = encodeURIComponent(buildSignedSessionCookie(session));
   return {
     "cookie": `gurupro_session=${encoded}`,
     "content-type": "application/json",

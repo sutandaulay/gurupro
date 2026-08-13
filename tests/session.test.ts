@@ -32,9 +32,14 @@ import {
   setDefaultSessionCookie,
   getContextFilters,
 } from '../lib/session'
+import { buildSignedSessionCookie } from '../lib/session-sign'
 
 function createCookie(value: string) {
   return { name: 'gurupro_session', value }
+}
+
+function signedCookie(session: any) {
+  return createCookie(buildSignedSessionCookie(session))
 }
 
 beforeEach(() => {
@@ -44,14 +49,22 @@ beforeEach(() => {
 describe('getSession', () => {
   it('membaca session dari gurupro_session cookie', async () => {
     const sessionData = { id: 'user-1', role: 'guru', activeContext: 'individual' }
-    mockCookieGet.mockReturnValue(createCookie(JSON.stringify(sessionData)))
+    mockCookieGet.mockReturnValue(signedCookie(sessionData))
 
     const result = await getSession()
-    expect(result).toEqual(sessionData)
+    expect(result).toMatchObject(sessionData)
+    expect(result!.roles).toEqual([])
+    expect(result!.lastInstitutionId).toBeNull()
   })
 
   it('mengembalikan null jika cookie tidak ada', async () => {
     mockCookieGet.mockReturnValue(undefined)
+    const result = await getSession()
+    expect(result).toBeNull()
+  })
+
+  it('mengembalikan null jika cookie tidak memiliki signature valid', async () => {
+    mockCookieGet.mockReturnValue(createCookie(JSON.stringify({ id: 'user-1', role: 'guru', activeContext: 'individual' })))
     const result = await getSession()
     expect(result).toBeNull()
   })
@@ -116,10 +129,12 @@ describe('getSession', () => {
 describe('requireSession', () => {
   it('mengembalikan session jika valid', async () => {
     const sessionData = { id: 'user-1', role: 'guru', activeContext: 'individual' }
-    mockCookieGet.mockReturnValue(createCookie(JSON.stringify(sessionData)))
+    mockCookieGet.mockReturnValue(signedCookie(sessionData))
 
     const result = await requireSession()
-    expect(result).toEqual(sessionData)
+    expect(result).toMatchObject(sessionData)
+    expect(result!.roles).toEqual([])
+    expect(result!.lastInstitutionId).toBeNull()
   })
 
   it('melempar error jika tidak ada session', async () => {
@@ -133,18 +148,18 @@ describe('requireSession', () => {
 describe('getActiveContext', () => {
   it('mengembalikan activeContext dari session', async () => {
     const sessionData = { id: 'user-1', role: 'guru', activeContext: { institutionId: 5 } }
-    mockCookieGet.mockReturnValue(createCookie(JSON.stringify(sessionData)))
+    mockCookieGet.mockReturnValue(signedCookie(sessionData))
 
     const result = await getActiveContext()
     expect(result).toEqual({ institutionId: 5 })
   })
 
-  it('mengembalikan undefined jika session tidak memiliki activeContext', async () => {
+  it('mengembalikan individual jika session tidak memiliki activeContext eksplisit (default new model)', async () => {
     const sessionData = { id: 'user-1', role: 'guru' }
-    mockCookieGet.mockReturnValue(createCookie(JSON.stringify(sessionData)))
+    mockCookieGet.mockReturnValue(signedCookie(sessionData))
 
     const result = await getActiveContext()
-    expect(result).toBeUndefined()
+    expect(result).toBe('individual')
   })
 
   it('mengembalikan undefined jika session tidak ada', async () => {
@@ -159,7 +174,7 @@ describe('getActiveContext', () => {
 describe('setActiveContext', () => {
   it('mengupdate activeContext di cookie', async () => {
     const sessionData = { id: 'user-1', role: 'guru', activeContext: 'individual' }
-    mockCookieGet.mockReturnValue(createCookie(JSON.stringify(sessionData)))
+    mockCookieGet.mockReturnValue(signedCookie(sessionData))
 
     await setActiveContext({ institutionId: 10 })
 
@@ -179,7 +194,7 @@ describe('setActiveContext', () => {
 
   it('dapat mengembalikan context ke individual', async () => {
     const sessionData = { id: 'user-1', role: 'guru', activeContext: { institutionId: 5 } }
-    mockCookieGet.mockReturnValue(createCookie(JSON.stringify(sessionData)))
+    mockCookieGet.mockReturnValue(signedCookie(sessionData))
 
     await setActiveContext('individual')
 
@@ -206,7 +221,7 @@ describe('setDefaultSessionCookie', () => {
 describe('getContextFilters', () => {
   it('mengembalikan filter default jika activeContext = individual', async () => {
     const sessionData = { id: 'user-1', role: 'guru', activeContext: 'individual' }
-    mockCookieGet.mockReturnValue(createCookie(JSON.stringify(sessionData)))
+    mockCookieGet.mockReturnValue(signedCookie(sessionData))
 
     const result = await getContextFilters('user-1')
     expect(result).toEqual({ institutionId: null, assignedMapel: [], assignedKelas: [] })
@@ -214,7 +229,7 @@ describe('getContextFilters', () => {
 
   it('mengembalikan filter default jika tidak ada activeContext', async () => {
     const sessionData = { id: 'user-1', role: 'guru' }
-    mockCookieGet.mockReturnValue(createCookie(JSON.stringify(sessionData)))
+    mockCookieGet.mockReturnValue(signedCookie(sessionData))
 
     const result = await getContextFilters('user-1')
     expect(result.institutionId).toBeNull()
@@ -222,7 +237,7 @@ describe('getContextFilters', () => {
 
   it('mengisi assignedMapel dan assignedKelas jika ada membership', async () => {
     const sessionData = { id: 'user-1', role: 'guru', activeContext: { institutionId: 5 } }
-    mockCookieGet.mockReturnValue(createCookie(JSON.stringify(sessionData)))
+    mockCookieGet.mockReturnValue(signedCookie(sessionData))
 
     vi.mocked(getUserActiveMemberships).mockResolvedValueOnce([
       { id: 100, institution_id: 5 },
@@ -240,7 +255,7 @@ describe('getContextFilters', () => {
 
   it('mengembalikan filter kosong jika user tidak punya membership di institution tersebut', async () => {
     const sessionData = { id: 'user-1', role: 'guru', activeContext: { institutionId: 5 } }
-    mockCookieGet.mockReturnValue(createCookie(JSON.stringify(sessionData)))
+    mockCookieGet.mockReturnValue(signedCookie(sessionData))
 
     vi.mocked(getUserActiveMemberships).mockResolvedValueOnce([
       { id: 100, institution_id: 999 },

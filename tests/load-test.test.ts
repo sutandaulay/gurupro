@@ -8,6 +8,7 @@ import { query, pool } from "@/lib/db";
 import { GET as adminGet } from "@/app/api/administrasi/route";
 import { GET as membersGet } from "@/app/api/institution/[institutionId]/members/route";
 import { performance } from "perf_hooks";
+import { buildSignedSessionCookie } from "@/lib/session-sign";
 
 // Mock next/headers
 let mockCookieValue: string | undefined = undefined;
@@ -28,7 +29,7 @@ vi.mock("next/headers", () => {
 
 function createSessionHeaders(userId: string, activeContext: any = "individual") {
   const session = { id: userId, role: "guru", activeContext };
-  const encoded = encodeURIComponent(JSON.stringify(session));
+  const encoded = encodeURIComponent(buildSignedSessionCookie(session));
   return {
     "cookie": `gurupro_session=${encoded}`,
     "content-type": "application/json",

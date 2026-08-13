@@ -8,6 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { buildSignedSessionCookie } from '@/lib/session-sign';
 
 vi.mock('@/lib/db', () => ({ query: vi.fn(), logAudit: vi.fn() }));
 vi.mock('next/headers', () => ({ cookies: vi.fn() }));
@@ -45,7 +46,7 @@ function makePost(raportId: string, newStatus = 'dikonfirmasi') {
 
 function mockSession(userId: string) {
   mockCookies.mockResolvedValue({
-    get: vi.fn().mockReturnValue({ value: JSON.stringify({ id: userId, role: 'guru' }) }),
+    get: vi.fn().mockReturnValue({ value: buildSignedSessionCookie({ id: userId, role: 'guru' }) }),
   });
 }
 

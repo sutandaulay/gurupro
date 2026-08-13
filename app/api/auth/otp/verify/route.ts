@@ -2,6 +2,7 @@ import { query } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { hashPassword } from "@/lib/auth";
 import { getClientIP } from "@/lib/auth-utils";
+import { buildSignedSessionCookie } from "@/lib/session";
 import * as crypto from "crypto";
 
 export async function POST(req: Request) {
@@ -205,19 +206,34 @@ export async function POST(req: Request) {
         );
       }
 
-      // Check memberships count for context switcher
+      // Check memberships count + roles for context switcher
       const membershipRes = await query(
-        `SELECT COUNT(*) as count 
-         FROM public.institution_members 
-         WHERE app_user_id = $1 AND status = 'active'`,
+        `SELECT im.institution_id,
+                COALESCE(
+                  (SELECT array_agg(imr.value ORDER BY imr.id)
+                   FROM public.institution_members_role imr
+                   WHERE imr.parent_id = im.id),
+                  ARRAY['guru']
+                ) AS institution_roles
+         FROM public.institution_members im
+         WHERE im.app_user_id = $1 AND status = 'active'
+         ORDER BY im.created_at DESC
+         LIMIT 1`,
         [user.id]
       );
-      const activeCount = parseInt(membershipRes.rows[0].count || "0");
+      const member = membershipRes.rows[0];
+      const activeCount = membershipRes.rows.length;
+      const institutionRoles: string[] = Array.isArray(member?.institution_roles)
+        ? member.institution_roles
+        : [];
 
-      const sessionData = JSON.stringify({
+      const sessionData = buildSignedSessionCookie({
         id: user.id,
-        role: user.role || "guru",
+        role: institutionRoles[0] || user.role || "guru",
+        roles: institutionRoles,
         activeContext: "individual",
+        lastInstitutionId:
+          activeCount === 1 && member?.institution_id != null ? member.institution_id : null,
       });
 
       const redirectUrl = checkoutPlan

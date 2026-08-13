@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { getActivePricingPlans } from "@/lib/settings";
 import { getTokensPerPoin } from "@/src/config/ratio-cache";
 import { getUserAccountMode, getUserActiveMemberships } from "@/lib/institution-members";
-import { SessionData, getSession, setDefaultSessionCookie } from "@/lib/session";
+import { SessionData, buildSignedSessionCookie, getSession, setDefaultSessionCookie } from "@/lib/session";
 
 const PROFILE_SELECT = `id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan,
   quota_poin_total, quota_poin_used, addon_poin, addon_poin_used, token_accumulated, referral_code, cashback_balance,
@@ -357,11 +357,13 @@ export async function PUT(req: Request) {
       values
     );
 
-    // Update session cookie with the new role (preserve activeContext)
-    const sessionData = JSON.stringify({
+    // Update session cookie (re-signed) with the new role (preserve activeContext)
+    const sessionData = buildSignedSessionCookie({
       id: userId,
       role: session.role || 'guru',
+      roles: session.roles ?? [],
       activeContext: session.activeContext ?? 'individual',
+      lastInstitutionId: session.lastInstitutionId ?? null,
     });
     cookieStore.set('gurupro_session', sessionData, {
       httpOnly: true,

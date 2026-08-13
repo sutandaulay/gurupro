@@ -18,6 +18,7 @@ vi.mock('next/headers', () => ({
 }))
 
 import { query } from '@/lib/db'
+import { buildSignedSessionCookie } from '@/lib/session-sign'
 
 const ELHANUM_USER_ID = '50e096cc-9dc2-4403-b731-5506088ddc32'
 const ELHANUM_EMAIL = 'ptgenerasidigitalindonesiaemas@gmail.com'
@@ -38,7 +39,7 @@ async function checkElhanumSeed(): Promise<boolean> {
 
 const elhanumSeeded = await checkElhanumSeed()
 
-const sessionCookieValue = JSON.stringify({
+const sessionCookieValue = buildSignedSessionCookie({
   id: ELHANUM_USER_ID,
   role: 'guru',
   activeContext: 'individual',

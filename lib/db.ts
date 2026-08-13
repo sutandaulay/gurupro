@@ -399,6 +399,7 @@ const initDb = async () => {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS login_attempts INTEGER DEFAULT 0');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS lock_until TIMESTAMP');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_invitation_token VARCHAR(255)');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_institution_id INTEGER');
 
     // Ensure payload schema changes are applied
     await pool.query('ALTER TABLE payload.otp_verifications ADD COLUMN IF NOT EXISTS purpose VARCHAR(50) DEFAULT \'password_reset\'');
