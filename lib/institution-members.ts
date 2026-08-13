@@ -97,14 +97,14 @@ export async function approveConnectionRequest(
     }
 
     const memberResult = await client.query(
-      `SELECT id FROM payload.institution_members WHERE user_id = $1 AND institution_id = $2 LIMIT 1`,
+      `SELECT id FROM public.institution_members WHERE user_id = $1 AND institution_id = $2 LIMIT 1`,
       [resolvedCmsUserId, request.institution_id]
     );
 
     let memberId = memberResult.rows[0]?.id;
     if (!memberId) {
       const newMember = await client.query(
-        `INSERT INTO payload.institution_members (user_id, app_user_id, institution_id, status, joined_at, created_at, updated_at)
+        `INSERT INTO public.institution_members (user_id, app_user_id, institution_id, status, joined_at, created_at, updated_at)
          VALUES ($1, $2, $3, 'active', NOW(), NOW(), NOW())
          RETURNING id`,
         [resolvedCmsUserId, appUserId, request.institution_id]
@@ -112,17 +112,17 @@ export async function approveConnectionRequest(
       memberId = newMember.rows[0].id;
     } else {
       await client.query(
-        `UPDATE payload.institution_members SET status = 'active', updated_at = NOW(), app_user_id = COALESCE(app_user_id, $1)
+        `UPDATE public.institution_members SET status = 'active', updated_at = NOW(), app_user_id = COALESCE(app_user_id, $1)
          WHERE id = $2`,
         [appUserId, memberId]
       );
     }
 
     await client.query(
-      `INSERT INTO payload.institution_members_role ("order", parent_id, value)
-       VALUES ($1, $2, 'guru')
+      `INSERT INTO public.institution_members_role (parent_id, value)
+       VALUES ($1, 'guru')
        ON CONFLICT DO NOTHING`,
-      [1, memberId]
+      [memberId]
     );
 
     const npsnResult = await client.query(
@@ -260,7 +260,7 @@ export async function createMembership(
   status: MembershipStatus = 'invited'
 ): Promise<InstitutionMemberRow> {
   const result = await query(
-    `INSERT INTO payload.institution_members (user_id, app_user_id, institution_id, status, joined_at, created_at, updated_at)
+    `INSERT INTO public.institution_members (user_id, app_user_id, institution_id, status, joined_at, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
      RETURNING *`,
     [cmsUserId, appUserId, institutionId, status, status === 'active' ? new Date().toISOString() : null]

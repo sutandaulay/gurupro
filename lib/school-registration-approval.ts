@@ -80,17 +80,17 @@ export async function approveSchoolRegistration(registration: any) {
 
     if (existingMembership.rows.length === 0) {
       const membership = await query(
-        `INSERT INTO payload.institution_members (user_id, app_user_id, institution_id, status, joined_at, created_at, updated_at)
+        `INSERT INTO public.institution_members (user_id, app_user_id, institution_id, status, joined_at, created_at, updated_at)
          VALUES ($1, $2, $3, 'active', NOW(), NOW(), NOW())
          RETURNING id`,
         [cmsUserId, null, newInstitutionId]
       );
 
       await query(
-        `INSERT INTO institution_members_role ("order", parent_id, value)
-         VALUES ($1, $2, 'admin_sekolah')
+        `INSERT INTO public.institution_members_role (parent_id, value)
+         VALUES ($1, 'admin_sekolah')
          ON CONFLICT DO NOTHING`,
-        [1, membership.rows[0].id]
+        [membership.rows[0].id]
       );
     }
   }
@@ -134,17 +134,17 @@ export async function approveSchoolRegistration(registration: any) {
         }
 
         const member = await query(
-          `INSERT INTO payload.institution_members (user_id, app_user_id, institution_id, status, joined_at, created_at, updated_at)
+          `INSERT INTO public.institution_members (user_id, app_user_id, institution_id, status, joined_at, created_at, updated_at)
            VALUES ($1, $2, $3, 'invited', NULL, NOW(), NOW())
            RETURNING id`,
           [cmsTeacherId, teacher.userId, newInstitutionId]
         );
 
         await query(
-          `INSERT INTO institution_members_role ("order", parent_id, value)
-           VALUES ($1, $2, 'guru')
+          `INSERT INTO public.institution_members_role (parent_id, value)
+           VALUES ($1, 'guru')
            ON CONFLICT DO NOTHING`,
-          [1, member.rows[0].id]
+          [member.rows[0].id]
         );
 
         const invitationToken =

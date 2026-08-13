@@ -58,6 +58,7 @@ const PAGE_ROLE_MAP: Record<string, string[]> = {
   "operator":       ["kepala_sekolah", "operator", "admin_sekolah"],
   "aktivitas":     ["kepala_sekolah", "wakasek", "operator", "admin_sekolah", "bendahara"],
   "tpg":            ["kepala_sekolah", "wakasek", "operator", "admin_sekolah"],
+  "laporan-mengajar": ["kepala_sekolah", "wakasek", "operator", "admin_sekolah", "guru"],
   "approval":       ["kepala_sekolah", "wakasek", "operator", "admin_sekolah"],
   "langganan":      ["kepala_sekolah", "operator", "admin_sekolah", "bendahara"],
   "pengaturan":     ["kepala_sekolah", "operator", "admin_sekolah"],

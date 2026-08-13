@@ -25,7 +25,6 @@ const MAIL_DOMAIN = `menu.test.${UNIQUE}@gurupro.test`
 let seeded = false
 let institutionId: number | null = null
 const appUserIds: string[] = []
-const cmsUserIds: number[] = []
 const memberIds: number[] = []
 
 async function seedData() {
@@ -34,8 +33,8 @@ async function seedData() {
     await client.query('BEGIN')
 
     const inst = await client.query(
-      `INSERT INTO payload.institutions (name, npsn, jenjang, naungan, subscription_tier, approval_layer_config, status, academic_year_active)
-       VALUES ($1, $2, 'SD', 'Kemendikbud', 'trial', 'single', 'active', '2025/2026')
+      `INSERT INTO public.institutions (school_id, name, npsn, jenjang, naungan, subscription_tier, status, academic_year_active)
+       VALUES (gen_random_uuid(), $1, $2, 'SD', 'Kemendikbud', 'trial', 'active', '2025/2026')
        RETURNING id`,
       [INSTITUTION_NAME, NPSN]
     )
@@ -47,36 +46,27 @@ async function seedData() {
       const suffix = `m${i + 1}.${UNIQUE}`
 
       const app = await client.query(
-        `INSERT INTO users (email, whatsapp, nama_lengkap, role, is_active)
-         VALUES ($1, $2, $3, 'guru', true)
+        `INSERT INTO users (email, whatsapp, nama_lengkap)
+         VALUES ($1, $2, $3)
          RETURNING id`,
         [`${role}.${suffix}@${MAIL_DOMAIN}`, `+62810000000${i}`, `Anggota Test ${role}`]
       )
       const appUserId = app.rows[0].id
       appUserIds.push(appUserId)
 
-      const cms = await client.query(
-        `INSERT INTO payload.cms_users (name, email, role, salt, hash, pdp_consent_given, pdp_consent_version, pdp_consent_consented_at)
-         VALUES ($1, $2, 'admin', '', '', true, '1.0', NOW())
-         RETURNING id`,
-        [`Anggota Test ${role}`, `${role}.${suffix}@${MAIL_DOMAIN}`]
-      )
-      const cmsUserId = cms.rows[0].id
-      cmsUserIds.push(cmsUserId)
-
       const member = await client.query(
-        `INSERT INTO payload.institution_members (user_id, app_user_id, institution_id, status, joined_at)
-         VALUES ($1, $2, $3, 'active', NOW())
+        `INSERT INTO public.institution_members (user_id, app_user_id, institution_id, status, joined_at)
+         VALUES (NULL, $1, $2, 'active', NOW())
          RETURNING id`,
-        [cmsUserId, appUserId, institutionId]
+        [appUserId, institutionId]
       )
       const memberId = member.rows[0].id
       memberIds.push(memberId)
 
       await client.query(
-        `INSERT INTO payload.institution_members_role ("order", parent_id, value)
-         VALUES ($1, $2, $3)`,
-        [1, memberId, role]
+        `INSERT INTO public.institution_members_role (parent_id, value)
+         VALUES ($1, $2)`,
+        [memberId, role]
       )
     }
 
@@ -103,13 +93,11 @@ afterAll(async () => {
   if (!seeded && institutionId === null && memberIds.length === 0) return
   try {
     if (memberIds.length) {
-      await pool.query('DELETE FROM payload.institution_members WHERE id = ANY($1::int[])', [memberIds])
+      await pool.query('DELETE FROM public.institution_members_role WHERE parent_id = ANY($1::int[])', [memberIds])
+      await pool.query('DELETE FROM public.institution_members WHERE id = ANY($1::int[])', [memberIds])
     }
     if (institutionId) {
-      await pool.query('DELETE FROM payload.institutions WHERE id = $1', [institutionId])
-    }
-    if (cmsUserIds.length) {
-      await pool.query('DELETE FROM payload.cms_users WHERE id = ANY($1::int[])', [cmsUserIds])
+      await pool.query('DELETE FROM public.institutions WHERE id = $1', [institutionId])
     }
     if (appUserIds.length) {
       await pool.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [appUserIds])
@@ -146,7 +134,7 @@ describe('Institusi Menu - Data Ter-Seed', () => {
   it('institusi tersimpan dengan data yang benar', async () => {
     if (!institutionId) return
     const res = await pool.query(
-      'SELECT name, npsn, jenjang, naungan, status FROM payload.institutions WHERE id = $1',
+      'SELECT name, npsn, jenjang, naungan, status FROM public.institutions WHERE id = $1',
       [institutionId]
     )
     expect(res.rows).toHaveLength(1)
@@ -161,8 +149,8 @@ describe('Institusi Menu - Data Ter-Seed', () => {
     if (!institutionId) return
     const res = await pool.query(
       `SELECT im.status, r.value AS role
-       FROM payload.institution_members im
-       JOIN payload.institution_members_role r ON r.parent_id = im.id
+       FROM public.institution_members im
+       JOIN public.institution_members_role r ON r.parent_id = im.id
        WHERE im.institution_id = $1`,
       [institutionId]
     )

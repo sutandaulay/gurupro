@@ -24,23 +24,35 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const schoolRes = await query("SELECT npsn FROM schools WHERE id = $1", [sekolah_id])
       if (schoolRes.rows.length > 0 && schoolRes.rows[0].npsn) {
         const npsn = schoolRes.rows[0].npsn
-        const instRes = await query("SELECT id, approval_layer_config FROM institutions WHERE npsn = $1", [npsn])
+        const instRes = await query("SELECT id FROM public.institutions WHERE npsn = $1", [npsn])
         if (instRes.rows.length > 0) {
-          const inst = instRes.rows[0]
+          const instId = instRes.rows[0].id
           // Cari peran pengguna pada institusi ini
           const roleRes = await query(
             `SELECT imr.value FROM public.institution_members im
              JOIN public.institution_members_role imr ON imr.parent_id = im.id
              WHERE im.app_user_id = $1 AND im.institution_id = $2 AND im.status = 'active'`,
-            [sessionData.id, inst.id]
+            [sessionData.id, instId]
           )
           const roles = roleRes.rows.map((r: any) => r.value)
-          
+
+          // approval_layer_config hanya ada di payload.institutions — fallback aman ke 'single'
+          let layer = 'single'
+          try {
+            const configRes = await query(
+              `SELECT approval_layer_config FROM payload.institutions WHERE npsn = $1`,
+              [npsn]
+            )
+            layer = configRes.rows[0]?.approval_layer_config || 'single'
+          } catch {
+            layer = 'single'
+          }
+
           let hasApprovalPermission = false
           if (roles.includes('kepala_sekolah')) {
             hasApprovalPermission = true
           } else if (roles.includes('wakasek')) {
-            hasApprovalPermission = inst.approval_layer_config === 'double'
+            hasApprovalPermission = layer === 'double'
           }
           
           if (!hasApprovalPermission) {

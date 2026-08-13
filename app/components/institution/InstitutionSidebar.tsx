@@ -44,25 +44,25 @@ const allMenuItems = [
         roles: ["kepala_sekolah", "wakasek"],
       },
       {
-        label: "Draf Surat AI",
+        label: "Draf Surat",
         href: "surat",
         icon: IconFileText,
         roles: ["kepala_sekolah", "wakasek"],
       },
       {
-        label: "Smart Alert",
+        label: "Peringatan Cerdas",
         href: "alerts",
         icon: IconAlertTriangle,
         roles: ["kepala_sekolah", "wakasek"],
       },
       {
-        label: "Approval Queue",
+        label: "Antrean Persetujuan",
         href: "queue",
         icon: IconClipboardCheck,
         roles: ["kepala_sekolah", "wakasek"],
       },
       {
-        label: "Kanban Task",
+        label: "Tugas Kanban",
         href: "kanban",
         icon: IconLayoutKanban,
         roles: ["kepala_sekolah", "wakasek"],
@@ -86,7 +86,7 @@ const allMenuItems = [
         roles: ["kepala_sekolah", "wakasek"],
       },
       {
-        label: "Overview",
+        label: "Ikhtisar",
         href: "dashboard",
         icon: IconLayoutDashboard,
         roles: ["kepala_sekolah", "operator"],
@@ -127,7 +127,7 @@ const allMenuItems = [
         roles: ["kepala_sekolah", "wakasek"],
       },
       {
-        label: "Keuangan Poin",
+        label: "Poin Keuangan",
         href: "bendahara",
         icon: IconCreditCard,
         roles: ["kepala_sekolah", "bendahara"],

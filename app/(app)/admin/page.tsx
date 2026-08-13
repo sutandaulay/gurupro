@@ -2188,7 +2188,7 @@ function AdminPageContent() {
                                   ...aiConfig,
                                   gemini: { ...aiConfig.gemini, model_name: e.target.value }
                                 })}
-                                placeholder="gemini-2.5-flash atau gemini-2.5-pro"
+                                placeholder="guruproai-2.5-flash atau guruproai-2.5-pro"
                                 className="w-full px-3 py-1.5 border border-slate-200 rounded-xl text-xs bg-white font-medium text-slate-800 focus:outline-none focus:border-indigo-500"
                               />
                             </div>

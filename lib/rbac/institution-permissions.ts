@@ -102,8 +102,15 @@ export async function canApproveDocuments(
     const configResult = await query(
       `SELECT approval_layer_config FROM institutions WHERE id = $1`,
       [institutionId]
-    )
-    if (configResult.rows.length === 0) return false
+    ).catch(() => ({ rows: [] }))
+    if (configResult.rows.length === 0) {
+      const configPayload = await query(
+        `SELECT approval_layer_config FROM payload.institutions WHERE id = $1`,
+        [institutionId]
+      ).catch(() => ({ rows: [] }))
+      if (configPayload.rows.length === 0) return false
+      return configPayload.rows[0].approval_layer_config === 'double'
+    }
     return configResult.rows[0].approval_layer_config === 'double'
   } catch (error) {
     console.error('[RBAC] canApproveDocuments error:', error)

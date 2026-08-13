@@ -22,7 +22,7 @@ describe('Menu Institusi — struktur masterMenus', () => {
     const labels = institutionMenu?.submenu?.map((s) => s.label) ?? []
     expect(labels).toEqual([
       'Overview Institusi',
-      'Anggota Institusi',
+      'Manajemen Guru',
       'Rekap TPG',
       'Laporan Mengajar',
       'Approval / Persetujuan',
@@ -31,10 +31,10 @@ describe('Menu Institusi — struktur masterMenus', () => {
     ])
   })
 
-  it('setiap submenu memakai href marker di bawah /dashboard/institution/', () => {
+  it('setiap submenu memakai href marker di bawah /institusi/ID/', () => {
     for (const sub of institutionSubmenus ?? []) {
       expect(isInstitutionHref(sub.href)).toBe(true)
-      expect(sub.href).toMatch(/^\/dashboard\/institution/)
+      expect(sub.href).toMatch(/^\/institusi\/ID/)
     }
   })
 
@@ -45,16 +45,15 @@ describe('Menu Institusi — struktur masterMenus', () => {
 
 describe('Menu Institusi — resolusi href dengan isi data (institutionId aktif)', () => {
   const INSTITUTION_ID = 42
-  const base = `/institusi/${INSTITUTION_ID}`
 
   const cases: { label: string; href: string; expected: string }[] = [
-    { label: 'Overview Institusi', href: '/dashboard/institution', expected: `${base}/dashboard` },
-    { label: 'Anggota Institusi', href: '/dashboard/institution/members', expected: `/dashboard/institution/${INSTITUTION_ID}/operator` },
-    { label: 'Rekap TPG', href: '/dashboard/institution/tpg', expected: `${base}/dashboard/tpg` },
-    { label: 'Laporan Mengajar', href: '/dashboard/institution/laporan-mengajar', expected: `/dashboard/institution/${INSTITUTION_ID}/laporan-mengajar` },
-    { label: 'Approval / Persetujuan', href: '/dashboard/institution/approval', expected: `${base}/dashboard/approval` },
-    { label: 'Langganan & Billing', href: '/dashboard/institution/langganan', expected: `${base}/dashboard/langganan` },
-    { label: 'Pengaturan Institusi', href: '/dashboard/institution/settings', expected: `${base}/dashboard/pengaturan` },
+    { label: 'Overview Institusi', href: '/institusi/ID/dashboard', expected: `/institusi/${INSTITUTION_ID}/dashboard` },
+    { label: 'Manajemen Guru', href: '/institusi/ID/dashboard/guru', expected: `/institusi/${INSTITUTION_ID}/dashboard/guru` },
+    { label: 'Rekap TPG', href: '/institusi/ID/dashboard/tpg', expected: `/institusi/${INSTITUTION_ID}/dashboard/tpg` },
+    { label: 'Laporan Mengajar', href: '/institusi/ID/dashboard/laporan-mengajar', expected: `/institusi/${INSTITUTION_ID}/dashboard/laporan-mengajar` },
+    { label: 'Approval / Persetujuan', href: '/institusi/ID/dashboard/approval', expected: `/institusi/${INSTITUTION_ID}/dashboard/approval` },
+    { label: 'Langganan & Billing', href: '/institusi/ID/dashboard/langganan', expected: `/institusi/${INSTITUTION_ID}/dashboard/langganan` },
+    { label: 'Pengaturan Institusi', href: '/institusi/ID/dashboard/pengaturan', expected: `/institusi/${INSTITUTION_ID}/dashboard/pengaturan` },
   ]
 
   it.each(cases)('$label → $expected', ({ href, expected }) => {
@@ -88,6 +87,7 @@ describe('Menu Institusi — fallback tanpa institusi aktif', () => {
   it('isInstitutionHref hanya true untuk marker institusi', () => {
     expect(isInstitutionHref('/dashboard/institution')).toBe(true)
     expect(isInstitutionHref('/dashboard/institution/members')).toBe(true)
+    expect(isInstitutionHref('/institusi/ID/dashboard')).toBe(true)
     expect(isInstitutionHref('/dashboard/billing')).toBe(false)
     expect(isInstitutionHref('/institusi/42/dashboard')).toBe(false)
     expect(isInstitutionHref(undefined)).toBe(false)
@@ -137,7 +137,7 @@ describe('Menu Institusi — ikon & kategori', () => {
   it('kategori submenu ter-resolve (kecuali Pengaturan → settings)', () => {
     const expected: Record<string, string> = {
       'Overview Institusi': 'institution',
-      'Anggota Institusi': 'people',
+      'Manajemen Guru': 'people',
       'Rekap TPG': 'reports',
       'Laporan Mengajar': 'academic',
       'Approval / Persetujuan': 'admin',

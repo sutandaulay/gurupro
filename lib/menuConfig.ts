@@ -160,19 +160,19 @@ export const masterMenus: MenuItem[] = [
     ],
   },
   {
-    label: "Administrasi",
+    label: "AI Administrasi",
     submenu: [
-      { label: "AI Silabus", href: "/dashboard/administrasi?tipe=silabus" },
+      { label: "Silabus", href: "/dashboard/administrasi?tipe=silabus" },
       { label: "Program Tahunan (Prota)", href: "/dashboard/prota" },
       { label: "Program Semester (Prosem)", href: "/dashboard/prosem" },
       { label: "ATP Editor", href: "/dashboard/atp-editor" },
-      { label: "AI Modul Ajar", href: "/dashboard/administrasi?tipe=modul_ajar" },
-      { label: "AI RPP", href: "/dashboard/administrasi?tipe=rpp" },
-      { label: "AI LKPD", href: "/dashboard/administrasi?tipe=lkpd" },
-      { label: "AI Bahan Ajar", href: "/dashboard/administrasi?tipe=bahan_ajar" },
+      { label: "Modul Ajar", href: "/dashboard/administrasi?tipe=modul_ajar" },
+      { label: "RPP", href: "/dashboard/administrasi?tipe=rpp" },
+      { label: "LKPD", href: "/dashboard/administrasi?tipe=lkpd" },
+      { label: "Bahan Ajar", href: "/dashboard/administrasi?tipe=bahan_ajar" },
       { label: "Persetujuan RPP (Kepsek)", href: "/dashboard/approval-rpp" },
       { label: "Dasbor Eksekutif (Kepsek)", href: "/dashboard/executive-dashboard" },
-      { label: "Buat Soal AI", href: "/dashboard?module=soal" },
+      { label: "Buat Soal", href: "/dashboard?module=soal" },
     ],
   },
   {
@@ -189,7 +189,7 @@ export const masterMenus: MenuItem[] = [
     label: "AI",
     submenu: [
       { label: "Chat AI", href: "/dashboard/chat" },
-      { label: "AI Performance Report", href: "/dashboard/ai-performance-report" },
+      { label: "Analisis Kinerja AI", href: "/dashboard/ai-performance-report" },
       { label: "Deep Learning", href: "/dashboard" },
     ],
   },
@@ -257,7 +257,7 @@ export const masterMenus: MenuItem[] = [
     href: "/dashboard?module=keuangan",
   },
   {
-    label: "Brankas",
+    label: "Brankas/Folder",
     href: "/dashboard/brankas",
   },
   {
@@ -271,7 +271,12 @@ export const masterMenus: MenuItem[] = [
 ];
 
 export function isInstitutionHref(href?: string): boolean {
-  return !!href && (href === "/dashboard/institution" || href.startsWith("/dashboard/institution/"));
+  return !!href && (
+    href === "/institusi/ID" ||
+    href.startsWith("/institusi/ID/") ||
+    href === "/dashboard/institution" ||
+    href.startsWith("/dashboard/institution/")
+  );
 }
 
 export interface ActiveContextPayload {
@@ -288,6 +293,9 @@ export function resolveActiveInstitutionId(data: ActiveContextPayload): number |
 
 export function resolveInstitutionHref(href: string, institutionId: number | null): string {
   if (!institutionId) return "/dashboard";
+  if (href === "/institusi/ID" || href.startsWith("/institusi/ID/")) {
+    return href.replace("/institusi/ID", `/institusi/${institutionId}`);
+  }
   const base = `/institusi/${institutionId}`;
   const institutionMap: Record<string, string> = {
     "/dashboard/institution": `${base}/dashboard`,
@@ -328,17 +336,24 @@ export function getLucideIcon(label: string): any {
     "Laporan Presensi": FileSpreadsheet,
     "Rekap TPG": FileSpreadsheet,
     "Administrasi": FileText,
+    "AI Administrasi": FileText,
     "AI Silabus": FileText,
+    "Silabus": FileText,
     "Program Tahunan (Prota)": Calendar,
     "Program Semester (Prosem)": Calendar,
     "ATP Editor": Pencil,
     "AI Modul Ajar": BookOpen,
+    "Modul Ajar": BookOpen,
     "AI RPP": FileText,
+    "RPP": FileText,
     "AI LKPD": FileText,
+    "LKPD": FileText,
     "AI Bahan Ajar": BookOpen,
+    "Bahan Ajar": BookOpen,
     "Persetujuan RPP (Kepsek)": CheckCircle,
     "Dasbor Eksekutif (Kepsek)": LayoutDashboard,
     "Buat Soal AI": Sparkles,
+    "Buat Soal": Sparkles,
     "Monitoring": BarChart3,
     "Jurnal Mengajar": BookOpen,
     "Kalender Akademik": Calendar,
@@ -348,6 +363,7 @@ export function getLucideIcon(label: string): any {
     "AI": Bot,
     "Chat AI": MessageCircle,
     "AI Performance Report": BarChart3,
+    "Analisis Kinerja AI": BarChart3,
     "Deep Learning": Brain,
     "Buku Nilai": BookOpen,
     "Laporan": FileBarChart,
@@ -378,6 +394,7 @@ export function getLucideIcon(label: string): any {
     "Overview Institusi": LayoutDashboard,
     "Manajemen Institusi": Building2,
     "Anggota Institusi": Users,
+    "Manajemen Guru": Users,
     "Approval / Persetujuan": CheckCircle,
     "Langganan & Billing": CreditCard,
     "Pengaturan Institusi": Settings,

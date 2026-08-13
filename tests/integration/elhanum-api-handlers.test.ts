@@ -24,6 +24,20 @@ const ELHANUM_EMAIL = 'ptgenerasidigitalindonesiaemas@gmail.com'
 const ELHANUM_SCHOOL_ID = '8606e992-1379-41ef-8834-e834e9312dee'
 const ELHANUM_CLASS_ID = 'a70db632-5e6a-4654-8eeb-90646814500d'
 
+// Test yang bergantung pada data seed ElHanum hanya dijalankan ketika seed ada
+// (scripts/seed-test-data.ts). Kontrak murni (401 tanpa session, 400 tanpa
+// school_id) tetap berjalan apa adanya.
+async function checkElhanumSeed(): Promise<boolean> {
+  try {
+    const res = await query('SELECT 1 FROM users WHERE id = $1', [ELHANUM_USER_ID])
+    return res.rows.length > 0
+  } catch {
+    return false
+  }
+}
+
+const elhanumSeeded = await checkElhanumSeed()
+
 const sessionCookieValue = JSON.stringify({
   id: ELHANUM_USER_ID,
   role: 'guru',
@@ -60,7 +74,7 @@ beforeEach(() => {
 })
 
 describe('ElHanum API - GET /api/me', () => {
-  it('returns elhanum profile data', async () => {
+  it.skipIf(!elhanumSeeded)('returns elhanum profile data', async () => {
     const res = await getMe()
     const body = await res.json()
     expect(res.status).toBe(200)
@@ -68,7 +82,7 @@ describe('ElHanum API - GET /api/me', () => {
     expect(body.user.email).toBe(ELHANUM_EMAIL)
   })
 
-  it('includes token/poin balance fields', async () => {
+  it.skipIf(!elhanumSeeded)('includes token/poin balance fields', async () => {
     const res = await getMe()
     const body = await res.json()
     expect(body.user).toHaveProperty('token_limit')
@@ -87,7 +101,7 @@ describe('ElHanum API - GET /api/me', () => {
 })
 
 describe('ElHanum API - GET /api/wali-kelas/my-classes', () => {
-  it('returns X.1 as elhanum wali kelas class', async () => {
+  it.skipIf(!elhanumSeeded)('returns X.1 as elhanum wali kelas class', async () => {
     const res = await getMyClasses(new Request(makeUrl('/api/wali-kelas/my-classes')))
     const body = await res.json()
     expect(res.status).toBe(200)
@@ -98,7 +112,7 @@ describe('ElHanum API - GET /api/wali-kelas/my-classes', () => {
 })
 
 describe('ElHanum API - GET /api/journals', () => {
-  it('returns journals for elhanum school', async () => {
+  it.skipIf(!elhanumSeeded)('returns journals for elhanum school', async () => {
     const url = makeUrl(`/api/journals?school_id=${ELHANUM_SCHOOL_ID}`)
     const res = await getJournals(new Request(url))
     const body = await res.json()
@@ -115,7 +129,7 @@ describe('ElHanum API - GET /api/journals', () => {
     expect(body.error).toContain('school_id')
   })
 
-  it('forbids access to school not owned/assigned by elhanum', async () => {
+  it.skipIf(!elhanumSeeded)('forbids access to school not owned/assigned by elhanum', async () => {
     const otherSchool = await query(
       'SELECT id FROM schools WHERE id != $1 LIMIT 1',
       [ELHANUM_SCHOOL_ID]
@@ -131,7 +145,7 @@ describe('ElHanum API - GET /api/journals', () => {
 })
 
 describe('ElHanum API - GET /api/wali-kelas', () => {
-  it('lists assignment for elhanum as wali kelas member', async () => {
+  it.skipIf(!elhanumSeeded)('lists assignment for elhanum as wali kelas member', async () => {
     const url = makeUrl(`/api/wali-kelas?wali_kelas_member_id=${ELHANUM_USER_ID}&include_details=false`)
     const res = await getWaliKelas(new Request(url))
     const body = await res.json()
