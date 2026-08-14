@@ -443,24 +443,33 @@ export default function AttendancePage() {
       return;
     }
 
+    const isSchool = selectedAssignment?.isSchool === true;
     setIsCheckingOut(true);
     try {
-      const response = await apiFetch('/api/attendance/check-out', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          faceEmbedding,
-          faceMatchScore: faceMatchScore || 0.8,
-          livenessPassed: livenessPassed ?? true,
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: location.accuracy,
-          institutionId: selectedInstitution.id,
-          assignmentId: selectedAssignment?.id,
-          qrCodeVerified: !!qrToken,
-          browserFingerprint,
-        }),
-      });
+      const response = isSchool
+        ? await apiFetch('/api/attendance/school/check-out', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              school_id: selectedInstitution.id,
+            }),
+          })
+        : await apiFetch('/api/attendance/check-out', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              faceEmbedding,
+              faceMatchScore: faceMatchScore || 0.8,
+              livenessPassed: livenessPassed ?? true,
+              latitude: location.latitude,
+              longitude: location.longitude,
+              accuracy: location.accuracy,
+              institutionId: selectedInstitution.id,
+              assignmentId: selectedAssignment?.id,
+              qrCodeVerified: !!qrToken,
+              browserFingerprint,
+            }),
+          });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -472,7 +481,7 @@ export default function AttendancePage() {
         ...result,
         type: 'check-out',
         timestamp: new Date().toLocaleString('id-ID'),
-        institutionName: selectedInstitution.name,
+        institutionName: isSchool ? 'Sekolah Mandiri' : selectedInstitution.name,
       });
       toast.success('Check-out berhasil!');
       fetchDashboard();

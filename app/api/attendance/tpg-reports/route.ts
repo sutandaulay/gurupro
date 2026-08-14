@@ -13,6 +13,19 @@ import {
 import { eq, and, gte, lte, inArray, sql } from 'drizzle-orm';
 import { parseISO, startOfWeek, endOfWeek, format, eachDayOfInterval, differenceInMinutes } from 'date-fns';
 import { query } from '@/lib/db';
+import { getSessionFromCookieHeader } from '@/lib/session-sign';
+
+async function getSessionUser(req: Request) {
+  const cookieSession = getSessionFromCookieHeader(req.headers.get('cookie'));
+  if (cookieSession?.id) {
+    return { id: cookieSession.id, role: cookieSession.role || 'guru' };
+  }
+  const session = await getServerSession(authOptions);
+  if (session?.user) {
+    return { id: session.user.id as string, role: (session.user as any).role || 'guru' };
+  }
+  return null;
+}
 
 // Schema untuk validasi query parameter
 const TPGReportQuerySchema = z.object({
@@ -24,8 +37,8 @@ const TPGReportQuerySchema = z.object({
 
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    const session = await getSessionUser(req);
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -34,20 +47,20 @@ export async function GET(req: Request) {
     const validatedParams = TPGReportQuerySchema.parse(queryParams);
 
     // Jika teacherId tidak disediakan, gunakan ID pengguna saat ini
-    const targetTeacherId = validatedParams.teacherId || session.user.id || '';
+    const targetTeacherId = validatedParams.teacherId || session.id || '';
 
     // Validasi akses: hanya admin, kepala sekolah, wakasek, atau operator yang bisa melihat laporan guru lain
-    if (targetTeacherId !== session.user.id && !['admin', 'kepala_sekolah', 'wakasek', 'operator'].includes(session.user.role || '')) {
+    if (targetTeacherId !== session.id && !['admin', 'kepala_sekolah', 'wakasek', 'operator'].includes(session.role || '')) {
       return NextResponse.json({ error: 'Forbidden: Anda tidak memiliki akses untuk melihat laporan guru ini' }, { status: 403 });
     }
 
     // Jika bukan admin dan ingin melihat laporan guru lain, pastikan guru tersebut berada di institusi yang sama
-    if (targetTeacherId !== session.user.id && (session.user.role || '') !== 'admin') {
+    if (targetTeacherId !== session.id && (session.role || '') !== 'admin') {
       const membersResult = await query(`
         SELECT institution_id as "institutionId"
         FROM public.institution_members
         WHERE app_user_id = $1 AND status = 'active'
-      `, [session.user.id]);
+      `, [session.id]);
       const userInstitutionMembers = membersResult.rows;
 
       const assignmentsResult = await query(`

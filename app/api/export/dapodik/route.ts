@@ -3,14 +3,27 @@ import { query } from "@/lib/db";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { buildDapodikWorkbook } from "@/lib/export-adapter/dapodik";
+import { getSessionFromCookieHeader } from "@/lib/session-sign";
+
+async function getSessionUser(req: Request) {
+  const cookieSession = getSessionFromCookieHeader(req.headers.get("cookie"));
+  if (cookieSession?.id) {
+    return { id: cookieSession.id, role: cookieSession.role || "guru" };
+  }
+  const session = await getServerSession(authOptions);
+  if (session?.user) {
+    return { id: session.user.id as string, role: (session.user as any).role || "guru" };
+  }
+  return null;
+}
 
 // Sprint 4.1 — Endpoint ekspor file Dapodik (Excel). MODUL TERPISAH.
 // READ-ONLY ke data sumber; mengembalikan file .xlsx untuk diunduh & diimport manual.
 
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getSessionUser(req);
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const url = new URL(req.url);
     const institutionId = parseInt(url.searchParams.get("institutionId") || "0");
@@ -25,11 +38,11 @@ export async function GET(req: Request) {
       `SELECT imr.value FROM public.institution_members im
        JOIN public.institution_members_role imr ON imr.parent_id = im.id
        WHERE im.app_user_id = $1 AND im.institution_id = $2 AND im.status = 'active'`,
-      [session.user.id, institutionId]
+      [session.id, institutionId]
     );
     const roles = memberRes.rows.map((r: any) => r.value);
     const allowed = ["admin", "operator", "kepala_sekolah", "wakasek"].some((r) => roles.includes(r));
-    if (!allowed && session.user.role !== "admin") {
+    if (!allowed && session.role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

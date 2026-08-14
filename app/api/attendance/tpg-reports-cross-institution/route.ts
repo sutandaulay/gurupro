@@ -10,6 +10,7 @@ import {
 import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
 import { startOfWeek, endOfWeek, format } from "date-fns";
 import { query as pgQuery } from "@/lib/db";
+import { getSessionFromCookieHeader } from "@/lib/session-sign";
 
 // Sprint 3.2 — Endpoint BARU untuk agregasi TPG lintas institusi.
 // REUSE query dari /api/attendance/tpg-reports (READ-ONLY ke attendance_summary).
@@ -117,11 +118,20 @@ async function computeCrossInstitution(
 
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    const cookieSession = getSessionFromCookieHeader(req.headers.get("cookie"));
+    let session: { id: string; role: string } | null = null;
+    if (cookieSession?.id) {
+      session = { id: cookieSession.id, role: cookieSession.role || "guru" };
+    } else {
+      const nextAuthSession = await getServerSession(authOptions);
+      if (nextAuthSession?.user) {
+        session = { id: nextAuthSession.user.id as string, role: (nextAuthSession.user as any).role || "guru" };
+      }
+    }
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const teacherId = session.user.id || "";
+    const teacherId = session.id;
 
     const url = new URL(req.url);
     const params = Object.fromEntries(url.searchParams.entries());

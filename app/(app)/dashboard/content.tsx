@@ -28,6 +28,7 @@ import AppIcon from "@/app/components/ui/AppIcon";
 import { Calendar, School, BookOpen, Users, Clock } from "lucide-react";
 import { getLucideIcon, resolveCategory } from "@/lib/menuConfig";
 import { Pagination, usePagedItems } from "@/components/ui/pagination";
+import ApprovalStatusBadge, { SubmitApprovalButton } from "@/components/approval/ApprovalStatusBadge";
 
 // Safe JSON fetch - always returns an object or array, never throws
 async function safeJson(url: string): Promise<any> {
@@ -9511,23 +9512,48 @@ const renderJurnalModule = () => {
               ) : (
                 <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                   {savedDocs.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between bg-white border border-slate-200 p-2 rounded-xl text-[11px] font-medium hover:border-slate-300 transition">
-                      <button
-                        onClick={() => openSavedDoc(doc)}
-                        className={`text-left font-bold truncate flex-1 mr-2 cursor-pointer ${
-                          isSubscriptionExpiredOver30Days()
-                            ? "text-slate-400 line-through"
-                            : "text-slate-700 hover:text-indigo-600"
-                        }`}
-                      >
-                        {isSubscriptionExpiredOver30Days() && "🔒 "}{doc.judul_dokumen}
-                      </button>
-                      <button
-                        onClick={() => deleteSavedDoc(doc.id)}
-                        className="text-rose-500 hover:text-rose-700 px-1.5 cursor-pointer font-bold"
-                      >
-                        ✕
-                      </button>
+                    <div key={doc.id} className="bg-white border border-slate-200 p-2 rounded-xl text-[11px] font-medium hover:border-slate-300 transition">
+                      <div className="flex items-center justify-between">
+                        <button
+                          onClick={() => openSavedDoc(doc)}
+                          className={`text-left font-bold truncate flex-1 mr-2 cursor-pointer ${
+                            isSubscriptionExpiredOver30Days()
+                              ? "text-slate-400 line-through"
+                              : "text-slate-700 hover:text-indigo-600"
+                          }`}
+                        >
+                          {isSubscriptionExpiredOver30Days() && "🔒 "}{doc.judul_dokumen}
+                        </button>
+                        <button
+                          onClick={() => deleteSavedDoc(doc.id)}
+                          className="text-rose-500 hover:text-rose-700 px-1.5 cursor-pointer font-bold"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      {["rpp", "modul"].includes(doc.tipe_dokumen) && (
+                        <div className="mt-1.5 flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <ApprovalStatusBadge status={doc.approval_status as any} />
+                            {doc.institution_id ? (
+                              <SubmitApprovalButton
+                                docId={doc.id}
+                                status={doc.approval_status as any}
+                                onSubmitted={() => { fetchSavedDocs(); showSuccess("Dokumen diajukan ke Kepsek untuk disetujui."); }}
+                              />
+                            ) : (
+                              <span className="text-[10px] text-slate-400">
+                                Belum ada Kepsek terkait — approval aktif setelah terhubung institusi
+                              </span>
+                            )}
+                          </div>
+                          {doc.approval_status === "revisi" && doc.approval_note && (
+                            <p className="text-[10px] text-rose-600 bg-rose-50 border border-rose-100 rounded-md px-2 py-1">
+                              <span className="font-bold">Catatan Kepsek:</span> {doc.approval_note}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

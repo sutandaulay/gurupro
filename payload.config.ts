@@ -11,10 +11,8 @@ import Features from "./collections/Features";
 import WhyPoints from "./collections/WhyPoints";
 import FooterContent from "./collections/FooterContent";
 import ChatbotConfig from "./collections/ChatbotConfig";
-import PricingPlans from "./collections/PricingPlans";
 import Categories from "./collections/Categories";
 import Posts from "./collections/Posts";
-import AddonTokenPackages from "./collections/AddonTokenPackages";
 import Institutions from "./collections/Institutions";
 import InstitutionMembers from "./collections/InstitutionMembers";
 import ModulAjar from "./collections/ModulAjar";
@@ -87,10 +85,8 @@ export default buildConfig({
     Media,
     Features,
     WhyPoints,
-    PricingPlans,
     Categories,
     Posts,
-    AddonTokenPackages,
     Institutions,
     InstitutionMembers,
     ModulAjar,

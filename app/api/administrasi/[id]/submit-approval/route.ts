@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getSessionFromCookieHeader } from "@/lib/session-sign";
+import { notifyLeadersDocSubmitted, logApprovalAction } from "@/lib/approval-notifications";
 
 // Sprint 3.1 — Guru mengajukan RPP/Modul Ajar ke Kepsek (opsional per institusi).
 // Tidak mengubah alur generate-dan-pakai; hanya mengubah approval_status draft -> pending.
@@ -14,7 +15,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const docRes = await query(
-      `SELECT id, user_id, tipe_dokumen, approval_status, institution_id
+      `SELECT id, user_id, tipe_dokumen, approval_status, institution_id, judul_dokumen
        FROM guru_administrasi WHERE id = $1`,
       [id]
     );
@@ -40,6 +41,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
        WHERE id = $1 RETURNING id, approval_status`,
       [id]
     );
+
+    // Notifikasi ke Kepsek/Wakasek institusi
+    const guruRes = await query(`SELECT nama_lengkap FROM users WHERE id = $1`, [sessionData.id]);
+    const guruNama = guruRes.rows[0]?.nama_lengkap || "Guru";
+    await notifyLeadersDocSubmitted(doc.institution_id, id, doc.judul_dokumen, guruNama);
+    await logApprovalAction({
+      docId: id,
+      actorUserId: sessionData.id,
+      actorName: guruNama,
+      action: "submit",
+      institutionId: doc.institution_id,
+    });
 
     return NextResponse.json(result.rows[0]);
   } catch (err: any) {

@@ -79,65 +79,70 @@ async function createAdminUser(payload: any) {
 }
 
 async function createPricingPlans(payload: any) {
+  // Sumber harga = CMS Landing Page (public.pricing_plans),
+  // dikelola via Dashboard Admin > CMS Landing > Paket.
+  const { pool } = await import('../lib/db')
   const plans = [
     {
-      package_name: 'Gratis',
-      token_amount: 5,
-      price: 0,
+      package_name: '1 Bulan',
+      price: 10000,
+      tokens: 5,
       duration_days: 30,
-      description: 'Paket dasar untuk pemula',
+      is_active: true,
+      is_popular: false,
       sort_order: 0,
-      is_popular: false,
-      is_active: true,
+      features: ['5 Poin Kuota Utama', 'Masa Aktif 30 Hari'],
     },
     {
-      package_name: 'Profesional',
-      token_amount: 100,
-      price: 99000,
-      duration_days: 30,
-      description: 'Ideal untuk guru penuh waktu',
-      sort_order: 1,
-      is_popular: true,
-      is_active: true,
-    },
-    {
-      package_name: 'Lanjutan',
-      token_amount: 500,
-      price: 450000,
+      package_name: '3 Bulan',
+      price: 60000,
+      tokens: 100,
       duration_days: 90,
-      description: 'Paket hemat untuk penggunaan intensif',
-      sort_order: 2,
-      is_popular: false,
       is_active: true,
+      is_popular: true,
+      sort_order: 1,
+      features: ['100 Poin Kuota Utama', 'Masa Aktif 90 Hari'],
     },
     {
-      package_name: 'Enterprise',
-      token_amount: 2000,
-      price: 1500000,
-      duration_days: 365,
-      description: 'Untuk sekolah dan institusi',
-      sort_order: 3,
-      is_popular: false,
+      package_name: '6 Bulan',
+      price: 100000,
+      tokens: 300,
+      duration_days: 180,
       is_active: true,
+      is_popular: false,
+      sort_order: 2,
+      features: ['300 Poin Kuota Utama', 'Masa Aktif 180 Hari'],
+    },
+    {
+      package_name: '1 Tahun',
+      price: 150000,
+      tokens: 1000,
+      duration_days: 365,
+      is_active: true,
+      is_popular: false,
+      sort_order: 3,
+      features: ['1000 Poin Kuota Utama', 'Masa Aktif 365 Hari'],
     },
   ]
 
   for (const plan of plans) {
     try {
-      const existing = await payload.find({
-        collection: 'pricing_plans',
-        where: { package_name: { equals: plan.package_name } }
-      })
-
-      if (existing.docs.length === 0) {
-        await payload.create({
-          collection: 'pricing_plans',
-          data: plan
-        })
-        console.log(`✅ Pricing plan dibuat: ${plan.package_name}`)
-      } else {
-        console.log(`ℹ️ Pricing plan sudah ada: ${plan.package_name}`)
-      }
+      await pool.query(
+        `INSERT INTO pricing_plans (package_name, price, duration_days, tokens, features, is_active, popular, sort_order, updated_at)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, NOW())
+         ON CONFLICT DO NOTHING`,
+        [
+          plan.package_name,
+          plan.price,
+          plan.duration_days,
+          plan.tokens,
+          JSON.stringify(plan.features),
+          plan.is_active,
+          plan.is_popular,
+          plan.sort_order,
+        ]
+      )
+      console.log(`✅ Pricing plan dibuat: ${plan.package_name}`)
     } catch (error) {
       console.log(`⚠️ Gagal membuat pricing plan ${plan.package_name}:`, (error as Error).message)
     }

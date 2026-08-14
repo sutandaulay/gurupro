@@ -1401,6 +1401,8 @@ const initDb = async () => {
       await pool.query(`ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS approval_note TEXT`);
       await pool.query(`ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS approved_by UUID`);
       await pool.query(`ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP`);
+      await pool.query(`ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS wakasek_approved_by UUID`);
+      await pool.query(`ALTER TABLE guru_administrasi ADD COLUMN IF NOT EXISTS wakasek_approved_at TIMESTAMP`);
       // Constraint nilai approval_status
       try {
         await pool.query(`ALTER TABLE guru_administrasi DROP CONSTRAINT IF EXISTS guru_administrasi_approval_status_check`);
@@ -1408,6 +1410,38 @@ const initDb = async () => {
       } catch (_) {}
     } catch (err) {
       console.error('Failed to add approval columns to guru_administrasi:', err);
+    }
+    // 36e. Sprint 3.1 — approval_layer_config pada public.institutions
+    // Memastikan konfigurasi single/double APPROVAL ada di tabel public (konsisten dengan payload.institutions).
+    try {
+      const checkInstTable = await pool.query(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'institutions')"
+      );
+      if (checkInstTable.rows[0].exists) {
+        await pool.query(`ALTER TABLE institutions ADD COLUMN IF NOT EXISTS approval_layer_config VARCHAR(20) NOT NULL DEFAULT 'single'`);
+      }
+    } catch (err) {
+      console.error('Failed to add approval_layer_config to institutions:', err);
+    }
+    // 36f. Sprint 3.1 — Audit trail approval RPP/Modul Ajar
+    // Mencatat setiap aksi (submit/approve lapisan wakasek/approve final/revisi) untuk pertanggungjawaban.
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS guru_administrasi_approval_log (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          doc_id UUID NOT NULL,
+          actor_user_id UUID,
+          actor_name VARCHAR(255),
+          action VARCHAR(20) NOT NULL,
+          note TEXT,
+          institution_id INTEGER,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_approval_log_doc ON guru_administrasi_approval_log (doc_id)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_approval_log_created ON guru_administrasi_approval_log (created_at)');
+    } catch (err) {
+      console.error('Failed to create approval audit log table:', err);
     }
     // 36c. Sprint 2.1 — Weekly Recap Personal (cron terpisah, read-only ke data eksisting)
     // Tabel BARU: preferensi on/off di users + hasil recap mingguan per guru.

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getSessionFromCookieHeader } from "@/lib/session-sign";
+import { getApprovalLayer, hasWakasek } from "@/lib/approval-config";
 
 // Sprint 3.1 — Daftar dokumen RPP/Modul Ajar yang menunggu persetujuan di institusi.
 // READ-ONLY terhadap guru_administrasi (hanya SELECT). Untuk panel Kepsek/Wakasek.
+// can_approve mengikuti lapisan: single -> Kepsek; double -> Wakasek layer-1, Kepsek layer-2.
 
 export async function GET(req: Request) {
   try {
@@ -34,6 +36,7 @@ export async function GET(req: Request) {
     const docsRes = await query(
       `SELECT ga.id, ga.user_id, ga.tipe_dokumen, ga.judul_dokumen, ga.approval_status,
               ga.approval_note, ga.created_at, ga.institution_id,
+              ga.wakasek_approved_by, ga.wakasek_approved_at,
               u.nama_lengkap AS guru_nama
        FROM guru_administrasi ga
        JOIN users u ON u.id = ga.user_id
@@ -44,16 +47,53 @@ export async function GET(req: Request) {
       [instIds]
     );
 
-    // Tandai apakah user boleh approve (wakasek hanya kalau double layer)
+    // Tandai apakah user boleh approve sesuai lapisan approval tiap institusi
     const rows = docsRes.rows.map((d: any) => {
-      const layerRes = memberRes; // sudah ada di roleMap
       const roles = roleMap[d.institution_id] || [];
-      let canApprove = false;
-      if (roles.includes("kepala_sekolah")) canApprove = true;
-      return { ...d, can_approve: canApprove, my_roles: roles };
+      const isKepsek = roles.includes("kepala_sekolah");
+      const isWakasek = roles.includes("wakasek");
+      const wakasekSudahApprove = Boolean(d.wakasek_approved_by && d.wakasek_approved_at);
+
+      // Sinkron query layer berjalan per baris (dokumen lintas institusi).
+      // Perlu sinkron: async di dalam .map
+      return Promise.resolve().then(async () => {
+        const layer = await getApprovalLayer(d.institution_id);
+        let canApprove = false;
+        let approvalStage: "wakasek_layer" | "kepsek_final" | "full" = "full";
+
+        if (layer === "double") {
+          if (isKepsek) {
+            // Kepsek: final apabila wakasek sudah approve, ATAU tidak ada wakasek di institusi.
+            if (wakasekSudahApprove) {
+              canApprove = true;
+              approvalStage = "kepsek_final";
+            } else {
+              const adaWakasek = await hasWakasek(d.institution_id);
+              canApprove = !adaWakasek;
+              approvalStage = adaWakasek ? "wakasek_layer" : "full";
+            }
+          } else if (isWakasek) {
+            canApprove = !wakasekSudahApprove;
+            approvalStage = wakasekSudahApprove ? "kepsek_final" : "wakasek_layer";
+          }
+        } else {
+          canApprove = isKepsek;
+          approvalStage = "full";
+        }
+
+        return {
+          ...d,
+          approval_layer: layer,
+          approval_stage: approvalStage,
+          wakasek_approved: wakasekSudahApprove,
+          can_approve: canApprove,
+          my_roles: roles,
+        };
+      });
     });
 
-    return NextResponse.json({ documents: rows, institutionCount: instIds.length });
+    const finalRows = await Promise.all(rows);
+    return NextResponse.json({ documents: finalRows, institutionCount: instIds.length });
   } catch (err: any) {
     console.error("list pending approval error:", err);
     return NextResponse.json({ error: "Gagal memuat daftar persetujuan" }, { status: 500 });

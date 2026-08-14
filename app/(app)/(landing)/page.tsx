@@ -11,7 +11,6 @@ import {
   resolveTablerIcon,
 } from "@/lib/fallback-data";
 import { query, ensureDbInitialized } from "@/lib/db";
-import { getPayloadWithTimeout } from "@/lib/payload";
 
 export const dynamic = "force-dynamic";
 
@@ -164,73 +163,32 @@ export default async function LandingPage({
   } catch {}
 
   // ============================================
-  // Load pricing plans from PAYLOAD CMS (Source of Truth)
-  // Use timeout to prevent hanging
+  // Load pricing plans dari CMS Landing Page (public.pricing_plans)
+  // Dikelola via Dashboard Admin > CMS Landing > Paket.
+  // Satu-satunya sumber harga; tidak ada fallback hardcoded.
   // ============================================
   try {
-    const payload = await getPayloadWithTimeout(async () => {
-      const { getPayload } = await import("@/lib/payload");
-      return getPayload();
-    }, 8000);
-
-    if (payload) {
-      const cmsPlans = await payload.find({
-        collection: "pricing-plans",
-        where: {
-          isActive: { equals: true },
-        },
-        sort: "sortOrder",
-        limit: 20,
-      });
-
-      if (cmsPlans.docs.length > 0) {
-        pricingPlans = cmsPlans.docs.map((plan: any) => ({
-          id: plan.slug || plan.id,
-          package_name: plan.packageName,
-          price: Number(plan.price) || 0,
-          tokens: Number(plan.tokens) || 0,
-          duration_days: Number(plan.durationDays) || 30,
-          features: plan.features?.map((f: any) => f.feature || f) || [],
-          popular: plan.isPopular || false,
-          sort_order: Number(plan.sortOrder) || 0,
-        }));
-      }
+    const { queryWithTimeout: qwt } = await import("@/lib/db");
+    const plansRes = await qwt(
+      "SELECT * FROM pricing_plans WHERE is_active = true ORDER BY sort_order ASC",
+      undefined,
+      5000
+    );
+    if (plansRes.rows.length > 0) {
+      pricingPlans = plansRes.rows.map((row: any) => ({
+        id: row.id,
+        package_name: row.package_name,
+        price: parsePrice(row.price),
+        tokens: typeof row.tokens === "string" ? parseInt(row.tokens) || 0 : row.tokens || 0,
+        duration_days: row.duration_days,
+        features: parseFeatures(row.features),
+        popular: row.popular || false,
+        sort_order: row.sort_order || 0,
+      }));
     }
-  } catch (cmsError) {
-    console.warn("[Landing] Failed to load pricing plans from CMS:", cmsError);
+  } catch (pricingError) {
+    console.warn("[Landing] Failed to load pricing plans:", pricingError);
   }
-
-  // Fallback: try public pricing_plans table if CMS is empty (with timeout)
-  if (pricingPlans.length === 0) {
-    try {
-      const { queryWithTimeout: qwt } = await import("@/lib/db");
-      const plansRes = await qwt(
-        "SELECT * FROM pricing_plans WHERE is_active = true ORDER BY sort_order ASC",
-        undefined,
-        5000
-      );
-      if (plansRes.rows.length > 0) {
-        pricingPlans = plansRes.rows.map((row: any) => ({
-          id: row.id,
-          package_name: row.package_name,
-          price: parsePrice(row.price),
-          tokens: typeof row.tokens === "string" ? parseInt(row.tokens) || 0 : row.tokens || 0,
-          duration_days: row.duration_days,
-          features: parseFeatures(row.features),
-          popular: row.popular || false,
-          sort_order: row.sort_order || 0,
-        }));
-      }
-    } catch {}
-  }
-
-  // Final fallback: hardcoded defaults
-  const defaultPricingPlans = [
-    { id: "free", package_name: "Gratis", price: 0, tokens: 10, duration_days: 30, popular: false, features: ["10 Poin Kuota Sekali", "Masa Aktif 30 Hari", "Generator Soal (LOTS C1-C3)", "Dukungan Kurikulum Merdeka"] },
-    { id: "three_month", package_name: "3 Bulan", price: 120000, tokens: 500, duration_days: 90, popular: true, features: ["500 Poin Kuota Utama", "Masa Aktif 90 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Terpadu"] },
-    { id: "six_month", package_name: "6 Bulan", price: 220000, tokens: 1100, duration_days: 180, popular: false, features: ["1100 Poin Kuota Utama", "Masa Aktif 180 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "Server Prioritas & CS Prioritas"] },
-    { id: "one_year", package_name: "1 Tahun", price: 400000, tokens: 2500, duration_days: 365, popular: false, features: ["2500 Poin Kuota Utama", "Masa Aktif 365 Hari", "Generator Soal HOTS (C4-C6)", "Cetak Lembar Jawaban Resmi", "CS VIP 24/7 & Backup Riwayat"] },
-  ];
 
   const defaultFaq = [
     {
@@ -279,7 +237,7 @@ export default async function LandingPage({
         copyright: footerCopyright,
         columns: footerColumns,
       }}
-      pricingPlans={pricingPlans.length > 0 ? pricingPlans : defaultPricingPlans}
+      pricingPlans={pricingPlans}
       faq={faqData || defaultFaq}
       referral={referralData || defaultReferral}
     />

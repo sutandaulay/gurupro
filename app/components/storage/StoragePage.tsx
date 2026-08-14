@@ -25,6 +25,7 @@ import {
   IconBrandWhatsapp,
   IconShieldLock,
 } from "@tabler/icons-react";
+import ApprovalStatusBadge from "@/components/approval/ApprovalStatusBadge";
 
 interface Folder {
   id: string;
@@ -51,6 +52,9 @@ interface FileItem {
   konten?: any;
   custom_values?: any;
   assessment_info?: any;
+  approval_status?: string;
+  approval_note?: string | null;
+  tipe_dokumen?: string;
 }
 
 const VIRTUAL_FOLDERS = [
@@ -285,6 +289,9 @@ export default function StoragePage() {
                 updated_at: item.created_at,
                 is_system: true,
                 konten: kontenObj,
+                approval_status: item.approval_status || null,
+                approval_note: item.approval_note || null,
+                tipe_dokumen: item.tipe_dokumen || null,
               } as any;
             } else if (folderId === "system_jurnal") {
               const customValuesObj = typeof item.custom_values === "string" ? JSON.parse(item.custom_values) : item.custom_values;
@@ -1206,6 +1213,16 @@ export default function StoragePage() {
                             day: "numeric",
                           })}
                         </p>
+                        {file.is_system && ["rpp", "modul"].includes(file.tipe_dokumen || "") && (
+                          <div className="mt-1 space-y-1">
+                            <ApprovalStatusBadge status={(file.approval_status || "draft") as any} />
+                            {file.approval_status === "revisi" && file.approval_note && (
+                              <p className="text-[10px] text-rose-600 bg-rose-50 border border-rose-100 rounded-md px-2 py-1">
+                                <span className="font-bold">Catatan Kepsek:</span> {file.approval_note}
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
                         {canPreview(file.mime_type) && (

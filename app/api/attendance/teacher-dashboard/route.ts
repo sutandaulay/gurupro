@@ -148,6 +148,16 @@ export async function GET(req: NextRequest) {
       }));
     }
 
+    // ==========================================
+    // 1c. Today's teacher_attendance for sekolah mandiri (check-in/check-out)
+    // ==========================================
+    const schoolAttendanceToday = await query(
+      `SELECT school_id, tanggal, check_in_time, check_out_time, status
+       FROM teacher_attendance
+       WHERE user_id = $1 AND tanggal = $2`,
+      [teacherId, startOfDay.toISOString().split('T')[0]]
+    );
+
     // Merge assignments
     const allAssignments = [...assignments, ...schoolAssignments];
 
@@ -357,6 +367,32 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    // Enrich school assignments with today's teacher_attendance (sekolah mandiri)
+    const enrichedSchoolAssignments = allAssignments
+      .filter((a: any) => a.isSchool)
+      .map((assignment: any) => {
+        const ta = (schoolAttendanceToday.rows || []).find(
+          (r: any) => String(r.school_id) === String(assignment.institutionId)
+        );
+        let attendanceStatus: 'belum_absen' | 'check_in_only' | 'completed' = 'belum_absen';
+        if (ta) {
+          attendanceStatus = ta.check_out_time ? 'completed' : 'check_in_only';
+        }
+        return {
+          ...assignment,
+          todayAttendance: {
+            status: attendanceStatus,
+            checkIn: ta
+              ? { timestamp: ta.check_in_time, distance: null, status: 'valid' }
+              : null,
+            checkOut: ta?.check_out_time
+              ? { timestamp: ta.check_out_time, distance: null, status: 'valid' }
+              : null,
+            teachingSessions: [],
+          },
+        };
+      });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -364,7 +400,7 @@ export async function GET(req: NextRequest) {
         date: today.toISOString(),
         dayName: todayKey,
         assignments: enrichedAssignments,
-        schoolAssignments: allAssignments.filter((a: any) => a.isSchool),
+        schoolAssignments: enrichedSchoolAssignments,
         dutyAssignmentsToday: dutyAssignmentsToday.rows || [],
         attendanceByInstitution,
         workingHours: {

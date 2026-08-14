@@ -8,6 +8,21 @@ import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { parseISO, eachDayOfInterval, isWithinInterval } from 'date-fns';
 import { query } from '@/lib/db';
+import { getSessionFromCookieHeader } from '@/lib/session-sign';
+
+// Sesuaikan sesi: guru mandiri yang login manual (cookie gurupro_session, tanpa
+// NextAuth) tetap bisa memakai fitur ini. Fallback ke NextAuth untuk OAuth.
+async function getSessionUser(req: Request) {
+  const cookieSession = getSessionFromCookieHeader(req.headers.get('cookie'));
+  if (cookieSession?.id) {
+    return { id: cookieSession.id, role: cookieSession.role || 'guru' };
+  }
+  const session = await getServerSession(authOptions);
+  if (session?.user) {
+    return { id: session.user.id as string, role: (session.user as any).role || 'guru' };
+  }
+  return null;
+}
 
 // Schema untuk validasi input pengajuan izin
 const LeaveRequestSchema = z.object({
@@ -23,8 +38,8 @@ const LeaveRequestSchema = z.object({
 export async function POST(req: Request) {
   try {
     // Validasi sesi pengguna
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    const session = await getSessionUser(req);
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -44,7 +59,7 @@ export async function POST(req: Request) {
     const conflictingRequests = await db.select()
       .from(leaveRequests)
       .where(and(
-        eq(leaveRequests.teacherId, session.user.id),
+        eq(leaveRequests.teacherId, session.id),
         eq(leaveRequests.status, 'pending'),
       ));
 
@@ -86,7 +101,7 @@ export async function POST(req: Request) {
       // Cek apakah guru memiliki sekolah mandiri
       const schoolResult = await db.select({ id: schools.id })
         .from(schools)
-        .where(eq(schools.userId, session.user.id))
+        .where(eq(schools.userId, session.id))
         .limit(1);
       
       if (schoolResult.length > 0) {
@@ -98,7 +113,7 @@ export async function POST(req: Request) {
           FROM public.institution_members
           WHERE app_user_id = $1 AND status = 'active'
           LIMIT 1
-        `, [session.user.id]);
+        `, [session.id]);
         
         if (assignmentResult.length > 0) {
           teacherInstitutionId = assignmentResult[0].institutionId;
@@ -109,7 +124,7 @@ export async function POST(req: Request) {
     // Buat record pengajuan izin
     const [newLeaveRequest] = await db.insert(leaveRequests).values({
       id: uuidv4(),
-      teacherId: session.user.id,
+      teacherId: session.id,
       institutionId: teacherInstitutionId,
       schoolId: teacherSchoolId,
       type: validatedData.type,
@@ -155,19 +170,19 @@ export async function POST(req: Request) {
 // Handler untuk GET (mengambil daftar pengajuan izin)
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    const session = await getSessionUser(req);
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Jika user adalah admin, ambil semua pengajuan izin
     // Jika user adalah guru, hanya ambil pengajuan izin miliknya sendiri
     let leaveRequestsList;
-    if (session.user.role === 'admin') {
+    if (session.role === 'admin') {
       leaveRequestsList = await db.select().from(leaveRequests);
     } else {
       leaveRequestsList = await db.select().from(leaveRequests)
-        .where(eq(leaveRequests.teacherId, session.user.id));
+        .where(eq(leaveRequests.teacherId, session.id));
     }
 
     return NextResponse.json({

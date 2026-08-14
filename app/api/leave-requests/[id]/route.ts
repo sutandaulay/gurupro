@@ -13,6 +13,19 @@ import { v4 as uuidv4 } from 'uuid';
 import { parseISO, eachDayOfInterval, format, startOfDay } from 'date-fns';
 import { suggestSubstitutes } from '@/lib/substitute-suggestion';
 import { sendWhatsAppNotification } from '@/lib/notifications';
+import { getSessionFromCookieHeader } from '@/lib/session-sign';
+
+async function getSessionUser(req: Request) {
+  const cookieSession = getSessionFromCookieHeader(req.headers.get('cookie'));
+  if (cookieSession?.id) {
+    return { id: cookieSession.id, role: cookieSession.role || 'guru' };
+  }
+  const session = await getServerSession(authOptions);
+  if (session?.user) {
+    return { id: session.user.id as string, role: (session.user as any).role || 'guru' };
+  }
+  return null;
+}
 
 // Schema untuk validasi input approval/rejection
 const UpdateLeaveRequestSchema = z.object({
@@ -42,33 +55,44 @@ export async function PATCH(
       return NextResponse.json({ error: 'Permintaan izin tidak ditemukan' }, { status: 404 });
     }
 
-    // Cek akses berdasarkan institusi
-    // User hanya bisa mengakses izin di institusi yang mereka miliki akses
-    const membersResult = await query(`
-      SELECT im.*, imr.value as "role"
-      FROM public.institution_members im
-      LEFT JOIN payload.institution_members_role imr ON imr.parent_id = im.id
-      WHERE im.app_user_id = $1 AND im.institution_id = $2
-    `, [session.user.id, existingRequest.institutionId]);
-    const userInstitutionMembers = membersResult.rows;
-
-    if (userInstitutionMembers.length === 0 && session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden: Anda tidak memiliki akses ke institusi ini' }, { status: 403 });
+    const session = await getSessionUser(req);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Cek apakah user memiliki peran yang sesuai untuk menyetujui izin
-    const userMember = userInstitutionMembers[0];
-    const allowedRoles = ['admin', 'operator', 'kepala_sekolah', 'wakasek'];
-    
-    if (!allowedRoles.includes(userMember.role) && session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden: Anda tidak memiliki izin untuk menyetujui izin' }, { status: 403 });
+    // Guru mandiri (sekolah mandiri): hanya pemilik request / admin yang bisa akses
+    if (!existingRequest.institutionId) {
+      if (session.role !== 'admin' && existingRequest.teacherId !== session.id) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    } else {
+      // Cek akses berdasarkan institusi
+      const membersResult = await query(`
+        SELECT im.*, imr.value as "role"
+        FROM public.institution_members im
+        LEFT JOIN payload.institution_members_role imr ON imr.parent_id = im.id
+        WHERE im.app_user_id = $1 AND im.institution_id = $2
+      `, [session.id, existingRequest.institutionId]);
+      const userInstitutionMembers = membersResult.rows;
+
+      if (userInstitutionMembers.length === 0 && session.role !== 'admin') {
+        return NextResponse.json({ error: 'Forbidden: Anda tidak memiliki akses ke institusi ini' }, { status: 403 });
+      }
+
+      // Cek apakah user memiliki peran yang sesuai untuk menyetujui izin
+      const userMember = userInstitutionMembers[0];
+      const allowedRoles = ['admin', 'operator', 'kepala_sekolah', 'wakasek'];
+
+      if (!allowedRoles.includes(userMember.role) && session.role !== 'admin') {
+        return NextResponse.json({ error: 'Forbidden: Anda tidak memiliki izin untuk menyetujui izin' }, { status: 403 });
+      }
     }
 
     // Update status request
     const [updatedRequest] = await db.update(leaveRequests)
       .set({
         status: validatedData.status,
-        approvedBy: session.user.id,
+        approvedBy: session.id,
         approvedAt: new Date(),
         notes: validatedData.notes || null,
       })
@@ -77,41 +101,45 @@ export async function PATCH(
 
     // Jika permintaan disetujui, update summary kehadiran
     if (validatedData.status === 'approved') {
-      await updateAttendanceSummaryForApprovedLeave(
-        existingRequest.teacherId,
-        existingRequest.institutionId,
-        existingRequest.startDate,
-        existingRequest.endDate,
-        existingRequest.type
-      );
+      if (existingRequest.institutionId) {
+        await updateAttendanceSummaryForApprovedLeave(
+          existingRequest.teacherId,
+          existingRequest.institutionId,
+          existingRequest.startDate,
+          existingRequest.endDate,
+          existingRequest.type
+        );
+      }
 
       // Sprint 4.5 — Saran guru pengganti + auto-share RPP (READ-ONLY, try/catch aman)
       // Tidak mengubah logika approve/attendance di atas.
       try {
-        const suggestions = await suggestSubstitutes(
-          Number(existingRequest.institutionId),
-          existingRequest.teacherId,
-          existingRequest.startDate,
-          existingRequest.endDate
-        );
+        if (existingRequest.institutionId) {
+          const suggestions = await suggestSubstitutes(
+            Number(existingRequest.institutionId),
+            existingRequest.teacherId,
+            existingRequest.startDate,
+            existingRequest.endDate
+          );
 
-        // Cari RPP/Modul Ajar terbaru guru yang izin untuk di-share ke pengganti
-        const rppRes = await query(
-          `SELECT id, judul_dokumen FROM guru_administrasi
-           WHERE user_id = $1 AND tipe_dokumen IN ('rpp','modul')
-             AND approval_status IN ('draft','approved')
-           ORDER BY created_at DESC LIMIT 3`,
-          [existingRequest.teacherId]
-        );
-        const rppList = rppRes.rows.map((r: any) => `• ${r.judul_dokumen}`).join("\n");
+          // Cari RPP/Modul Ajar terbaru guru yang izin untuk di-share ke pengganti
+          const rppRes = await query(
+            `SELECT id, judul_dokumen FROM guru_administrasi
+             WHERE user_id = $1 AND tipe_dokumen IN ('rpp','modul')
+               AND approval_status IN ('draft','approved')
+             ORDER BY created_at DESC LIMIT 3`,
+            [existingRequest.teacherId]
+          );
+          const rppList = rppRes.rows.map((r: any) => `• ${r.judul_dokumen}`).join("\n");
 
-        for (const s of suggestions) {
-          if (!s.whatsapp) continue;
-          const msg = `[GuruPRO] 📋 Guru ${existingRequest.type} pada ${String(existingRequest.startDate).slice(0,10)}–${String(existingRequest.endDate).slice(0,10)}.\n` +
-            `Anda disarankan sebagai guru pengganti.` +
-            (rppList ? `\nRPP/Modul Ajar yang bisa dipakai:\n${rppList}` : "") +
-            `\n\nLogin GuruPRO untuk detail.`;
-          await sendWhatsAppNotification(s.whatsapp, msg);
+          for (const s of suggestions) {
+            if (!s.whatsapp) continue;
+            const msg = `[GuruPRO] 📋 Guru ${existingRequest.type} pada ${String(existingRequest.startDate).slice(0,10)}–${String(existingRequest.endDate).slice(0,10)}.\n` +
+              `Anda disarankan sebagai guru pengganti.` +
+              (rppList ? `\nRPP/Modul Ajar yang bisa dipakai:\n${rppList}` : "") +
+              `\n\nLogin GuruPRO untuk detail.`;
+            await sendWhatsAppNotification(s.whatsapp, msg);
+          }
         }
       } catch (subErr) {
         console.error("Substitute suggestion (non-fatal):", subErr);
@@ -215,17 +243,27 @@ export async function GET(
       return NextResponse.json({ error: 'Permintaan izin tidak ditemukan' }, { status: 404 });
     }
 
-    // Cek akses: admin bisa lihat semua, user hanya bisa lihat di institusi yang mereka miliki akses
-    if (session.user.role !== 'admin') {
+    const session = await getSessionUser(req);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Guru mandiri (sekolah mandiri): pemilik request bisa lihat detail sendiri
+    if (!leaveRequest.institutionId) {
+      if (session.role !== 'admin' && leaveRequest.teacherId !== session.id) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    } else if (session.role !== 'admin') {
+      // Cek akses: user hanya bisa lihat di institusi yang mereka miliki akses
       const membersResult2 = await query(`
         SELECT im.*, imr.value as "role"
         FROM public.institution_members im
         LEFT JOIN payload.institution_members_role imr ON imr.parent_id = im.id
         WHERE im.app_user_id = $1 AND im.institution_id = $2
-      `, [session.user.id, leaveRequest.institutionId]);
+      `, [session.id, leaveRequest.institutionId]);
       const userInstitutionMembers = membersResult2.rows;
 
-      if (userInstitutionMembers.length === 0) {
+      if (userInstitutionMembers.length === 0 && leaveRequest.teacherId !== session.id) {
         return NextResponse.json({ error: 'Forbidden: Anda tidak memiliki akses ke institusi ini' }, { status: 403 });
       }
     }

@@ -3,7 +3,8 @@ import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import ApprovalStatusBadge, { SubmitApprovalButton } from "@/components/approval/ApprovalStatusBadge";
+import ApprovalStatusBadge from "@/components/approval/ApprovalStatusBadge";
+import { usePendingApproval } from "@/components/approval/usePendingApproval";
 
 interface PendingDoc {
   id: string;
@@ -15,60 +16,28 @@ interface PendingDoc {
   created_at: string;
   can_approve: boolean;
   my_roles: string[];
+  approval_layer?: string;
+  approval_stage?: "wakasek_layer" | "kepsek_final" | "full";
+  wakasek_approved?: boolean;
 }
 
 export default function ApprovalRppPage() {
   const router = useRouter();
-  const [docs, setDocs] = useState<PendingDoc[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [processingId, setProcessingId] = useState<string | null>(null);
+  const { docs, loading, error, processingId, load, act } = usePendingApproval();
   const [note, setNote] = useState<Record<string, string>>({});
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await apiFetch("/api/administrasi/pending-approval", { cache: "no-store" });
-      if (res.status === 403) {
-        setError("Halaman ini hanya untuk Kepala Sekolah atau Wakasek.");
-        setDocs([]);
-        return;
-      }
-      if (!res.ok) throw new Error("Gagal memuat");
-      const data = await res.json();
-      setDocs(data.documents || []);
-    } catch {
-      setError("Gagal memuat daftar persetujuan. Coba sebentar lagi.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const handleAction = async (id: string, aksi: "approve" | "revisi") => {
     if (aksi === "revisi" && !note[id]?.trim()) {
       alert("Tulis catatan revisi untuk guru ya.");
       return;
     }
-    setProcessingId(id);
-    try {
-      const res = await apiFetch(`/api/administrasi/${id}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aksi, catatan: note[id] || null }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        alert(d.error || "Gagal memproses");
-        return;
-      }
-      load();
-    } catch {
-      alert("Terjadi kesalahan");
-    } finally {
-      setProcessingId(null);
+    const res = await act(id, aksi, note[id] || null);
+    if (res.ok) {
+      setNote((n) => ({ ...n, [id]: "" }));
+    } else {
+      alert(res.error);
     }
   };
 
@@ -110,7 +79,17 @@ export default function ApprovalRppPage() {
                   {d.tipe_dokumen === "rpp" ? "RPP" : "Modul Ajar"} • {d.guru_nama}
                 </p>
               </div>
-              <ApprovalStatusBadge status={d.approval_status as any} />
+              <div className="flex flex-col items-end gap-1">
+                <ApprovalStatusBadge status={d.approval_status as any} />
+                {d.approval_layer === "double" && (
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    Double approval{" "}
+                    {d.wakasek_approved
+                      ? "• Wakasek ✓, menunggu Kepsek"
+                      : "• Menunggu Wakasek"}
+                  </span>
+                )}
+              </div>
             </div>
 
             <textarea
@@ -127,9 +106,15 @@ export default function ApprovalRppPage() {
                   <button
                     onClick={() => handleAction(d.id, "approve")}
                     disabled={processingId === d.id}
-                    className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+                    className={`flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold disabled:opacity-50`}
                   >
-                    {processingId === d.id ? "Memproses..." : "Setujui"}
+                    {processingId === d.id
+                      ? "Memproses..."
+                      : d.approval_stage === "wakasek_layer"
+                        ? "Setujui (Layer Wakasek)"
+                        : d.approval_stage === "kepsek_final"
+                          ? "Setujui (Final Kepsek)"
+                          : "Setujui"}
                   </button>
                   <button
                     onClick={() => handleAction(d.id, "revisi")}
@@ -141,7 +126,9 @@ export default function ApprovalRppPage() {
                 </>
               ) : (
                 <p className="text-xs text-slate-400 italic w-full text-center py-1">
-                  Menunggu persetujuan Wakasek (double approval)
+                  {d.approval_layer === "double" && d.approval_stage === "wakasek_layer"
+                    ? "Menunggu persetujuan Wakasek (layer 1/2 double approval)"
+                    : "Menunggu persetujuan final Kepsek (layer 2/2 double approval)"}
                 </p>
               )}
             </div>

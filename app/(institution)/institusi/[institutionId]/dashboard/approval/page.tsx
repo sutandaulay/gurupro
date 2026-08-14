@@ -5,10 +5,11 @@ import { useState, useEffect } from "react";
 import { Card, Badge, Spinner, Modal, Textarea } from "@/app/components/ui";
 import { useToast } from "@/app/components/ui/toast";
 import { IconCheck, IconAlertCircle, IconClock, IconFileText, IconBook } from "@tabler/icons-react";
+import { usePendingApproval } from "@/components/approval/usePendingApproval";
 
 interface PendingDocument {
   id: string;
-  user_id: number;
+  user_id: string | number;
   guru_nama: string;
   tipe_dokumen: "rpp" | "modul";
   judul_dokumen: string;
@@ -18,6 +19,9 @@ interface PendingDocument {
   institution_id: number;
   can_approve: boolean;
   my_roles: string[];
+  approval_layer?: string;
+  approval_stage?: "wakasek_layer" | "kepsek_final" | "full";
+  wakasek_approved?: boolean;
 }
 
 export default function ApprovalPage({
@@ -27,9 +31,7 @@ export default function ApprovalPage({
 }) {
   const toast = useToast();
   const [institutionId, setInstitutionId] = useState<number | null>(null);
-  const [documents, setDocuments] = useState<PendingDocument[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const { docs: documents, loading, error, act } = usePendingApproval();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<PendingDocument | null>(null);
   const [actionType, setActionType] = useState<"approve" | "revisi">("approve");
@@ -39,64 +41,32 @@ export default function ApprovalPage({
     params.then((p) => setInstitutionId(parseInt(p.institutionId, 10)));
   }, [params]);
 
-  const fetchData = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await apiFetch("/api/administrasi/pending-approval");
-      if (res.status === 403) {
-        setError("Anda tidak punya akses.");
-        return;
-      }
-      if (!res.ok) {
-        setError("Gagal memuat daftar persetujuan.");
-        return;
-      }
-      const data = await res.json();
-      setDocuments(data.documents || []);
-    } catch {
-      setError("Gagal memuat daftar persetujuan.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const handleAction = async () => {
     if (!selectedDoc) return;
     setProcessingId(selectedDoc.id);
-    try {
-      const res = await apiFetch(`/api/administrasi/${selectedDoc.id}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aksi: actionType, catatan: catatan || undefined }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || "Gagal memproses.");
-        return;
-      }
-      toast.success(
-        actionType === "approve"
-          ? "Dokumen berhasil disetujui."
-          : "Dokumen diminta revisi."
-      );
-      setSelectedDoc(null);
-      setCatatan("");
-      fetchData();
-    } catch {
-      toast.error("Gagal memproses dokumen.");
-    } finally {
-      setProcessingId(null);
+    const res = await act(selectedDoc.id, actionType, catatan || null);
+    if (!res.ok) {
+      toast.error(res.error || "Gagal memproses.");
+      return;
     }
+    toast.success(
+      actionType === "approve"
+        ? res.data?.message || "Dokumen berhasil disetujui."
+        : "Dokumen diminta revisi."
+    );
+    setSelectedDoc(null);
+    setCatatan("");
+    setProcessingId(null);
   };
 
   const pendingCount = documents.filter((d) => d.approval_status === "pending").length;
   const rppDocs = documents.filter((d) => d.tipe_dokumen === "rpp");
   const modulDocs = documents.filter((d) => d.tipe_dokumen === "modul");
+
+  const localDocs =
+    institutionId != null
+      ? documents.filter((d) => Number(d.institution_id) === institutionId)
+      : documents;
 
   return (
     <div className="space-y-6">
@@ -154,7 +124,7 @@ export default function ApprovalPage({
           <IconAlertCircle size={40} className="mx-auto text-red-400 mb-3" />
           <p className="text-red-600">{error}</p>
         </Card>
-      ) : documents.length === 0 ? (
+      ) : localDocs.length === 0 ? (
         <Card className="p-12 text-center">
           <IconCheck size={40} className="mx-auto text-green-300 mb-3" />
           <p className="text-gray-500 font-medium">Semua dokumen sudah diproses!</p>
@@ -162,7 +132,7 @@ export default function ApprovalPage({
         </Card>
       ) : (
         <div className="space-y-3">
-          {documents.map((doc) => (
+          {localDocs.map((doc) => (
             <Card key={doc.id} className="p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
@@ -185,6 +155,13 @@ export default function ApprovalPage({
                           ? "Disetujui"
                           : "Revisi"}
                     </Badge>
+                    {doc.approval_layer === "double" && (
+                      <Badge variant="info">
+                        {doc.wakasek_approved
+                          ? "Wakasek ✓ • Final Kepsek"
+                          : "Lapisan 1 • Wakasek"}
+                      </Badge>
+                    )}
                   </div>
                   <p className="font-semibold text-gray-900 text-base">
                     {doc.judul_dokumen || "(Tanpa judul)"}
@@ -218,7 +195,11 @@ export default function ApprovalPage({
                       }}
                       className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg font-medium transition-colors cursor-pointer"
                     >
-                      Setujui
+                      {doc.approval_stage === "wakasek_layer"
+                        ? "Setujui (Lapisan 1)"
+                        : doc.approval_stage === "kepsek_final"
+                          ? "Setujui (Final)"
+                          : "Setujui"}
                     </button>
                     <button
                       onClick={() => {

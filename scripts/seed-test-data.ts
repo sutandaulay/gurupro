@@ -79,7 +79,7 @@ async function cleanupExistingTestData(): Promise<void> {
       'user_school_assignments', 'tahun_ajaran', 'guru_administrasi', 'GeminiCache', 'TokenUsage',
       'payload.institution_members_assigned_kelas', 'payload.institution_members_assigned_mapel',
       'payload.institution_members_role', 'payload.institution_members', 'payload.invitations',
-      'payload.otp_verifications', 'payload.pricing_plans', 'payload.landing_page_hero_stats',
+      'payload.otp_verifications', 'payload.landing_page_hero_stats',
       'payload.landing_page', 'payload.footer_content_social_links', 'payload.footer_content_links',
       'payload.footer_content', 'payload.chatbot_config', 'payload.cms_features', 'payload.why_points',
       'payload.categories', 'payload.posts', 'payload.media', 'payload.cms_users_sessions',
@@ -1509,25 +1509,8 @@ async function seedTestData(): Promise<{
     }
     console.log(`   ✅ Created referrals`);
 
-    // 44. PAYLOAD LANDING / FEATURES / WHY POINTS / CATEGORIES / POSTS / PRICING PLANS
+    // 44. PAYLOAD LANDING / FEATURES / WHY POINTS / CATEGORIES / POSTS
     console.log('   Seeding payload CMS...');
-    for (const schoolId of schools.map(s => s.id)) {
-      await client.query(`
-        INSERT INTO payload.pricing_plans ("packageName", slug, price, "durationDays", tokens, features, "isActive", "isPopular", description)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      `, [
-        `TEST_${pick(['Basic', 'Pro'])}`,
-        `test-${pick(['basic', 'pro'])}-${Date.now()}`,
-        Math.floor(Math.random() * 500000) + 100000,
-        30,
-        Math.floor(Math.random() * 1000) + 100,
-        JSON.stringify(['Fitur 1', 'Fitur 2']),
-        true,
-        Math.random() > 0.5,
-        'Testing plan'
-      ]);
-    }
-
     const landingId = await client.query(`INSERT INTO payload.landing_page DEFAULT VALUES RETURNING id`);
     if (landingId.rows[0]?.id) {
       await client.query(`

@@ -1,4 +1,14 @@
 import { query } from "@/lib/db";
+import {
+  getGuruList,
+  toNamaMap,
+  getStrukturStaf,
+  getGuruTelat3x,
+  getGuruBelumTerassign,
+  getRaportStats,
+  getRaportMendekatiDeadline,
+  awalMingguIni,
+} from "@/lib/dashboard-stats";
 
 // =====================================================
 // Sprint 3.3 / Dashboard Institusi v2
@@ -62,18 +72,6 @@ export interface ExecDashboard {
   observasiPending: number;
 }
 
-function awalMingguIni(now = new Date()): { start: Date; end: Date } {
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  const hari = d.getDay();
-  const selisihKeSenin = hari === 0 ? -6 : 1 - hari;
-  const start = new Date(d);
-  start.setDate(d.getDate() + selisihKeSenin);
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-  return { start, end };
-}
-
 export async function buildExecDashboard(
   institutionId: number,
   now: Date = new Date()
@@ -85,29 +83,10 @@ export async function buildExecDashboard(
   // ==========================================
   // 1. Guru aktif di institusi
   // ==========================================
-  const membersRes = await query(
-    `SELECT DISTINCT im.id AS member_id, im.app_user_id AS user_id
-     FROM public.institution_members im
-     JOIN public.institution_members_role imr ON imr.parent_id = im.id
-     WHERE im.institution_id = $1 AND im.status = 'active'
-       AND imr.value = 'guru'`,
-    [institutionId]
-  );
-  const guruIds = membersRes.rows.map((r: any) => r.user_id).filter(Boolean);
-  const memberIds = membersRes.rows.map((r: any) => r.member_id).filter(Boolean);
+  const guruList = await getGuruList(institutionId);
+  const guruIds = guruList.map((g) => g.guruId);
+  const namaMap = toNamaMap(guruList);
   const totalGuru = guruIds.length;
-
-  // Nama guru
-  const namaMap: Record<string, string> = {};
-  if (guruIds.length > 0) {
-    const namaRes = await query(
-      `SELECT id, nama_lengkap FROM users WHERE id = ANY($1)`,
-      [guruIds]
-    );
-    for (const r of namaRes.rows) {
-      namaMap[r.id] = r.nama_lengkap || "Guru";
-    }
-  }
 
   let guruAktifMingguIni = 0;
   let totalSesiMengajar = 0;
@@ -171,143 +150,75 @@ export async function buildExecDashboard(
   };
   const raportMingguIni: { status: string; jumlah: number }[] = [];
 
-  // Cek apakah tabel data_raport ada
-  const tableCheck = await query(
-    `SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'data_raport') as exists`
-  );
-  if (tableCheck.rows[0]?.exists) {
-    const raportStatsRes = await query(
-      `SELECT dr.status, COUNT(*)::int AS jumlah
-       FROM data_raport dr
-       JOIN classes c ON c.id = dr.kelas_id
-       JOIN institutions i ON i.school_id = c.school_id
-       WHERE i.id = $1
-       GROUP BY dr.status`,
-      [institutionId]
+  const raportRes = await getRaportStats(institutionId);
+  for (const [status, jumlah] of Object.entries(raportRes.byStatus)) {
+    if (status in raportStats) {
+      (raportStats as any)[status] = jumlah;
+      raportStats.total += jumlah;
+    }
+  }
+
+  // Raport minggu ini
+  try {
+    const tableCheck = await query(
+      `SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'data_raport') as exists`
     );
-    for (const row of raportStatsRes.rows) {
-      const status = row.status as string;
-      const jumlah = Number(row.jumlah);
-      if (status in raportStats) {
-        (raportStats as any)[status] = jumlah;
-        raportStats.total += jumlah;
+    if (tableCheck.rows[0]?.exists) {
+      const raporMingguRes = await query(
+        `SELECT dr.status, COUNT(*)::int AS jumlah
+         FROM data_raport dr
+         JOIN classes c ON c.id = dr.kelas_id
+         JOIN institutions i ON i.school_id = c.school_id
+         WHERE i.id = $1
+           AND dr.updated_at >= $2
+           AND dr.updated_at <= $3
+         GROUP BY dr.status`,
+        [institutionId, start.toISOString(), end.toISOString()]
+      );
+      for (const row of raporMingguRes.rows) {
+        raportMingguIni.push({ status: row.status, jumlah: Number(row.jumlah) });
       }
     }
-
-    // Raport minggu ini
-    const raporMingguRes = await query(
-      `SELECT dr.status, COUNT(*)::int AS jumlah
-       FROM data_raport dr
-       JOIN classes c ON c.id = dr.kelas_id
-       JOIN institutions i ON i.school_id = c.school_id
-       WHERE i.id = $1
-         AND dr.updated_at >= $2
-         AND dr.updated_at <= $3
-       GROUP BY dr.status`,
-      [institutionId, start.toISOString(), end.toISOString()]
-    );
-    for (const row of raporMingguRes.rows) {
-      raportMingguIni.push({ status: row.status, jumlah: Number(row.jumlah) });
-    }
-
-    // Mendekati deadline (7 hari)
-    const deadlineDate = new Date(now);
-    deadlineDate.setDate(deadlineDate.getDate() + 7);
-    const deadlineRes = await query(
-      `SELECT COUNT(*)::int AS jumlah
-       FROM data_raport dr
-       JOIN classes c ON c.id = dr.kelas_id
-       JOIN institutions i ON i.school_id = c.school_id
-       WHERE i.id = $1
-         AND dr.status IN ('draft','dikirim_ke_wali_kelas')
-         AND EXTRACT(YEAR FROM dr.updated_at) = $2`,
-      [institutionId, now.getFullYear()]
-    );
-    raportStats.raportMendekatiDeadline = Number(deadlineRes.rows[0]?.jumlah || 0);
+  } catch {
+    raportMingguIni.length = 0;
   }
+
+  raportStats.raportMendekatiDeadline = await getRaportMendekatiDeadline(institutionId, now);
 
   // ==========================================
   // 4. Struktur Staf
   // ==========================================
-  const strukturStaf: Record<string, number> = {};
-  const roleStatsRes = await query(
-    `SELECT imr.value AS role, COUNT(*)::int AS jumlah
-     FROM public.institution_members im
-     JOIN public.institution_members_role imr ON imr.parent_id = im.id
-     WHERE im.institution_id = $1 AND im.status = 'active'
-     GROUP BY imr.value`,
-    [institutionId]
-  );
-  for (const row of roleStatsRes.rows) {
-    strukturStaf[row.role] = Number(row.jumlah);
-  }
-
-  // Sub-role
+  const strukturStaf = await getStrukturStaf(institutionId);
   const subRoles: Record<string, { label: string; jumlah: number }> = {};
-  const subRoleRes = await query(
-    `SELECT sub_role, COUNT(*)::int AS jumlah
-     FROM public.institution_members
-     WHERE institution_id = $1 AND status = 'active' AND sub_role IS NOT NULL AND sub_role != ''
-     GROUP BY sub_role`,
-    [institutionId]
-  );
   const subRoleLabel: Record<string, string> = {
     wali_kelas: "Wali Kelas",
     pembina_ekskul: "Pembina Ekskul",
   };
-  for (const row of subRoleRes.rows) {
-    subRoles[row.sub_role] = {
-      label: subRoleLabel[row.sub_role] || row.sub_role,
-      jumlah: Number(row.jumlah),
-    };
-    strukturStaf[`sub_role_${row.sub_role}`] = Number(row.jumlah);
+  for (const key of Object.keys(strukturStaf)) {
+    if (key.startsWith("sub_role_")) {
+      const subRole = key.replace("sub_role_", "");
+      subRoles[subRole] = {
+        label: subRoleLabel[subRole] || subRole,
+        jumlah: strukturStaf[key],
+      };
+    }
   }
 
   // ==========================================
   // 5. Guru belum ter-assign kelas/mapel
   // ==========================================
-  const unassignedRes = await query(
-    `SELECT im.app_user_id AS guru_id, u.nama_lengkap AS nama
-     FROM public.institution_members im
-     JOIN public.institution_members_role imr ON imr.parent_id = im.id
-     JOIN users u ON u.id::text = im.app_user_id
-     WHERE im.institution_id = $1 AND im.status = 'active'
-       AND imr.value = 'guru'
-       AND NOT EXISTS (
-         SELECT 1 FROM teacher_institution_assignments tia
-         WHERE tia.institution_id = im.institution_id
-           AND tia.teacher_id::text = im.app_user_id
-       )`,
-    [institutionId]
-  );
-  const guruBelumTerassign = unassignedRes.rows.map((r: any) => ({
-    id: r.guru_id,
-    nama: namaMap[r.guru_id] || r.nama || "Guru",
+  const guruBelumTerassign = (await getGuruBelumTerassign(institutionId, namaMap)).map((g) => ({
+    id: g.id,
+    nama: g.nama || namaMap[g.id] || "Guru",
   }));
 
   // ==========================================
   // 6. Guru telat >= 3x/minggu
   // ==========================================
-  const guruTelat3x: { nama: string; jumlahTelat: number }[] = [];
-  if (totalGuru > 0) {
-    const telatRes = await query(
-      `SELECT al.teacher_id, COUNT(*)::int AS jumlah_telat
-       FROM attendance_logs al
-       WHERE al.institution_id = $1
-         AND al.timestamp >= $2
-         AND al.timestamp <= $3
-         AND (al.status = 'flagged' OR al.flag_reasons::text LIKE '%late%' OR al.flag_reasons::text LIKE '%telat%')
-       GROUP BY al.teacher_id
-       HAVING COUNT(*) >= 3`,
-      [institutionId, start.toISOString(), end.toISOString()]
-    );
-    for (const row of telatRes.rows) {
-      guruTelat3x.push({
-        nama: namaMap[row.teacher_id] || "Guru",
-        jumlahTelat: Number(row.jumlah_telat),
-      });
-    }
-  }
+  const guruTelat3x = (await getGuruTelat3x(institutionId, start, end, namaMap)).map((g) => ({
+    nama: g.nama || "Guru",
+    jumlahTelat: g.jumlahTelat,
+  }));
 
   // ==========================================
   // 7. Top Guru
