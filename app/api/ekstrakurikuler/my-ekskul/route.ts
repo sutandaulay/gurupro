@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getPayload } from '@/lib/payload';
 import { getEkstrakurikuler } from '@/lib/sikap-ekskul';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 /**
  * GET /api/ekstrakurikuler/my-ekskul
@@ -14,7 +15,10 @@ export async function GET(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
+    }
 
     // Get current user's member ID
     const payload = await getPayload();

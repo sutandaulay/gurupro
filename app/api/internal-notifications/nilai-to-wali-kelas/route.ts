@@ -4,6 +4,7 @@ import { getWaliKelasForKelas } from '@/lib/wali-kelas';
 import { sendInAppNotification } from '@/lib/institution-members';
 import { cookies } from 'next/headers';
 import { getPayload } from '@/lib/payload';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,11 +22,10 @@ export async function POST(request: NextRequest) {
 
     // Get current user session
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('gurupro_session')?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+    if (!session) {
       return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
 
     // Verify user is a member of the institution
     const payload = await getPayload();

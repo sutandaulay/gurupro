@@ -9,20 +9,20 @@ import { query } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getTokensPerPoin } from "@/src/config/ratio-cache";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 export async function GET() {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
+    const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
 
-    if (!sessionCookie) {
+    if (!session) {
       return NextResponse.json(
         { error: "Sesi tidak aktif", reason: "no_session" },
         { status: 401 }
       );
     }
 
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     const userRes = await query(

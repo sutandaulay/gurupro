@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { getSessionFromCookieHeader } from "@/lib/session-sign";
 
 // Sprint 3.1 — Guru mengajukan RPP/Modul Ajar ke Kepsek (opsional per institusi).
 // Tidak mengubah alur generate-dan-pakai; hanya mengubah approval_status draft -> pending.
@@ -7,12 +8,10 @@ import { query } from "@/lib/db";
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    const sessionCookie = req.headers.get("cookie")?.split(";")
-      .find((c) => c.trim().startsWith("gurupro_session="));
-    if (!sessionCookie) {
+    const sessionData = getSessionFromCookieHeader(req.headers.get("cookie"));
+    if (!sessionData) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split("=")[1]));
 
     const docRes = await query(
       `SELECT id, user_id, tipe_dokumen, approval_status, institution_id

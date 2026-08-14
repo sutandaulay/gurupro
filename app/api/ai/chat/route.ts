@@ -5,6 +5,7 @@ import { generateChatResponse, estimateCost } from '@/lib/ai/generators';
 import { getUserPoinAccess, logFailedPoinUsage } from '@/src/services/poin-service';
 import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
 import { enforceOutputLimits } from '@/lib/ai/limits';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 const prisma = new PrismaClient();
 
@@ -19,12 +20,7 @@ async function getCurrentUser() {
     return null;
   }
 
-  try {
-    const sessionData = JSON.parse(sessionCookie.value);
-    return sessionData;
-  } catch {
-    return null;
-  }
+  return parseSessionCookie(sessionCookie.value);
 }
 
 /**

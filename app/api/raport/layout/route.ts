@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { query, logAudit } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { requireSchoolAccess } from '@/lib/school-access';
+import { parseSessionCookie } from '@/lib/session-sign';
 import {
   createLayout,
   updateLayout,
@@ -48,11 +49,10 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('gurupro_session')?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+    if (!session) {
       return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     const body = await req.json();
@@ -103,11 +103,10 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('gurupro_session')?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+    if (!session) {
       return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     const body = await req.json();
@@ -138,11 +137,10 @@ export async function PUT(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('gurupro_session')?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+    if (!session) {
       return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     const { searchParams } = new URL(req.url);

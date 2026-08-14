@@ -2,6 +2,7 @@ import { query, logAudit } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { requireSchoolAccess } from "@/lib/school-access";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 export async function GET(req: Request) {
   try {
@@ -64,7 +65,10 @@ export async function POST(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
+    }
     const userId = session.id;
 
     const body = await req.json();

@@ -5,6 +5,7 @@ import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
 import { enforceMarkdownLimits } from "@/lib/ai/limits";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 export async function POST(req: Request) {
   try {
@@ -20,7 +21,10 @@ export async function POST(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
+    }
     const userId = session.id;
 
     const poinState = await getUserPoinAccess(userId);

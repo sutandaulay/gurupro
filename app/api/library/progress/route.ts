@@ -9,12 +9,12 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { progressUpdateSchema } from "@/lib/validations/library";
 import { handleProgressUpdate } from "@/lib/library/complete-item";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 async function verifyGuru() {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("gurupro_session")?.value;
-  if (!sessionCookie) throw new Error("Unauthorized");
-  const session = JSON.parse(sessionCookie);
+  const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
+  if (!session) throw new Error("Unauthorized");
   return session;
 }
 

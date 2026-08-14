@@ -8,12 +8,12 @@ import { NextResponse } from "next/server";
 import { libraryItemCreateSchema } from "@/lib/validations/library";
 import { parsePagination, wrapResponse } from "@/lib/pagination";
 import { pdfKey, audiobookKey, coverKey } from "@/lib/r2-library";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 async function verifyAdmin() {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("gurupro_session")?.value;
-  if (!sessionCookie) throw new Error("Unauthorized");
-  const session = JSON.parse(sessionCookie);
+  const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
+  if (!session) throw new Error("Unauthorized");
   if (!['admin', 'super_admin', 'manager'].includes(session.role)) throw new Error("Forbidden");
 }
 
@@ -81,7 +81,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
     }
     const data = parsed.data;
-    const session = JSON.parse((await cookies()).get("gurupro_session")!.value);
+    const session = parseSessionCookie((await cookies()).get("gurupro_session")?.value);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const result = await query(
       `INSERT INTO library_items

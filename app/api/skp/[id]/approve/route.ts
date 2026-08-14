@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { getSessionFromCookieHeader } from '@/lib/session-sign'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
-    const sessionCookie = req.headers.get('cookie')?.split(';')
-      .find(c => c.trim().startsWith('gurupro_session='))
+    const sessionData = getSessionFromCookieHeader(req.headers.get('cookie'))
 
-    if (!sessionCookie) {
+    if (!sessionData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
 
     // Verifikasi peran jika SKP dikaitkan dengan sekolah yang terhubung ke institusi
     const skpRes = await query("SELECT sekolah_id FROM skp_tahunan WHERE id = $1", [id])

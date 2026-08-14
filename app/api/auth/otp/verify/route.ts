@@ -227,6 +227,14 @@ export async function POST(req: Request) {
         ? member.institution_roles
         : [];
 
+      let sessionSid: string | null = null;
+      try {
+        const { createServerSession } = await import("@/lib/session");
+        sessionSid = await createServerSession(user.id);
+      } catch (err) {
+        console.error("Create server session failed:", err);
+      }
+
       const sessionData = buildSignedSessionCookie({
         id: user.id,
         role: institutionRoles[0] || user.role || "guru",
@@ -234,6 +242,7 @@ export async function POST(req: Request) {
         activeContext: "individual",
         lastInstitutionId:
           activeCount === 1 && member?.institution_id != null ? member.institution_id : null,
+        sid: sessionSid ?? undefined,
       });
 
       const redirectUrl = checkoutPlan
@@ -277,6 +286,17 @@ export async function POST(req: Request) {
          VALUES ($1, $2, $3, $4)`,
         [user.id, "Reset Password", "Reset password sukses via OTP verifikasi", clientIP]
       );
+
+      // Revoke all existing sessions: password change must invalidate old cookies
+      try {
+        await query(
+          `UPDATE user_sessions SET revoked_at = CURRENT_TIMESTAMP
+           WHERE user_id = $1 AND revoked_at IS NULL`,
+          [user.id]
+        );
+      } catch (err) {
+        console.error("Revoke sessions after password reset failed:", err);
+      }
 
       return NextResponse.json({
         success: true,

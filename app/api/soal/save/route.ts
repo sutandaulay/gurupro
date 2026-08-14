@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { query } from "@/lib/db";
+import { parseSessionCookie } from "@/lib/session-sign";
 import { uploadToR2 } from "@/lib/r2";
 import { getUserPoinAccess } from "@/src/services/poin-service";
 import {
@@ -575,11 +576,10 @@ export async function POST(req: Request) {
 
     // Auth
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     const tokenState = await getUserPoinAccess(userId);

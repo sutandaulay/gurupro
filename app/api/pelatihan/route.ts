@@ -6,19 +6,18 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { logPelatihanEvidence, getSemesterFromDate } from '@/lib/evidence/logger'
+import { getSessionFromCookieHeader } from '@/lib/session-sign'
 
 // GET /api/pelatihan - List all pelatihan for current user
 export async function GET(req: Request) {
   try {
     // Get session from cookie
-    const sessionCookie = req.headers.get('cookie')?.split(';')
-      .find(c => c.trim().startsWith('gurupro_session='))
+    const sessionData = getSessionFromCookieHeader(req.headers.get('cookie'))
 
-    if (!sessionCookie) {
+    if (!sessionData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
     const guruId = sessionData.id
 
     const { searchParams } = new URL(req.url)
@@ -83,14 +82,12 @@ export async function GET(req: Request) {
 // POST /api/pelatihan - Create new pelatihan
 export async function POST(req: Request) {
   try {
-    const sessionCookie = req.headers.get('cookie')?.split(';')
-      .find(c => c.trim().startsWith('gurupro_session='))
+    const sessionData = getSessionFromCookieHeader(req.headers.get('cookie'))
 
-    if (!sessionCookie) {
+    if (!sessionData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
     const guruId = sessionData.id
 
     const body = await req.json()

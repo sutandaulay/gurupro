@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 export async function POST(req: Request) {
   try {
@@ -9,7 +10,10 @@ export async function POST(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const userId = session.id;
 
     const { npsn } = await req.json();

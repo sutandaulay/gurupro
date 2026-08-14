@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 const prisma = new PrismaClient();
 
 async function getCurrentUser() {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('gurupro_session');
-  if (!sessionCookie?.value) return null;
-  try {
-    return JSON.parse(sessionCookie.value);
-  } catch {
-    return null;
-  }
+  return parseSessionCookie(cookieStore.get('gurupro_session')?.value);
 }
 
 type AttendanceSummary = {

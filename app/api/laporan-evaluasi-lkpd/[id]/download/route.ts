@@ -7,6 +7,7 @@ import { uploadToR2 } from "@/lib/r2";
 import { generateLaporanEvaluasiPdfBuffer, generateLaporanEvaluasiDocBuffer } from "@/lib/doc-compiler";
 import { laporanEvaluasiLkpdOutputSchema } from "@/lib/schemas/laporan-evaluasi-lkpd";
 import { z } from "zod";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 /**
  * POST /api/laporan-evaluasi-lkpd/[id]/download
@@ -23,11 +24,10 @@ export async function POST(
 
     // Auth
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
+    if (!session) {
       return NextResponse.json({ error: "Sesi tidak aktif" }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
     const userIdNum = parseInt(userId, 10);
 

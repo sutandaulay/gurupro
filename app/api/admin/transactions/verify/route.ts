@@ -2,6 +2,7 @@ import { query } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { processSuccessPayment } from "@/lib/payments";
 import { getPaymentGatewayConfig } from "@/lib/settings";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 /**
  * Admin: verifikasi & aktifkan transaksi secara manual.
@@ -15,11 +16,10 @@ import { getPaymentGatewayConfig } from "@/lib/settings";
  */
 async function verifyAdmin(req: Request) {
   const cookieStore = await (await import("next/headers")).cookies();
-  const sessionCookie = cookieStore.get("gurupro_session")?.value;
-  if (!sessionCookie) {
+  const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const session = JSON.parse(sessionCookie);
   if (!["admin", "super_admin", "manager"].includes(session.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

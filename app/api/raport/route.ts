@@ -3,6 +3,7 @@ import { query, logAudit } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { requireSchoolAccess } from '@/lib/school-access';
 import { parsePagination, offset, wrapResponse } from '@/lib/pagination';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 export async function GET(req: Request) {
   try {
@@ -71,11 +72,10 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('gurupro_session')?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+    if (!session) {
       return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     const body = await req.json();

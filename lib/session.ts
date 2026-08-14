@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { randomUUID } from 'crypto';
 import { query } from '@/lib/db';
 import { getUserActiveMemberships } from '@/lib/institution-members';
 import { getServerSession } from 'next-auth';
@@ -94,6 +95,24 @@ export async function requireSession(): Promise<SessionData> {
     // DB hiccup — signed session cookie still trusted as a safe fallback
   }
 
+  // Revocation check: if the cookie carries a server-side session id, reject
+  // when it has been revoked (logout) or has expired on the server.
+  if (session.sid) {
+    try {
+      const sessRes = await query(
+        `SELECT 1 FROM user_sessions
+         WHERE sid = $1 AND user_id = $2 AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP`,
+        [session.sid, session.id]
+      );
+      if (sessRes.rows.length === 0) {
+        throw new Error('Unauthorized');
+      }
+    } catch (err) {
+      if ((err as Error).message === 'Unauthorized') throw err;
+      // DB hiccup — keep signing-verified session as safe fallback
+    }
+  }
+
   return session;
 }
 
@@ -143,6 +162,49 @@ export async function setDefaultSessionCookie(
   };
 
   (await cookies()).set('gurupro_session', buildSignedSessionCookie(data), sessionCookieOptions());
+}
+
+// =============================================================
+// Server-side session store (revocation for logout/password change)
+// =============================================================
+
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Create a server-side session row and return its sid (for the cookie). */
+export async function createServerSession(userId: string, ttlMs: number = SESSION_TTL_MS): Promise<string> {
+  const sid = randomUUID();
+  const expiresAt = new Date(Date.now() + ttlMs);
+  await query(
+    `INSERT INTO user_sessions (sid, user_id, expires_at) VALUES ($1, $2, $3)`,
+    [sid, userId, expiresAt]
+  );
+  return sid;
+}
+
+/** Revoke a single session (logout). No-op if the sid is unknown. */
+export async function revokeServerSession(sid: string): Promise<void> {
+  await query(
+    `UPDATE user_sessions SET revoked_at = CURRENT_TIMESTAMP
+     WHERE sid = $1 AND revoked_at IS NULL`,
+    [sid]
+  );
+}
+
+/** Revoke every active session for a user (e.g. after password change). */
+export async function revokeAllServerSessions(userId: string): Promise<void> {
+  await query(
+    `UPDATE user_sessions SET revoked_at = CURRENT_TIMESTAMP
+     WHERE user_id = $1 AND revoked_at IS NULL`,
+    [userId]
+  );
+}
+
+/** Attach a fresh server-side sid to a session cookie payload (create row in DB). */
+export async function attachServerSessionId(
+  data: SessionData & { activeContext?: ActiveContext },
+): Promise<{ data: SessionData; sid: string }> {
+  const sid = await createServerSession(data.id);
+  return { data: { ...data, sid }, sid };
 }
 
 export async function getContextFilters(userId: string): Promise<ContextFilter> {

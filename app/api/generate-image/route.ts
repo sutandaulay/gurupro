@@ -3,22 +3,13 @@ import { cookies } from "next/headers";
 import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from "@/src/services/poin-service";
 import { calculatePoinFromTokens } from "@/src/lib/ai-usage";
 import { enforceOutputLimits } from "@/lib/ai/limits";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 export async function POST(req: Request) {
   try {
     // Auth: hanya user login
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
-    if (!sessionCookie) {
-      return NextResponse.json({ error: "Sesi tidak aktif. Silakan login terlebih dahulu." }, { status: 401 });
-    }
-    let userId: string | null = null;
-    try {
-      const sessionData = JSON.parse(sessionCookie);
-      userId = sessionData?.id || null;
-    } catch {
-      return NextResponse.json({ error: "Sesi tidak valid." }, { status: 401 });
-    }
+    const sessionData = parseSessionCookie((await cookies()).get("gurupro_session")?.value);
+    const userId = sessionData?.id || null;
     if (!userId) {
       return NextResponse.json({ error: "Sesi tidak valid." }, { status: 401 });
     }

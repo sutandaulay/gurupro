@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { getPaymentGatewayConfig } from "@/lib/settings";
 import { grantUserPoin } from "@/src/services/poin-service";
 import { cookies } from "next/headers";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 function isUUID(str: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
@@ -20,15 +21,9 @@ export async function POST(req: Request) {
 
     if (!userId) {
       // Fallback: try to resolve userId from active cookie session
-      const cookieStore = await cookies();
-      const sessionCookie = cookieStore.get("gurupro_session")?.value;
-      if (sessionCookie) {
-        try {
-          const session = JSON.parse(sessionCookie);
-          userId = session.id;
-        } catch (e) {
-          console.error("Failed to parse session cookie in checkout API:", e);
-        }
+      const session = parseSessionCookie((await cookies()).get("gurupro_session")?.value);
+      if (session) {
+        userId = session.id;
       }
     }
 

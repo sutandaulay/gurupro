@@ -1,6 +1,7 @@
 import { query } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 // ==========================================
 // ATP EDITOR API - Full CRUD
@@ -15,7 +16,10 @@ export async function GET(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif" }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif" }, { status: 401 });
+    }
     const userId = session.id;
 
     const { searchParams } = new URL(req.url);
@@ -80,7 +84,10 @@ export async function POST(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif" }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif" }, { status: 401 });
+    }
     const userId = session.id;
 
     const body = await req.json();

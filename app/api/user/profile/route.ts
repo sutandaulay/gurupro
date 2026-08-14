@@ -5,6 +5,7 @@ import { getActivePricingPlans } from "@/lib/settings";
 import { getTokensPerPoin } from "@/src/config/ratio-cache";
 import { getUserAccountMode, getUserActiveMemberships } from "@/lib/institution-members";
 import { SessionData, buildSignedSessionCookie, getSession, setDefaultSessionCookie } from "@/lib/session";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 const PROFILE_SELECT = `id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan,
   quota_poin_total, quota_poin_used, addon_poin, addon_poin_used, token_accumulated, referral_code, cashback_balance,
@@ -192,13 +193,12 @@ export async function GET() {
 export async function PUT(req: Request) {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
+    const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
 
-    if (!sessionCookie) {
+    if (!session) {
       return NextResponse.json({ error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
     }
 
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     const body = await req.json();
@@ -242,6 +242,18 @@ export async function PUT(req: Request) {
         "UPDATE users SET password_hash = $1 WHERE id = $2",
         [hashedPassword, userId]
       );
+
+      // Password change invalidates all existing sessions (except this one
+      // is self-revoked conceptually; issue a fresh sid below)
+      try {
+        await query(
+          `UPDATE user_sessions SET revoked_at = CURRENT_TIMESTAMP
+           WHERE user_id = $1 AND revoked_at IS NULL`,
+          [userId]
+        );
+      } catch (err) {
+        console.error("Revoke sessions after password change failed:", err);
+      }
 
       return NextResponse.json({ message: "Password berhasil diubah!" });
     }

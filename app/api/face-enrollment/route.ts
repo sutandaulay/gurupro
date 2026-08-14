@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { query } from "@/lib/db";
 import { uploadToR2 } from "@/lib/r2";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 // GET - Fetch face enrollment status
 export async function GET() {
@@ -13,7 +14,10 @@ export async function GET() {
       return NextResponse.json({ error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
     }
 
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
+    }
     const userId = session.id;
 
     const result = await query(
@@ -54,7 +58,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
     }
 
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
+    }
     const userId = session.id;
 
     const body = await req.json();
@@ -218,7 +225,10 @@ export async function DELETE() {
       return NextResponse.json({ error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
     }
 
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
+    }
     const userId = session.id;
 
     await query("DELETE FROM user_face_enrollment WHERE user_id = $1", [userId]);

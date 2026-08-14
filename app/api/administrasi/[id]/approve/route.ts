@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { getSessionFromCookieHeader } from "@/lib/session-sign";
 
 // Sprint 3.1 — Kepsek/Wakasek menyetujui atau minta revisi RPP/Modul Ajar.
 // Reuse pola SKP Approval Flow: cek institutions.approvalLayerConfig (single/double).
@@ -8,12 +9,10 @@ import { query } from "@/lib/db";
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    const sessionCookie = req.headers.get("cookie")?.split(";")
-      .find((c) => c.trim().startsWith("gurupro_session="));
-    if (!sessionCookie) {
+    const sessionData = getSessionFromCookieHeader(req.headers.get("cookie"));
+    if (!sessionData) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split("=")[1]));
 
     const docRes = await query(
       `SELECT id, user_id, tipe_dokumen, approval_status, institution_id

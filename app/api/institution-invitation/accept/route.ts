@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 export async function GET(req: Request) {
   try {
@@ -37,16 +38,10 @@ export async function GET(req: Request) {
 
     const member = memberResult.rows[0];
 
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('gurupro_session')?.value;
+    const session = parseSessionCookie((await cookies()).get('gurupro_session')?.value);
     let isLoggedIn = false;
-    if (sessionCookie) {
-      try {
-        const session = JSON.parse(sessionCookie);
-        if (session.id === user.id) {
-          isLoggedIn = true;
-        }
-      } catch { /* ignore */ }
+    if (session?.id === user.id) {
+      isLoggedIn = true;
     }
 
     if (!isLoggedIn) {

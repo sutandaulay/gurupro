@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { getSessionFromCookieHeader } from '@/lib/session-sign'
 import {
   escapeHtml,
   escapeHtmlPlain,
@@ -23,14 +24,12 @@ import {
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
-    const sessionCookie = req.headers.get('cookie')?.split(';')
-      .find(c => c.trim().startsWith('gurupro_session='))
+    const sessionData = getSessionFromCookieHeader(req.headers.get('cookie'))
 
-    if (!sessionCookie) {
+    if (!sessionData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
     const guruId = sessionData.id
 
     const userDb = await query("SELECT role, status_langganan, subscription_end FROM users WHERE id = $1", [guruId])

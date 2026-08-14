@@ -2,6 +2,7 @@ import { query } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parsePagination, wrapResponse } from "@/lib/pagination";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 export async function GET(req: Request) {
   try {
@@ -10,7 +11,10 @@ export async function GET(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
+    }
     const userRole = session.role;
 
     // Only allow admin, pengawas, and kepala_sekolah to read audit logs

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { parseSessionCookie } from '@/lib/session-sign';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -18,8 +19,7 @@ async function getCurrentUser() {
   }
 
   try {
-    const sessionData = JSON.parse(sessionCookie.value);
-    return sessionData;
+    return parseSessionCookie(sessionCookie.value);
   } catch {
     return null;
   }

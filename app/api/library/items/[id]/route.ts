@@ -6,12 +6,13 @@ import { query } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getLibrarySignedUrl } from "@/lib/r2-library";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 async function verifyGuru() {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("gurupro_session")?.value;
-  if (!sessionCookie) throw new Error("Unauthorized");
-  return JSON.parse(sessionCookie);
+  const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
+  if (!session) throw new Error("Unauthorized");
+  return session;
 }
 
 export async function GET(

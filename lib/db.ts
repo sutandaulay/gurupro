@@ -401,6 +401,20 @@ const initDb = async () => {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_invitation_token VARCHAR(255)');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_institution_id INTEGER');
 
+    // Server-side session store (enables logout/password-change revocation)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        sid UUID NOT NULL UNIQUE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP + INTERVAL '7 days'),
+        revoked_at TIMESTAMP
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_sessions_sid ON user_sessions(sid)`);
+
     // Ensure payload schema changes are applied
     await pool.query('ALTER TABLE payload.otp_verifications ADD COLUMN IF NOT EXISTS purpose VARCHAR(50) DEFAULT \'password_reset\'');
     await pool.query('ALTER TABLE payload.otp_verifications ALTER COLUMN performance_share_link_id DROP NOT NULL');

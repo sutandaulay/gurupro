@@ -1,17 +1,17 @@
 import { query } from "@/lib/db";
+import { parseSessionCookie } from "@/lib/session-sign";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
+    const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
 
-    if (!sessionCookie) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     const result = await query(

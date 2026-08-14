@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { getSession, getContextFilters } from "@/lib/session";
+import { parseSessionCookie } from "@/lib/session-sign";
 import { parsePagination, wrapResponse } from "@/lib/pagination";
 
 export async function GET(req: Request) {
@@ -15,7 +16,10 @@ export async function GET(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
+    }
     const userId = session.id;
 
     const filters = await getContextFilters(userId);
@@ -96,7 +100,10 @@ export async function POST(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
+    }
     const userId = session.id;
 
     const getJakartaDateString = () => {
@@ -158,7 +165,10 @@ export async function DELETE(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
+    }
     const userId = session.id;
 
     await query("DELETE FROM guru_administrasi WHERE id = $1 AND user_id = $2", [id, userId]);

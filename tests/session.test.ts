@@ -143,6 +143,58 @@ describe('requireSession', () => {
 
     await expect(requireSession()).rejects.toThrow('Unauthorized')
   })
+
+  it('mengembalikan session valid jika sid aktif di DB', async () => {
+    const sessionData = { id: 'user-1', role: 'guru', activeContext: 'individual', sid: 'abc-123' }
+    mockCookieGet.mockReturnValue(signedCookie(sessionData))
+
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'user-1', role: 'guru', is_active: true }] }) // user check
+      .mockResolvedValueOnce({ rows: [{ 1: 1 }] }) // session check
+
+    const result = await requireSession()
+    expect(result!.sid).toBe('abc-123')
+  })
+
+  it('melempar error jika sid sudah revoked di DB', async () => {
+    const sessionData = { id: 'user-1', role: 'guru', activeContext: 'individual', sid: 'abc-123' }
+    mockCookieGet.mockReturnValue(signedCookie(sessionData))
+
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'user-1', role: 'guru', is_active: true }] }) // user check
+      .mockResolvedValueOnce({ rows: [] }) // session check — revoked/none
+
+    await expect(requireSession()).rejects.toThrow('Unauthorized')
+  })
+
+  it('revokeServerSession menandai sid revoked di DB', async () => {
+    const { revokeServerSession } = await import('../lib/session')
+    await revokeServerSession('abc-123')
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE user_sessions SET revoked_at'),
+      ['abc-123']
+    )
+  })
+
+  it('createServerSession menyimpan sid baru dan mengembalikannya', async () => {
+    const { createServerSession } = await import('../lib/session')
+    mockQuery.mockResolvedValueOnce({ rows: [] })
+    const sid = await createServerSession('user-1')
+    expect(sid).toBeTruthy()
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO user_sessions'),
+      [sid, 'user-1', expect.any(Date)]
+    )
+  })
+
+  it('revokeAllServerSessions mencabut seluruh sesi user', async () => {
+    const { revokeAllServerSessions } = await import('../lib/session')
+    await revokeAllServerSessions('user-1')
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE user_sessions SET revoked_at'),
+      ['user-1']
+    )
+  })
 })
 
 describe('getActiveContext', () => {

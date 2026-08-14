@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { getSessionFromCookieHeader } from "@/lib/session-sign";
 
 // Sprint 3.1 — Daftar dokumen RPP/Modul Ajar yang menunggu persetujuan di institusi.
 // READ-ONLY terhadap guru_administrasi (hanya SELECT). Untuk panel Kepsek/Wakasek.
 
 export async function GET(req: Request) {
   try {
-    const sessionCookie = req.headers.get("cookie")?.split(";")
-      .find((c) => c.trim().startsWith("gurupro_session="));
-    if (!sessionCookie) {
+    const sessionData = getSessionFromCookieHeader(req.headers.get("cookie"));
+    if (!sessionData) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split("=")[1]));
 
     // Cari institusi tempat user punya role kepala_sekolah/wakasek
     const memberRes = await query(

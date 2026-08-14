@@ -6,6 +6,7 @@ import { parsePagination, offset, wrapResponse } from '@/lib/pagination';
 import { ubahStatus } from '@/lib/raport/repository';
 import { getOwnedWaliKelasClassIds } from '@/lib/wali-kelas/dashboard';
 import type { StatusRaport, RoleChangedBy } from '@/lib/raport/repository';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 function isValidUUID(str: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -26,16 +27,9 @@ export async function GET(req: Request) {
     if (schoolId) await requireSchoolAccess(schoolId)
 
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('gurupro_session')?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+    if (!session) {
       return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
-    }
-
-    let session;
-    try {
-      session = JSON.parse(sessionCookie);
-    } catch {
-      return NextResponse.json({ error: 'Session tidak valid' }, { status: 401 });
     }
     const userId = session.id;
 
@@ -178,11 +172,10 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('gurupro_session')?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+    if (!session) {
       return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     const body = await req.json();

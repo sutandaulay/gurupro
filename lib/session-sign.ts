@@ -10,6 +10,10 @@ export interface SessionData {
   activeContext?: ActiveContext;
   roles?: string[];
   lastInstitutionId?: number | null;
+  /** Server-side session id (for revocation). NOT part of the HMAC payload —
+   *  safe as a non-signed claim because it is cross-checked against the DB
+   *  (user_id must match session.id) before it grants anything. */
+  sid?: string;
 }
 
 const SESSION_SECRET = process.env.SESSION_SECRET ?? (() => {
@@ -54,6 +58,7 @@ export function buildSignedSessionCookie(data: SessionData & { activeContext?: A
     lastInstitutionId: data.lastInstitutionId ?? null,
   };
   payload.sig = signPayload(payload);
+  if (data.sid) payload.sid = data.sid;
   return JSON.stringify(payload);
 }
 
@@ -70,8 +75,48 @@ export function parseSignedSession(data?: string): SessionData | null {
       activeContext: parsed.activeContext,
       roles: parsed.roles ?? [],
       lastInstitutionId: parsed.lastInstitutionId ?? null,
+      sid: typeof parsed.sid === 'string' ? parsed.sid : undefined,
     };
   } catch {
     return null;
   }
+}
+
+function normalizeCookieValue(value?: string): string | undefined {
+  if (!value) return undefined;
+  try {
+    // Next.js cookies().get() already returns a decoded value; when the value
+    // comes from a raw header we must strip a trailing URL-encoding.
+    if (value.includes('%')) {
+      const decoded = decodeURIComponent(value);
+      if (decoded.includes('{') && decoded.includes('}')) return decoded;
+    }
+  } catch {
+    // not URL-encoded — leave as-is
+  }
+  return value;
+}
+
+/**
+ * Drop-in replacement for the legacy `JSON.parse(sessionCookie)` pattern.
+ * Returns `any` (same typing comfort) but only returns the payload when the
+ * HMAC signature verifies; returns null for unsigned/forged cookies.
+ */
+export function parseSessionCookie(value?: string): any {
+  return parseSignedSession(normalizeCookieValue(value));
+}
+
+/**
+ * Extract + verify the gurupro_session from a raw `cookie` request header
+ * (the `req.headers.get("cookie")?.split(...).find(...)` pattern).
+ */
+export function getSessionFromCookieHeader(header?: string | null): any {
+  if (!header) return null;
+  const match = header
+    .split(';')
+    .map((c) => c.trim())
+    .find((c) => c.startsWith('gurupro_session='));
+  if (!match) return null;
+  const value = match.slice('gurupro_session='.length);
+  return parseSignedSession(normalizeCookieValue(value));
 }

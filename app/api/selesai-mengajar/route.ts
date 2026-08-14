@@ -10,6 +10,7 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { PrismaClient } from '@prisma/client';
 import { query } from '@/lib/db';
+import { parseSessionCookie } from '@/lib/session-sign';
 import { generateAndSaveJurnal } from '@/lib/selesai-mengajar/generate-jurnal';
 import { saveAbsensiSummary } from '@/lib/selesai-mengajar/save-absensi';
 import { updateProgressATP } from '@/lib/selesai-mengajar/update-atp';
@@ -49,8 +50,7 @@ async function getCurrentUser() {
   }
 
   try {
-    const sessionData = JSON.parse(sessionCookie.value);
-    return sessionData;
+    return parseSessionCookie(sessionCookie.value);
   } catch {
     return null;
   }

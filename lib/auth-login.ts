@@ -187,6 +187,15 @@ export async function performLogin(input: LoginInput): Promise<LoginResult> {
     }
   }
 
+  // Create a server-side session (enables logout / password-change revocation)
+  let sid: string | undefined;
+  try {
+    const { createServerSession } = await import("@/lib/session");
+    sid = await createServerSession(String(user.id));
+  } catch (err) {
+    console.error("Create server session failed:", err);
+  }
+
   await setDefaultSessionCookie({
     id: String(user.id),
     role: primaryRole,
@@ -194,6 +203,7 @@ export async function performLogin(input: LoginInput): Promise<LoginResult> {
     lastInstitutionId:
       activeContext === "individual" ? null : activeContext.institutionId,
     activeContext,
+    sid,
   });
 
   return {

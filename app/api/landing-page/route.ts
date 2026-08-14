@@ -2,12 +2,12 @@ import { query } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 async function verifyAdmin() {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("gurupro_session")?.value;
-  if (!sessionCookie) throw new Error("Unauthorized");
-  const session = JSON.parse(sessionCookie);
+  const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
+  if (!session) throw new Error("Unauthorized");
   if (session.role !== "admin") throw new Error("Forbidden");
 }
 

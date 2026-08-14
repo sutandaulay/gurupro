@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { query } from "@/lib/db";
+import { parseSessionCookie } from "@/lib/session-sign";
 import { uploadToR2 } from "@/lib/r2";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -9,13 +10,12 @@ const MAX_SIZE = 2 * 1024 * 1024; // 2MB
 export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
+    const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
 
-    if (!sessionCookie) {
+    if (!session) {
       return NextResponse.json({ error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
     }
 
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     const formData = await req.formData();

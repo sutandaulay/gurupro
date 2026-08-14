@@ -4,6 +4,7 @@ import { query } from "@/lib/db";
 import { getUserPoinAccess, consumeUserPoinFromUsage, logFailedPoinUsage } from "@/src/services/poin-service";
 import { cookies } from "next/headers";
 import { truncateText } from "@/lib/ai/validation-utils";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 /**
  * Enforce Bank Soal output limits - truncate sesuai batas karakter
@@ -39,7 +40,10 @@ export async function POST(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ reason: "session_expired", error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ reason: "session_expired", error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
+    }
     const userId = session.id;
 
     // Ambil data user

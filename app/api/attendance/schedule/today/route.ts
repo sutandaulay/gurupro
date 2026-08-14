@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query as pgQuery } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 export async function GET() {
   try {
@@ -9,7 +10,10 @@ export async function GET() {
     if (!sessionCookie) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const userId = session.id;
 
     const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];

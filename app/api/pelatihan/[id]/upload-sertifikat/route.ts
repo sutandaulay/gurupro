@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { uploadToR2 } from '@/lib/r2'
+import { getSessionFromCookieHeader } from '@/lib/session-sign'
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 const MAX_SIZE = 5 * 1024 * 1024 // 5MB
@@ -12,14 +13,12 @@ const MAX_SIZE = 5 * 1024 * 1024 // 5MB
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
-    const sessionCookie = req.headers.get('cookie')?.split(';')
-      .find(c => c.trim().startsWith('gurupro_session='))
+    const sessionData = getSessionFromCookieHeader(req.headers.get('cookie'))
 
-    if (!sessionCookie) {
+    if (!sessionData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
     const guruId = sessionData.id
 
     const { query: dbQuery } = await import('@/lib/db')

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 /**
  * User Notifications API
@@ -16,13 +17,12 @@ export async function GET(request: Request) {
 
     // Get user ID from session cookie
     const cookieStore = await import("next/headers").then(m => m.cookies());
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
+    const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
 
-    if (!sessionCookie) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     // Fetch notifications
@@ -59,13 +59,12 @@ export async function PUT(request: Request) {
   try {
     // Get user ID from session cookie
     const cookieStore = await import("next/headers").then(m => m.cookies());
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
+    const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
 
-    if (!sessionCookie) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     const body = await request.json();

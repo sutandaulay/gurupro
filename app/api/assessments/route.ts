@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getContextFilters } from "@/lib/session";
 import { requireSchoolAccess } from "@/lib/school-access";
 import { parsePagination, wrapResponse } from "@/lib/pagination";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 export async function GET(req: Request) {
   try {
@@ -81,7 +82,10 @@ export async function POST(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
+    }
     const userId = session.id;
 
     const { id, school_id, class_id, subject_id, nama_asesmen, tipe_asesmen, kkm } = await req.json();
@@ -127,7 +131,10 @@ export async function DELETE(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif." }, { status: 401 });
+    }
     const userId = session.id;
 
     const { searchParams } = new URL(req.url);

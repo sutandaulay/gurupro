@@ -5,19 +5,11 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { requireSchoolAccess } from '@/lib/school-access'
+import { getSessionFromCookieHeader } from '@/lib/session-sign'
 
 // Helper: get user ID dari cookie (untuk POST)
-function getUserId(cookieHeader: string): string | null {
-  try {
-    const cookies = cookieHeader.split(';').map(c => c.trim())
-    const session = cookies.find(c => c.startsWith('gurupro_session='))
-    if (!session) return null
-    const value = session.split('=')[1] || ''
-    const data = JSON.parse(decodeURIComponent(value))
-    return data.id || null
-  } catch {
-    return null
-  }
+function getUserId(cookieHeader: string | null): string | null {
+  return getSessionFromCookieHeader(cookieHeader)?.id ?? null
 }
 
 // GET list — wajib sekolah_id

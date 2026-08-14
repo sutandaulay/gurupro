@@ -3,6 +3,7 @@ import { query } from "@/lib/db";
 import { consumeUserPoinFromUsage, logFailedPoinUsage } from "@/src/services/poin-service";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 export async function POST(req: Request) {
   try {
@@ -14,11 +15,10 @@ export async function POST(req: Request) {
 
     // 1. SaaS Poin Validation
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
+    if (!session) {
       return NextResponse.json({ error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     const kurikulumLabel = kurikulum === "merdeka" ? "Kurikulum Merdeka"

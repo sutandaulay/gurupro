@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { getSessionFromCookieHeader } from "@/lib/session-sign";
 
 // Sprint 3.3 — Baca cache dashboard eksekutif untuk Kepsek/Wakasek.
 // Validasi role, lalu kembalikan payload dari executive_dashboard_cache (bukan query live).
 
 export async function GET(req: Request) {
   try {
-    const sessionCookie = req.headers.get("cookie")?.split(";")
-      .find((c) => c.trim().startsWith("gurupro_session="));
-    if (!sessionCookie) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split("=")[1]));
+    const sessionData = getSessionFromCookieHeader(req.headers.get("cookie"));
+    if (!sessionData) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const url = new URL(req.url);
     const institutionId = url.searchParams.get("institutionId");

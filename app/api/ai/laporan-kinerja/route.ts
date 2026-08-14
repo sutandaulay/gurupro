@@ -12,18 +12,17 @@ import { getUserPoinAccess, consumeUserPoin, logFailedPoinUsage } from '@/src/se
 import { deductPoinFromAIResult } from '@/src/lib/ai-usage'
 import { getCurrentAcademicYear } from '@/lib/utils'
 import { enforceOutputLimits } from '@/lib/ai/limits'
+import { getSessionFromCookieHeader } from '@/lib/session-sign'
 
 // POST /api/ai/laporan-kinerja - Generate laporan kinerja
 export async function POST(req: Request) {
   // Check auth
-  const sessionCookie = req.headers.get('cookie')?.split(';')
-    ?.find(c => c.trim().startsWith('gurupro_session='))
+  const sessionData = getSessionFromCookieHeader(req.headers.get('cookie'))
 
-  if (!sessionCookie) {
+  if (!sessionData) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
   const guruId = sessionData.id
 
   // Poin check

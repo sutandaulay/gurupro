@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { query } from "@/lib/db";
 import { coverKey, pdfKey, audiobookKey, invalidateLibraryCache } from "@/lib/r2-library";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 const BUCKET = process.env.R2_LIBRARY_BUCKET || "gurupro-library";
 
@@ -30,9 +31,8 @@ async function getR2Client() {
 
 async function verifyAdmin() {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("gurupro_session")?.value;
-  if (!sessionCookie) throw new Error("Unauthorized");
-  const session = JSON.parse(sessionCookie);
+  const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
+  if (!session) throw new Error("Unauthorized");
   if (!["admin", "super_admin", "manager"].includes(session.role)) throw new Error("Forbidden");
 }
 

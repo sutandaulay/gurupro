@@ -12,6 +12,7 @@ import {
   CatatanWaliKelasQuerySchema,
 } from '@/lib/schemas/sikap-ekskul';
 import { parsePagination, wrapResponse } from '@/lib/pagination';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 /**
  * GET /api/catatan-wali-kelas
@@ -49,7 +50,10 @@ export async function POST(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
+    }
 
     const payload = await getPayload();
     const memberResult = await payload.find({
@@ -92,7 +96,10 @@ export async function PUT(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
+    }
 
     const payload = await getPayload();
     const memberResult = await payload.find({

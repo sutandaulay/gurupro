@@ -16,6 +16,7 @@ import {
   isInstitutionMember,
   canViewAllTeachers,
 } from "@/lib/rbac/institution-permissions";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 // ==========================================
 // LAPORAN EVALUASI LKPD GENERATOR
@@ -134,7 +135,10 @@ export async function POST(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif" }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif" }, { status: 401 });
+    }
     const userId = session.id;
 
     const poinState = await getUserPoinAccess(userId);

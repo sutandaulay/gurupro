@@ -5,14 +5,14 @@ import { uploadBase64ToR2 } from "@/lib/r2";
 import { getContextFilters } from "@/lib/session";
 import { requireSchoolAccess } from "@/lib/school-access";
 import { parsePagination, offset, wrapResponse } from "@/lib/pagination";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 async function getUserId() {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("gurupro_session")?.value;
-  if (!sessionCookie) {
+  const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
+  if (!session) {
     throw new Error("Unauthorized");
   }
-  const session = JSON.parse(sessionCookie);
   return session.id;
 }
 

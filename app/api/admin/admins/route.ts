@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 export async function GET(request: Request) {
   try {
     // Check if current user is admin
     const { cookies } = await import("next/headers");
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
+    const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
 
-    if (!sessionCookie) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const session = JSON.parse(sessionCookie);
     if (!['admin', 'super_admin', 'manager'].includes(session.role)) {
       return NextResponse.json({ error: "Akses ditolak. Hanya admin yang dapat mengakses." }, { status: 403 });
     }
@@ -37,13 +37,12 @@ export async function POST(request: Request) {
     // Check if current user is admin
     const { cookies } = await import("next/headers");
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
+    const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
 
-    if (!sessionCookie) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const session = JSON.parse(sessionCookie);
     if (!['admin', 'super_admin', 'manager'].includes(session.role)) {
       return NextResponse.json({ error: "Akses ditolak. Hanya admin yang dapat mengakses." }, { status: 403 });
     }

@@ -6,6 +6,7 @@ import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
 import { generateAIContentWithUsage } from '@/lib/ai';
 import { cookies } from 'next/headers';
 import { truncateText } from '@/lib/ai/validation-utils';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 export const GenerateDeskripsiCapaianRequestSchema = z.object({
   siswaId: z.string().uuid(),
@@ -170,11 +171,10 @@ export async function POST(req: Request) {
     const params = parsed.data;
 
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('gurupro_session')?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+    if (!session) {
       return NextResponse.json({ error: 'Sesi tidak aktif.' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     const poinState = await getUserPoinAccess(userId);

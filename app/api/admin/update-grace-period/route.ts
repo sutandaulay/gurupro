@@ -10,15 +10,15 @@
 import { query, pool } from "@/lib/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 export async function GET() {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
     if (!['admin', 'super_admin', 'manager'].includes(session.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

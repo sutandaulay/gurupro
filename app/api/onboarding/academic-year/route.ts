@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { pool } from '@/lib/db'
+import { parseSessionCookie } from '@/lib/session-sign'
 
 async function getUserId() {
   const cookieStore = await cookies()
-  const rawSession = cookieStore.get('gurupro_session')?.value
-  if (!rawSession) throw new Error('Unauthorized')
-  const session = JSON.parse(rawSession)
+  const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value)
   if (!session?.id) throw new Error('Unauthorized')
   return session.id as string
 }

@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 async function getUserId() {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('gurupro_session')?.value;
-  if (!sessionCookie) {
+  const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+  if (!session) {
     throw new Error('Unauthorized');
   }
-  const session = JSON.parse(sessionCookie);
   return session.id;
 }
 

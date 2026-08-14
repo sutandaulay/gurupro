@@ -3,6 +3,7 @@ import { query } from "@/lib/db";
 import { cookies } from "next/headers";
 import { getSession } from "@/lib/session";
 import { canAccessLaporanEvaluasiLkpd, isLaporanEvaluasiCreator } from "@/lib/rbac/institution-permissions";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 /**
  * GET /api/laporan-evaluasi-lkpd
@@ -13,11 +14,10 @@ export async function GET(req: Request) {
   try {
     // Auth
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("gurupro_session")?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get("gurupro_session")?.value);
+    if (!session) {
       return NextResponse.json({ error: "Sesi tidak aktif" }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
     const userIdNum = parseInt(userId, 10);
 

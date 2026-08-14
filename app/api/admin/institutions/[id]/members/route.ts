@@ -3,16 +3,16 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 const prisma = new PrismaClient();
 
 // Helper: Pastikan user adalah admin
 async function requireAdmin() {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('gurupro_session')?.value;
-  if (!sessionCookie) throw new Error('Unauthorized');
+  const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+  if (!session) throw new Error('Unauthorized');
 
-  const session = JSON.parse(sessionCookie);
   const userId = session.id;
 
   const result = await query('SELECT role FROM users WHERE id = $1', [userId]);

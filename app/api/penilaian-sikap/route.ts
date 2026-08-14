@@ -14,6 +14,7 @@ import {
   PenilaianSikapQuerySchema,
 } from '@/lib/schemas/sikap-ekskul';
 import { parsePagination, wrapResponse } from '@/lib/pagination';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 /**
  * GET /api/penilaian-sikap
@@ -48,11 +49,10 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('gurupro_session')?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+    if (!session) {
       return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
 
     // Get actor's member ID from institution-members
     const payload = await getPayload();
@@ -89,11 +89,10 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('gurupro_session')?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+    if (!session) {
       return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
 
     const payload = await getPayload();
     const memberResult = await payload.find({

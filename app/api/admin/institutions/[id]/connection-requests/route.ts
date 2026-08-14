@@ -4,13 +4,13 @@ import { query } from '@/lib/db';
 import { getPendingConnectionRequestsByInstitution } from '@/lib/institution-members';
 import { sendInAppNotification } from '@/lib/institution-members';
 import { sendWhatsAppNotification, sendEmailNotification } from '@/lib/notifications';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 async function requireAdmin() {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('gurupro_session')?.value;
-  if (!sessionCookie) throw new Error('Unauthorized');
+  const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+  if (!session) throw new Error('Unauthorized');
 
-  const session = JSON.parse(sessionCookie);
   const userId = session.id;
 
   const result = await query('SELECT role FROM users WHERE id = $1', [userId]);

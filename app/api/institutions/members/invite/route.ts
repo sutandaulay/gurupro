@@ -1,5 +1,6 @@
 import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { parseSessionCookie } from '@/lib/session-sign';
 import { NextResponse } from 'next/server';
 import {
   findAppUserByEmailOrUsername,
@@ -12,9 +13,8 @@ import {
 
 async function getUserId() {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('gurupro_session')?.value;
-  if (!sessionCookie) throw new Error('Unauthorized');
-  const session = JSON.parse(sessionCookie);
+  const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+  if (!session) throw new Error('Unauthorized');
   return session.id;
 }
 

@@ -7,15 +7,15 @@ import { getUserPoinAccess, logFailedPoinUsage } from '@/src/services/poin-servi
 import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
 import { getParseKeuanganPrompt } from '@/lib/ai/parseKeuanganPrompts';
 import { ParseKeuanganOutputSchema, type ParseKeuanganOutput } from '@/lib/schemas/parse-keuangan';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('gurupro_session')?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+    if (!session) {
       return NextResponse.json({ error: 'Sesi tidak aktif.' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
     const userId = session.id;
 
     const poinAccess = await getUserPoinAccess(userId);

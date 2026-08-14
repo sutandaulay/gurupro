@@ -8,6 +8,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { uploadToR2 } from "@/lib/r2";
 import { parseBahanAjarSections, generatePptxBuffer, generatePdfBuffer, generateDocBuffer } from "@/lib/doc-compiler";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 export async function POST(req: Request) {
   try {
@@ -81,7 +82,10 @@ export async function POST(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif. Silakan login kembali." }, { status: 401 });
+    }
     const userId = session.id;
 
     // Ambil data user

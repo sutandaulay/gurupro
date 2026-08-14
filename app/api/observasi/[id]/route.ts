@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { getSessionFromCookieHeader } from '@/lib/session-sign'
 
 async function getObservasiWithRatings(observasiId: string, guruId: string) {
   const obsResult = await query(
@@ -30,14 +31,12 @@ async function getObservasiWithRatings(observasiId: string, guruId: string) {
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
-    const sessionCookie = req.headers.get('cookie')?.split(';')
-      .find(c => c.trim().startsWith('gurupro_session='))
+    const sessionData = getSessionFromCookieHeader(req.headers.get('cookie'))
 
-    if (!sessionCookie) {
+    if (!sessionData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
     const guruId = sessionData.id
 
     const result = await getObservasiWithRatings(id, guruId)
@@ -56,14 +55,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
-    const sessionCookie = req.headers.get('cookie')?.split(';')
-      .find(c => c.trim().startsWith('gurupro_session='))
+    const sessionData = getSessionFromCookieHeader(req.headers.get('cookie'))
 
-    if (!sessionCookie) {
+    if (!sessionData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
     const guruId = sessionData.id
 
     const body = await req.json()
@@ -110,14 +107,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
-    const sessionCookie = req.headers.get('cookie')?.split(';')
-      .find(c => c.trim().startsWith('gurupro_session='))
+    const sessionData = getSessionFromCookieHeader(req.headers.get('cookie'))
 
-    if (!sessionCookie) {
+    if (!sessionData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
     const guruId = sessionData.id
 
     const result = await query(

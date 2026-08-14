@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
+import { parseSessionCookie } from '@/lib/session-sign';
 
 /**
  * GET /api/wali-kelas/my-classes
@@ -13,11 +14,10 @@ import { query } from '@/lib/db';
 export async function GET(req: Request) {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('gurupro_session')?.value;
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
+    if (!session) {
       return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
 
     // Union of Master Data path + assignment path
     const result = await query(

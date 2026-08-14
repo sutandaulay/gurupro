@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { uploadToR2 } from '@/lib/r2'
 import { parsePagination, wrapResponse } from '@/lib/pagination'
+import { getSessionFromCookieHeader } from '@/lib/session-sign'
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 const MAX_SIZE = 5 * 1024 * 1024 // 5MB
@@ -14,14 +15,12 @@ const MAX_SIZE = 5 * 1024 * 1024 // 5MB
 // GET /api/dokumen-bukti - List documents
 export async function GET(req: Request) {
   try {
-    const sessionCookie = req.headers.get('cookie')?.split(';')
-      .find(c => c.trim().startsWith('gurupro_session='))
+    const sessionData = getSessionFromCookieHeader(req.headers.get('cookie'))
 
-    if (!sessionCookie) {
+    if (!sessionData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
     const guruId = sessionData.id
 
     const { searchParams } = new URL(req.url)
@@ -70,14 +69,12 @@ export async function GET(req: Request) {
 // POST /api/dokumen-bukti - Upload document
 export async function POST(req: Request) {
   try {
-    const sessionCookie = req.headers.get('cookie')?.split(';')
-      .find(c => c.trim().startsWith('gurupro_session='))
+    const sessionData = getSessionFromCookieHeader(req.headers.get('cookie'))
 
-    if (!sessionCookie) {
+    if (!sessionData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
     const guruId = sessionData.id
 
     const userDb = await query("SELECT role, status_langganan, subscription_end FROM users WHERE id = $1", [guruId])
@@ -170,14 +167,12 @@ export async function POST(req: Request) {
 // DELETE /api/dokumen-bukti - Delete document
 export async function DELETE(req: Request) {
   try {
-    const sessionCookie = req.headers.get('cookie')?.split(';')
-      .find(c => c.trim().startsWith('gurupro_session='))
+    const sessionData = getSessionFromCookieHeader(req.headers.get('cookie'))
 
-    if (!sessionCookie) {
+    if (!sessionData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
     const guruId = sessionData.id
 
     const { searchParams } = new URL(req.url)

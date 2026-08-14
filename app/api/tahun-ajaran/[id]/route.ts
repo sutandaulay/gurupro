@@ -7,6 +7,7 @@ import { query } from '@/lib/db'
 import { comparePassword } from '@/lib/auth'
 import { cookies } from 'next/headers'
 import { requireSchoolAccess } from '@/lib/school-access'
+import { parseSessionCookie } from '@/lib/session-sign'
 
 // GET /api/tahun-ajaran/[id]
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -94,11 +95,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const { id } = await params
   try {
     const cookieStore = await cookies()
-    const sessionCookie = cookieStore.get('gurupro_session')?.value
-    if (!sessionCookie) {
+    const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value)
+    if (!session) {
       return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 })
     }
-    const session = JSON.parse(sessionCookie)
 
     const body = await req.json()
     const { password } = body

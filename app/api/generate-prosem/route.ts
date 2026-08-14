@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { jsonrepair as repair } from "jsonrepair";
 import { uploadToR2 } from "@/lib/r2";
 import { generatePdfBuffer, generateDocBuffer } from "@/lib/doc-compiler";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 // ==========================================
 // PROSEM GENERATOR - Program Semester
@@ -47,7 +48,10 @@ export async function POST(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif" }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif" }, { status: 401 });
+    }
     const userId = session.id;
 
     const poinState = await getUserPoinAccess(userId);

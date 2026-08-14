@@ -9,6 +9,7 @@ import { generateLkpdPdfBuffer, generateLkpdDocBuffer } from "@/lib/doc-compiler
 import { lkpdOutputSchema, lkpdFormInputSchema } from "@/lib/schemas/lkpd";
 import { z } from "zod";
 import { truncateText } from "@/lib/ai/validation-utils";
+import { parseSessionCookie } from "@/lib/session-sign";
 
 // ==========================================
 // LKPD GENERATOR - Lembar Kerja Peserta Didik
@@ -122,7 +123,10 @@ export async function POST(req: Request) {
     if (!sessionCookie) {
       return NextResponse.json({ error: "Sesi tidak aktif" }, { status: 401 });
     }
-    const session = JSON.parse(sessionCookie);
+    const session = parseSessionCookie(sessionCookie);
+    if (!session) {
+      return NextResponse.json({ error: "Sesi tidak aktif" }, { status: 401 });
+    }
     const userId = session.id;
 
     const poinState = await getUserPoinAccess(userId);
