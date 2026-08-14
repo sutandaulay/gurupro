@@ -5,6 +5,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { signInWithGoogle } from '@/lib/oauth';
+import BrandLogo from "@/app/components/ui/BrandLogo";
 import {
   IconMail,
   IconLock,
@@ -435,9 +436,15 @@ function LoginContent() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden mb-8 text-center">
-            <h1 className="text-2xl font-black tracking-tight text-violet-600">
-              Guru<span className="text-slate-800">PRO</span>
-            </h1>
+            <BrandLogo
+              className="h-10 w-auto mx-auto"
+              alt="GuruPRO"
+              fallback={
+                <h1 className="text-2xl font-black tracking-tight text-violet-600">
+                  Guru<span className="text-slate-800">PRO</span>
+                </h1>
+              }
+            />
           </div>
 
           {/* Title + subtitle */}

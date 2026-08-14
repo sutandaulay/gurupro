@@ -10,11 +10,12 @@ import SchoolRegistrationsManager from "@/components/admin/SchoolRegistrationsMa
 import InstitutionsManager from "@/components/admin/InstitutionsManager";
 import NotificationBell from "@/components/admin/NotificationBell";
 import LibraryAdmin from "@/components/admin/LibraryAdmin";
+import MenuPermissionsManager from "@/components/admin/MenuPermissionsManager";
 import { ToastProvider, useToast } from "@/components/admin/ToastNotification";
 import { Pagination, usePagedItems } from "@/components/ui/pagination";
 
 function AdminPageContent() {
-  const [activeTab, setActiveTab] = useState<"users" | "transactions" | "cms" | "registrations" | "institutions" | "referrals" | "admins" | "settings" | "notifications" | "library">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "transactions" | "cms" | "registrations" | "institutions" | "referrals" | "admins" | "settings" | "notifications" | "library" | "access">("users");
   
   // Data States
   const [users, setUsers] = useState<any[]>([]);
@@ -1077,6 +1078,15 @@ function AdminPageContent() {
             >
               📚 Perpustakaan Digital
             </button>
+
+            <button
+              onClick={() => setActiveTab("access")}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
+                activeTab === "access" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              🛂 Manajemen Akses &amp; Menu
+            </button>
           </div>
 
           {/* Search & Filter */}
@@ -1805,6 +1815,10 @@ function AdminPageContent() {
             </div>
           ) : activeTab === "library" ? (
             <LibraryAdmin />
+          ) : activeTab === "access" ? (
+            <div className="p-6">
+              <MenuPermissionsManager />
+            </div>
           ) : (
             <div className="p-6 space-y-8 animate-fadeIn">
               <div className="border-b border-slate-100 pb-4">

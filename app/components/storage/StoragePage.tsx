@@ -850,7 +850,11 @@ export default function StoragePage() {
       <table style="width: 100%; border-collapse: collapse; border-bottom: 3px double #000000; margin-bottom: 20pt; font-family: Arial, sans-serif;">
         <tr>
           <td style="width: 15%; text-align: center; padding-bottom: 10pt;">
-            <span style="font-size: 32pt;">🏫</span>
+            ${
+              activeSchool?.logo
+                ? `<img src="${activeSchool.logo}" style="max-height: 60px; max-width: 60px; object-fit: contain;" alt="Logo Sekolah"/>`
+                : '<span style="font-size: 32pt;">🏫</span>'
+            }
           </td>
           <td style="width: 70%; text-align: center; padding-bottom: 10pt;">
             <h2 style="margin: 0; font-size: 11pt; font-weight: bold; text-transform: uppercase; color: #1e3a8a; letter-spacing: 1px;">PEMERINTAH REPUBLIK INDONESIA</h2>

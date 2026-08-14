@@ -76,7 +76,7 @@ async function fetchProfileData(userId: string, oauthImage: string | null) {
     const schoolId = cookieStore.get("gurupro_school_selected")?.value;
     if (schoolId) {
       const schoolRes = await query(
-        "SELECT id, nama_sekolah, npsn, alamat_sekolah FROM schools WHERE id = $1",
+        "SELECT id, nama_sekolah, npsn, alamat, logo FROM schools WHERE id = $1",
         [schoolId]
       );
       if (schoolRes.rows.length > 0) {

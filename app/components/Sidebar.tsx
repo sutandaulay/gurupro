@@ -4,6 +4,7 @@ import SchoolSwitcher from './school-switcher';
 import Dimensi8Selector from './dimensi-8-selector';
 import TigaPengalamanSelector from './tiga-pengalaman-selector';
 import PaiModeSelector from './pai-mode-selector';
+import BrandLogo from './ui/BrandLogo';
 import { useKurikulumStore, useTeacherStore } from '@/lib/stores';
 
 const kurikulumData: { [key: string]: {
@@ -195,7 +196,12 @@ export default function Sidebar({ onGenerate, isLoading, schools = [] }: Sidebar
 
   return (
     <aside className="w-full p-6 bg-white/70 backdrop-blur-md border border-slate-200/60 rounded-[32px] lg:h-[calc(100vh-3rem)] lg:sticky lg:top-6 lg:overflow-y-auto shadow-[0_8px_32px_rgba(31,38,135,0.03)] text-slate-800">
-      <h2 className="text-2xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-indigo-600 text-center">GuruPRO</h2>
+      <BrandLogo
+        className="h-10 w-auto max-w-full mx-auto mb-6"
+        fallback={
+          <h2 className="text-2xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-indigo-600 text-center">GuruPRO</h2>
+        }
+      />
 
       {/* === DEEP LEARNING MULTI-SCHOOL FEATURES === */}
       <SchoolSwitcher />

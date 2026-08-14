@@ -593,6 +593,8 @@ export async function POST(req: Request) {
     let kepalaNama = meta?.kepalaSekolah || "";
     let kepalaNip = meta?.kepalaNip || "";
     let schoolAddress = meta?.alamat || "";
+    let schoolLogo = meta?.logo || "";
+    let schoolNpsn = meta?.npsn || "";
 
     try {
       const userRes = await query(
@@ -606,7 +608,7 @@ export async function POST(req: Request) {
 
       if (meta?.school_id) {
         const schoolRes = await query(
-          `SELECT s.nama_sekolah, s.alamat, s.npsn, s.logo_url,
+          `SELECT s.nama_sekolah, s.alamat, s.npsn, s.logo,
                   st.nama_lengkap as kepala_nama, st.nip as kepala_nip
            FROM schools s
            LEFT JOIN users st ON st.id = s.kepala_sekolah_id
@@ -618,6 +620,8 @@ export async function POST(req: Request) {
           schoolAddress = schoolAddress || sr.alamat || "";
           kepalaNama = kepalaNama || sr.kepala_nama || "";
           kepalaNip = kepalaNip || sr.kepala_nip || "";
+          schoolLogo = schoolLogo || sr.logo || "";
+          schoolNpsn = schoolNpsn || sr.npsn || "";
         }
       }
     } catch (_) {
@@ -631,6 +635,8 @@ export async function POST(req: Request) {
       kepalaSekolah: kepalaNama,
       kepalaNip,
       alamat: schoolAddress,
+      logo: schoolLogo,
+      npsn: schoolNpsn,
     };
 
     const mapel = meta?.mapel || "Mata Pelajaran";

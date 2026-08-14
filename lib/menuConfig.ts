@@ -42,10 +42,20 @@ import {
   CheckSquare,
 } from "lucide-react";
 
+export type SubMenuItem = {
+  label: string;
+  href: string;
+  desc?: string;
+  key: string;
+  module?: string;
+};
+
 export type MenuItem = {
+  key: string;
   label: string;
   href?: string;
-  submenu?: { label: string; href: string; desc?: string }[];
+  module?: string;
+  submenu?: SubMenuItem[];
 };
 
 export type Category = 
@@ -134,137 +144,158 @@ export const categoryThemes: Record<Category, CategoryTheme> = {
 };
 
 export const institutionSubmenus: MenuItem["submenu"] = [
-  { label: "Overview Institusi", href: "/institusi/ID/dashboard", desc: "Ringkasan data institusi" },
-  { label: "Manajemen Guru", href: "/institusi/ID/dashboard/guru", desc: "Kelola guru, undang, dan role" },
-  { label: "Rekap TPG", href: "/institusi/ID/dashboard/tpg", desc: "Rekap tunjangan profesi guru" },
-  { label: "Laporan Mengajar", href: "/institusi/ID/dashboard/laporan-mengajar" },
-  { label: "Approval / Persetujuan", href: "/institusi/ID/dashboard/approval" },
-  { label: "Langganan & Billing", href: "/institusi/ID/dashboard/langganan" },
-  { label: "Pengaturan Institusi", href: "/institusi/ID/dashboard/pengaturan" },
+  { label: "Overview Institusi", href: "/institusi/ID/dashboard", desc: "Ringkasan data institusi", key: "overview" },
+  { label: "Manajemen Guru", href: "/institusi/ID/dashboard/guru", desc: "Kelola guru, undang, dan role", key: "manajemen_guru" },
+  { label: "Rekap TPG", href: "/institusi/ID/dashboard/tpg", desc: "Rekap tunjangan profesi guru", key: "rekap_tpg" },
+  { label: "Laporan Mengajar", href: "/institusi/ID/dashboard/laporan-mengajar", key: "laporan_mengajar" },
+  { label: "Approval / Persetujuan", href: "/institusi/ID/dashboard/approval", key: "approval" },
+  { label: "Langganan & Billing", href: "/institusi/ID/dashboard/langganan", key: "langganan" },
+  { label: "Pengaturan Institusi", href: "/institusi/ID/dashboard/pengaturan", key: "pengaturan" },
 ];
 
 export const masterMenus: MenuItem[] = [
-  { label: "Dasbor", href: "/dashboard" },
+  { key: "dasbor", label: "Dasbor", href: "/dashboard" },
   {
+    key: "master_data",
     label: "Master Data",
     href: "/dashboard?module=sekolah",
+    module: "sekolah",
   },
   {
+    key: "presensi",
     label: "Presensi",
     submenu: [
-      { label: "Presensi Saya", href: "/dashboard/attendance" },
-      { label: "Presensi Mengajar", href: "/dashboard/attendance/teaching" },
-      { label: "Pengajuan Izin", href: "/dashboard/attendance/leave" },
-      { label: "Laporan Presensi", href: "/dashboard/reports/attendance" },
-      { label: "Rekap TPG", href: "/dashboard/reports/tpg" },
+      { key: "presensi_saya", label: "Presensi Saya", href: "/dashboard/attendance" },
+      { key: "presensi_mengajar", label: "Presensi Mengajar", href: "/dashboard/attendance/teaching" },
+      { key: "pengajuan_izin", label: "Pengajuan Izin", href: "/dashboard/attendance/leave" },
+      { key: "laporan_presensi", label: "Laporan Presensi", href: "/dashboard/reports/attendance" },
+      { key: "rekap_tpg", label: "Rekap TPG", href: "/dashboard/reports/tpg" },
     ],
   },
   {
+    key: "ai_administrasi",
     label: "AI Administrasi",
     submenu: [
-      { label: "Silabus", href: "/dashboard/administrasi?tipe=silabus" },
-      { label: "Program Tahunan (Prota)", href: "/dashboard/prota" },
-      { label: "Program Semester (Prosem)", href: "/dashboard/prosem" },
-      { label: "ATP Editor", href: "/dashboard/atp-editor" },
-      { label: "Modul Ajar", href: "/dashboard/administrasi?tipe=modul_ajar" },
-      { label: "RPP", href: "/dashboard/administrasi?tipe=rpp" },
-      { label: "LKPD", href: "/dashboard/administrasi?tipe=lkpd" },
-      { label: "Bahan Ajar", href: "/dashboard/administrasi?tipe=bahan_ajar" },
-      { label: "Persetujuan RPP (Kepsek)", href: "/dashboard/approval-rpp" },
-      { label: "Dasbor Eksekutif (Kepsek)", href: "/dashboard/executive-dashboard" },
-      { label: "Buat Soal", href: "/dashboard?module=soal" },
+      { key: "silabus", label: "Silabus", href: "/dashboard/administrasi?tipe=silabus", module: "administrasi" },
+      { key: "prota", label: "Program Tahunan (Prota)", href: "/dashboard/prota" },
+      { key: "prosem", label: "Program Semester (Prosem)", href: "/dashboard/prosem" },
+      { key: "atp_editor", label: "ATP Editor", href: "/dashboard/atp-editor" },
+      { key: "modul_ajar", label: "Modul Ajar", href: "/dashboard/administrasi?tipe=modul_ajar", module: "administrasi" },
+      { key: "rpp", label: "RPP", href: "/dashboard/administrasi?tipe=rpp", module: "administrasi" },
+      { key: "lkpd", label: "LKPD", href: "/dashboard/administrasi?tipe=lkpd", module: "administrasi" },
+      { key: "bahan_ajar", label: "Bahan Ajar", href: "/dashboard/administrasi?tipe=bahan_ajar", module: "administrasi" },
+      { key: "persetujuan_rpp", label: "Persetujuan RPP (Kepsek)", href: "/dashboard/approval-rpp" },
+      { key: "dasbor_eksekutif", label: "Dasbor Eksekutif (Kepsek)", href: "/dashboard/executive-dashboard" },
+      { key: "buat_soal", label: "Buat Soal", href: "/dashboard?module=soal", module: "soal" },
     ],
   },
   {
+    key: "monitoring",
     label: "Monitoring",
     submenu: [
-      { label: "Jurnal Mengajar", href: "/dashboard?module=jurnal" },
-      { label: "Kalender Akademik", href: "/dashboard?module=kalender" },
-      { label: "Supervisi & Analitik", href: "/dashboard?module=supervisi_analitik" },
-      { label: "Tugas Harian", href: "/dashboard?module=tugas_harian" },
-      { label: "Pengingat", href: "/dashboard?module=scheduler" },
+      { key: "jurnal_mengajar", label: "Jurnal Mengajar", href: "/dashboard?module=jurnal", module: "jurnal" },
+      { key: "kalender_akademik", label: "Kalender Akademik", href: "/dashboard?module=kalender", module: "kalender" },
+      { key: "supervisi_analitik", label: "Supervisi & Analitik", href: "/dashboard?module=supervisi_analitik", module: "supervisi_analitik" },
+      { key: "tugas_harian", label: "Tugas Harian", href: "/dashboard?module=tugas_harian", module: "tugas_harian" },
+      { key: "pengingat", label: "Pengingat", href: "/dashboard?module=scheduler", module: "scheduler" },
     ],
   },
   {
+    key: "ai",
     label: "AI",
     submenu: [
-      { label: "Chat AI", href: "/dashboard/chat" },
-      { label: "Analisis Kinerja AI", href: "/dashboard/ai-performance-report" },
-      { label: "Deep Learning", href: "/dashboard" },
+      { key: "chat_ai", label: "Chat AI", href: "/dashboard/chat" },
+      { key: "analisis_kinerja_ai", label: "Analisis Kinerja AI", href: "/dashboard/ai-performance-report" },
+      { key: "deep_learning", label: "Deep Learning", href: "/dashboard" },
     ],
   },
   {
+    key: "buku_nilai",
     label: "Buku Nilai",
     href: "/dashboard?module=nilai",
+    module: "nilai",
   },
   {
+    key: "laporan",
     label: "Laporan",
     submenu: [
-      { label: "Laporan Harian & Mengajar", href: "/dashboard/laporan-harian", desc: "Rekap harian resmi + arsip jurnal mengajar" },
-      { label: "Laporan Kinerja", href: "/dashboard/laporan-kinerja" },
-      { label: "Evidence", href: "/dashboard/evidence" },
+      { key: "laporan_harian", label: "Laporan Harian & Mengajar", href: "/dashboard/laporan-harian", desc: "Rekap harian resmi + arsip jurnal mengajar" },
+      { key: "laporan_kinerja", label: "Laporan Kinerja", href: "/dashboard/laporan-kinerja" },
+      { key: "evidence", label: "Evidence", href: "/dashboard/evidence" },
     ],
   },
   {
+    key: "raport",
     label: "Raport",
     submenu: [
-      { label: "Status Raport", href: "/dashboard/raport-status" },
-      { label: "Review Nilai Raport", href: "/dashboard/rapor-review" },
-      { label: "Layout Raport", href: "/dashboard/layout-raport" },
-      { label: "Pemetaan Kolom Raport", href: "/dashboard/pemetaan-kolom" },
+      { key: "status_raport", label: "Status Raport", href: "/dashboard/raport-status" },
+      { key: "review_nilai", label: "Review Nilai Raport", href: "/dashboard/rapor-review" },
+      { key: "layout_raport", label: "Layout Raport", href: "/dashboard/layout-raport" },
+      { key: "pemetaan_kolom", label: "Pemetaan Kolom Raport", href: "/dashboard/pemetaan-kolom" },
     ],
   },
   {
+    key: "pengembangan_diri",
     label: "Pengembangan Diri",
     submenu: [
-      { label: "Daftar Kegiatan", href: "/dashboard/pengembangan-diri" },
-      { label: "Buat Baru", href: "/dashboard/pengembangan-diri/tambah" },
-      { label: "Sertifikat", href: "/dashboard/pengembangan-diri?tab=documents" },
+      { key: "daftar_kegiatan", label: "Daftar Kegiatan", href: "/dashboard/pengembangan-diri" },
+      { key: "buat_baru", label: "Buat Baru", href: "/dashboard/pengembangan-diri/tambah" },
+      { key: "sertifikat", label: "Sertifikat", href: "/dashboard/pengembangan-diri?tab=documents" },
     ],
   },
   {
+    key: "perpustakaan",
     label: "Perpustakaan",
     href: "/dashboard/perpustakaan",
   },
   {
+    key: "wali_kelas",
     label: "Wali Kelas",
     submenu: [
-      { label: "Dashboard Wali Kelas", href: "/dashboard/wali-kelas" },
-      { label: "Daftar Siswa", href: "/dashboard/wali-kelas?tab=siswa" },
-      { label: "Catatan Wali Kelas", href: "/dashboard/wali-kelas?tab=catatan" },
-      { label: "Laporan Wali Kelas", href: "/dashboard/wali-kelas?tab=laporan" },
+      { key: "dashboard", label: "Dashboard Wali Kelas", href: "/dashboard/wali-kelas" },
+      { key: "daftar_siswa", label: "Daftar Siswa", href: "/dashboard/wali-kelas?tab=siswa" },
+      { key: "catatan", label: "Catatan Wali Kelas", href: "/dashboard/wali-kelas?tab=catatan" },
+      { key: "laporan", label: "Laporan Wali Kelas", href: "/dashboard/wali-kelas?tab=laporan" },
     ],
   },
   {
+    key: "pembina_ekskul",
     label: "Pembina Eskul",
     submenu: [
-      { label: "Dashboard Pembina", href: "/dashboard/pembina-ekskul" },
-      { label: "Daftar Kegiatan", href: "/dashboard/pembina-ekskul?tab=daftar" },
-      { label: "Penilaian", href: "/dashboard/pembina-ekskul?tab=penilaian" },
-      { label: "Laporan", href: "/dashboard/pembina-ekskul?tab=laporan" },
+      { key: "dashboard", label: "Dashboard Pembina", href: "/dashboard/pembina-ekskul" },
+      { key: "daftar", label: "Daftar Kegiatan", href: "/dashboard/pembina-ekskul?tab=daftar" },
+      { key: "penilaian", label: "Penilaian", href: "/dashboard/pembina-ekskul?tab=penilaian" },
+      { key: "laporan", label: "Laporan", href: "/dashboard/pembina-ekskul?tab=laporan" },
     ],
   },
   {
+    key: "institusi",
     label: "Institusi",
     submenu: institutionSubmenus,
   },
   {
+    key: "komunitas_guru",
     label: "Komunitas Guru",
     href: "/dashboard/forum",
   },
   {
+    key: "keuangan",
     label: "Keuangan",
     href: "/dashboard?module=keuangan",
+    module: "keuangan",
   },
   {
+    key: "brankas",
     label: "Brankas/Folder",
     href: "/dashboard/brankas",
   },
   {
+    key: "pengaturan",
     label: "Pengaturan",
     href: "/profile?tab=pengaturan",
   },
   {
+    key: "billing",
     label: "Billing",
     href: "/dashboard/billing",
   },
@@ -409,4 +440,131 @@ export function getLucideIcon(label: string): any {
     "Perpustakaan": BookOpen,
   };
   return map[label] || null;
+}
+
+// =============================================================
+// Katalog Fitur, Modul Dashboard & Role — single source of truth
+// untuk konfigurasi visibilitas menu per role (per institusi).
+// =============================================================
+
+/** Modul yang dirender di halaman /dashboard (content.tsx). */
+export const DASHBOARD_MODULES: { key: string; label: string; href?: string }[] = [
+  { key: "sekolah", label: "Master Data", href: "/dashboard?module=sekolah" },
+  { key: "administrasi", label: "AI Administrasi", href: "/dashboard/administrasi" },
+  { key: "jurnal", label: "Jurnal Mengajar", href: "/dashboard?module=jurnal" },
+  { key: "keuangan", label: "Keuangan", href: "/dashboard?module=keuangan" },
+  { key: "nilai", label: "Buku Nilai", href: "/dashboard?module=nilai" },
+  { key: "kalender", label: "Kalender Akademik", href: "/dashboard?module=kalender" },
+  { key: "supervisi_analitik", label: "Supervisi & Analitik", href: "/dashboard?module=supervisi_analitik" },
+  { key: "tugas_harian", label: "Tugas Harian", href: "/dashboard?module=tugas_harian" },
+  { key: "storage_saya", label: "Storage Saya", href: "/dashboard?module=storage_saya" },
+  { key: "scheduler", label: "Pengingat", href: "/dashboard?module=scheduler" },
+  { key: "soal", label: "Buat Soal", href: "/dashboard?module=soal" },
+  { key: "profil", label: "Profil", href: "/profile" },
+];
+
+/** Role institusi (institution-members). */
+export const INSTITUTION_ROLES: { value: string; label: string }[] = [
+  { value: "kepala_sekolah", label: "Kepala Sekolah" },
+  { value: "wakasek", label: "Wakasek" },
+  { value: "operator", label: "Operator" },
+  { value: "admin_sekolah", label: "Admin Sekolah" },
+  { value: "bendahara", label: "Bendahara" },
+  { value: "guru", label: "Guru" },
+  { value: "wali_kelas", label: "Wali Kelas" },
+  { value: "pembina_ekskul", label: "Pembina Ekskul" },
+];
+
+/** Role global aplikasi (users.role). */
+export const APP_ROLES: { value: string; label: string }[] = [
+  { value: "guru", label: "Guru (Akun)" },
+  { value: "admin", label: "Admin Platform" },
+  { value: "super_admin", label: "Super Admin" },
+  { value: "manager", label: "Manager" },
+];
+
+/** Role yang TIDAK pernah dibatasi oleh konfigurasi institusi. */
+export const UNRESTRICTED_ROLES = new Set(["admin", "super_admin", "manager"]);
+
+/** Awalan (namespace) feature key. */
+export const FEATURE_NS = {
+  MENU: "m",
+  SUBMENU: "s",
+  MODULE: "d",
+} as const;
+
+export function menuFeatureKey(key: string): string {
+  return `${FEATURE_NS.MENU}:${key}`;
+}
+
+export function submenuFeatureKey(parentKey: string, childKey: string): string {
+  return `${FEATURE_NS.SUBMENU}:${parentKey}.${childKey}`;
+}
+
+export function moduleFeatureKey(moduleKey: string): string {
+  return `${FEATURE_NS.MODULE}:${moduleKey}`;
+}
+
+/**
+ * Feature key sebuah menu/submenu.
+ * - Item yang terhubung ke modul dashboard (punya `module`) memakai key modul
+ *   supaya satu toggle mengatur baik menu maupun modulnya.
+ * - Submenu memakai key namespace `s:<parent>.<child>`.
+ */
+export function getFeatureKeyForMenu(item: MenuItem): string {
+  if (item.module) return moduleFeatureKey(item.module);
+  return menuFeatureKey(item.key);
+}
+
+export function getFeatureKeyForSubmenu(parentKey: string, sub: SubMenuItem): string {
+  if (sub.module) return moduleFeatureKey(sub.module);
+  return submenuFeatureKey(parentKey, sub.key);
+}
+
+/** Pohon fitur untuk UI administrator (menu → submenu). */
+export function buildFeatureTree(): {
+  key: string;
+  label: string;
+  href?: string;
+  moduleKey?: string;
+  isModuleLinked: boolean;
+  children: {
+    key: string;
+    uid: string;
+    label: string;
+    href: string;
+    moduleKey?: string;
+    isModuleLinked: boolean;
+  }[];
+}[] {
+  return masterMenus.map((item) => ({
+    key: getFeatureKeyForMenu(item),
+    label: item.label,
+    href: item.href,
+    moduleKey: item.module,
+    isModuleLinked: !!item.module,
+    children: (item.submenu ?? []).map((sub) => ({
+      key: getFeatureKeyForSubmenu(item.key, sub),
+      uid: submenuFeatureKey(item.key, sub.key),
+      label: sub.label,
+      href: sub.href,
+      moduleKey: sub.module,
+      isModuleLinked: !!sub.module,
+    })),
+  }));
+}
+
+/** Daftar feature key yang bisa disembunyikan (menu, submenu, modul). */
+export function getAllFeatureKeys(): string[] {
+  const keys: string[] = [];
+  for (const item of masterMenus) {
+    keys.push(getFeatureKeyForMenu(item));
+    for (const sub of item.submenu ?? []) {
+      keys.push(getFeatureKeyForSubmenu(item.key, sub));
+    }
+  }
+  for (const mod of DASHBOARD_MODULES) {
+    keys.push(moduleFeatureKey(mod.key));
+  }
+  return Array.from(new Set(keys));
 }

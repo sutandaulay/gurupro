@@ -7,7 +7,8 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useProfileStore } from "@/lib/stores";
 import AppIcon from "@/app/components/ui/AppIcon";
-import { getLucideIcon, masterMenus, resolveCategory, isInstitutionHref, resolveInstitutionHref, resolveActiveInstitutionId } from "@/lib/menuConfig";
+import { getLucideIcon, masterMenus, resolveCategory, isInstitutionHref, resolveInstitutionHref, resolveActiveInstitutionId, getFeatureKeyForMenu, getFeatureKeyForSubmenu } from "@/lib/menuConfig";
+import { useMenuVisibility } from "@/hooks/useMenuVisibility";
 
 export type MenuItem = {
   label: string;
@@ -63,6 +64,7 @@ export default function MobileHomeMenu({ currentModule, onNavigate }: MobileHome
   const [isLoading, setIsLoading] = useState(true);
   const [roleFlags, setRoleFlags] = useState<{ isWaliKelas: boolean; isPembinaEkskul: boolean } | null>(null);
   const [activeInstitutionId, setActiveInstitutionId] = useState<number | null>(null);
+  const { hiddenSet } = useMenuVisibility();
   const [greeting, setGreeting] = useState("Selamat pagi");
   const [currentDate, setCurrentDate] = useState("");
 
@@ -117,7 +119,18 @@ export default function MobileHomeMenu({ currentModule, onNavigate }: MobileHome
   }, []);
 
   const filteredMenus = useMemo(() => {
-    let base = masterMenus;
+    let base = masterMenus
+      .map((item) => {
+        const children = (item.submenu ?? []).filter(
+          (sub) => !hiddenSet.has(getFeatureKeyForSubmenu(item.key, sub))
+        );
+        return { ...item, submenu: item.submenu ? children : undefined };
+      })
+      .filter((item) => {
+        if (hiddenSet.has(getFeatureKeyForMenu(item))) return false;
+        if (item.submenu && item.submenu.length === 0) return false;
+        return true;
+      });
     if (roleFlags) {
       base = base.filter((item) => {
         if (item.label === "Wali Kelas" && !roleFlags.isWaliKelas) return false;
@@ -132,7 +145,7 @@ export default function MobileHomeMenu({ currentModule, onNavigate }: MobileHome
         m.label.toLowerCase().includes(q) ||
         m.submenu?.some(s => s.label.toLowerCase().includes(q))
     );
-  }, [search, roleFlags]);
+  }, [search, roleFlags, hiddenSet]);
 
   const handleNavigate = (href?: string) => {
     if (onNavigate) onNavigate();

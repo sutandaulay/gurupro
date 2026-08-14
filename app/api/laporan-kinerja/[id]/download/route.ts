@@ -62,12 +62,31 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       : laporan.content
 
     const sekolah = content?.identitas?.sekolah || ''
-    const downloadDate = new Date(laporan.created_at || downloadDate)
+
+    let schoolInfo: { nama_sekolah: string; alamat: string | null; npsn: string | null; logo: string | null } | null = null
+    try {
+      const schoolRes = await query(
+        `SELECT s.nama_sekolah, s.alamat, s.npsn, s.logo
+         FROM user_schools us
+         JOIN schools s ON s.id = us.school_id
+         WHERE us.user_id = $1`,
+        [guruId]
+      )
+      const schoolRows = schoolRes.rows
+      schoolInfo =
+        schoolRows.find((r: any) => r.nama_sekolah === sekolah) ||
+        schoolRows?.[0] ||
+        null
+    } catch (_) {
+      // non-critical — continue dengan nama sekolah
+    }
+
+    const downloadDate = laporan.created_at ? new Date(laporan.created_at) : new Date()
     const tahunAjaran = getTahunAjaranDariTanggal(downloadDate)
     const semester = getSemesterDariTanggal(downloadDate)
     const semesterLabel = semester === 'ganjil' ? 'Ganjil' : 'Genap'
 
-    const html = generateHTMLContent(laporan, content, sekolah, guruId, tahunAjaran, semesterLabel, downloadDate)
+    const html = generateHTMLContent(laporan, content, sekolah, schoolInfo, guruId, tahunAjaran, semesterLabel, downloadDate)
 
     const contentType = format === 'docx'
       ? 'application/msword'
@@ -91,6 +110,7 @@ function generateHTMLContent(
   laporan: any,
   content: any,
   sekolah: string,
+  schoolInfo: { nama_sekolah: string; alamat: string | null; npsn: string | null; logo: string | null } | null,
   guruId: string,
   tahunAjaran: string,
   semesterLabel: string,
@@ -100,9 +120,17 @@ function generateHTMLContent(
   const guruNip = escapeHtml(content?.identitas?.nip || laporan.nip || '')
 
   // --- Kop Sekolah ---
-  const kopHtml = sekolah
-    ? buildKopSekolahHTML({ nama_sekolah: sekolah })
-    : ''
+  let kopHtml = ''
+  if (schoolInfo?.nama_sekolah) {
+    kopHtml = buildKopSekolahHTML({
+      nama_sekolah: schoolInfo.nama_sekolah,
+      alamat: schoolInfo.alamat || null,
+      npsn: schoolInfo.npsn || null,
+      logo: schoolInfo.logo || null,
+    })
+  } else if (sekolah) {
+    kopHtml = buildKopSekolahHTML({ nama_sekolah: sekolah })
+  }
 
   // --- Identitas ---
   const identitasRows: [string, string][] = [

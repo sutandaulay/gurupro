@@ -26,9 +26,11 @@ import MobileHomeMenu from "@/app/components/mobile/MobileHomeMenu";
 import MobileBottomNav from "@/app/components/mobile/MobileBottomNav";
 import AppIcon from "@/app/components/ui/AppIcon";
 import { Calendar, School, BookOpen, Users, Clock } from "lucide-react";
-import { getLucideIcon, resolveCategory } from "@/lib/menuConfig";
+import { getLucideIcon, resolveCategory, moduleFeatureKey, DASHBOARD_MODULES } from "@/lib/menuConfig";
+import { useMenuVisibility } from "@/hooks/useMenuVisibility";
 import { Pagination, usePagedItems } from "@/components/ui/pagination";
 import ApprovalStatusBadge, { SubmitApprovalButton } from "@/components/approval/ApprovalStatusBadge";
+import { buildKopSekolahHTML } from "@/lib/export/document-shared";
 
 // Safe JSON fetch - always returns an object or array, never throws
 async function safeJson(url: string): Promise<any> {
@@ -178,6 +180,7 @@ function getGreeting(hour: number) {
 
 function DashboardContent() {
   const router = useRouter();
+  const { hiddenSet } = useMenuVisibility();
   const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [greeting, setGreeting] = useState("Selamat pagi");
@@ -360,6 +363,16 @@ function DashboardContent() {
   const [currentModule, setCurrentModule] = useState<
     "soal" | "administrasi" | "jurnal" | "keuangan" | "profil" | "sekolah" | "nilai" | "kalender" | "supervisi_analitik" | "tugas_harian" | "storage_saya" | "scheduler"
   >("tugas_harian");
+
+  // Jangan tampilkan modul yang disembunyikan oleh konfigurasi peran institusi.
+  useEffect(() => {
+    if (hiddenSet.has(moduleFeatureKey(currentModule))) {
+      const fallback =
+        DASHBOARD_MODULES.find((m) => !hiddenSet.has(moduleFeatureKey(m.key)))?.key ??
+        "tugas_harian";
+      setCurrentModule(fallback as any);
+    }
+  }, [hiddenSet, currentModule]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [schoolsLoaded, setSchoolsLoaded] = useState(false);
@@ -962,7 +975,7 @@ function DashboardContent() {
       const customEvent = e as CustomEvent;
       const module = customEvent.detail?.module;
       console.log("[page.tsx] handleSwitchModule custom event received:", module);
-      if (module) {
+      if (module && !hiddenSet.has(moduleFeatureKey(module))) {
         setCurrentModule(module as any);
       }
     };
@@ -1003,7 +1016,9 @@ function DashboardContent() {
       "scheduler"
     ];
     if (moduleParam && validModules.includes(moduleParam)) {
-      setCurrentModule(moduleParam as any);
+      if (!hiddenSet.has(moduleFeatureKey(moduleParam))) {
+        setCurrentModule(moduleParam as any);
+      }
       
       // Handle active sub-tab for keuangan if specified
       const tabParam = searchParams.get("tab");
@@ -1019,7 +1034,7 @@ function DashboardContent() {
       url.searchParams.delete("tab");
       window.history.replaceState({}, "", url.pathname + url.search);
     }
-  }, [searchParams]);
+  }, [searchParams, hiddenSet]);
 
   // Verifikasi pembayaran setelah redirect dari payment gateway (fallback webhook)
   useEffect(() => {
@@ -3708,6 +3723,10 @@ function DashboardContent() {
       ...formData,
       namaGuru: currentUser?.nama_lengkap || "",
       namaSekolah: activeSchool?.nama_sekolah || "",
+      schoolName: activeSchool?.nama_sekolah || "",
+      schoolAddress: activeSchool?.alamat || "",
+      schoolNpsn: activeSchool?.npsn || "",
+      schoolLogo: activeSchool?.logo || "",
     };
 
     setMetaInfo(formData);
@@ -4289,7 +4308,11 @@ function DashboardContent() {
       <table style="width: 100%; border-collapse: collapse; border-bottom: 3px double #000000; margin-bottom: 20pt; font-family: Arial, sans-serif;">
         <tr>
           <td style="width: 15%; text-align: center; padding-bottom: 10pt;">
-            <span style="font-size: 32pt;">🏫</span>
+            ${
+              activeSchool?.logo
+                ? `<img src="${activeSchool.logo}" style="max-height: 60px; max-width: 60px; object-fit: contain;" alt="Logo Sekolah"/>`
+                : '<span style="font-size: 32pt;">🏫</span>'
+            }
           </td>
           <td style="width: 70%; text-align: center; padding-bottom: 10pt;">
             <h2 style="margin: 0; font-size: 11pt; font-weight: bold; text-transform: uppercase; color: #1e3a8a; letter-spacing: 1px;">PEMERINTAH REPUBLIK INDONESIA</h2>
@@ -4362,9 +4385,9 @@ function DashboardContent() {
   const downloadPdfClient = async (title: string, markdown: string) => {
     setIsLoading(true);
     setLoadingProgress("Mempersiapkan ekspor PDF...");
-    try {
+try {
       const html2pdf = await loadHtml2Pdf();
-      const htmlContent = generatePrintLayout(title, markdown, { showPageNumber: true, isDocx: false });
+      const data = enrichExportMeta();
       const content = document.createElement('div');
       content.innerHTML = htmlContent;
 
@@ -4386,9 +4409,21 @@ function DashboardContent() {
     }
   };
 
+  const enrichExportMeta = () => {
+    const data = currentFormData || metaInfo;
+    const school = schools.find((s: any) => s.id === selectedSchoolId);
+    return {
+      ...data,
+      schoolName: data?.schoolName || school?.nama_sekolah || "",
+      schoolAddress: data?.schoolAddress || school?.alamat || "",
+      schoolNpsn: data?.schoolNpsn || school?.npsn || "",
+      schoolLogo: data?.schoolLogo || school?.logo || "",
+    };
+  };
+
   const downloadWord = () => {
     if (soalList.length === 0) return;
-    const data = currentFormData || metaInfo;
+    const data = enrichExportMeta();
     
     let contentHtml = "";
     const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
@@ -4512,18 +4547,12 @@ function DashboardContent() {
     const jenis = data.jenisAsesmen || "Asesmen";
     const today = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 
-    const kopTable = `
-    <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
-      <tr>
-        <td style="width:50px;"></td>
-        <td style="text-align:center;vertical-align:middle;">
-          <h1 style="margin:0;font-size:16pt;font-weight:bold;color:#000;text-transform:uppercase;">${schoolName}</h1>
-          <p style="margin:2px 0;font-size:9pt;color:#555;">Alamat sekolah tidak tersedia</p>
-        </td>
-        <td style="width:50px;"></td>
-      </tr>
-    </table>
-    <div style="border-bottom:2px solid #000;margin-bottom:12px;"></div>`;
+    const kopTable = buildKopSekolahHTML({
+      nama_sekolah: schoolName,
+      alamat: data.schoolAddress || null,
+      npsn: data.schoolNpsn || null,
+      logo: data.schoolLogo || null,
+    });
 
     const identitasRows = [
       ["Mata Pelajaran", mapel, "Jenis Asesmen", jenis],
@@ -4605,7 +4634,7 @@ function DashboardContent() {
     
     try {
       const html2pdf = await loadHtml2Pdf();
-      const data = currentFormData || metaInfo;
+      const data = enrichExportMeta();
       const content = document.createElement('div');
       
       content.style.fontFamily = "'Times New Roman', serif";
@@ -4624,18 +4653,12 @@ function DashboardContent() {
       const guru = data.namaGuru || "Pendidik";
       const today = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 
-      const kopHtml = `
-      <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
-        <tr>
-          <td style="width:50px;"></td>
-          <td style="text-align:center;vertical-align:middle;">
-            <h1 style="margin:0;font-size:16pt;font-weight:bold;color:#000;text-transform:uppercase;">${schoolName}</h1>
-            <p style="margin:2px 0;font-size:9pt;color:#555;">Alamat sekolah tidak tersedia</p>
-          </td>
-          <td style="width:50px;"></td>
-        </tr>
-      </table>
-      <div style="border-bottom:2px solid #000;margin-bottom:10px;"></div>
+      const kopHtml = buildKopSekolahHTML({
+        nama_sekolah: schoolName,
+        alamat: data.schoolAddress || null,
+        npsn: data.schoolNpsn || null,
+        logo: data.schoolLogo || null,
+      }) + `
 
       <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
         <tr>
@@ -9985,12 +10008,12 @@ const renderJurnalModule = () => {
     ];
 
     const quickActions = [
-      { icon: "📚", label: "Buat RPP Baru", onClick: () => { setCurrentModule("administrasi"); setAdminDocType("rpp"); } },
-      { icon: "📊", label: "Input Nilai", onClick: () => { setCurrentModule("nilai"); } },
-      { icon: "📝", label: "Buat Soal", onClick: () => { setCurrentModule("soal"); } },
-      { icon: "📋", label: "Laporan Kelas", onClick: () => { setCurrentModule("sekolah"); setTabSekolah("presensi"); } },
-      { icon: "✨", label: "Bahan Ajar AI", onClick: () => { router.push("/dashboard/bahan-ajar"); } },
-    ];
+      { icon: "📚", label: "Buat RPP Baru", moduleKey: "administrasi", onClick: () => { setCurrentModule("administrasi"); setAdminDocType("rpp"); } },
+      { icon: "📊", label: "Input Nilai", moduleKey: "nilai", onClick: () => { setCurrentModule("nilai"); } },
+      { icon: "📝", label: "Buat Soal", moduleKey: "soal", onClick: () => { setCurrentModule("soal"); } },
+      { icon: "📋", label: "Laporan Kelas", moduleKey: "sekolah", onClick: () => { setCurrentModule("sekolah"); setTabSekolah("presensi"); } },
+      { icon: "✨", label: "Bahan Ajar AI", moduleKey: "administrasi", onClick: () => { router.push("/dashboard/bahan-ajar"); } },
+    ].filter((a) => (a.moduleKey ? !hiddenSet.has(moduleFeatureKey(a.moduleKey)) : true));
 
     return (
       <div className="space-y-6 animate-fadeIn px-4 sm:px-6 py-6">
@@ -13136,7 +13159,7 @@ const renderJurnalModule = () => {
         isOpen={isKisikisiExportModalOpen}
         onClose={() => setIsKisikisiExportModalOpen(false)}
         soalList={soalList}
-        metaInfo={currentFormData || metaInfo}
+        metaInfo={enrichExportMeta()}
         onExportPdf={downloadKisikisiPdf}
         onExportWord={downloadKisikisiWord}
       />

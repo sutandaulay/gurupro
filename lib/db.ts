@@ -1527,6 +1527,37 @@ const initDb = async () => {
       console.error('Failed to create institution_feature_flags table:', err);
     }
 
+    // 36f-2a. Visibilitas menu/fitur/submenu per ROLE per institusi.
+    // Tabel baru untuk konfigurasi "fitur, menu, sub menu" per role (default TAMPAK).
+    // institution_id sengaja TANPA FK karena app punya DUA universe institusi:
+    // payload.institutions (dropdown admin: id 1,2,3,10,46,47) dan
+    // public.institution_members (konteks user: id 1-7). Satu FK tidak
+    // menaungi keduanya; id disimpan apa adanya dan divalidasi di API.
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS institution_role_menu_settings (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          institution_id INTEGER NOT NULL,
+          role VARCHAR(50) NOT NULL,
+          feature_key VARCHAR(120) NOT NULL,
+          visible BOOLEAN NOT NULL DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (institution_id, role, feature_key)
+        )
+      `);
+      await pool.query(`
+        ALTER TABLE institution_role_menu_settings
+        DROP CONSTRAINT IF EXISTS institution_role_menu_settings_institution_id_fkey
+      `);
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_inst_role_menu_settings_inst_role
+        ON institution_role_menu_settings (institution_id, role)
+      `);
+    } catch (err) {
+      console.error('Failed to create institution_role_menu_settings table:', err);
+    }
+
     // 36f-2b. Assignment Mapel & Kelas per member — source of truth schema PUBLIC.
     // Dulu hanya ada di schema `payload` (migrasi Payload) sehingga GET/PATCH/import
     // yang membaca/menulis dengan id PUBLIC tidak pernah match (FK payload). Diasilkan

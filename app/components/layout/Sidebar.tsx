@@ -7,7 +7,8 @@ import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { useProfileStore, useTeacherStore } from "@/lib/stores";
 import AppIcon from "@/app/components/ui/AppIcon";
-import { getLucideIcon, masterMenus, resolveCategory, isInstitutionHref, resolveInstitutionHref, resolveActiveInstitutionId } from "@/lib/menuConfig";
+import { getLucideIcon, masterMenus, resolveCategory, isInstitutionHref, resolveInstitutionHref, resolveActiveInstitutionId, getFeatureKeyForMenu, getFeatureKeyForSubmenu } from "@/lib/menuConfig";
+import { useMenuVisibility } from "@/hooks/useMenuVisibility";
 import {
   IconX,
   IconChevronDown,
@@ -36,6 +37,7 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
   const [expandedItems, setExpandedItems] = useState<{[key: string]: boolean}>({});
   const [roleFlags, setRoleFlags] = useState<{ isWaliKelas: boolean; isPembinaEkskul: boolean } | null>(null);
   const [activeInstitutionId, setActiveInstitutionId] = useState<number | null>(null);
+  const { hiddenSet } = useMenuVisibility();
 
   const {
     schools,
@@ -297,7 +299,11 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
                             : 'text-gray-700'
                         }`}
                       >
-                        <IconBuilding size={14} className="shrink-0 text-gray-400" />
+                        {school.logo ? (
+                          <img src={school.logo} alt={school.nama_sekolah} className="w-4 h-4 shrink-0 object-contain rounded" />
+                        ) : (
+                          <IconBuilding size={14} className="shrink-0 text-gray-400" />
+                        )}
                         <span className="truncate">{school.nama_sekolah}</span>
                         {activeSchoolId === school.id && (
                           <span className="ml-auto">
@@ -350,13 +356,24 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
           </Dialog>
 
           {(() => {
-            const visibleMenus = roleFlags
-              ? masterMenus.filter((item) => {
-                  if (item.label === "Wali Kelas" && !roleFlags.isWaliKelas) return false;
-                  if (item.label === "Pembina Eskul" && !roleFlags.isPembinaEkskul) return false;
-                  return true;
-                })
-              : masterMenus;
+            const visibleMenus = masterMenus
+              .map((item) => {
+                const itemKey = getFeatureKeyForMenu(item);
+                const children = (item.submenu ?? []).filter(
+                  (sub) => !hiddenSet.has(getFeatureKeyForSubmenu(item.key, sub))
+                );
+                return { ...item, submenu: item.submenu ? children : undefined };
+              })
+              .filter((item) => {
+                if (hiddenSet.has(getFeatureKeyForMenu(item))) return false;
+                if (item.submenu && item.submenu.length === 0) return false;
+                return true;
+              })
+              .filter((item) => {
+                if (roleFlags && item.label === "Wali Kelas" && !roleFlags.isWaliKelas) return false;
+                if (roleFlags && item.label === "Pembina Eskul" && !roleFlags.isPembinaEkskul) return false;
+                return true;
+              });
 
             return visibleMenus.map((item) => {
               const Icon = getLucideIcon(item.label);

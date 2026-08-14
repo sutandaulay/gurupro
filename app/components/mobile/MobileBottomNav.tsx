@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { LayoutDashboard, Clock, ClipboardList, BookOpen } from "lucide-react";
 import AppIcon from "@/app/components/ui/AppIcon";
-import { resolveCategory } from "@/lib/menuConfig";
+import { resolveCategory, menuFeatureKey, moduleFeatureKey } from "@/lib/menuConfig";
+import { useMenuVisibility } from "@/hooks/useMenuVisibility";
 
 const BOTTOM_ITEMS = [
   {
@@ -37,6 +38,16 @@ const BOTTOM_ITEMS = [
 export default function MobileBottomNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { hiddenSet } = useMenuVisibility();
+
+  const visibleItems = BOTTOM_ITEMS.filter((item) => {
+    if (item.id === "dasbor") return !hiddenSet.has(menuFeatureKey("dasbor"));
+    if (item.href.includes("?module=")) {
+      const mod = item.href.split("=")[1];
+      return !hiddenSet.has(moduleFeatureKey(mod));
+    }
+    return true;
+  });
 
   const isActive = (item: typeof BOTTOM_ITEMS[0]) => {
     if (item.href.includes("?module=")) {
@@ -58,7 +69,7 @@ export default function MobileBottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-t border-slate-200/80 pb-[env(safe-area-inset-bottom)] md:hidden">
       <div className="flex items-center justify-around h-14 max-w-lg mx-auto">
-        {BOTTOM_ITEMS.map((item) => {
+        {visibleItems.map((item) => {
           const active = isActive(item);
           return (
             <Link

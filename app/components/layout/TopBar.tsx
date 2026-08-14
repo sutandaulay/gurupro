@@ -403,7 +403,11 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
                               : 'text-gray-700'
                           }`}
                         >
-                          <IconBuilding size={14} className="shrink-0 text-gray-400" />
+                          {school.logo ? (
+                            <img src={school.logo} alt={school.nama_sekolah} className="w-4 h-4 shrink-0 object-contain rounded" />
+                          ) : (
+                            <IconBuilding size={14} className="shrink-0 text-gray-400" />
+                          )}
                           <span className="truncate">{school.nama_sekolah}</span>
                           {activeSchoolId === school.id && (
                             <span className="ml-auto">

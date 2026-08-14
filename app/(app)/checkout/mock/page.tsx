@@ -3,6 +3,7 @@ import { apiFetch } from "@/lib/api-client";
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
+import BrandLogo from "@/app/components/ui/BrandLogo";
 import {
   IconLoader2,
   IconCheck,
@@ -91,7 +92,13 @@ function MockCheckoutContent() {
               <IconCreditCard size={18} />
             </span>
             <div>
-              <span className="text-sm font-bold tracking-tight text-white">GuruPRO</span>
+              <BrandLogo
+                className="h-6 w-auto"
+                alt="GuruPRO"
+                fallback={
+                  <span className="text-sm font-bold tracking-tight text-white">GuruPRO</span>
+                }
+              />
               <span className="block text-[10px] text-indigo-400 font-medium">Simulasi Pembayaran</span>
             </div>
           </div>
