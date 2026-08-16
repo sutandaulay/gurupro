@@ -5,7 +5,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import AppIcon from "@/app/components/ui/AppIcon";
-import { getLucideIcon, resolveCategory, resolveInstitutionHref, resolveActiveInstitutionId, isInstitutionHref } from "@/lib/menuConfig";
+import { getLucideIcon, resolveCategory, resolveInstitutionHref, resolveActiveInstitutionId, isInstitutionHref, featureKeyForHref } from "@/lib/menuConfig";
+import { useMenuVisibility } from "@/hooks/useMenuVisibility";
 
 type SubItem = {
   label: string;
@@ -167,6 +168,7 @@ interface MenuBarProps {
 export default function MenuBar({ onStorageClick }: MenuBarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { hiddenSet, isLoading } = useMenuVisibility();
 
   const [isWaliKelas, setIsWaliKelas] = useState<boolean | null>(null);
   const [activeInstitutionId, setActiveInstitutionId] = useState<number | null>(null);
@@ -207,20 +209,52 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
 
   const visibleMenuItems: MenuItem[] = useMemo(() => {
     if (isWaliKelas === null) return menuItems;
-    return menuItems.map((item) => {
-      // Hide institution menu until institution context is loaded
-      if (item.label === "Institusi" && !institutionLoaded) {
-        return { ...item, submenu: [] };
-      }
-      if (item.label !== "Raport" || !item.submenu) return item;
-      return {
-        ...item,
-        submenu: item.submenu.filter(
-          (sub) => !(sub as SubItem).label?.startsWith("Status Raport") || isWaliKelas
-        ),
-      };
-    });
-  }, [isWaliKelas, institutionLoaded]);
+
+    // Sembunyikan item yang rutenya merupakan feature (menu/submenu/modul)
+    // yang disembunyikan oleh konfigurasi peran institusi.
+    const isVisibleFeature = (href?: string) => {
+      if (!href || isLoading) return true;
+      const fk = featureKeyForHref(href);
+      return fk === null || !hiddenSet.has(fk);
+    };
+
+    const filterSub = (subs: MenuItem["submenu"]): MenuItem["submenu"] => {
+      if (!subs) return undefined;
+      const filtered = subs
+        .map((sub) => {
+          if ("submenu" in sub && sub.submenu) {
+            const nested = filterSub(sub.submenu);
+            if (!nested || nested.length === 0) return null;
+            return { ...sub, submenu: nested as SubItem[] };
+          }
+          return isVisibleFeature(sub.href) ? sub : null;
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+      return filtered;
+    };
+
+    return menuItems
+      .map((item) => {
+        // Hide institution menu until institution context is loaded
+        if (item.label === "Institusi" && !institutionLoaded) {
+          return { ...item, submenu: [] };
+        }
+        if (item.label === "Raport" && item.submenu) {
+          const kept = item.submenu.filter(
+            (sub) => !(sub as SubItem).label?.startsWith("Status Raport") || isWaliKelas
+          );
+          const filtered = filterSub(kept);
+          return filtered && filtered.length > 0 ? { ...item, submenu: filtered } : null;
+        }
+        if (item.label === "Brankas") return item;
+        if (item.submenu) {
+          const filtered = filterSub(item.submenu);
+          return filtered && filtered.length > 0 ? { ...item, submenu: filtered } : null;
+        }
+        return isVisibleFeature(item.href) ? item : null;
+      })
+      .filter((x): x is MenuItem => x !== null);
+  }, [isWaliKelas, institutionLoaded, hiddenSet, isLoading]);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
@@ -253,7 +287,7 @@ export default function MenuBar({ onStorageClick }: MenuBarProps) {
 
   return (
     <div className="relative hidden lg:block w-full">
-      <nav className="flex h-12 bg-white border-b border-gray-200 px-6 sticky top-0 z-50 max-w-[1400px] mx-auto">
+      <nav className="flex h-12 bg-white border-b border-gray-200 px-6 sticky top-0 z-50 max-w-[1400px] 2xl:max-w-[1800px] mx-auto">
         <div className="flex items-center gap-1 w-full overflow-x-auto thin-scrollbar">
           {visibleMenuItems.map((item) => {
             const active = isDropdownActive(item);

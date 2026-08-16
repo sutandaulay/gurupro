@@ -235,7 +235,7 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
 
       {/* Sidebar Container: Drawer di mobile, toggleable di desktop (>= md) */}
       <div
-        className={`fixed top-0 left-0 h-full w-[80vw] max-w-[280px] md:w-64 bg-white shadow-xl md:shadow-none z-[999] md:z-40 border-r border-gray-200/80 transform transition-transform duration-300 ease-in-out md:top-16 md:h-[calc(100vh-4rem)] ${
+        className={`fixed top-0 left-0 h-full w-[80vw] max-w-[280px] md:max-w-none md:w-64 2xl:w-72 bg-white shadow-xl md:shadow-none z-[999] md:z-40 border-r border-gray-200/80 transform transition-transform duration-300 ease-in-out md:top-16 md:h-[calc(100vh-4rem)] ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } flex flex-col`}
       >

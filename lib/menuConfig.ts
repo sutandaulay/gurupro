@@ -568,3 +568,81 @@ export function getAllFeatureKeys(): string[] {
   }
   return Array.from(new Set(keys));
 }
+
+// =============================================================
+// Pemetaan URL → feature key untuk akses (guard) sisi client.
+// Menormalisasi URL sehingga id institusi (angka atau token "ID")
+// tidak membedakan rute: /institusi/42/dashboard == /institusi/ID/dashboard
+// =============================================================
+
+/** Normalisasi href agar bisa dibandingkan dengan pathname aktif. */
+export function normalizeFeatureHref(raw: string): string {
+  const [pathPart, qsPart] = raw.split("?");
+  let path = (pathPart || "/")
+    .replace(/\/institusi\/(ID|\d+)/g, "/institusi/{id}")
+    .replace(/\/dashboard\/institution\/(ID|\d+)/g, "/dashboard/institution/{id}")
+    .replace(/\/+$/, "");
+  if (!path) path = "/";
+
+  let query = "";
+  if (qsPart) {
+    query = qsPart
+      .split("&")
+      .filter(Boolean)
+      .map((p) => {
+        const i = p.indexOf("=");
+        return i < 0 ? p : `${p.slice(0, i)}=${p.slice(i + 1)}`;
+      })
+      .sort()
+      .join("&");
+  }
+  return query ? `${path}?${query}` : path;
+}
+
+/** Normalisasi lokasi saat ini (pathname + query) untuk dibandingkan. */
+export function normalizeCurrentPath(
+  pathname: string,
+  searchParams: URLSearchParams | null
+): string {
+  const qs = searchParams ? searchParams.toString() : "";
+  return normalizeFeatureHref(qs ? `${pathname}?${qs}` : pathname);
+}
+
+/** Kumpulkan rute (URL normal) milik feature yang tersembunyi. */
+export function getHiddenFeatureHrefs(hiddenKeys: string[]): Set<string> {
+  const out = new Set<string>();
+  const hidden = new Set(hiddenKeys);
+  for (const group of buildFeatureTree()) {
+    if (hidden.has(group.key)) {
+      if (group.href) out.add(normalizeFeatureHref(group.href));
+      for (const child of group.children) out.add(normalizeFeatureHref(child.href));
+    } else {
+      for (const child of group.children) {
+        if (hidden.has(child.key)) out.add(normalizeFeatureHref(child.href));
+      }
+    }
+  }
+  for (const mod of DASHBOARD_MODULES) {
+    if (hidden.has(moduleFeatureKey(mod.key)) && mod.href) {
+      out.add(normalizeFeatureHref(mod.href));
+    }
+  }
+  return out;
+}
+
+/** Feature key sebuah URL (atau null bila bukan rute fitur yang dikonfigurasi). */
+export function featureKeyForHref(rawHref: string): string | null {
+  const norm = normalizeFeatureHref(rawHref);
+  for (const group of buildFeatureTree()) {
+    if (group.href && normalizeFeatureHref(group.href) === norm) return group.key;
+    for (const child of group.children) {
+      if (normalizeFeatureHref(child.href) === norm) return child.key;
+    }
+  }
+  for (const mod of DASHBOARD_MODULES) {
+    if (mod.href && normalizeFeatureHref(mod.href) === norm) {
+      return moduleFeatureKey(mod.key);
+    }
+  }
+  return null;
+}

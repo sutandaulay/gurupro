@@ -21,9 +21,15 @@ export default function InstitutionShell({
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("inst_sidebar_open");
-      if (saved !== null) {
-        setSidebarOpen(saved === "true");
+      const isMobile = window.innerWidth < 768;
+      if (isMobile) {
+        // Di mobile drawer mulai tertutup; tidak menyimpan preferensi.
+        setSidebarOpen(false);
+      } else {
+        const saved = localStorage.getItem("inst_sidebar_open");
+        if (saved !== null) {
+          setSidebarOpen(saved === "true");
+        }
       }
     }
   }, []);
@@ -53,11 +59,11 @@ export default function InstitutionShell({
           onClose={() => setSidebarOpen(false)}
         />
         <main
-          className={`flex-1 relative pb-24 md:pb-0 min-w-0 transition-all duration-300 ease-in-out ${
-            sidebarOpen ? "md:pl-64" : "md:pl-0"
+          className={`flex-1 relative min-w-0 transition-all duration-300 ease-in-out ${
+            sidebarOpen ? "md:pl-64 2xl:pl-72" : "md:pl-0"
           }`}
         >
-          <div className="md:max-w-[1400px] md:mx-auto md:px-6 py-6">
+          <div className="md:max-w-[1400px] 2xl:max-w-[1800px] md:mx-auto md:px-6 py-6">
             {children}
           </div>
         </main>

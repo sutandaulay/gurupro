@@ -26,20 +26,59 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || '';
+    // source=all → gabungkan public.institutions (operasional/konteks user)
+    // dengan payload.institutions (kelola admin). Default hanya payload.
+    const source = searchParams.get('source') || 'payload';
 
-    let institutionsQuery = `
-      SELECT i.*,
-        (SELECT COUNT(*) FROM public.institution_members im WHERE im.institution_id = i.id AND im.status = 'active') as member_count
-      FROM payload.institutions i
-    `;
+    let institutionsQuery: string;
     const params: any[] = [];
 
+    if (source === 'all') {
+      // Prefer data public.institutions saat id bentrok (public menang).
+      // DISTINCT ON + ORDER BY harus diawali kolom id.
+      institutionsQuery = `
+        SELECT id, name, npsn, jenjang, naungan, subscription_tier,
+               academic_year_active, approval_layer_config, status,
+               created_at, updated_at, member_count
+        FROM (
+          SELECT DISTINCT ON (i.id)
+                 i.id, i.name, i.npsn, i.jenjang, i.naungan,
+                 i.subscription_tier, i.academic_year_active,
+                 i.approval_layer_config, i.status, i.created_at, i.updated_at,
+                 (SELECT COUNT(*) FROM public.institution_members im
+                  WHERE im.institution_id = i.id AND im.status = 'active') AS member_count
+          FROM (
+            SELECT id, name::text AS name, npsn, jenjang::text AS jenjang,
+                   naungan::text AS naungan, subscription_tier::text AS subscription_tier,
+                   academic_year_active, approval_layer_config::text AS approval_layer_config,
+                   status::text AS status, created_at, updated_at,
+                   'public' AS source
+            FROM public.institutions
+            UNION ALL
+            SELECT id, name::text AS name, npsn, jenjang::text AS jenjang,
+                   naungan::text AS naungan, subscription_tier::text AS subscription_tier,
+                   academic_year_active, approval_layer_config::text AS approval_layer_config,
+                   status::text AS status, created_at, updated_at,
+                   'payload' AS source
+            FROM payload.institutions
+          ) i
+          ORDER BY i.id, CASE WHEN i.source = 'public' THEN 0 ELSE 1 END
+        ) f
+      `;
+    } else {
+      institutionsQuery = `
+        SELECT i.*,
+          (SELECT COUNT(*) FROM public.institution_members im WHERE im.institution_id = i.id AND im.status = 'active') as member_count
+        FROM payload.institutions i
+      `;
+    }
+
     if (search) {
-      institutionsQuery += ` WHERE LOWER(i.name) LIKE $1 OR LOWER(i.npsn) LIKE $1`;
+      institutionsQuery += ` WHERE LOWER(f.name) LIKE $1 OR LOWER(COALESCE(f.npsn, '')) LIKE $1`;
       params.push(`%${search.toLowerCase()}%`);
     }
 
-    institutionsQuery += ` ORDER BY i.created_at DESC`;
+    institutionsQuery += ` ORDER BY f.created_at DESC`;
 
     const institutions = await query(institutionsQuery, params);
 

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMenuVisibility } from "@/hooks/useMenuVisibility";
+import { featureKeyForHref } from "@/lib/menuConfig";
 import {
   IconLayoutDashboard,
   IconUsers,
@@ -155,7 +157,14 @@ export default function InstitutionSidebar({
   onClose,
 }: InstitutionSidebarProps) {
   const pathname = usePathname();
+  const { hiddenSet, isLoading } = useMenuVisibility();
   const basePath = `/institusi/${institutionId}/dashboard`;
+
+  const hiddenByFeature = (itemHref: string) => {
+    if (isLoading) return false;
+    const fk = featureKeyForHref(`/institusi/ID/dashboard/${itemHref}`);
+    return fk !== null && hiddenSet.has(fk);
+  };
 
   return (
     <>
@@ -167,10 +176,12 @@ export default function InstitutionSidebar({
       )}
       <aside
         className={`
-          fixed md:sticky top-0 left-0 z-50 md:z-auto
-          h-screen w-64 bg-white border-r border-gray-200
+          fixed md:sticky top-0 md:top-16 left-0 z-50 md:z-auto
+          h-screen md:h-[calc(100vh-4rem)] w-64 bg-white border-r border-gray-200
           transform transition-all duration-300 ease-in-out
-          ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0 md:w-0 md:min-w-0 md:overflow-hidden md:border-none"}
+          ${isOpen
+            ? "translate-x-0 2xl:w-72"
+            : "-translate-x-full md:translate-x-0 md:w-0 md:min-w-0 md:overflow-hidden md:border-none"}
           flex flex-col
         `}
       >
@@ -197,8 +208,10 @@ export default function InstitutionSidebar({
 
         <nav className="flex-1 overflow-y-auto py-3">
           {allMenuItems.map((group) => {
-            const visibleItems = group.items.filter((item) =>
-              item.roles.some((r) => userRoles.includes(r))
+            const visibleItems = group.items.filter(
+              (item) =>
+                item.roles.some((r) => userRoles.includes(r)) &&
+                !hiddenByFeature(item.href)
             );
             if (visibleItems.length === 0) return null;
 

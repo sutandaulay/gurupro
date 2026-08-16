@@ -9,6 +9,7 @@ import { apiFetch } from "@/lib/api-client";
  */
 export function useMenuVisibility() {
   const [hiddenKeys, setHiddenKeys] = useState<string[] | null>(null);
+  const [institutionId, setInstitutionId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -17,12 +18,21 @@ export function useMenuVisibility() {
         const res = await apiFetch("/api/user/menu-visibility");
         if (res.ok) {
           const data = await res.json();
-          if (!cancelled) setHiddenKeys(Array.isArray(data.hiddenKeys) ? data.hiddenKeys : []);
+          if (!cancelled) {
+            setHiddenKeys(Array.isArray(data.hiddenKeys) ? data.hiddenKeys : []);
+            setInstitutionId(
+              Number.isFinite(data.institutionId) ? data.institutionId : null
+            );
+          }
         } else if (!cancelled) {
           setHiddenKeys([]);
+          setInstitutionId(null);
         }
       } catch {
-        if (!cancelled) setHiddenKeys([]);
+        if (!cancelled) {
+          setHiddenKeys([]);
+          setInstitutionId(null);
+        }
       }
     };
     load();
@@ -36,6 +46,7 @@ export function useMenuVisibility() {
   return {
     hiddenKeys: hiddenKeys ?? [],
     hiddenSet,
+    institutionId,
     isLoading: hiddenKeys === null,
     isHidden: (key: string) => hiddenSet.has(key),
   };

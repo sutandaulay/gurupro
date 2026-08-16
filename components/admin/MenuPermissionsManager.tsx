@@ -66,7 +66,7 @@ export default function MenuPermissionsManager() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await apiFetch("/api/admin/institutions?search=");
+        const res = await apiFetch("/api/admin/institutions?source=all&search=");
         if (res.ok) {
           const data = await res.json();
           setInstitutions(Array.isArray(data) ? data : []);

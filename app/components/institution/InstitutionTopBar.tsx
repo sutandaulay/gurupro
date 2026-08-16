@@ -37,8 +37,9 @@ export default function InstitutionTopBar({
       <div className="flex items-center gap-3 min-w-0">
         <button
           onClick={onToggleSidebar}
-          className="hidden md:flex p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer shrink-0"
+          className="flex p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer shrink-0"
           type="button"
+          aria-label="Toggle menu"
         >
           <IconMenu2 size={22} />
         </button>

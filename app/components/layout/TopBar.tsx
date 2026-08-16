@@ -326,7 +326,7 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
 
   return (
     <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-30 flex items-center px-4 shadow-sm">
-      <div className="flex items-center justify-between w-full max-w-[1400px] mx-auto">
+      <div className="flex items-center justify-between w-full max-w-[1400px] 2xl:max-w-[1800px] mx-auto">
         <div className="flex items-center gap-3">
           <button
             onClick={onToggleSidebar}
@@ -347,8 +347,8 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Search bar hanya ditampilkan di layar besar */}
-          <div className="hidden md:flex items-center bg-gray-100 rounded-lg px-3 py-2 w-64">
+          {/* Search bar hanya ditampilkan di layar besar/tablet landscape */}
+          <div className="hidden lg:flex items-center bg-gray-100 rounded-lg px-3 py-2 w-64">
             <IconSearch size={16} className="text-gray-400 mr-2" />
             <input
               type="text"
@@ -360,15 +360,16 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
           </div>
           
           <div className="flex items-center gap-2">
-            {/* School Switcher */}
+            {/* School Switcher — sama di semua ukuran layar */}
             {teacherSchools.length > 0 && (
-              <div className="relative hidden md:block">
+              <div className="relative shrink-0">
                 <button
                   onClick={() => setIsContextDropdownOpen(!isContextDropdownOpen)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-xs transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-xs transition-colors cursor-pointer min-w-0"
+                  aria-label="Pilih Sekolah"
                 >
                   <IconBuilding size={14} className="text-violet-600 shrink-0" />
-                  <span className="text-gray-800 font-semibold max-w-[120px] truncate">
+                  <span className="hidden sm:inline text-gray-800 font-semibold max-w-[120px] truncate">
                     {teacherSchools.find(s => s.id === activeSchoolId)?.nama_sekolah || "Pilih Sekolah"}
                   </span>
                   <svg
@@ -571,7 +572,7 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
                     {initials}
                   </div>
                 )}
-                <span className="hidden md:inline text-sm font-medium text-gray-700 max-w-[100px] truncate">
+                <span className="hidden lg:inline text-sm font-medium text-gray-700 max-w-[100px] truncate">
                   {session?.user?.name?.split(" ")[0] || "Pengguna"}
                 </span>
               </button>

@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { query } from "@/lib/db";
 import InstitutionShell from "@/app/components/institution/InstitutionShell";
 import { ToastProvider } from "@/app/components/ui/toast";
+import FeatureAccessGate from "@/components/guard/FeatureAccessGate";
 
 interface Props {
   children: React.ReactNode;
@@ -120,7 +121,7 @@ export default async function InstitutionDashboardLayout({
         institutionName={inst.name}
         userRoles={roles}
       >
-        {children}
+        <FeatureAccessGate>{children}</FeatureAccessGate>
       </InstitutionShell>
     </ToastProvider>
   );

@@ -8,6 +8,7 @@ import TopBar from "@/app/components/layout/TopBar";
 import Sidebar from "@/app/components/layout/Sidebar";
 import SessionSync from "@/app/components/SessionSync";
 import ReferralProcessor from "@/app/(app)/components/ReferralProcessor";
+import FeatureAccessGate from "@/components/guard/FeatureAccessGate";
 
 
 
@@ -85,7 +86,7 @@ export default function DashboardLayout({
         />
         <main
           className={`flex-1 relative pb-24 md:pb-0 min-w-0 transition-all duration-300 ease-in-out ${
-            sidebarOpen ? "md:pl-64" : "md:pl-0"
+            sidebarOpen ? "md:pl-64 2xl:pl-72" : "md:pl-0"
           }`}
         >
           {/* Grace Period Alert Banner */}
@@ -106,8 +107,8 @@ export default function DashboardLayout({
             </div>
           )}
 
-          <div className="md:max-w-[1400px] md:mx-auto md:px-6 py-6">
-            {children}
+          <div className="md:max-w-[1400px] 2xl:max-w-[1800px] md:mx-auto md:px-6 py-6">
+            <FeatureAccessGate>{children}</FeatureAccessGate>
           </div>
         </main>
       </div>

@@ -367,12 +367,18 @@ function DashboardContent() {
   // Jangan tampilkan modul yang disembunyikan oleh konfigurasi peran institusi.
   useEffect(() => {
     if (hiddenSet.has(moduleFeatureKey(currentModule))) {
-      const fallback =
-        DASHBOARD_MODULES.find((m) => !hiddenSet.has(moduleFeatureKey(m.key)))?.key ??
-        "tugas_harian";
-      setCurrentModule(fallback as any);
+      const fallback = DASHBOARD_MODULES.find(
+        (m) => !hiddenSet.has(moduleFeatureKey(m.key))
+      )?.key;
+      if (fallback) setCurrentModule(fallback as any);
     }
   }, [hiddenSet, currentModule]);
+
+  // Semua modul disembunyikan admin → tampilkan layar kosong, bukan memaksa
+  // merender modul tersembunyi.
+  const allModulesHidden =
+    hiddenSet.size > 0 &&
+    DASHBOARD_MODULES.every((m) => hiddenSet.has(moduleFeatureKey(m.key)));
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [schoolsLoaded, setSchoolsLoaded] = useState(false);
@@ -10813,6 +10819,25 @@ const renderJurnalModule = () => {
       errorMsg.includes("rate-limits")
     )
   );
+
+  if (allModulesHidden) {
+    return (
+      <main className="min-h-screen bg-slate-50 p-4 sm:p-6 pb-24 lg:pb-6 flex flex-col gap-6 text-slate-800 font-sans">
+        <div className="flex flex-col items-center justify-center min-h-[50vh] p-8 text-center">
+          <div className="w-14 h-14 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-2xl mb-4">
+            🔒
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">
+            Tidak ada modul tersedia
+          </h2>
+          <p className="text-sm text-slate-500 max-w-sm">
+            Administrator telah menyembunyikan semua modul untuk peran Anda di
+            institusi ini. Hubungi administrator untuk mengembalikan akses.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6 pb-24 lg:pb-6 flex flex-col gap-6 text-slate-800 print:bg-white print:p-0 print:gap-0 font-sans">
