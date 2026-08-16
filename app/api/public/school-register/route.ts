@@ -17,8 +17,8 @@ async function sendApprovalEmail(to: string, token: string, namaLengkap: string)
     <h2 style="color: #4f46e5;">Konfirmasi Pendaftaran Institusi</h2>
     <p>Halo Bapak/Ibu,</p>
     <p>Kami menerima permintaan pendaftaran institusi <strong>${namaLengkap || 'Anda'}</strong> di GuruPRO.</p>
-    <p>Klik tautan berikut untuk menyetujui dan mengaktifkan pendaftaran:</p>
-    <p><a href="${approveUrl}" style="background:#4f46e5;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">Setujui Pendaftaran</a></p>
+    <p>Klik tautan berikut untuk mengonfirmasi dan mengaktifkan pendaftaran:</p>
+    <p><a href="${approveUrl}" style="background:#4f46e5;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">Konfirmasi &amp; Aktifkan Pendaftaran</a></p>
     <p style="color:#666;font-size:14px;">Tautan ini berlaku selama 7 hari. Jika ini bukan permintaan Anda, abaikan email ini.</p>
     <p>Terima kasih,<br>Tim GuruPRO</p>
   </div>`;

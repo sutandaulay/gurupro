@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { approveSchoolRegistration } from '@/lib/school-registration-approval';
 import { sendWhatsAppNotification, sendEmailNotification } from '@/lib/notifications';
 
 async function sendApprovalNotifications(data: any) {
@@ -11,10 +12,12 @@ async function sendApprovalNotifications(data: any) {
 
 Halo tim ${data.nama_lembaga},
 
-Pendaftaran institusi Anda telah disetujui.
+Pendaftaran institusi Anda telah disetujui dan akun Anda telah aktif.
 
 Silakan masuk ke akun GuruPRO untuk mulai menggunakan fitur institusi:
 ${loginUrl}
+
+Jika email ini baru pertama kali digunakan, gunakan menu "Lupa Kata Sandi" pada halaman masuk untuk membuat kata sandi Anda.
 
 Terima kasih,
 Tim GuruPRO`;
@@ -34,8 +37,9 @@ Tim GuruPRO`;
         `<div style="font-family: sans-serif; padding: 20px;">
           <h2 style="color: #4f46e5;">Pendaftaran Institusi Disetujui</h2>
           <p>Halo tim <strong>${data.nama_lembaga}</strong>,</p>
-          <p>Pendaftaran institusi Anda telah disetujui.</p>
+          <p>Pendaftaran institusi Anda telah disetujui dan akun Anda telah aktif.</p>
           <p><a href="${loginUrl}" style="background:#4f46e5;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">Masuk ke GuruPRO</a></p>
+          <p style="color:#666;font-size:14px;">Jika email ini baru pertama kali digunakan, gunakan menu <strong>"Lupa Kata Sandi"</strong> pada halaman masuk untuk membuat kata sandi Anda.</p>
           <p>Terima kasih,<br>Tim GuruPRO</p>
         </div>`
       );
@@ -69,6 +73,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Token sudah kadaluwarsa' }, { status: 410 });
     }
 
+    // Buat institusi + akun + membership dahulu; jika gagal,
+    // status tetap 'pending' sehingga token bisa dicoba ulang.
+    const result = await approveSchoolRegistration(reg);
+
     await query('UPDATE school_registrations SET status = \'approved\', updated_at = NOW() WHERE id = $1', [reg.id]);
 
     await sendApprovalNotifications({
@@ -77,7 +85,11 @@ export async function GET(req: Request) {
       whatsapp: reg.whatsapp,
     });
 
-    return NextResponse.json({ success: true, message: 'Pendaftaran telah disetujui' });
+    return NextResponse.json({
+      success: true,
+      message: 'Pendaftaran telah disetujui',
+      institutionId: result.institutionId,
+    });
   } catch (error: any) {
     console.error('Approve school registration error:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });

@@ -66,15 +66,8 @@ export async function PUT(req: Request) {
 
     const registration = currentRegistration.rows[0];
 
-    // Update status pendaftaran
-    await query(
-      `UPDATE school_registrations
-       SET status = $1, catatan_admin = $2, updated_at = NOW()
-       WHERE id = $3`,
-      [status, catatan_admin || null, id]
-    );
-
-    // Jika status diubah menjadi approved, buat lembaga (institution) baru secara otomatis
+    // Jika status diubah menjadi approved, buat lembaga (institution) baru dahulu,
+    // agar jika gagal status tetap 'pending' dan bisa dicoba ulang.
     if (status === 'approved') {
       try {
         await approveSchoolRegistration(registration);
@@ -83,6 +76,14 @@ export async function PUT(req: Request) {
         return NextResponse.json({ error: 'Gagal menyetujui pendaftaran' }, { status: 500 });
       }
     }
+
+    // Update status pendaftaran
+    await query(
+      `UPDATE school_registrations
+       SET status = $1, catatan_admin = $2, updated_at = NOW()
+       WHERE id = $3`,
+      [status, catatan_admin || null, id]
+    );
 
     return NextResponse.json({ success: true, status });
   } catch (error: any) {

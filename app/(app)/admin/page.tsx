@@ -117,7 +117,7 @@ function AdminPageContent() {
   // User pagination (server-side)
   const [usersPage, setUsersPage] = useState(1);
   const [usersTotal, setUsersTotal] = useState(0);
-  const [usersPageSize] = useState(25);
+  const [usersPageSize, setUsersPageSize] = useState(25);
   const referralsPager = usePagedItems(referralsList, 25);
   const payoutRequestsPager = usePagedItems(payoutRequestsList, 25);
   const ratioHistoryPager = usePagedItems(ratioHistory, 25);
@@ -304,10 +304,13 @@ function AdminPageContent() {
     };
   }, [addToast, formatCurrency]);
 
-  const fetchUsers = async (queryStr = "") => {
+  const fetchUsers = async (queryStr = "", statusOverride?: string, pageOverride?: number, sizeOverride?: number) => {
     setIsLoadingUsers(true);
     try {
-      const res = await apiFetch(`/api/admin/users?q=${encodeURIComponent(queryStr)}&status=${userStatusFilter}&page=${usersPage}&limit=${usersPageSize}`);
+      const status = statusOverride ?? userStatusFilter;
+      const page = pageOverride ?? usersPage;
+      const limit = sizeOverride ?? usersPageSize;
+      const res = await apiFetch(`/api/admin/users?q=${encodeURIComponent(queryStr)}&status=${status}&page=${page}&limit=${limit}`);
       if (res.ok) {
         const data = await res.json();
         const usersList = Array.isArray(data) ? data : (data.users || []);
@@ -1094,7 +1097,7 @@ function AdminPageContent() {
             <div className="flex gap-2 items-center">
               <select
                 value={userStatusFilter}
-                onChange={(e) => { setUserStatusFilter(e.target.value); setUsersPage(1); fetchUsers(userSearch); }}
+                onChange={(e) => { setUserStatusFilter(e.target.value); setUsersPage(1); fetchUsers(userSearch, e.target.value, 1); }}
                 className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs outline-none bg-white font-bold text-slate-700"
               >
                 <option value="all">Semua</option>
@@ -1108,7 +1111,7 @@ function AdminPageContent() {
                   type="text"
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setUsersPage(1); fetchUsers(userSearch); } }}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setUsersPage(1); fetchUsers(userSearch, userStatusFilter, 1); } }}
                   placeholder="Cari nama, email, WA..."
                   className="pl-8 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs outline-none bg-white font-medium text-slate-800 w-52"
                 />
@@ -1427,7 +1430,8 @@ function AdminPageContent() {
                     pageSize={usersPageSize}
                     total={usersTotal}
                     totalPages={Math.ceil(usersTotal / usersPageSize)}
-                    onPageChange={(p) => { setUsersPage(p); fetchUsers(userSearch); }}
+                    onPageChange={(p) => { setUsersPage(p); fetchUsers(userSearch, userStatusFilter, p); }}
+                    onPageSizeChange={(s) => { setUsersPageSize(s); setUsersPage(1); fetchUsers(userSearch, userStatusFilter, 1, s); }}
                   />
                 </div>
               )}

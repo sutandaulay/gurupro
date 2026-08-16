@@ -29,7 +29,7 @@ function ApproveSchoolRegistrationInner() {
 
     async function approve() {
       try {
-        const res = await apiFetch(`/api/public/school-registrations/approve?token=${encodeURIComponent(token)}`, {
+        const res = await apiFetch(`/api/public/school-registrations/approve?token=${encodeURIComponent(token ?? '')}`, {
           method: 'GET',
         })
         const data = await res.json()
@@ -39,8 +39,8 @@ function ApproveSchoolRegistrationInner() {
           return
         }
         setStatus('success')
-        setMessage('Pendaftaran institusi berhasil disetujui. Silakan masuk ke akun Anda.')
-        setTimeout(() => router.push('/login'), 3000)
+        setMessage('Pendaftaran institusi berhasil diaktifkan. Silakan masuk ke akun Anda. Untuk email baru, gunakan "Lupa Kata Sandi" pada halaman masuk agar dapat membuat kata sandi.')
+        setTimeout(() => router.push('/login'), 4000)
       } catch {
         setStatus('error')
         setMessage('Terjadi kesalahan jaringan')
