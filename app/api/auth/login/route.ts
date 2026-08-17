@@ -36,6 +36,13 @@ export async function POST(request: Request) {
   try {
     const result = await performLogin({ loginId, password, checkoutPlan });
 
+    if (result.requiresOtp && result.userId) {
+      if (isAjax) {
+        return NextResponse.json({ success: true, ...result }, { status: 200 });
+      }
+      return NextResponse.redirect(new URL('/login?error=' + encodeURIComponent(result.error || ''), request.url), REDIRECT_STATUS);
+    }
+
     if (result.error) {
       if (isAjax) {
         const status = result.requiresOtp ? 403 : 401;

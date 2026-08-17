@@ -52,6 +52,31 @@ ${htmlContent.replace(/<[^>]*>/g, " ").substring(0, 300)}...
 }
 
 /**
+ * Send the account-activation link email.
+ * Used when an existing, not-yet-verified account tries to log in.
+ */
+export async function sendAccountVerificationEmail(
+  to: string,
+  namaLengkap: string,
+  verifyLink: string
+) {
+  const subject = "Verifikasi Akun GuruPRO";
+  const html = `
+    <div style="font-family: sans-serif; padding: 20px; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #4f46e5;">Aktifkan Akun GuruPRO Anda</h2>
+      <p>Halo <strong>${namaLengkap}</strong>,</p>
+      <p>Akun Anda belum aktif. Klik tombol di bawah untuk memverifikasi akun Anda dan mulai menggunakan GuruPRO.</p>
+      <p style="text-align: center; margin: 28px 0;">
+        <a href="${verifyLink}" style="display: inline-block; background: #4f46e5; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold;">
+          Verifikasi Akun
+        </a>
+      </p>
+      <p>Link ini berlaku selama 24 jam. Jika Anda tidak merasa mendaftar, abaikan email ini.</p>
+    </div>`;
+  return sendEmailNotification(to, subject, html);
+}
+
+/**
  * Send actual WhatsApp notification using Fonnte or RuangWA.
  * Falls back to console.log if configuration is not active.
  */

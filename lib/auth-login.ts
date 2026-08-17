@@ -5,9 +5,9 @@
 import { query } from "@/lib/db";
 import { hashPassword, comparePassword } from "@/lib/auth";
 import { setDefaultSessionCookie } from "@/lib/session";
-import { sendEventNotification } from "@/lib/notifications";
+import { sendEventNotification, sendAccountVerificationEmail } from "@/lib/notifications";
 import { normalizeEmail, normalizePhoneNumber } from "@/lib/performance-share";
-import { generateSecureOTP } from "@/lib/auth-utils";
+import { generateSecureOTP, createVerificationToken, getAppBaseUrl } from "@/lib/auth-utils";
 
 export interface LoginResult {
   error?: string;
@@ -104,22 +104,17 @@ export async function performLogin(input: LoginInput): Promise<LoginResult> {
 
   // Verification gate
   if (!user.phone_verified && !user.email_verified) {
-    const otp = generateSecureOTP();
+    const token = createVerificationToken(String(user.id));
+    const verifyLink = `${getAppBaseUrl()}/api/auth/email-verify?token=${encodeURIComponent(token)}`;
 
-    await query(
-      `INSERT INTO payload.otp_verifications (otp_hash, channel, sent_to, expires_at, attempt_count, purpose, created_at, updated_at)
-       VALUES ($1, $2, $3, NOW() + INTERVAL '10 minutes', 0, 'account_verification', NOW(), NOW())`,
-      [otp, "whatsapp", user.whatsapp]
+    await sendAccountVerificationEmail(
+      user.email,
+      user.nama_lengkap || "User GuruPRO",
+      verifyLink
     );
 
-    await sendEventNotification("forgot_password", {
-      email: user.email,
-      whatsapp: user.whatsapp,
-      nama_lengkap: user.nama_lengkap || "User GuruPRO",
-    }, { otp_code: otp });
-
     return {
-      error: "Akun Anda belum terverifikasi! Kode OTP baru telah dikirim.",
+      error: "Akun Anda belum terverifikasi! Link verifikasi telah dikirim ke email Anda.",
       requiresOtp: true,
       userId: String(user.id),
     };

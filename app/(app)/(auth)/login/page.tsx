@@ -224,6 +224,11 @@ function LoginContent() {
       const newPath = window.location.pathname;
       window.history.replaceState(null, '', newPath);
     }
+    if (searchParams.get('verified') === '1') {
+      setSuccess('Akun Anda berhasil diverifikasi. Silakan masuk dengan akun Anda.');
+      const newPath = window.location.pathname;
+      window.history.replaceState(null, '', newPath);
+    }
   }, [searchParams]);
 
   const clearErrors = () => {
@@ -277,7 +282,7 @@ function LoginContent() {
       if (res.ok && data.requiresOtp) {
         setOtpUserId(data.userId);
         setForgotStep('verify_account');
-        setSuccess(data.message || 'Silakan masukkan kode OTP yang dikirim.');
+        setSuccess(data.message || 'Link verifikasi telah dikirim ke email Anda.');
       } else if (res.ok && data.success) {
         // Redirect to dashboard or admin based on response
         router.push(data.redirectUrl);
@@ -288,43 +293,6 @@ function LoginContent() {
     } catch (err) {
       console.error('Login/Register Error:', err);
       setError('Masalah koneksi jaringan. Silakan coba lagi.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Verify Account OTP
-  const handleVerifyAccountOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!otpCode) {
-      setError('Kode OTP wajib diisi!');
-      return;
-    }
-    setError(null);
-    setSuccess(null);
-    setLoading(true);
-
-    try {
-      const res = await apiFetch('/api/auth/otp/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: otpUserId,
-          otp: otpCode,
-          purpose: 'account_verification',
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setSuccess(data.message || 'Akun Anda berhasil diverifikasi!');
-        setForgotStep('none');
-        setOtpCode('');
-        router.push(data.redirectUrl || '/dashboard');
-      } else {
-        setError(data.error || 'Gagal verifikasi OTP.');
-      }
-    } catch (err) {
-      setError('Masalah koneksi jaringan.');
     } finally {
       setLoading(false);
     }
@@ -591,25 +559,16 @@ function LoginContent() {
 
           {/* ===== VERIFY ACCOUNT OTP ===== */}
           {forgotStep === 'verify_account' && (
-            <form onSubmit={handleVerifyAccountOtp} className="flex flex-col gap-4">
-              <TextField
-                label="Kode OTP Verifikasi Akun (6 Digit)"
-                type="text"
-                required
-                maxLength={6}
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
-                placeholder="123456"
-                disabled={loading}
-                inputClassName="text-center tracking-[0.3em] font-bold"
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-success-600 hover:bg-success-700 text-white font-bold text-sm rounded-button shadow-md shadow-success-200 transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
-              >
-                {loading ? <IconLoader2 size={18} stroke={2} className="animate-spin" /> : 'Verifikasi Akun'}
-              </button>
+            <div className="flex flex-col gap-4">
+              <div className="p-4 bg-violet-50 border border-violet-100 rounded-button text-center">
+                <IconMail size={28} stroke={1.75} className="mx-auto mb-2 text-violet-600" />
+                <p className="text-sm font-bold text-slate-800">Periksa Email Anda</p>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                  Link verifikasi akun telah dikirim ke email Anda. Buka email tersebut lalu klik tombol{' '}
+                  <strong>“Verifikasi Akun”</strong> untuk mengaktifkan akun. Setelah selesai, silakan masuk kembali.
+                </p>
+                <p className="text-[10px] text-slate-400 mt-2">Link berlaku selama 24 jam.</p>
+              </div>
               <button
                 type="button"
                 onClick={async () => {
@@ -617,16 +576,16 @@ function LoginContent() {
                   setSuccess(null);
                   setLoading(true);
                   try {
-                    const res = await apiFetch('/api/auth/otp/request', {
+                    const res = await apiFetch('/api/auth/verification-link/request', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ userId: otpUserId, purpose: 'account_verification' }),
+                      body: JSON.stringify({ userId: otpUserId }),
                     });
                     const data = await res.json();
                     if (res.ok) {
-                      setSuccess(data.message || 'OTP berhasil dikirim ulang!');
+                      setSuccess(data.message || 'Link verifikasi berhasil dikirim ulang!');
                     } else {
-                      setError(data.error || 'Gagal mengirim ulang OTP.');
+                      setError(data.error || 'Gagal mengirim ulang link verifikasi.');
                     }
                   } catch {
                     setError('Masalah koneksi jaringan.');
@@ -634,9 +593,9 @@ function LoginContent() {
                     setLoading(false);
                   }
                 }}
-                className="flex items-center justify-center gap-1.5 text-xs font-bold text-violet-600 hover:text-violet-700 transition-colors cursor-pointer mt-1"
+                className="w-full flex items-center justify-center gap-2 py-3 bg-success-600 hover:bg-success-700 text-white font-bold text-sm rounded-button shadow-md shadow-success-200 transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
               >
-                Kirim Ulang Kode OTP
+                {loading ? <IconLoader2 size={18} stroke={2} className="animate-spin" /> : 'Kirim Ulang Link Verifikasi'}
               </button>
               <button
                 type="button"
@@ -645,7 +604,7 @@ function LoginContent() {
               >
                 <IconArrowLeft size={14} stroke={2} /> Kembali ke Halaman Masuk
               </button>
-            </form>
+            </div>
           )}
 
           {/* ===== LOGIN / REGISTER ===== */}
