@@ -93,7 +93,7 @@ export default function DetailSkpPage() {
             <span>←</span>
             <span>Kembali</span>
           </Button>
-          <h1 className="text-2xl font-bold">📋 SKP Tahunan</h1>
+          <h1 className="text-2xl font-bold">SKP Tahunan</h1>
           <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
             <span>{skp.tahun_ajaran_nama || 'Tahun Ajaran'}</span>
             <span
@@ -122,7 +122,7 @@ export default function DetailSkpPage() {
 
       {/* Indikator */}
       <div className="bg-card border rounded-xl p-6 mb-6">
-        <h2 className="font-semibold mb-4">📊 Indikator Kinerja Dipilih</h2>
+        <h2 className="font-semibold mb-4">Indikator Kinerja Dipilih</h2>
         <div className="space-y-3">
           {skp.indikator_list?.map((ind: any) => (
             <div key={ind.id} className="flex items-center justify-between border rounded-lg p-3">
@@ -145,7 +145,7 @@ export default function DetailSkpPage() {
       {/* Observasi Terkait */}
       {skp.observasi && skp.observasi.length > 0 && (
         <div className="bg-card border rounded-xl p-6 mb-6">
-          <h2 className="font-semibold mb-4">👁️ Observasi Terkait</h2>
+          <h2 className="font-semibold mb-4">Observasi Terkait</h2>
           <div className="space-y-3">
             {skp.observasi.map((obs: any) => (
               <div
@@ -176,14 +176,14 @@ export default function DetailSkpPage() {
       {/* Catatan */}
       {skp.catatan_guru && (
         <div className="bg-card border rounded-xl p-6 mb-6">
-          <h2 className="font-semibold mb-2">📝 Catatan Guru</h2>
+          <h2 className="font-semibold mb-2">Catatan Guru</h2>
           <p className="text-muted-foreground whitespace-pre-line">{skp.catatan_guru}</p>
         </div>
       )}
 
       {skp.catatan_kepsek && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
-          <h2 className="font-semibold text-blue-800 mb-2">🏫 Catatan Kepala Sekolah</h2>
+          <h2 className="font-semibold text-blue-800 mb-2">Catatan Kepala Sekolah</h2>
           <p className="text-blue-700 whitespace-pre-line">{skp.catatan_kepsek}</p>
         </div>
       )}

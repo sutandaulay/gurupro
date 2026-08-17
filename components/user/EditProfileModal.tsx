@@ -31,7 +31,10 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
   const [isLoading, setIsLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [isUploadingSignature, setIsUploadingSignature] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const signatureInputRef = useRef<HTMLInputElement>(null);
 
   const profileFromStore = useProfileStore(s => s.profile);
   const fetchProfile = useProfileStore(s => s.fetchProfile);
@@ -48,6 +51,7 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
           nip: source.nip || "",
         });
         setPhotoUrl(source.photo_url || null);
+        setSignatureUrl(source.signature_url || null);
         setIsLoading(false);
       } else {
         fetchProfile().then(data => {
@@ -60,12 +64,65 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
               nip: data.nip || "",
             });
             setPhotoUrl(data.photo_url || null);
+            setSignatureUrl(data.signature_url || null);
           }
           setIsLoading(false);
         });
       }
     }
   }, [isOpen]);
+
+  const handleSignatureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setResult({ success: false, message: "Tipe file tidak didukung. Gunakan PNG, JPEG, atau WebP." });
+      return;
+    }
+
+    if (file.size > 500 * 1024) {
+      setResult({ success: false, message: "Ukuran file maksimal 500KB." });
+      return;
+    }
+
+    // Show preview immediately
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setSignatureUrl(ev.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    setIsUploadingSignature(true);
+    setResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("signature", file);
+
+      const res = await apiFetch("/api/user/upload-signature", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setResult({ success: true, message: "Tanda tangan berhasil diupload!" });
+        setSignatureUrl(data.signature_url);
+      } else {
+        setResult({ success: false, message: data.error || "Gagal mengupload tanda tangan." });
+        const profileData = await fetchProfile();
+        setSignatureUrl(profileData?.signature_url || null);
+      }
+    } catch (error: any) {
+      setResult({ success: false, message: error.message || "Gagal mengupload tanda tangan." });
+    } finally {
+      setIsUploadingSignature(false);
+      if (signatureInputRef.current) signatureInputRef.current.value = "";
+    }
+  };
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -343,6 +400,58 @@ export default function EditProfileModal({ isOpen, onClose, onSuccess, currentUs
                   <p className="font-bold text-slate-800">{formData.nama_lengkap || "Nama Lengkap"}</p>
                   <p className="text-xs text-slate-500">@{formData.username || "username"}</p>
                   <p className="text-xs text-violet-600 font-semibold mt-1">{formData.email}</p>
+                </div>
+              </div>
+
+              {/* Signature Upload */}
+              <div className="p-4 bg-slate-50 rounded-2xl">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0">
+                    <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">Tanda Tangan</p>
+                    {signatureUrl ? (
+                      <div className="relative w-32 h-16 bg-white border border-slate-200 rounded-lg overflow-hidden flex items-center justify-center">
+                        <img src={signatureUrl} alt="Tanda Tangan" className="max-w-full max-h-full object-contain" />
+                      </div>
+                    ) : (
+                      <div className="w-32 h-16 bg-white border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center">
+                        <span className="text-xs text-slate-400">Belum ada</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => signatureInputRef.current?.click()}
+                      disabled={isUploadingSignature}
+                      className="mt-2 w-32 px-3 py-1.5 bg-violet-600 text-white text-xs font-bold rounded-lg hover:bg-violet-700 transition disabled:opacity-50 flex items-center justify-center gap-1"
+                    >
+                      {isUploadingSignature ? (
+                        <>
+                          <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Upload...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                          </svg>
+                          {signatureUrl ? 'Ubah' : 'Upload'}
+                        </>
+                      )}
+                    </button>
+                    <input
+                      ref={signatureInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={handleSignatureChange}
+                    />
+                  </div>
+                  <div className="pt-6">
+                    <p className="text-xs text-slate-500">Tanda tangan akan muncul di dokumen hasil cetak (laporan kinerja, surat).</p>
+                    <p className="text-xs text-slate-400 mt-1">Format: PNG/JPG/WebP, maks 500KB. Resolusi tinggi menghasilkan tampilan terbaik.</p>
+                  </div>
                 </div>
               </div>
 

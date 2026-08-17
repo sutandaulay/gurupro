@@ -10,7 +10,7 @@ import { parseSessionCookie } from "@/lib/session-sign";
 const PROFILE_SELECT = `id, username, email, whatsapp, nama_lengkap, nama_sekolah, role, status_langganan,
   quota_poin_total, quota_poin_used, addon_poin, addon_poin_used, token_accumulated, referral_code, cashback_balance,
   bank_name, bank_account_number, bank_account_name, subscription_start, subscription_end, created_at,
-  photo_url, notification_tone, morning_briefing_enabled, weekly_recap_enabled, gender`;
+  photo_url, signature_url, notification_tone, morning_briefing_enabled, weekly_recap_enabled, gender`;
 
 async function syncFromNextAuth(): Promise<{ synced: boolean; oauthImage?: string | null }> {
   try {
@@ -135,6 +135,7 @@ async function fetchProfileData(userId: string, oauthImage: string | null) {
     subscription_end: user.subscription_end,
     created_at: user.created_at,
     photo_url: user.photo_url || oauthImage || null,
+    signature_url: user.signature_url || null,
     notification_tone: user.notification_tone || "hangat",
     morning_briefing_enabled: user.morning_briefing_enabled !== false,
     weekly_recap_enabled: user.weekly_recap_enabled !== false,

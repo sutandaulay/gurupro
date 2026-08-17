@@ -18,6 +18,19 @@
   --color-card: #ffffff;
   --color-card-foreground: #0f172a;
   --color-muted-foreground: #64748b;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0f172a;
+  --color-primary: #7c3aed;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f1f5f9;
+  --color-secondary-foreground: #0f172a;
+  --color-accent: #f1f5f9;
+  --color-accent-foreground: #4c1d95;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e2e8f0;
+  --color-input: #e2e8f0;
+  --color-ring: #7c3aed;
   --color-amber-850: #92400e;
   --color-amber-650: #d97706;
   --color-emerald-850: #065f46;
@@ -37,6 +50,19 @@
   --color-card: #1e293b;
   --color-card-foreground: #f8fafc;
   --color-muted-foreground: #94a3b8;
+  --color-popover: #1e293b;
+  --color-popover-foreground: #f8fafc;
+  --color-primary: #8b5cf6;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #334155;
+  --color-secondary-foreground: #f8fafc;
+  --color-accent: #334155;
+  --color-accent-foreground: #f8fafc;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #334155;
+  --color-input: #334155;
+  --color-ring: #8b5cf6;
   --color-amber-850: #fcd34d;
   --color-amber-650: #fbbf24;
   --color-emerald-850: #6ee7b7;
@@ -709,6 +735,19 @@
 :where(.dark) .bg-muted { background-color: #334155 !important; }
 :where(.dark) .bg-background { background-color: #0f172a !important; }
 :where(.dark) .bg-card { background-color: #1e293b !important; }
+:where(.dark) .bg-popover { background-color: #1e293b !important; }
+:where(.dark) .text-popover-foreground { color: #f8fafc !important; }
+:where(.dark) .bg-primary { background-color: #6d28d9 !important; }
+:where(.dark) .text-primary-foreground { color: #ffffff !important; }
+:where(.dark) .bg-secondary { background-color: #334155 !important; }
+:where(.dark) .text-secondary-foreground { color: #f8fafc !important; }
+:where(.dark) .bg-accent { background-color: #334155 !important; }
+:where(.dark) .text-accent-foreground { color: #f8fafc !important; }
+:where(.dark) .bg-destructive { background-color: #dc2626 !important; }
+:where(.dark) .text-destructive-foreground { color: #ffffff !important; }
+:where(.dark) .border-input { border-color: #475569 !important; }
+:where(.dark) .border-border { border-color: #334155 !important; }
+:where(.dark) .ring-ring { --tw-ring-color: #8b5cf6 !important; }
 
 /* Light tint backgrounds → solid dark so text is visible */
 :where(.dark) .bg-indigo-50,

@@ -102,7 +102,6 @@ export function LaporanGeneratingOverlay({
         'shadow-2xl animate-in fade-in zoom-in-95 duration-300'
       )}>
         <div className="text-center mb-6">
-          <div className="text-4xl mb-3 animate-bounce">📊</div>
           <h2 className="text-lg font-semibold">Sedang merangkum hasil kerja keras Anda...</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Biasanya selesai dalam 15-30 detik

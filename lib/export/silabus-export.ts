@@ -19,11 +19,34 @@ import {
 // PDF EXPORT
 // ============================================
 
-export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buffer> {
+export async function generateSilabusPdfBuffer(
+  data: SilabusOutput,
+  options?: {
+    logoUrl?: string | null;
+    namaSekolah?: string;
+    alamat?: string | null;
+    npsn?: string | null;
+    kepalaNama?: string;
+    kepalaNip?: string | null;
+    guruNama?: string;
+    guruNip?: string | null;
+    guruSignatureUrl?: string | null;
+    kepalaSignatureUrl?: string | null;
+    lokasi?: string;
+    tanggal?: Date;
+  }
+): Promise<Buffer> {
+  const opts = options || {};
+  const {
+    logoUrl, namaSekolah, alamat, npsn,
+    kepalaNama, kepalaNip, guruNama, guruNip,
+    guruSignatureUrl, kepalaSignatureUrl, lokasi, tanggal,
+  } = opts;
+
   return new Promise((resolve, reject) => {
     // Use landscape A4
     const doc = new PDFDocument({
-      margin: 40,
+      margin: 0,
       size: 'A4',
       layout: 'landscape',
     });
@@ -33,13 +56,126 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', (err) => reject(err));
 
+    // In landscape: page.width > page.height
     const pageWidth = doc.page.width;
     const pageHeight = doc.page.height;
-    const contentWidth = pageWidth - 80;
+    // Standard margins: left 3cm (85pt), right 2cm (57pt), top 2.5cm (71pt), bottom 2cm (57pt)
+    const ML = 85;
+    const MR = 57;
+    const MT = 71;
+    const MB = 57;
+    const CW = pageWidth - ML - MR;
 
-    // Page numbering
+    const BLACK = '#000000';
+    const DARK = '#1F2937';
+    const GRAY = '#9CA3AF';
+    const primaryColor = '#1E3A8A';
+    const headerBg = '#E0E7FF';
+    const borderColor = '#334155';
+
+    let y = MT;
     let pageNum = 1;
+
     const addPageNumber = () => {
+      doc.font('Helvetica').fontSize(8).fillColor(GRAY);
+      doc.text(
+        `Halaman ${pageNum}`,
+        ML,
+        pageHeight - MB + 8,
+        { align: 'center', width: CW }
+      );
+      doc.fillColor(BLACK);
+    };
+    addPageNumber();
+    doc.on('pageAdded', () => {
+      pageNum++;
+      addPageNumber();
+    });
+
+    // === KOP SEKOLAH ===
+    if (namaSekolah) {
+      if (logoUrl) {
+        try { doc.image(logoUrl, ML, y, { fit: [40, 40], align: 'center' }); } catch (_) {}
+      }
+      const nameX = logoUrl ? ML + 50 : ML;
+      doc.font('Helvetica-Bold').fontSize(13).fillColor(BLACK);
+      doc.text(namaSekolah.toUpperCase(), nameX, y + 5, {
+        width: CW - (logoUrl ? 50 : 0), align: 'center',
+      });
+      y += 22;
+      if (alamat) {
+        doc.font('Helvetica').fontSize(8).fillColor(GRAY);
+        doc.text(alamat, ML, y, { width: CW, align: 'center' });
+        y += 12;
+      }
+      if (npsn) {
+        doc.font('Helvetica').fontSize(8).fillColor(GRAY);
+        doc.text(`NPSN: ${npsn}`, ML, y, { width: CW, align: 'center' });
+        y += 12;
+      }
+      y += 4;
+      doc.moveTo(ML, y).lineTo(pageWidth - MR, y).lineWidth(2).stroke(borderColor);
+      y += 3;
+      doc.moveTo(ML, y).lineTo(pageWidth - MR, y).lineWidth(1).stroke(borderColor);
+      y += 14;
+    }
+
+    // Header
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(primaryColor).text(
+      'ALUR TUJUAN PEMBELAJARAN (ATP)',
+      ML, y,
+      { align: 'center', width: CW }
+    );
+    y += 16;
+
+    // Subtitle
+    doc.font('Helvetica').fontSize(9).fillColor('#4B5563').text(
+      `${data.identitas.mataPelajaran} | Fase ${data.identitas.fase} | Semester ${data.identitas.semester === 1 ? 'Ganjil' : 'Genap'}`,
+      ML, y,
+      { align: 'center', width: CW }
+    );
+    y += 16;
+
+    // Identitas Box
+    doc.rect(ML, y, CW, 30).stroke(borderColor);
+
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(primaryColor);
+    doc.text('Mata Pelajaran:', ML + 5, y + 4);
+    doc.text('Fase:', ML + 5, y + 16);
+    doc.font('Helvetica').fillColor(DARK);
+    doc.text(data.identitas.mataPelajaran, ML + 90, y + 4);
+    doc.text(data.identitas.fase, ML + 90, y + 16);
+
+    doc.font('Helvetica-Bold').fillColor(primaryColor);
+    doc.text('Semester:', ML + 300, y + 4);
+    doc.text('Tahun Ajaran:', ML + 300, y + 16);
+    doc.font('Helvetica').fillColor(DARK);
+    doc.text(data.identitas.semester === 1 ? 'Ganjil' : 'Genap', ML + 370, y + 4);
+    doc.text(data.identitas.tahunAjaran || '-', ML + 370, y + 16);
+    y += 34;
+
+    // Capaian Pembelajaran Section
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(primaryColor).text(
+      'CAPAIAN PEMBELAJARAN (CP)',
+      ML, y
+    );
+    y += 12;
+    doc.font('Helvetica').fontSize(8).fillColor('#374151');
+    doc.text(data.capaianPembelajaran, ML, y, { width: CW });
+    y += 14;
+
+    // Table Header
+    const tableY = y;
+
+    // Table column widths
+    const colWidths = {
+      no: 35,
+      topik: 120,
+      tujuan: 240,
+      dimensi: 100,
+      pertemuan: 45,
+      minggu: 40,
+    };
       doc.font('Helvetica').fontSize(8).fillColor('#9CA3AF');
       doc.text(
         `Halaman ${pageNum}`,
@@ -131,16 +267,15 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
 
     // Helper: Calculate text height with word-wrap
     const calculateTextHeight = (text: string, maxWidth: number, fontSize: number = 7): number => {
-      // Rough estimate: ~3 chars per "unit" width at fontSize 7
       const charsPerLine = Math.floor(maxWidth / (fontSize * 0.5));
       const lines = Math.ceil(text.length / charsPerLine);
-      return Math.max(lines * (fontSize + 2), 20); // Minimum 20px
+      return Math.max(lines * (fontSize + 2), 20);
     };
 
     // Draw header row
-    doc.rect(40, tableY, contentWidth, 20).fill(headerBg);
+    doc.rect(ML, tableY, CW, 20).fill(headerBg);
 
-    let xPos = 40;
+    let xPos = ML;
     doc.font('Helvetica-Bold').fontSize(7).fillColor(primaryColor);
 
     doc.text('No', xPos + 2, tableY + 6, { width: colWidths.no, align: 'center' });
@@ -162,20 +297,19 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
 
     // Table rows
     let rowY = tableY + 20;
-    let rowIndex = 0;
 
     data.alurTujuanPembelajaran.forEach((unit, idx) => {
       const isEven = idx % 2 === 0;
       const rowHeight = 35;
 
       // Check if we need a new page
-      if (rowY + rowHeight > pageHeight - 40) {
-        doc.addPage({ layout: 'landscape', margin: 40 });
-        rowY = 40;
+      if (rowY + rowHeight > pageHeight - MB) {
+        doc.addPage({ layout: 'landscape', margin: 0 });
+        rowY = MT;
 
         // Re-draw header on new page
-        doc.rect(40, rowY, contentWidth, 20).fill(headerBg);
-        xPos = 40;
+        doc.rect(ML, rowY, CW, 20).fill(headerBg);
+        xPos = ML;
         doc.font('Helvetica-Bold').fontSize(7).fillColor(primaryColor);
         doc.text('No', xPos + 2, rowY + 6, { width: colWidths.no, align: 'center' });
         xPos += colWidths.no;
@@ -194,11 +328,11 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
 
       // Row background
       if (isEven) {
-        doc.rect(40, rowY, contentWidth, rowHeight).fill('#F9FAFB');
+        doc.rect(ML, rowY, CW, rowHeight).fill('#F9FAFB');
       }
-      doc.rect(40, rowY, contentWidth, rowHeight).stroke(borderColor);
+      doc.rect(ML, rowY, CW, rowHeight).stroke(borderColor);
 
-      xPos = 40;
+      xPos = ML;
       doc.font('Helvetica-Bold').fontSize(7).fillColor(primaryColor).text(
         String(unit.unitKe),
         xPos,
@@ -207,7 +341,7 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
       );
       xPos += colWidths.no;
 
-      // Topik - with truncation for long text
+      // Topik
       const safeTopik = truncateText(unit.topik, 80);
       doc.font('Helvetica').fontSize(7).fillColor('#1F2937').text(
         safeTopik,
@@ -217,11 +351,8 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
       );
       xPos += colWidths.topik;
 
-      // Tujuan pembelajaran (multiple lines) - with truncation
-      const tpText = truncateText(
-        unit.tujuanPembelajaran.slice(0, 2).join('; '),
-        300
-      );
+      // Tujuan pembelajaran
+      const tpText = truncateText(unit.tujuanPembelajaran.slice(0, 2).join('; '), 300);
       doc.font('Helvetica').fontSize(6.5).fillColor('#374151').text(
         tpText,
         xPos + 2,
@@ -230,11 +361,8 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
       );
       xPos += colWidths.tujuan;
 
-      // Dimensi - with truncation
-      const dimensiText = truncateText(
-        unit.dimensiProfilLulusanTerhubung.slice(0, 2).join(', '),
-        100
-      );
+      // Dimensi
+      const dimensiText = truncateText(unit.dimensiProfilLulusanTerhubung.slice(0, 2).join(', '), 100);
       doc.font('Helvetica').fontSize(6.5).fillColor('#4B5563').text(
         dimensiText,
         xPos + 2,
@@ -260,23 +388,22 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
       );
 
       rowY += rowHeight;
-      rowIndex++;
     });
 
+    rowY += 8;
+
     // Total row
-    const totalY = rowY;
-    doc.rect(40, totalY, contentWidth, 20).fill(headerBg);
-    doc.rect(40, totalY, contentWidth, 20).stroke(borderColor);
+    doc.rect(ML, rowY, CW, 20).fill(headerBg);
+    doc.rect(ML, rowY, CW, 20).stroke(borderColor);
 
     doc.font('Helvetica-Bold').fontSize(8).fillColor(primaryColor);
-    doc.text('TOTAL', 42, totalY + 6);
+    doc.text('TOTAL', ML + 2, rowY + 6);
 
-    // Skip topik and tujuan columns
-    let totalX = 40 + colWidths.no + colWidths.topik + colWidths.tujuan;
+    let totalX = ML + colWidths.no + colWidths.topik + colWidths.tujuan + 5;
     doc.text(
       `Total: ${data.alurTujuanPembelajaran.length} Unit`,
-      totalX + 5,
-      totalY + 6,
+      totalX,
+      rowY + 6,
       { width: colWidths.dimensi - 5 }
     );
     totalX += colWidths.dimensi;
@@ -284,7 +411,7 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
     doc.text(
       String(data.totalEstimasi.totalPertemuan),
       totalX,
-      totalY + 6,
+      rowY + 6,
       { width: colWidths.pertemuan, align: 'center' }
     );
     totalX += colWidths.pertemuan;
@@ -292,9 +419,50 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
     doc.text(
       String(data.totalEstimasi.totalMinggu),
       totalX,
-      totalY + 6,
+      rowY + 6,
       { width: colWidths.minggu, align: 'center' }
     );
+
+    // === SIGNATURE BLOCK ===
+    if (kepalaNama || guruNama) {
+      rowY += 30;
+      const sigColW = CW / 2 - 10;
+      const sigDate = tanggal
+        ? new Date(tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+        : new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      // Left: Kepala Sekolah
+      doc.font('Helvetica').fontSize(9).fillColor(BLACK);
+      doc.text(`${lokasi || ''}, ${sigDate}`, ML, rowY, { width: sigColW });
+      rowY += 14;
+      doc.text("Kepala Sekolah,", ML, rowY, { width: sigColW });
+      rowY += 44;
+      if (kepalaSignatureUrl) {
+        try { doc.image(kepalaSignatureUrl, ML, rowY - 44, { fit: [100, 44], align: 'left' }); } catch (_) {}
+      }
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(BLACK);
+      doc.text(kepalaNama || '_____________________', ML, rowY, { width: sigColW });
+      rowY += 12;
+      doc.font('Helvetica').fontSize(8).fillColor(GRAY);
+      doc.text(`NIP. ${kepalaNip || '_____________________'}`);
+      rowY -= 44 + 14 + 12;
+
+      // Right: Guru
+      const rx = ML + sigColW + 20;
+      doc.font('Helvetica').fontSize(9).fillColor(BLACK);
+      doc.text(`${lokasi || ''}, ${sigDate}`, rx, rowY, { width: sigColW });
+      rowY += 14;
+      doc.text("Guru,", rx, rowY, { width: sigColW });
+      rowY += 44;
+      if (guruSignatureUrl) {
+        try { doc.image(guruSignatureUrl, rx, rowY - 44, { fit: [100, 44], align: 'left' }); } catch (_) {}
+      }
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(BLACK);
+      doc.text(guruNama || '_____________________', rx, rowY, { width: sigColW });
+      rowY += 12;
+      doc.font('Helvetica').fontSize(8).fillColor(GRAY);
+      doc.text(`NIP. ${guruNip || '_____________________'}`);
+    }
 
     doc.end();
   });
@@ -304,10 +472,84 @@ export async function generateSilabusPdfBuffer(data: SilabusOutput): Promise<Buf
 // DOCX EXPORT
 // ============================================
 
-export async function generateSilabusDocBuffer(data: SilabusOutput): Promise<Buffer> {
-  const pageWidth = 842; // A4 Landscape width in points
-  const margin = 40;
-  const contentWidth = pageWidth - margin * 2;
+export async function generateSilabusDocBuffer(
+  data: SilabusOutput,
+  options?: {
+    logoUrl?: string | null;
+    namaSekolah?: string;
+    alamat?: string | null;
+    npsn?: string | null;
+    kepalaNama?: string;
+    kepalaNip?: string | null;
+    guruNama?: string;
+    guruNip?: string | null;
+    guruSignatureUrl?: string | null;
+    kepalaSignatureUrl?: string | null;
+    lokasi?: string;
+    tanggal?: Date;
+  }
+): Promise<Buffer> {
+  const opts = options || {};
+  const {
+    logoUrl, namaSekolah, alamat, npsn,
+    kepalaNama, kepalaNip, guruNama, guruNip,
+    guruSignatureUrl, kepalaSignatureUrl, lokasi, tanggal,
+  } = opts;
+
+  // Kop sekolah HTML
+  const kopHtml = namaSekolah ? (() => {
+    const logoSection = logoUrl
+      ? `<td style="width:60px;text-align:center;vertical-align:middle;"><img src="${logoUrl}" alt="Logo" style="max-height:60px;max-width:60px;object-fit:contain;" /></td>`
+      : `<td style="width:60px;"></td>`;
+    const alamatLine = alamat ? `<p style="margin:2px 0;font-size:9pt;color:#555;">${alamat}</p>` : '';
+    const npsnLine = npsn ? `<p style="margin:2px 0;font-size:9pt;">NPSN: ${npsn}</p>` : '';
+    return `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
+      <tr>${logoSection}
+        <td style="text-align:center;vertical-align:middle;">
+          <h1 style="margin:0;font-size:15pt;font-weight:bold;color:#000;text-transform:uppercase;">${namaSekolah}</h1>
+          ${alamatLine}${npsnLine}
+        </td>
+        <td style="width:60px;"></td>
+      </tr>
+    </table>
+    <div style="border-bottom:2px solid #000;margin-bottom:16px;"></div>`;
+  })() : '';
+
+  // Signature block HTML
+  const sigDate = tanggal
+    ? new Date(tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+    : new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  const tempatLine = lokasi || '';
+  const kepalaSigImg = kepalaSignatureUrl
+    ? `<img src="${kepalaSignatureUrl}" alt="Tanda Tangan" style="height:60px;width:auto;object-fit:contain;display:block;margin:0 auto;" />`
+    : `<div style="height:60px;"></div>`;
+  const guruSigImg = guruSignatureUrl
+    ? `<img src="${guruSignatureUrl}" alt="Tanda Tangan" style="height:60px;width:auto;object-fit:contain;display:block;margin:0 auto;" />`
+    : `<div style="height:60px;"></div>`;
+
+  const signatureHtml = (kepalaNama || guruNama) ? `
+  <div style="margin-top:40px;page-break-inside:avoid;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div style="text-align:center;width:45%;">
+        <p style="margin:0 0 4px;font-size:11pt;">${tempatLine}, ${sigDate}</p>
+        <p style="margin:0 0 4px;font-size:11pt;">Kepala Sekolah,</p>
+        <div style="height:8px;"></div>
+        ${kepalaSigImg}
+        <div style="height:4px;"></div>
+        <p style="margin:0;font-size:11pt;text-decoration:underline;font-weight:bold;">${kepalaNama || '_____________________'}</p>
+        <p style="margin:4px 0 0;font-size:10pt;">NIP. ${kepalaNip || '_____________________'}</p>
+      </div>
+      <div style="text-align:center;width:45%;">
+        <p style="margin:0 0 4px;font-size:11pt;">${tempatLine}, ${sigDate}</p>
+        <p style="margin:0 0 4px;font-size:11pt;">Guru,</p>
+        <div style="height:8px;"></div>
+        ${guruSigImg}
+        <div style="height:4px;"></div>
+        <p style="margin:0;font-size:11pt;text-decoration:underline;font-weight:bold;">${guruNama || '_____________________'}</p>
+        <p style="margin:4px 0 0;font-size:10pt;">NIP. ${guruNip || '_____________________'}</p>
+      </div>
+    </div>
+  </div>` : '';
 
   // Build HTML for Word
   let html = `
@@ -319,7 +561,7 @@ export async function generateSilabusDocBuffer(data: SilabusOutput): Promise<Buf
   <style>
     @page {
       size: landscape;
-      margin: 1in;
+      margin: 2.5cm 2cm 2cm 3cm;
     }
     body {
       font-family: Arial, sans-serif;
@@ -442,6 +684,7 @@ export async function generateSilabusDocBuffer(data: SilabusOutput): Promise<Buf
   </style>
 </head>
 <body>
+  ${kopHtml}
   <div class="header">
     <h1>ALUR TUJUAN PEMBELAJARAN (ATP)</h1>
     <p>${data.identitas.mataPelajaran} | Fase ${data.identitas.fase} | Semester ${data.identitas.semester === 1 ? 'Ganjil' : 'Genap'}</p>
@@ -526,6 +769,8 @@ export async function generateSilabusDocBuffer(data: SilabusOutput): Promise<Buf
       </tbody>
     </table>
   </div>
+
+  ${signatureHtml}
 
   <div class="footer">
     ${BRAND_DISCLAIMER} | ${formatTanggalIndonesia(new Date())}

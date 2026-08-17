@@ -156,7 +156,7 @@ export default function SkpPlanningPage() {
         <span>Kembali</span>
       </Button>
 
-      <h1 className="text-2xl font-bold mb-2">📋 Rencana SKP Tahunan</h1>
+      <h1 className="text-2xl font-bold mb-2">Rencana SKP Tahunan</h1>
       <p className="text-muted-foreground mb-6">
         Pilih indikator kinerja yang akan menjadi fokus Anda tahun ini sesuai PKG 2026
       </p>

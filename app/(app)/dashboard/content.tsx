@@ -2421,7 +2421,7 @@ function DashboardContent() {
           .sig-container { display: flex; justify-content: space-between; margin-top: 40px; page-break-inside: avoid; }
           .sig-box { text-align: center; width: 22%; font-size: 9.5pt; }
           @media print {
-            @page { size: landscape; margin: 25mm 30mm 25mm 20mm; }
+            @page { size: landscape; margin: 25mm 20mm 20mm 30mm; }
           }
         </style>
       </head>

@@ -184,8 +184,10 @@ function LoginContent() {
   // New UI states
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   // Auto-switch to register mode if URL has mode=register or ref code
   useEffect(() => {
@@ -228,6 +230,7 @@ function LoginContent() {
     setError(null);
     setEmailError(null);
     setPasswordError(null);
+    setConfirmError(null);
   };
 
   // Handle login/register form submission via fetch API
@@ -236,10 +239,21 @@ function LoginContent() {
     setError(null);
     setEmailError(null);
     setPasswordError(null);
+    setConfirmError(null);
     setLoading(true);
 
     const form = e.currentTarget;
     const formData = new FormData(form);
+
+    if (isRegister) {
+      const password = formData.get('password')?.toString() || '';
+      const confirmPassword = formData.get('confirm_password')?.toString() || '';
+      if (confirmPassword !== password) {
+        setConfirmError('Konfirmasi kata sandi tidak cocok.');
+        setLoading(false);
+        return;
+      }
+    }
 
     // Add checkout_plan if present in URL
     const checkoutPlan = searchParams.get('checkout');
@@ -260,13 +274,13 @@ function LoginContent() {
 
       const data = await res.json();
 
-      if (res.ok && data.success) {
-        // Redirect to dashboard or admin based on response
-        router.push(data.redirectUrl);
-      } else if (data.requiresOtp) {
+      if (res.ok && data.requiresOtp) {
         setOtpUserId(data.userId);
         setForgotStep('verify_account');
         setSuccess(data.message || 'Silakan masukkan kode OTP yang dikirim.');
+      } else if (res.ok && data.success) {
+        // Redirect to dashboard or admin based on response
+        router.push(data.redirectUrl);
       } else {
         // Show error message
         setError(data.error || 'Terjadi kesalahan. Silakan coba lagi.');
@@ -706,6 +720,20 @@ function LoginContent() {
                   disabled={loading}
                   rightElement={passwordToggle(showPassword, setShowPassword)}
                 />
+
+                {isRegister && (
+                  <TextField
+                    label="Konfirmasi Kata Sandi"
+                    icon={IconLock}
+                    type={showConfirm ? 'text' : 'password'}
+                    name="confirm_password"
+                    required
+                    placeholder="Ulangi kata sandi Anda"
+                    error={confirmError}
+                    disabled={loading}
+                    rightElement={passwordToggle(showConfirm, setShowConfirm)}
+                  />
+                )}
 
                 {isRegister && (
                   <TextField

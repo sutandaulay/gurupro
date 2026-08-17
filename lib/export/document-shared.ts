@@ -180,6 +180,7 @@ export function buildIdentitasTableHTML(rows: [string, string][], options?: {
 // ============================================
 // BUILD SIGNATURE BLOCK HTML
 // Tanda tangan: kiri = guru, kanan = kepala sekolah
+// Supports image-based signatures (uploaded PNG/JPG)
 // ============================================
 export function buildSignatureBlockHTML(options: {
   guruNama: string;
@@ -188,23 +189,39 @@ export function buildSignatureBlockHTML(options: {
   kepalaNip?: string | null;
   lokasi?: string;
   tanggal?: string;
+  guruSignatureUrl?: string | null;
+  kepalaSignatureUrl?: string | null;
 }): string {
-  const { guruNama, guruNip, kepalaNama, kepalaNip, lokasi, tanggal } = options;
+  const { guruNama, guruNip, kepalaNama, kepalaNip, lokasi, tanggal, guruSignatureUrl, kepalaSignatureUrl } = options;
   const tempatLine = lokasi || '';
   const tanggalLine = tanggal || formatTanggalIndonesia(new Date());
+
+  const guruSigImg = guruSignatureUrl
+    ? `<img src="${escapeHtml(guruSignatureUrl)}" alt="Tanda Tangan Guru" style="height:60px;width:auto;object-fit:contain;display:block;margin:0 auto;" />`
+    : `<div style="height:60px;"></div>`;
+
+  const kepalaSigImg = kepalaSignatureUrl
+    ? `<img src="${escapeHtml(kepalaSignatureUrl)}" alt="Tanda Tangan Kepala Sekolah" style="height:60px;width:auto;object-fit:contain;display:block;margin:0 auto;" />`
+    : `<div style="height:60px;"></div>`;
 
   return `
   <div style="margin-top:40px;page-break-inside:avoid;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;">
       <div style="text-align:center;width:45%;">
-        <p style="margin:0 0 4px;font-size:11pt;">${escapeHtml(tempatLine)}</p>
-        <p style="margin:0 0 80px;font-size:11pt;">Kepala Sekolah,</p>
+        <p style="margin:0 0 4px;font-size:11pt;">${escapeHtml(tempatLine)}, ${escapeHtml(tanggalLine)}</p>
+        <p style="margin:0 0 4px;font-size:11pt;">Kepala Sekolah,</p>
+        <div style="height:8px;"></div>
+        ${kepalaSigImg}
+        <div style="height:4px;"></div>
         <p style="margin:0;font-size:11pt;text-decoration:underline;font-weight:bold;">${escapeHtml(kepalaNama || '_____________________')}</p>
         ${kepalaNip ? `<p style="margin:4px 0 0;font-size:10pt;">NIP. ${escapeHtml(kepalaNip)}</p>` : `<p style="margin:4px 0 0;font-size:10pt;">NIP. _____________________</p>`}
       </div>
       <div style="text-align:center;width:45%;">
-        <p style="margin:0 0 4px;font-size:11pt;">${escapeHtml(tempatLine)}</p>
-        <p style="margin:0 0 80px;font-size:11pt;">Guru,</p>
+        <p style="margin:0 0 4px;font-size:11pt;">${escapeHtml(tempatLine)}, ${escapeHtml(tanggalLine)}</p>
+        <p style="margin:0 0 4px;font-size:11pt;">Guru,</p>
+        <div style="height:8px;"></div>
+        ${guruSigImg}
+        <div style="height:4px;"></div>
         <p style="margin:0;font-size:11pt;text-decoration:underline;font-weight:bold;">${escapeHtml(guruNama || '_____________________')}</p>
         ${guruNip ? `<p style="margin:4px 0 0;font-size:10pt;">NIP. ${escapeHtml(guruNip)}</p>` : `<p style="margin:4px 0 0;font-size:10pt;">NIP. _____________________</p>`}
       </div>

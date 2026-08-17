@@ -163,7 +163,7 @@ export default function LeaveRequestPage() {
                   value={formData.type} 
                   onValueChange={(value: 'sakit' | 'izin' | 'cuti') => handleInputChange('type', value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-neutral-50 border-slate-200 shadow-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -181,20 +181,21 @@ export default function LeaveRequestPage() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-full justify-start text-left font-normal"
+                        className="w-full justify-start text-left font-normal bg-neutral-50 border-slate-200 shadow-sm"
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {formData.startDate ? format(formData.startDate, "PPP", { locale: id }) : <span>Pilih tanggal</span>}
                       </Button>
                     </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={formData.startDate}
-                          onSelect={(date) => date && handleInputChange('startDate', date)}
-                          locale={id}
-                        />
-                      </PopoverContent>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        weekStartsOn={0}
+                        selected={formData.startDate}
+                        onSelect={(date) => date && handleInputChange('startDate', date)}
+                        locale={id}
+                      />
+                    </PopoverContent>
                   </Popover>
                 </div>
 
@@ -204,20 +205,21 @@ export default function LeaveRequestPage() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-full justify-start text-left font-normal"
+                        className="w-full justify-start text-left font-normal bg-neutral-50 border-slate-200 shadow-sm"
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {formData.endDate ? format(formData.endDate, "PPP", { locale: id }) : <span>Pilih tanggal</span>}
                       </Button>
                     </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={formData.endDate}
-                          onSelect={(date) => date && handleInputChange('endDate', date)}
-                          locale={id}
-                        />
-                      </PopoverContent>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        weekStartsOn={0}
+                        selected={formData.endDate}
+                        onSelect={(date) => date && handleInputChange('endDate', date)}
+                        locale={id}
+                      />
+                    </PopoverContent>
                   </Popover>
                 </div>
               </div>
@@ -230,6 +232,7 @@ export default function LeaveRequestPage() {
                   onChange={(e) => handleInputChange('reason', e.target.value)}
                   placeholder="Jelaskan alasan Anda mengajukan izin..."
                   rows={4}
+                  className="bg-neutral-50 border-slate-200 shadow-sm"
                 />
                 <p className="text-sm text-muted-foreground">
                   Minimal 10 karakter
@@ -244,6 +247,7 @@ export default function LeaveRequestPage() {
                     type="file"
                     onChange={handleFileChange}
                     accept=".pdf,.jpg,.jpeg,.png"
+                    className="bg-neutral-50 border-slate-200 shadow-sm"
                   />
                   <Button type="button" variant="outline" size="icon">
                     <Upload className="h-4 w-4" />

@@ -78,7 +78,7 @@ export default function ObservasiListPage() {
             <span>←</span>
             <span>Kembali</span>
           </Button>
-          <h1 className="text-2xl font-bold">👁️ Observasi Kinerja</h1>
+          <h1 className="text-2xl font-bold">Observasi Kinerja</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Observasi kelas oleh Kepala Sekolah sesuai PKG 2026
           </p>
@@ -91,7 +91,7 @@ export default function ObservasiListPage() {
 
       {observasiList.length === 0 ? (
         <div className="text-center py-16">
-          <div className="text-4xl mb-4">👁️</div>
+          
           <p className="text-muted-foreground mb-3">Belum ada observasi kinerja</p>
           <p className="text-xs text-muted-foreground mb-4">
             Observasi dilakukan oleh Kepala Sekolah untuk menilai praktik kinerja di kelas

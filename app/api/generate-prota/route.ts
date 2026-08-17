@@ -158,10 +158,48 @@ Hasilkan seluruh dokumen PROTA tersebut langsung dalam format Markdown dengan ta
         const cleanMarkdown = (parsed.konten || "").trim();
         const docTitle = parsed.judul || `Program Tahunan - ${subjectList} Kelas ${kelas || ""}`;
 
-        const pdfBuf = await generatePdfBuffer(cleanMarkdown, docTitle);
+        // Fetch user info
+        const userRes = await query("SELECT nama_lengkap, nip, signature_url FROM users WHERE id = $1", [userId]);
+        const userInfo = userRes.rows[0] || {};
+
+        // Fetch school info
+        let schoolData: any = { nama_sekolah: school_name || null, alamat: null, npsn: school_npsn || null, logo: null, nama_kepala_sekolah: null, nip_kepala_sekolah: null, kepala_signature_url: null };
+        if (school_id) {
+          try {
+            const schoolRes = await query(
+              `SELECT s.nama_sekolah, s.alamat, s.npsn, s.logo,
+                      i.nama_kepala_sekolah, i.nip_kepala_sekolah,
+                      ks.signature_url AS kepala_signature_url
+               FROM user_schools us
+               JOIN schools s ON s.id = us.school_id
+               LEFT JOIN institutions i ON i.school_id = s.id
+               LEFT JOIN users ks ON ks.nama_sekolah = s.nama_sekolah AND ks.role = 'kepala_sekolah'
+               WHERE us.user_id = $1 AND s.id = $2`,
+              [userId, school_id]
+            );
+            if (schoolRes.rows[0]) schoolData = schoolRes.rows[0];
+          } catch (_) {}
+        }
+
+        const docOpts = {
+          logoUrl: schoolData.logo,
+          namaSekolah: schoolData.nama_sekolah,
+          alamat: schoolData.alamat,
+          npsn: schoolData.npsn,
+          kepalaNama: schoolData.nama_kepala_sekolah,
+          kepalaNip: schoolData.nip_kepala_sekolah,
+          guruNama: userInfo.nama_lengkap,
+          guruNip: userInfo.nip,
+          guruSignatureUrl: userInfo.signature_url,
+          kepalaSignatureUrl: schoolData.kepala_signature_url,
+          lokasi: schoolData.nama_sekolah,
+          tanggal: new Date(),
+        };
+
+        const pdfBuf = await generatePdfBuffer(cleanMarkdown, docTitle, docOpts);
         pdfUrl = await uploadToR2(pdfBuf, `${Date.now()}-prota.pdf`, "application/pdf");
 
-        const docBuf = generateDocBuffer(cleanMarkdown, docTitle);
+        const docBuf = generateDocBuffer(cleanMarkdown, docTitle, docOpts);
         docxUrl = await uploadToR2(docBuf, `${Date.now()}-prota.doc`, "application/msword");
       } catch (uploadErr) {
         console.error("Failed to compile or upload Prota files to R2:", uploadErr);

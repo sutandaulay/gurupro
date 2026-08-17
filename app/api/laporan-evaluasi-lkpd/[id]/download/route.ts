@@ -82,7 +82,7 @@ export async function POST(
 
     if (format === "docx") {
       const docBuf = generateLaporanEvaluasiDocBuffer(parsedData, docTitle);
-      const docUrl = await uploadToR2(docBuf, `${id}-laporan-evaluasi-lkpd.docx`, "application/msword");
+      const docUrl = await uploadToR2(docBuf, `${id}-laporan-evaluasi-lkpd.doc`, "application/msword");
 
       // Update URL in database
       await query(`

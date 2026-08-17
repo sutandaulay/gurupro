@@ -3,8 +3,11 @@ import { query as pgQuery } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { parseSessionCookie } from '@/lib/session-sign';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const schoolId = searchParams.get('school_id');
+
     const cookieStore = await cookies();
     const session = parseSessionCookie(cookieStore.get('gurupro_session')?.value);
     if (!session) {
@@ -75,7 +78,7 @@ export async function GET() {
       
       if (memberCheck.rows.length === 0) {
         const newMember = await pgQuery(
-          `INSERT INTO payload.institution_members (user_id, app_user_id, institution_id, status, joined_at, created_at, updated_at)
+          `INSERT INTO public.institution_members (user_id, app_user_id, institution_id, status, joined_at, created_at, updated_at)
            VALUES ($1, $2, $3, 'active', NOW(), NOW(), NOW())
            RETURNING id`,
           [cmsUserId, userId, instId]
@@ -84,8 +87,8 @@ export async function GET() {
         const memberId = newMember.rows[0].id;
         
         await pgQuery(
-          `INSERT INTO payload.institution_members_role ("order", parent_id, value)
-           VALUES (1, $1, 'guru')
+          `INSERT INTO public.institution_members_role (parent_id, value)
+           VALUES ($1, 'guru')
            ON CONFLICT DO NOTHING`,
           [memberId]
         );
@@ -94,7 +97,7 @@ export async function GET() {
 
     // 4. Query all active institutions connected to the user
     const connectedInsts = await pgQuery(
-      `SELECT i.id, i.name, i.location_latitude as latitude, i.location_longitude as longitude, 
+      `SELECT i.id, i.name, i.npsn, i.location_latitude as latitude, i.location_longitude as longitude, 
               i.attendance_settings_attendance_radius_meters as radius_meters, 
               i.attendance_settings_qr_code_enabled as qr_enabled
        FROM payload.institutions i
@@ -103,7 +106,25 @@ export async function GET() {
       [userId]
     );
 
-    const formatted = connectedInsts.rows.map((inst: any) => ({
+    // Bila school_id diberikan, tampilkan hanya institusi dari sekolah yang sedang aktif
+    let institutionRows = connectedInsts.rows;
+    if (schoolId) {
+      const schoolRes = await pgQuery(
+        "SELECT npsn, nama_sekolah FROM schools WHERE id = $1",
+        [schoolId]
+      );
+      if (schoolRes.rows.length === 0) {
+        return NextResponse.json({ error: 'Sekolah tidak ditemukan' }, { status: 404 });
+      }
+      const school = schoolRes.rows[0];
+      const mockNpsn = `MOCK_${schoolId.replace(/-/g, '').slice(0, 10)}`;
+      institutionRows = connectedInsts.rows.filter((inst: any) =>
+        inst.name === school.nama_sekolah ||
+        (inst.npsn && (inst.npsn === school.npsn || inst.npsn === mockNpsn))
+      );
+    }
+
+    const formatted = institutionRows.map((inst: any) => ({
       id: inst.id.toString(),
       name: inst.name,
       location: {

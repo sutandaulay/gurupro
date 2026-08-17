@@ -245,7 +245,7 @@ function generateDocContent(
   <meta charset="UTF-8">
   <title>${escapeHtml(title)} - ${contentTitle}</title>
   <style>
-    @page { margin: 2cm 2.5cm; size: A4; }
+    @page { margin: 2.5cm 2cm 2cm 3cm; size: A4; }
     * { box-sizing: border-box; }
     body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6; color: #000; margin: 0; padding: 20px; }
     h1 { font-size: 18pt; text-align: center; margin-bottom: 4px; text-transform: uppercase; }

@@ -206,7 +206,6 @@ export const masterMenus: MenuItem[] = [
     submenu: [
       { key: "chat_ai", label: "Chat AI", href: "/dashboard/chat" },
       { key: "analisis_kinerja_ai", label: "Analisis Kinerja AI", href: "/dashboard/ai-performance-report" },
-      { key: "deep_learning", label: "Deep Learning", href: "/dashboard" },
     ],
   },
   {

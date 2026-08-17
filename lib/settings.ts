@@ -125,7 +125,7 @@ export async function getEmailSenderConfig(): Promise<EmailSenderConfig> {
     active: false,
     smtp: { host: "smtp.mailtrap.io", port: 2525, secure: false, user: "", pass: "" },
     sender_name: "GuruPRO Support",
-    sender_email: "no-reply@gurupro.id"
+    sender_email: "gurupro.ai@gmail.com"
   };
   const val = await getSystemSetting<EmailSenderConfig>("email_sender");
   return val ? { ...defaults, ...val } : defaults;

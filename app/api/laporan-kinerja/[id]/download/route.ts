@@ -1,6 +1,6 @@
 /**
  * API Route: /api/laporan-kinerja/[id]/download
- * Download laporan kinerja as DOCX (proper Word format)
+ * Download laporan kinerja as DOCX, PDF, or HTML
  */
 
 import { NextResponse } from 'next/server'
@@ -8,7 +8,6 @@ import { query } from '@/lib/db'
 import { getSessionFromCookieHeader } from '@/lib/session-sign'
 import {
   escapeHtml,
-  escapeHtmlPlain,
   formatTanggalIndonesia,
   getTahunAjaranDariTanggal,
   getSemesterDariTanggal,
@@ -18,8 +17,8 @@ import {
   buildDocumentFooterHTML,
   buildWordDocTemplate,
   newlinesToBulletList,
-  BRAND_DISCLAIMER,
 } from '@/lib/export/document-shared'
+import { generateLaporanKinerjaPdfBuffer } from '@/lib/export/laporan-kinerja-pdf'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -45,7 +44,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const format = searchParams.get('format') || 'docx'
 
     const result = await query(
-      `SELECT l.*, u.nama_lengkap, u.nip
+      `SELECT l.*, u.nama_lengkap, u.nip, u.signature_url AS guru_signature_url
        FROM laporan_kinerja l
        JOIN users u ON u.id = l.guru_id
        WHERE l.id = $1 AND l.guru_id = $2`,
@@ -63,12 +62,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     const sekolah = content?.identitas?.sekolah || ''
 
-    let schoolInfo: { nama_sekolah: string; alamat: string | null; npsn: string | null; logo: string | null } | null = null
+    let schoolInfo: {
+      nama_sekolah: string; alamat: string | null; npsn: string | null; logo: string | null;
+      nama_kepala_sekolah: string | null; nip_kepala_sekolah: string | null;
+      kepala_signature_url: string | null;
+    } | null = null
     try {
       const schoolRes = await query(
-        `SELECT s.nama_sekolah, s.alamat, s.npsn, s.logo
+        `SELECT s.nama_sekolah, s.alamat, s.npsn, s.logo,
+                i.nama_kepala_sekolah, i.nip_kepala_sekolah,
+                ks.signature_url AS kepala_signature_url
          FROM user_schools us
          JOIN schools s ON s.id = us.school_id
+         LEFT JOIN institutions i ON i.school_id = s.id
+         LEFT JOIN users ks ON ks.nama_sekolah = s.nama_sekolah AND ks.role = 'kepala_sekolah'
          WHERE us.user_id = $1`,
         [guruId]
       )
@@ -85,8 +92,49 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const tahunAjaran = getTahunAjaranDariTanggal(downloadDate)
     const semester = getSemesterDariTanggal(downloadDate)
     const semesterLabel = semester === 'ganjil' ? 'Ganjil' : 'Genap'
+    const guruSignatureUrl = laporan.guru_signature_url || null
 
-    const html = generateHTMLContent(laporan, content, sekolah, schoolInfo, guruId, tahunAjaran, semesterLabel, downloadDate)
+    const html = generateHTMLContent(laporan, content, sekolah, schoolInfo, guruId, tahunAjaran, semesterLabel, downloadDate, guruSignatureUrl)
+
+    // --- PDF generation ---
+    if (format === 'pdf') {
+      const pdfBuffer = await generateLaporanKinerjaPdfBuffer({
+        judul: laporan.judul || 'Laporan Kinerja',
+        semesterLabel,
+        tahunAjaran,
+        predikat: laporan.predikat,
+        namaSekolah: schoolInfo?.nama_sekolah || sekolah || 'Sekolah',
+        alamat: schoolInfo?.alamat,
+        npsn: schoolInfo?.npsn,
+        logoUrl: schoolInfo?.logo,
+        guruNama: guruNama,
+        guruNip: guruNip,
+        mataPelajaran: content?.identitas?.mata_pelajaran || '-',
+        kelas: content?.identitas?.kelas || '-',
+        sekolah: sekolah || '-',
+        periode: content?.identitas?.periode || '-',
+        sections: (content?.sections || []).map((s: any) => ({ heading: s.heading || '', content: s.content || '' })),
+        ringkasanSingkat: content?.ringkasan_singkat,
+        kepalaNama: schoolInfo?.nama_kepala_sekolah || '_____________________',
+        kepalaNip: schoolInfo?.nip_kepala_sekolah,
+        guruNamaTtd: guruNama,
+        guruNipTtd: guruNip,
+        lokasi: sekolah || '',
+        tanggal: downloadDate,
+        kepalaSignatureUrl: schoolInfo?.kepala_signature_url || undefined,
+        guruSignatureUrl: guruSignatureUrl || undefined,
+      })
+
+      const filename = `LaporanKinerja_${(laporan.nama_lengkap || 'Guru').replace(/\s+/g, '_')}_${semesterLabel}_${tahunAjaran.replace('/', '-')}.pdf`
+
+      return new Response(pdfBuffer, {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+          'Content-Length': String(pdfBuffer.length),
+        },
+      })
+    }
 
     const contentType = format === 'docx'
       ? 'application/msword'
@@ -110,11 +158,16 @@ function generateHTMLContent(
   laporan: any,
   content: any,
   sekolah: string,
-  schoolInfo: { nama_sekolah: string; alamat: string | null; npsn: string | null; logo: string | null } | null,
+  schoolInfo: {
+    nama_sekolah: string; alamat: string | null; npsn: string | null; logo: string | null;
+    nama_kepala_sekolah: string | null; nip_kepala_sekolah: string | null;
+    kepala_signature_url: string | null;
+  } | null,
   guruId: string,
   tahunAjaran: string,
   semesterLabel: string,
   downloadDate: Date,
+  guruSignatureUrl?: string | null,
 ): string {
   const guruNama = escapeHtml(content?.identitas?.nama || laporan.nama_lengkap || '-')
   const guruNip = escapeHtml(content?.identitas?.nip || laporan.nip || '')
@@ -179,14 +232,19 @@ function generateHTMLContent(
   </div>`
     : ''
 
+  const kepalaNama = schoolInfo?.nama_kepala_sekolah || '_____________________'
+  const kepalaNip = schoolInfo?.nip_kepala_sekolah || undefined
+
   // --- Tanda Tangan ---
   const signatureHtml = buildSignatureBlockHTML({
     guruNama: guruNama,
     guruNip: guruNip,
-    kepalaNama: '_____________________',
-    kepalaNip: undefined,
+    kepalaNama: kepalaNama,
+    kepalaNip: kepalaNip,
     lokasi: sekolah || '',
     tanggal: formatTanggalIndonesia(downloadDate),
+    guruSignatureUrl: guruSignatureUrl || undefined,
+    kepalaSignatureUrl: schoolInfo?.kepala_signature_url || undefined,
   })
 
   // --- Footer ---

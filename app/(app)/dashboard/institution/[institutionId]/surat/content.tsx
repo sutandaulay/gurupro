@@ -7,6 +7,7 @@ interface SchoolHeader {
   nama_sekolah: string;
   alamat: string;
   npsn: string;
+  logo: string | null;
   nama_kepala_sekolah: string;
   nip_kepala_sekolah: string;
   academic_year_active: string;
@@ -200,17 +201,35 @@ export default function AiSuratContent() {
     return (
       <div className="bg-white shadow-sm rounded-xl border border-gray-200">
         {/* Kop surat */}
-        <div className="px-10 pt-8 text-center">
-          <div className="text-xl font-bold text-gray-900 uppercase tracking-wide leading-snug">
-            {school?.nama_sekolah || "—"}
-          </div>
-          <div className="text-xs text-gray-600 mt-1 max-w-xl mx-auto">
-            {school?.alamat || ""}
-          </div>
-          <div className="text-xs text-gray-500 mt-0.5">
-            NPSN: {school?.npsn || "-"}
-            {school?.academic_year_active ? ` | Tahun Ajaran: ${school.academic_year_active}` : ""}
-          </div>
+        <div className="px-10 pt-8">
+          <table className="w-full">
+            <tbody>
+              <tr>
+                {school?.logo && (
+                  <td className="w-16 align-middle text-center pr-4">
+                    <img
+                      src={school.logo}
+                      alt="Logo"
+                      className="max-h-16 max-w-16 object-contain mx-auto"
+                    />
+                  </td>
+                )}
+                <td className={school?.logo ? "text-center align-middle" : "text-center align-middle"}>
+                  <div className="text-xl font-bold text-gray-900 uppercase tracking-wide leading-snug">
+                    {school?.nama_sekolah || "—"}
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1 max-w-xl mx-auto">
+                    {school?.alamat || ""}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    NPSN: {school?.npsn || "-"}
+                    {school?.academic_year_active ? ` | Tahun Ajaran: ${school.academic_year_active}` : ""}
+                  </div>
+                </td>
+                {school?.logo && <td className="w-16" />}
+              </tr>
+            </tbody>
+          </table>
         </div>
         {/* Garis ganda kop */}
         <div className="px-0 mt-3">
@@ -319,12 +338,30 @@ export default function AiSuratContent() {
         <>
           {/* Kop surat preview */}
           {school && (
-            <div className="bg-white rounded-xl border border-gray-200 p-5 text-center">
-              <div className="text-lg font-bold text-gray-900 uppercase">
-                {school.nama_sekolah}
-              </div>
-              <div className="text-sm text-gray-500">{school.alamat}</div>
-              <div className="text-xs text-gray-400">NPSN: {school.npsn || "-"}</div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <table className="w-full">
+                <tbody>
+                  <tr>
+                    {school.logo && (
+                      <td className="w-16 align-middle text-center pr-4">
+                        <img
+                          src={school.logo}
+                          alt="Logo"
+                          className="max-h-16 max-w-16 object-contain mx-auto"
+                        />
+                      </td>
+                    )}
+                    <td className="text-center align-middle">
+                      <div className="text-lg font-bold text-gray-900 uppercase">
+                        {school.nama_sekolah}
+                      </div>
+                      <div className="text-sm text-gray-500">{school.alamat}</div>
+                      <div className="text-xs text-gray-400">NPSN: {school.npsn || "-"}</div>
+                    </td>
+                    {school.logo && <td className="w-16" />}
+                  </tr>
+                </tbody>
+              </table>
             </div>
           )}
 

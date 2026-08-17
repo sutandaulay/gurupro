@@ -65,7 +65,6 @@ const menuItems: MenuItem[] = [
     submenu: [
       { label: "Chat AI", href: "/dashboard/chat" },
       { label: "AI Performance Report", href: "/dashboard/ai-performance-report" },
-      { label: "Deep Learning", href: "/dashboard" },
     ],
   },
   {

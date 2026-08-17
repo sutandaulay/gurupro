@@ -121,7 +121,7 @@ export default function LaporanKinerjaListPage() {
     <div className="container max-w-4xl mx-auto py-6 px-4">
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">📋 Laporan Kinerja</h1>
+          <h1 className="text-2xl font-bold">Laporan Kinerja</h1>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="secondary" onClick={() => router.push('/dashboard/laporan-kinerja/buat')} className="gap-2">
@@ -129,7 +129,6 @@ export default function LaporanKinerjaListPage() {
             <span>Buat Baru</span>
           </Button>
           <Button variant="secondary" onClick={() => router.push('/dashboard/laporan-kinerja/observasi')} className="gap-2">
-            <span>👁️</span>
             <span>Observasi</span>
           </Button>
         </div>
@@ -138,7 +137,7 @@ export default function LaporanKinerjaListPage() {
       {/* SKP Tahunan Section */}
       <div className="bg-card border rounded-xl p-6 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-lg">📋 SKP Tahunan</h2>
+          <h2 className="font-semibold text-lg">SKP Tahunan</h2>
           {!activeSkp && (
             <Button onClick={() => router.push('/dashboard/laporan-kinerja/skp')} className="gap-2 text-sm">
               <span>+</span>
@@ -185,7 +184,7 @@ export default function LaporanKinerjaListPage() {
       {/* Laporan Tergenerate Section */}
       <div className="bg-card border rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-lg">📄 Laporan Tergenerate</h2>
+          <h2 className="font-semibold text-lg">Laporan Tergenerate</h2>
           <div className="flex gap-2 items-center">
             <Label className="text-xs text-slate-500">Status:</Label>
             <Select value={statusFilter} onValueChange={setStatusFilter}>

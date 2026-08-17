@@ -146,7 +146,7 @@ export default function BuatObservasiPage() {
         <span>Kembali</span>
       </Button>
 
-      <h1 className="text-2xl font-bold mb-2">👁️ Observasi Kinerja Baru</h1>
+      <h1 className="text-2xl font-bold mb-2">Observasi Kinerja Baru</h1>
       <p className="text-muted-foreground mb-6">
         Input hasil observasi kelas sesuai indikator kinerja PKG 2026
       </p>
@@ -204,7 +204,7 @@ export default function BuatObservasiPage() {
 
       {/* Indikator Ratings */}
       <div className="bg-card border rounded-xl p-6 mb-6">
-        <h2 className="font-semibold mb-4">📊 Penilaian Indikator</h2>
+        <h2 className="font-semibold mb-4">Penilaian Indikator</h2>
         <p className="text-xs text-muted-foreground mb-4">
           Beri rating 1–4 untuk setiap indikator yang terobservasi (1=Kurang, 2=Cukup, 3=Baik, 4=Sangat Baik)
         </p>
@@ -319,7 +319,6 @@ export default function BuatObservasiPage() {
             </>
           ) : (
             <>
-              <span>✓</span>
               <span>Simpan Observasi</span>
             </>
           )}

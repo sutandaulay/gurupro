@@ -262,7 +262,7 @@ export default function ViewLaporanKinerjaPage() {
             <span>←</span>
             <span>Kembali</span>
           </Button>
-          <h1 className="text-2xl font-bold">📄 {laporan.judul}</h1>
+          <h1 className="text-2xl font-bold">{laporan.judul}</h1>
           <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground flex-wrap">
             <span>Semester {laporan.semester === 'ganjil' ? 'Ganjil' : 'Genap'}</span>
             <span>•</span>
@@ -290,22 +290,18 @@ export default function ViewLaporanKinerjaPage() {
       {/* Action Buttons */}
       <div className="flex gap-2 mb-6 flex-wrap">
         <Button variant="secondary" onClick={() => handleDownload('docx')} disabled={downloading} className="gap-2">
-          <span>📥</span>
           <span>Download Word</span>
         </Button>
         <Button variant="secondary" onClick={() => handleDownload('pdf')} disabled={downloading} className="gap-2">
-          <span>📄</span>
           <span>Download PDF</span>
         </Button>
         {laporan.status !== 'final' && (
           <Button onClick={handleFinalize} className="gap-2">
-            <span>✓</span>
             <span>Finalisasi</span>
           </Button>
         )}
         {laporan.status !== 'final' && observasiList.length > 0 && (
           <Button onClick={() => { setShowPredikatForm(true); setSelectedPredikat(laporan.predikat || '') }} variant="secondary" className="gap-2">
-            <span>🏆</span>
             <span>Tetapkan Predikat</span>
           </Button>
         )}

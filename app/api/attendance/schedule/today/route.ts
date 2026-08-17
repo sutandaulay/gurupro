@@ -2,9 +2,13 @@ import { NextResponse } from 'next/server';
 import { query as pgQuery } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { parseSessionCookie } from '@/lib/session-sign';
+import { requireSchoolAccess } from '@/lib/school-access';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const schoolId = searchParams.get('school_id');
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('gurupro_session')?.value;
     if (!sessionCookie) {
@@ -16,8 +20,20 @@ export async function GET() {
     }
     const userId = session.id;
 
+    if (schoolId) {
+      try {
+        await requireSchoolAccess(schoolId);
+      } catch (err) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
     const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
     const todayDay = days[new Date().getDay()];
+
+    // Filter jadwal ke sekolah yang sedang aktif bila school_id diberikan
+    const schoolFilter = schoolId ? ' AND sc.school_id = $3' : '';
+    const schoolParams = schoolId ? [schoolId] : [];
 
     // 1. Fetch schedules via user_school_assignments (institutional teachers)
     const institutionSchedules = await pgQuery(
@@ -30,9 +46,9 @@ export async function GET() {
        JOIN schools s ON sc.school_id = s.id
        JOIN user_school_assignments usa ON usa."schoolId" = s.id
        LEFT JOIN payload.institutions i ON i.npsn = s.npsn OR i.name = s.nama_sekolah
-       WHERE usa."userId" = $1 AND sc.hari = $2
+       WHERE usa."userId" = $1 AND sc.hari = $2${schoolFilter}
        ORDER BY sc.jam_mulai ASC`,
-      [userId, todayDay]
+      [userId, todayDay, ...schoolParams]
     );
 
     // 2. Fetch schedules for independent teachers who own their own schools
@@ -44,9 +60,9 @@ export async function GET() {
        JOIN classes c ON sc.class_id = c.id
        JOIN subjects sb ON sc.subject_id = sb.id
        JOIN schools s ON sc.school_id = s.id
-       WHERE s.user_id = $1 AND sc.hari = $2
+       WHERE s.user_id = $1 AND sc.hari = $2${schoolFilter}
        ORDER BY sc.jam_mulai ASC`,
-      [userId, todayDay]
+      [userId, todayDay, ...schoolParams]
     );
 
     // Merge and deduplicate by schedule id

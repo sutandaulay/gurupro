@@ -196,63 +196,189 @@ export async function generatePptxBuffer(slideMarkdown: string, topic: string): 
  * Generate PDF buffer from Markdown
  * With robust overflow handling
  */
-export async function generatePdfBuffer(markdown: string, title: string): Promise<Buffer> {
+export async function generatePdfBuffer(
+  markdown: string,
+  title: string,
+  options?: {
+    logoUrl?: string | null;
+    namaSekolah?: string;
+    alamat?: string | null;
+    npsn?: string | null;
+    kepalaNama?: string;
+    kepalaNip?: string | null;
+    guruNama?: string;
+    guruNip?: string | null;
+    guruSignatureUrl?: string | null;
+    kepalaSignatureUrl?: string | null;
+    lokasi?: string;
+    tanggal?: Date;
+  }
+): Promise<Buffer> {
+  const opts = options || {};
+  const {
+    logoUrl, namaSekolah, alamat, npsn,
+    kepalaNama, kepalaNip, guruNama, guruNip,
+    guruSignatureUrl, kepalaSignatureUrl, lokasi, tanggal,
+  } = opts;
+
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: "A4" });
+    const doc = new PDFDocument({ margin: 0, size: "A4" });
     const chunks: Buffer[] = [];
 
     doc.on("data", (chunk) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", (err) => reject(err));
 
-    // Document title
-    doc.font("Helvetica-Bold").fontSize(18).text(title, { align: "center" });
-    doc.moveDown(1.5);
+    const PAGE_WIDTH = doc.page.width as number;
+    const PAGE_HEIGHT = doc.page.height as number;
+    const ML = 85;   // 3cm
+    const MR = 57;   // 2cm
+    const MT = 71;    // 2.5cm
+    const MB = 57;    // 2cm
+    const CW = PAGE_WIDTH - ML - MR;
 
-    // Check for tables in markdown and handle them
-    const tableRegex = /\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g;
-    let lastIndex = 0;
-    let match;
+    const BLACK = '#000000';
+    const GRAY = '#6B7280';
+    const BORDER = '#374151';
 
-    const processLine = (line: string) => {
-      line = line.trim();
-      if (!line) {
-        doc.moveDown(0.4);
-        return;
-      }
+    let y = MT;
+    let pageNum = 1;
 
-      // Check header levels
-      if (line.startsWith("# ")) {
-        doc.font("Helvetica-Bold").fontSize(16).text(line.substring(2));
-        doc.moveDown(0.8);
-      } else if (line.startsWith("## ")) {
-        doc.font("Helvetica-Bold").fontSize(12).text(line.substring(3));
-        doc.moveDown(0.6);
-      } else if (line.startsWith("### ")) {
-        doc.font("Helvetica-Bold").fontSize(10).text(line.substring(4));
-        doc.moveDown(0.4);
-      } else if (line.startsWith("- ")) {
-        // Truncate bullet items for safety
-        const truncated = truncateText(line.substring(2), 100);
-        doc.font("Helvetica").fontSize(9).text("• " + truncated, { indent: 15 });
-        doc.moveDown(0.2);
-      } else {
-        // Plain text: strip out bold/italic styling tags and truncate
-        const cleanText = line
-          .replace(/\*\*(.*?)\*\*/g, "$1")
-          .replace(/\*(.*?)\*/g, "$1");
-
-        // Truncate very long lines
-        const truncated = truncateText(cleanText, 500);
-        doc.font("Helvetica").fontSize(9).text(truncated, { align: "justify" });
-        doc.moveDown(0.3);
-      }
+    const checkPageBreak = (needed: number) => {
+      if (y + needed > PAGE_HEIGHT - MB) { doc.addPage(); y = MT; pageNum++; }
     };
 
+    const addPageNumber = () => {
+      doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+      doc.text(`Halaman ${pageNum}`, ML, PAGE_HEIGHT - MB + 10, { align: "center", width: CW });
+      doc.fillColor(BLACK);
+    };
+    addPageNumber();
+    // @ts-ignore
+    doc.on("pageAdded", () => { pageNum++; addPageNumber(); });
+
+    // === KOP SEKOLAH ===
+    if (namaSekolah) {
+      if (logoUrl) {
+        try { doc.image(logoUrl, ML, y, { fit: [50, 50], align: 'center' }); } catch (_) {}
+      }
+      const nameX = logoUrl ? ML + 65 : ML;
+      doc.font("Helvetica-Bold").fontSize(15).fillColor(BLACK);
+      doc.text(namaSekolah.toUpperCase(), nameX, y + 8, {
+        width: CW - (logoUrl ? 65 : 0), align: 'center',
+      });
+      y += 28;
+      if (alamat) {
+        doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+        doc.text(alamat, ML, y, { width: CW, align: 'center' });
+        y += 13;
+      }
+      if (npsn) {
+        doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+        doc.text(`NPSN: ${npsn}`, ML, y, { width: CW, align: 'center' });
+        y += 13;
+      }
+      y += 6;
+      doc.moveTo(ML, y).lineTo(PAGE_WIDTH - MR, y).lineWidth(2).stroke(BORDER);
+      y += 4;
+      doc.moveTo(ML, y).lineTo(PAGE_WIDTH - MR, y).lineWidth(1).stroke(BORDER);
+      y += 18;
+    }
+
+    // Document title
+    doc.font("Helvetica-Bold").fontSize(18).fillColor(BLACK);
+    doc.text(title, ML, y, { width: CW, align: "center" });
+    y += 30;
+
+    // Process markdown lines
     const lines = markdown.split("\n");
-    lines.forEach((line) => {
-      processLine(line);
-    });
+    for (const line of lines) {
+      const text = line.trim();
+      if (!text) {
+        y += 8;
+        continue;
+      }
+      if (text.startsWith("# ")) {
+        checkPageBreak(24);
+        doc.font("Helvetica-Bold").fontSize(14).fillColor(BLACK);
+        doc.text(text.substring(2), ML, y);
+        y += 20;
+      } else if (text.startsWith("## ")) {
+        checkPageBreak(20);
+        doc.font("Helvetica-Bold").fontSize(11).fillColor(BLACK);
+        doc.text(text.substring(3), ML, y);
+        y += 16;
+      } else if (text.startsWith("### ")) {
+        checkPageBreak(16);
+        doc.font("Helvetica-Bold").fontSize(10).fillColor(BLACK);
+        doc.text(text.substring(4), ML, y);
+        y += 14;
+      } else if (text.startsWith("- ") || text.startsWith("* ")) {
+        checkPageBreak(16);
+        doc.font("Helvetica").fontSize(9).fillColor(BLACK);
+        doc.text("• " + truncateText(text.substring(2), 100), ML, y);
+        y += 14;
+      } else if (text.startsWith("|")) {
+        // Table row - just render as text for now
+        checkPageBreak(14);
+        doc.font("Helvetica").fontSize(9).fillColor(BLACK);
+        const clean = text.replace(/\|/g, '  ').trim();
+        doc.text(clean, ML, y);
+        y += 14;
+      } else {
+        checkPageBreak(16);
+        const cleanText = text.replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1");
+        doc.font("Helvetica").fontSize(9).fillColor(BLACK);
+        doc.text(truncateText(cleanText, 500), ML, y, { width: CW, align: "justify" });
+        y += 14;
+      }
+    }
+
+    // === SIGNATURE BLOCK ===
+    if (kepalaNama || guruNama) {
+      checkPageBreak(100);
+      y += 8;
+      const sigColW = CW / 2 - 10;
+      const sigDate = tanggal
+        ? new Date(tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+        : new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      // Left: Kepala Sekolah
+      doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+      doc.text(`${lokasi || ''}, ${sigDate}`, ML, y, { width: sigColW });
+      y += 16;
+      doc.text("Kepala Sekolah,", ML, y, { width: sigColW });
+      y += 52;
+      if (kepalaSignatureUrl) {
+        try { doc.image(kepalaSignatureUrl, ML, y - 52, { fit: [120, 52], align: 'left' }); } catch (_) {}
+      }
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(BLACK);
+      doc.text(kepalaNama || '_____________________', ML, y, { width: sigColW });
+      y += 14;
+      doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+      doc.text(`NIP. ${kepalaNip || '_____________________'}`);
+      y -= 52 + 16 + 14;
+
+      // Right: Guru
+      const rx = ML + sigColW + 20;
+      doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+      doc.text(`${lokasi || ''}, ${sigDate}`, rx, y, { width: sigColW });
+      y += 16;
+      doc.text("Guru,", rx, y, { width: sigColW });
+      y += 52;
+      if (guruSignatureUrl) {
+        try { doc.image(guruSignatureUrl, rx, y - 52, { fit: [120, 52], align: 'left' }); } catch (_) {}
+      }
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(BLACK);
+      doc.text(guruNama || '_____________________', rx, y, { width: sigColW });
+      y += 14;
+      doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+      doc.text(`NIP. ${guruNip || '_____________________'}`);
+    }
+
+    // Footer
+    doc.font("Helvetica").fontSize(8).fillColor(GRAY);
+    doc.text("Dokumen ini dihasilkan oleh GuruPRO AI", ML, PAGE_HEIGHT - MB + 10, { align: "center", width: CW });
 
     doc.end();
   });
@@ -261,7 +387,31 @@ export async function generatePdfBuffer(markdown: string, title: string): Promis
 /**
  * Generate DOC (Word-compatible HTML) buffer
  */
-export function generateDocBuffer(markdown: string, title: string): Buffer {
+export function generateDocBuffer(
+  markdown: string,
+  title: string,
+  options?: {
+    logoUrl?: string | null;
+    namaSekolah?: string;
+    alamat?: string | null;
+    npsn?: string | null;
+    kepalaNama?: string;
+    kepalaNip?: string | null;
+    guruNama?: string;
+    guruNip?: string | null;
+    guruSignatureUrl?: string | null;
+    kepalaSignatureUrl?: string | null;
+    lokasi?: string;
+    tanggal?: Date;
+  }
+): Buffer {
+  const opts = options || {};
+  const {
+    logoUrl, namaSekolah, alamat, npsn,
+    kepalaNama, kepalaNip, guruNama, guruNip,
+    guruSignatureUrl, kepalaSignatureUrl, lokasi, tanggal,
+  } = opts;
+
   let bodyHtml = markdown
     .replace(/^### (.+)$/gm, '<h3 style="font-family: Arial, sans-serif; font-size: 13pt; color: #333333; margin-top: 10pt; margin-bottom: 4pt;">$1</h3>')
     .replace(/^## (.+)$/gm, '<h2 style="font-family: Arial, sans-serif; font-size: 15pt; color: #1E3A8A; margin-top: 16pt; margin-bottom: 6pt; border-bottom: 1px solid #CCCCCC; padding-bottom: 2pt;">$1</h2>')
@@ -283,6 +433,61 @@ export function generateDocBuffer(markdown: string, title: string): Buffer {
     return `<table style="width: 100%; border-collapse: collapse; margin: 12pt 0; font-size: 10pt; table-layout: fixed;">${headerRow}${bodyRows}</table>`;
   });
 
+  // Kop sekolah HTML
+  const kopHtml = namaSekolah ? (() => {
+    const logoSection = logoUrl
+      ? `<td style="width:60px;text-align:center;vertical-align:middle;"><img src="${logoUrl}" alt="Logo" style="max-height:60px;max-width:60px;object-fit:contain;" /></td>`
+      : `<td style="width:60px;"></td>`;
+    const alamatLine = alamat ? `<p style="margin:2px 0;font-size:9pt;color:#555;">${alamat}</p>` : '';
+    const npsnLine = npsn ? `<p style="margin:2px 0;font-size:9pt;">NPSN: ${npsn}</p>` : '';
+    return `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
+      <tr>${logoSection}
+        <td style="text-align:center;vertical-align:middle;">
+          <h1 style="margin:0;font-size:15pt;font-weight:bold;color:#000;text-transform:uppercase;">${namaSekolah}</h1>
+          ${alamatLine}${npsnLine}
+        </td>
+        <td style="width:60px;"></td>
+      </tr>
+    </table>
+    <div style="border-bottom:2px solid #000;margin-bottom:16px;"></div>`;
+  })() : '';
+
+  // Signature block HTML
+  const sigDate = tanggal
+    ? new Date(tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+    : new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  const tempatLine = lokasi || '';
+  const kepalaSigImg = kepalaSignatureUrl
+    ? `<img src="${kepalaSignatureUrl}" alt="Tanda Tangan" style="height:60px;width:auto;object-fit:contain;display:block;margin:0 auto;" />`
+    : `<div style="height:60px;"></div>`;
+  const guruSigImg = guruSignatureUrl
+    ? `<img src="${guruSignatureUrl}" alt="Tanda Tangan" style="height:60px;width:auto;object-fit:contain;display:block;margin:0 auto;" />`
+    : `<div style="height:60px;"></div>`;
+
+  const signatureHtml = (kepalaNama || guruNama) ? `
+  <div style="margin-top:40px;page-break-inside:avoid;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div style="text-align:center;width:45%;">
+        <p style="margin:0 0 4px;font-size:11pt;">${tempatLine}, ${sigDate}</p>
+        <p style="margin:0 0 4px;font-size:11pt;">Kepala Sekolah,</p>
+        <div style="height:8px;"></div>
+        ${kepalaSigImg}
+        <div style="height:4px;"></div>
+        <p style="margin:0;font-size:11pt;text-decoration:underline;font-weight:bold;">${kepalaNama || '_____________________'}</p>
+        <p style="margin:4px 0 0;font-size:10pt;">NIP. ${kepalaNip || '_____________________'}</p>
+      </div>
+      <div style="text-align:center;width:45%;">
+        <p style="margin:0 0 4px;font-size:11pt;">${tempatLine}, ${sigDate}</p>
+        <p style="margin:0 0 4px;font-size:11pt;">Guru,</p>
+        <div style="height:8px;"></div>
+        ${guruSigImg}
+        <div style="height:4px;"></div>
+        <p style="margin:0;font-size:11pt;text-decoration:underline;font-weight:bold;">${guruNama || '_____________________'}</p>
+        <p style="margin:4px 0 0;font-size:10pt;">NIP. ${guruNip || '_____________________'}</p>
+      </div>
+    </div>
+  </div>` : '';
+
   const html = `
     <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
     <head>
@@ -303,7 +508,9 @@ export function generateDocBuffer(markdown: string, title: string): Buffer {
       </style>
     </head>
     <body style="padding: 40px; font-family: Arial, sans-serif;">
+      ${kopHtml}
       ${bodyHtml}
+      ${signatureHtml}
     </body>
     </html>
   `;
@@ -319,101 +526,224 @@ export function generateDocBuffer(markdown: string, title: string): Buffer {
  * Generate print-ready PDF for structured LKPD
  * With robust overflow handling
  */
-export async function generateLkpdPdfBuffer(lkpdData: LKPDOutput, title: string): Promise<Buffer> {
+export async function generateLkpdPdfBuffer(
+  lkpdData: LKPDOutput,
+  title: string,
+  options?: {
+    logoUrl?: string | null;
+    namaSekolah?: string;
+    alamat?: string | null;
+    npsn?: string | null;
+    kepalaNama?: string;
+    kepalaNip?: string | null;
+    guruNama?: string;
+    guruNip?: string | null;
+    guruSignatureUrl?: string | null;
+    kepalaSignatureUrl?: string | null;
+    lokasi?: string;
+    tanggal?: Date;
+  }
+): Promise<Buffer> {
+  const opts = options || {};
+  const {
+    logoUrl, namaSekolah, alamat, npsn,
+    kepalaNama, kepalaNip, guruNama, guruNip,
+    guruSignatureUrl, kepalaSignatureUrl, lokasi, tanggal,
+  } = opts;
+
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: "A4" });
+    const doc = new PDFDocument({ margin: 0, size: "A4" });
     const chunks: Buffer[] = [];
 
     doc.on("data", (chunk) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", (err) => reject(err));
 
-    const { identitas, petunjukPengerjaan, tujuanKegiatan, aktivitas, refleksiSingkat } = lkpdData;
+    const PAGE_WIDTH = doc.page.width as number;
+    const PAGE_HEIGHT = doc.page.height as number;
+    const ML = 85;   // 3cm left
+    const MR = 57;   // 2cm right
+    const MT = 71;    // 2.5cm top
+    const MB = 57;    // 2cm bottom
+    const CW = PAGE_WIDTH - ML - MR;
 
-    // Page numbering
+    const BLACK = '#000000';
+    const GRAY = '#6B7280';
+    const BORDER = '#374151';
+
+    let y = MT;
     let pageNum = 1;
+
+    const checkPageBreak = (needed: number) => {
+      if (y + needed > PAGE_HEIGHT - MB) { doc.addPage(); y = MT; pageNum++; }
+    };
+
     const addPageNumber = () => {
-      doc.font("Helvetica").fontSize(8).fillColor("#999");
-      doc.text(`Halaman ${pageNum}`, 50, doc.page.height - 40, { align: "center", width: 510 });
-      doc.fillColor("#000");
+      doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+      doc.text(`Halaman ${pageNum}`, ML, PAGE_HEIGHT - MB + 10, { align: "center", width: CW });
+      doc.fillColor(BLACK);
     };
     addPageNumber();
-    // @ts-ignore - PDFKit custom event
+    // @ts-ignore
     doc.on("pageAdded", () => { pageNum++; addPageNumber(); });
 
-    // Header
-    doc.font("Helvetica-Bold").fontSize(14).text("LEMBAR KERJA PESERTA DIDIK (LKPD)", { align: "center" });
-    doc.moveDown(0.5);
+    // === KOP SEKOLAH ===
+    if (namaSekolah) {
+      if (logoUrl) {
+        try { doc.image(logoUrl, ML, y, { fit: [50, 50], align: 'center' }); } catch (_) {}
+      }
+      const nameX = logoUrl ? ML + 65 : ML;
+      doc.font("Helvetica-Bold").fontSize(15).fillColor(BLACK);
+      doc.text(namaSekolah.toUpperCase(), nameX, y + 8, {
+        width: CW - (logoUrl ? 65 : 0), align: 'center',
+      });
+      y += 28;
+      if (alamat) {
+        doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+        doc.text(alamat, ML, y, { width: CW, align: 'center' });
+        y += 13;
+      }
+      if (npsn) {
+        doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+        doc.text(`NPSN: ${npsn}`, ML, y, { width: CW, align: 'center' });
+        y += 13;
+      }
+      y += 6;
+      doc.moveTo(ML, y).lineTo(PAGE_WIDTH - MR, y).lineWidth(2).stroke(BORDER);
+      y += 4;
+      doc.moveTo(ML, y).lineTo(PAGE_WIDTH - MR, y).lineWidth(1).stroke(BORDER);
+      y += 18;
+    }
 
-    // Identitas - with truncation for safety
-    doc.font("Helvetica").fontSize(10);
-    doc.text(`Mata Pelajaran : ${truncateText(identitas.mataPelajaran, 50)}`, { indent: 0 });
-    doc.text(`Fase           : ${identitas.fase}`, { indent: 0 });
-    doc.text(`Topik          : ${truncateText(identitas.topik, 60)}`, { indent: 0 });
-    doc.moveDown(0.3);
+    // Document title
+    doc.font("Helvetica-Bold").fontSize(14).fillColor(BLACK);
+    doc.text("LEMBAR KERJA PESERTA DIDIK (LKPD)", ML, y, { width: CW, align: "center" });
+    y += 22;
 
-    // Name/Group fields (empty for handwriting)
-    const col1X = 50;
-    doc.font("Helvetica").fontSize(10);
-    doc.text(`Nama Siswa     : ________________________`, { indent: 0 });
-    doc.text(`Kelas          : ________`, { continued: true, indent: 0 });
-    doc.text(`   Kelompok     : ________`, { indent: col1X });
-    doc.moveDown(0.8);
+    const { identitas, petunjukPengerjaan, tujuanKegiatan, aktivitas, refleksiSingkat } = lkpdData;
+
+    // Identitas
+    doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+    doc.text(`Mata Pelajaran : ${truncateText(identitas.mataPelajaran, 50)}`, ML, y);
+    y += 14;
+    doc.text(`Fase           : ${identitas.fase}`, ML, y);
+    y += 14;
+    doc.text(`Topik          : ${truncateText(identitas.topik, 60)}`, ML, y);
+    y += 20;
+
+    // Name/Group fields
+    doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+    doc.text(`Nama Siswa     : ________________________`, ML, y);
+    y += 14;
+    doc.text(`Kelas          : ________     Kelompok     : ________`, ML, y);
+    y += 24;
 
     // Divider
-    doc.moveTo(50, doc.y).lineTo(560, doc.y).stroke();
-    doc.moveDown(0.5);
+    doc.moveTo(ML, y).lineTo(PAGE_WIDTH - MR, y).stroke(BORDER);
+    y += 18;
 
-    // Tujuan Kegiatan - with truncation
-    doc.font("Helvetica-Bold").fontSize(11).text("TUJUAN KEGIATAN", { underline: true });
-    doc.font("Helvetica").fontSize(10).text(truncateText(tujuanKegiatan, 280), { align: "justify" });
-    doc.moveDown(0.5);
+    // Tujuan Kegiatan
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(BLACK);
+    doc.text("TUJUAN KEGIATAN", ML, y);
+    y += 14;
+    doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+    doc.text(truncateText(tujuanKegiatan, 280), ML, y, { width: CW, align: "justify" });
+    y += 24;
 
-    // Petunjuk Pengerjaan - with truncation
-    doc.font("Helvetica-Bold").fontSize(11).text("PETUNJUK PENGERJAAN", { underline: true });
-    doc.font("Helvetica").fontSize(10);
+    // Petunjuk Pengerjaan
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(BLACK);
+    doc.text("PETUNJUK PENGERJAAN", ML, y);
+    y += 14;
+    doc.font("Helvetica").fontSize(10).fillColor(BLACK);
     petunjukPengerjaan.forEach((petunjuk, idx) => {
-      doc.text(`${idx + 1}. ${truncateText(petunjuk, 140)}`);
+      checkPageBreak(16);
+      doc.text(`${idx + 1}. ${truncateText(petunjuk, 140)}`, ML, y);
+      y += 14;
     });
-    doc.moveDown(0.5);
+    y += 10;
 
     // Aktivitas
-    doc.font("Helvetica-Bold").fontSize(11).text("AKTIVITAS", { underline: true });
-    doc.moveDown(0.3);
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(BLACK);
+    doc.text("AKTIVITAS", ML, y);
+    y += 14;
 
     aktivitas.forEach((act: Aktivitas) => {
-      // Activity header
-      doc.font("Helvetica-Bold").fontSize(10).text(`Aktivitas ${act.nomor} - ${act.tahap === 'memahami' ? 'MEMAHAMI' : 'MENGAPLIKASI'}`);
-      // Instruksi with truncation
-      doc.font("Helvetica").fontSize(10).text(truncateText(act.instruksi, 380), { align: "justify" });
-      doc.moveDown(0.3);
-
-      // Render response space based on jenisRespon
-      renderAktivitasSpace(doc, act);
-
-      doc.moveDown(0.5);
+      checkPageBreak(40);
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(BLACK);
+      doc.text(`Aktivitas ${act.nomor} - ${act.tahap === 'memahami' ? 'MEMAHAMI' : 'MENGAPLIKASI'}`, ML, y);
+      y += 14;
+      doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+      doc.text(truncateText(act.instruksi, 380), ML, y, { width: CW, align: "justify" });
+      y += 14;
+      renderAktivitasSpace(doc, act, ML, PAGE_WIDTH - MR);
+      y += 6;
     });
 
     // Refleksi Singkat
     if (refleksiSingkat.length > 0) {
-      doc.addPage();
-      doc.font("Helvetica-Bold").fontSize(11).text("REFLEKSI DIRI", { underline: true });
-      doc.moveDown(0.3);
-
+      checkPageBreak(60);
+      doc.font("Helvetica-Bold").fontSize(11).fillColor(BLACK);
+      doc.text("REFLEKSI DIRI", ML, y);
+      y += 14;
       refleksiSingkat.forEach((refleksi, idx) => {
-        doc.font("Helvetica").fontSize(10).text(`${idx + 1}. ${truncateText(refleksi, 190)}`);
-        // Draw lines for answers
+        checkPageBreak(40);
+        doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+        doc.text(`${idx + 1}. ${truncateText(refleksi, 190)}`, ML, y);
+        y += 14;
         for (let i = 0; i < 3; i++) {
-          doc.moveDown(0.2);
-          doc.moveTo(50, doc.y).lineTo(560, doc.y).stroke();
+          checkPageBreak(12);
+          doc.moveTo(ML, y).lineTo(PAGE_WIDTH - MR, y).stroke(BORDER);
+          y += 14;
         }
-        doc.moveDown(0.3);
+        y += 6;
       });
     }
 
+    // === SIGNATURE BLOCK ===
+    if (kepalaNama || guruNama) {
+      checkPageBreak(100);
+      y += 8;
+      const sigColW = CW / 2 - 10;
+      const sigDate = tanggal
+        ? new Date(tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+        : new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      // Left: Kepala Sekolah
+      doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+      doc.text(`${lokasi || ''}, ${sigDate}`, ML, y, { width: sigColW });
+      y += 16;
+      doc.text("Kepala Sekolah,", ML, y, { width: sigColW });
+      y += 52;
+      if (kepalaSignatureUrl) {
+        try { doc.image(kepalaSignatureUrl, ML, y - 52, { fit: [120, 52], align: 'left' }); } catch (_) {}
+      }
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(BLACK);
+      doc.text(kepalaNama || '_____________________', ML, y, { width: sigColW });
+      y += 14;
+      doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+      doc.text(`NIP. ${kepalaNip || '_____________________'}`);
+      y -= 52 + 16 + 14;
+
+      // Right: Guru
+      const rx = ML + sigColW + 20;
+      doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+      doc.text(`${lokasi || ''}, ${sigDate}`, rx, y, { width: sigColW });
+      y += 16;
+      doc.text("Guru,", rx, y, { width: sigColW });
+      y += 52;
+      if (guruSignatureUrl) {
+        try { doc.image(guruSignatureUrl, rx, y - 52, { fit: [120, 52], align: 'left' }); } catch (_) {}
+      }
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(BLACK);
+      doc.text(guruNama || '_____________________', rx, y, { width: sigColW });
+      y += 14;
+      doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+      doc.text(`NIP. ${guruNip || '_____________________'}`);
+    }
+
     // Footer
-    doc.moveDown(1);
-    doc.font("Helvetica").fontSize(8).text("* LKPD ini dirancang untuk aktivitas belajar kelompok", { align: "center" });
+    doc.font("Helvetica").fontSize(8).fillColor(GRAY);
+    doc.text("Dokumen ini dihasilkan oleh GuruPRO AI", ML, PAGE_HEIGHT - MB + 10, { align: "center", width: CW });
 
     doc.end();
   });
@@ -422,15 +752,15 @@ export async function generateLkpdPdfBuffer(lkpdData: LKPDOutput, title: string)
 /**
  * Render answer space based on jenisRespon
  */
-function renderAktivitasSpace(doc: any, act: Aktivitas) {
+function renderAktivitasSpace(doc: any, act: Aktivitas, ml: number, mr: number) {
   const ruangJawabanBaris = act.ruangJawabanBaris || 3;
-  const pageWidth = 560;
+  const pageWidth = mr - ml;
 
   switch (act.jenisRespon) {
     case "isian_singkat":
       // Short answer - dots
       for (let i = 0; i < Math.min(ruangJawabanBaris, 3); i++) {
-        doc.text("_______________________________________________");
+        doc.text("_______________________________________________", ml, doc.y);
         doc.moveDown(0.1);
       }
       break;
@@ -438,7 +768,7 @@ function renderAktivitasSpace(doc: any, act: Aktivitas) {
     case "uraian":
       // Paragraph - lines
       for (let i = 0; i < ruangJawabanBaris; i++) {
-        doc.moveTo(50, doc.y).lineTo(pageWidth, doc.y).stroke();
+        doc.moveTo(ml, doc.y).lineTo(mr, doc.y).stroke();
         doc.moveDown(0.35);
       }
       break;
@@ -447,12 +777,12 @@ function renderAktivitasSpace(doc: any, act: Aktivitas) {
       // Table - draw grid
       const rows = Math.min(ruangJawabanBaris + 1, 6);
       const cols = 3;
-      const cellWidth = (pageWidth - 50) / cols;
+      const cellWidth = (pageWidth - ml) / cols;
       const cellHeight = 25;
 
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          const x = 50 + c * cellWidth;
+          const x = ml + c * cellWidth;
           const y = doc.y + r * cellHeight;
           doc.rect(x, y, cellWidth, cellHeight).stroke();
           if (r === 0) {
@@ -466,15 +796,15 @@ function renderAktivitasSpace(doc: any, act: Aktivitas) {
 
     case "gambar_diagram":
       // Box for drawing
-      doc.rect(50, doc.y, pageWidth - 50, 120).stroke();
-      doc.font("Helvetica").fontSize(8).text("(Ruang menggambar/membuat diagram)", 50, doc.y + 50, { width: pageWidth - 50, align: "center" });
+      doc.rect(ml, doc.y, pageWidth - ml, 120).stroke();
+      doc.font("Helvetica").fontSize(8).text("(Ruang menggambar/membuat diagram)", ml, doc.y + 50, { width: pageWidth - ml, align: "center" });
       doc.moveDown(10);
       break;
 
     case "checklist":
       // Checkbox list
       for (let i = 0; i < ruangJawabanBaris; i++) {
-        doc.rect(50, doc.y - 3, 8, 8).stroke();
+        doc.rect(ml, doc.y - 3, 8, 8).stroke();
         doc.text("_______________________________________________");
         doc.moveDown(0.3);
       }
@@ -494,7 +824,31 @@ function getTableHeader(col: number): string {
  * Generate DOCX buffer for structured LKPD
  * With robust overflow handling and word-wrap
  */
-export function generateLkpdDocBuffer(lkpdData: LKPDOutput, title: string): Buffer {
+export function generateLkpdDocBuffer(
+  lkpdData: LKPDOutput,
+  title: string,
+  options?: {
+    logoUrl?: string | null;
+    namaSekolah?: string;
+    alamat?: string | null;
+    npsn?: string | null;
+    kepalaNama?: string;
+    kepalaNip?: string | null;
+    guruNama?: string;
+    guruNip?: string | null;
+    guruSignatureUrl?: string | null;
+    kepalaSignatureUrl?: string | null;
+    lokasi?: string;
+    tanggal?: Date;
+  }
+): Buffer {
+  const opts = options || {};
+  const {
+    logoUrl, namaSekolah, alamat, npsn,
+    kepalaNama, kepalaNip, guruNama, guruNip,
+    guruSignatureUrl, kepalaSignatureUrl, lokasi, tanggal,
+  } = opts;
+
   const { identitas, petunjukPengerjaan, tujuanKegiatan, aktivitas, refleksiSingkat } = lkpdData;
 
   const aktivitasHtml = aktivitas.map((act: Aktivitas) => {
@@ -519,6 +873,62 @@ export function generateLkpdDocBuffer(lkpdData: LKPDOutput, title: string): Buff
     </div>
   ` : '';
 
+  // Kop sekolah HTML
+  const kopHtml = namaSekolah ? (() => {
+    const logoSection = logoUrl
+      ? `<td style="width:60px;text-align:center;vertical-align:middle;"><img src="${logoUrl}" alt="Logo" style="max-height:60px;max-width:60px;object-fit:contain;" /></td>`
+      : `<td style="width:60px;"></td>`;
+    const alamatLine = alamat ? `<p style="margin:2px 0;font-size:9pt;color:#555;">${alamat}</p>` : '';
+    const npsnLine = npsn ? `<p style="margin:2px 0;font-size:9pt;">NPSN: ${npsn}</p>` : '';
+    return `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
+      <tr>${logoSection}
+        <td style="text-align:center;vertical-align:middle;">
+          <h1 style="margin:0;font-size:15pt;font-weight:bold;color:#000;text-transform:uppercase;">${namaSekolah}</h1>
+          ${alamatLine}${npsnLine}
+        </td>
+        <td style="width:60px;"></td>
+      </tr>
+    </table>
+    <div style="border-bottom:2px solid #000;margin-bottom:16px;"></div>`;
+  })() : '';
+
+  // Signature block HTML
+  const sigDate = tanggal
+    ? new Date(tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+    : new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  const tempatLine = lokasi || '';
+
+  const kepalaSigImg = kepalaSignatureUrl
+    ? `<img src="${kepalaSignatureUrl}" alt="Tanda Tangan" style="height:60px;width:auto;object-fit:contain;display:block;margin:0 auto;" />`
+    : `<div style="height:60px;"></div>`;
+  const guruSigImg = guruSignatureUrl
+    ? `<img src="${guruSignatureUrl}" alt="Tanda Tangan" style="height:60px;width:auto;object-fit:contain;display:block;margin:0 auto;" />`
+    : `<div style="height:60px;"></div>`;
+
+  const signatureHtml = (kepalaNama || guruNama) ? `
+  <div style="margin-top:40px;page-break-inside:avoid;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div style="text-align:center;width:45%;">
+        <p style="margin:0 0 4px;font-size:11pt;">${tempatLine}, ${sigDate}</p>
+        <p style="margin:0 0 4px;font-size:11pt;">Kepala Sekolah,</p>
+        <div style="height:8px;"></div>
+        ${kepalaSigImg}
+        <div style="height:4px;"></div>
+        <p style="margin:0;font-size:11pt;text-decoration:underline;font-weight:bold;">${kepalaNama || '_____________________'}</p>
+        <p style="margin:4px 0 0;font-size:10pt;">NIP. ${kepalaNip || '_____________________'}</p>
+      </div>
+      <div style="text-align:center;width:45%;">
+        <p style="margin:0 0 4px;font-size:11pt;">${tempatLine}, ${sigDate}</p>
+        <p style="margin:0 0 4px;font-size:11pt;">Guru,</p>
+        <div style="height:8px;"></div>
+        ${guruSigImg}
+        <div style="height:4px;"></div>
+        <p style="margin:0;font-size:11pt;text-decoration:underline;font-weight:bold;">${guruNama || '_____________________'}</p>
+        <p style="margin:4px 0 0;font-size:10pt;">NIP. ${guruNip || '_____________________'}</p>
+      </div>
+    </div>
+  </div>` : '';
+
   const html = `
     <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
     <head>
@@ -538,6 +948,8 @@ export function generateLkpdDocBuffer(lkpdData: LKPDOutput, title: string): Buff
       </style>
     </head>
     <body style="padding: 40px; font-family: Arial, sans-serif;">
+      ${kopHtml}
+
       <h1 style="font-family: Arial, sans-serif; font-size: 16pt; text-align: center; margin-bottom: 10pt;">
         LEMBAR KERJA PESERTA DIDIK (LKPD)
       </h1>
@@ -587,6 +999,8 @@ export function generateLkpdDocBuffer(lkpdData: LKPDOutput, title: string): Buff
       ${aktivitasHtml}
 
       ${refleksiHtml}
+
+      ${signatureHtml}
 
       <div style="text-align: center; margin-top: 20pt; font-family: Arial, sans-serif; font-size: 8pt; color: #666;">
         LKPD ini dirancang untuk aktivitas belajar kelompok

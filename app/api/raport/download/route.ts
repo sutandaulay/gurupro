@@ -172,7 +172,7 @@ function generateRaportHTML(
   <meta charset="UTF-8">
   <title>Rapor - ${escapeHtml(siswa.nama_siswa)}</title>
   <style>
-    @page { margin: 2.5cm 2cm; size: A4; }
+    @page { margin: 2.5cm 2cm 2cm 3cm; size: A4; }
     * { box-sizing: border-box; }
     body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #111; margin: 0; padding: 0; line-height: 1.5; }
     h1 { text-align: center; font-size: 16pt; font-weight: bold; text-transform: uppercase; }

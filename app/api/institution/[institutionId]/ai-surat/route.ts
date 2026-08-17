@@ -33,7 +33,7 @@ async function getLeaderRoles(appUserId: string, institutionId: number): Promise
 
 async function getSchoolHeader(instId: number) {
   const res = await query(
-    `SELECT s.nama_sekolah, s.alamat, s.npsn, s.nama_kepala_sekolah, s.nip_kepala_sekolah,
+    `SELECT s.nama_sekolah, s.alamat, s.npsn, s.logo, s.nama_kepala_sekolah, s.nip_kepala_sekolah,
             i.academic_year_active
      FROM institutions i
      JOIN schools s ON s.id = i.school_id

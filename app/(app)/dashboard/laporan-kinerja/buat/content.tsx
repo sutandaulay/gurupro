@@ -154,7 +154,7 @@ export default function BuatLaporanKinerjaPage() {
         <span>Kembali</span>
       </Button>
 
-      <h1 className="text-2xl font-bold mb-2">🤖 Generate Laporan Kinerja</h1>
+      <h1 className="text-2xl font-bold mb-2">Generate Laporan Kinerja</h1>
       <p className="text-muted-foreground mb-6">
         AI akan menyusun laporan naratif lengkap berdasarkan evidence kerja Anda
       </p>
@@ -166,7 +166,7 @@ export default function BuatLaporanKinerjaPage() {
       )}
 
       <div className="bg-card border rounded-xl p-6 mb-6">
-        <h2 className="font-semibold mb-4">📋 Evidence yang Akan Dimasukkan</h2>
+        <h2 className="font-semibold mb-4">Evidence yang Akan Dimasukkan</h2>
 
         {evidenceData ? (
           <div className="space-y-4">
@@ -192,7 +192,7 @@ export default function BuatLaporanKinerjaPage() {
             {evidenceData.pelatihan && evidenceData.pelatihan.length > 0 && (
               <div>
                 <h3 className="text-sm font-medium mb-2">
-                  🎓 Pelatihan ({evidenceData.stat_cards.total_pelatihan} — {evidenceData.stat_cards.total_jam_pelatihan} jam)
+                  Pelatihan ({evidenceData.stat_cards.total_pelatihan} — {evidenceData.stat_cards.total_jam_pelatihan} jam)
                 </h3>
                 <div className="space-y-2">
                   {evidenceData.pelatihan.map((p) => (
@@ -219,7 +219,7 @@ export default function BuatLaporanKinerjaPage() {
             {!evidenceData.siap_laporan && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-sm text-amber-800">
-                  ⚠️ Beberapa indikator masih membutuhkan bukti lebih banyak.
+                  Beberapa indikator masih membutuhkan bukti lebih banyak.
                   Laporan tetap bisa dibuat, tapi akan ada catatan kekurangannya.
                 </p>
               </div>
@@ -272,7 +272,6 @@ export default function BuatLaporanKinerjaPage() {
             </>
           ) : (
             <>
-              <span>🤖</span>
               <span>Generate Laporan Kinerja</span>
             </>
           )}

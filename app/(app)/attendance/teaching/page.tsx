@@ -6,10 +6,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Pagination, usePagedItems } from '@/components/ui/pagination';
 import { Clock, School, BookOpen, MapPin, UserCheck, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { GeoValidationBadge } from '@/components/attendance/GeoValidationBadge';
 import { useSession } from 'next-auth/react';
+
+interface SchoolOption {
+  id: string;
+  nama_sekolah: string;
+}
 
 interface Institution {
   id: string;
@@ -69,19 +76,63 @@ export default function TeachingAttendancePage() {
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
   const [confirmingSwitch, setConfirmingSwitch] = useState<{ from: string; to: string } | null>(null);
+  const [schools, setSchools] = useState<SchoolOption[]>([]);
+  const [activeSchoolId, setActiveSchoolId] = useState<string>('');
+  const [schoolsReady, setSchoolsReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const schedulesPager = usePagedItems(schedules, 25);
 
-  // Simulasi pengambilan data jadwal dan institusi
+  // Muat daftar sekolah user dan tentukan sekolah yang sedang aktif
   useEffect(() => {
+    const loadSchools = async () => {
+      try {
+        const res = await apiFetch('/api/schools');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setSchools(data);
+            const saved = sessionStorage.getItem('gurupro_school_selected') || '';
+            if (data.some((s: SchoolOption) => String(s.id) === saved)) {
+              setActiveSchoolId(saved);
+            } else if (data.length > 0) {
+              const first = String(data[0].id);
+              sessionStorage.setItem('gurupro_school_selected', first);
+              setActiveSchoolId(first);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching schools:', err);
+      } finally {
+        setSchoolsReady(true);
+      }
+    };
+
+    loadSchools();
+  }, []);
+
+  // Simulasi pengambilan data jadwal dan institusi untuk sekolah aktif
+  useEffect(() => {
+    if (!schoolsReady) return;
+
     const fetchData = async () => {
       try {
         setLoading(true);
-        
+        setError(null);
+
+        // Hanya tampilkan data sekolah yang sedang aktif bila sudah terpilih
+        const scheduleUrl = activeSchoolId
+          ? `/api/attendance/schedule/today?school_id=${activeSchoolId}`
+          : '/api/attendance/schedule/today';
+        const institutionUrl = activeSchoolId
+          ? `/api/institutions?school_id=${activeSchoolId}`
+          : '/api/institutions';
+
         // Simulasi API call untuk mendapatkan jadwal mengajar hari ini
         const [scheduleRes, institutionRes] = await Promise.all([
-          apiFetch('/api/attendance/schedule/today'),
-          apiFetch('/api/institutions')
+          apiFetch(scheduleUrl),
+          apiFetch(institutionUrl)
         ]);
 
         if (!scheduleRes.ok || !institutionRes.ok) {
@@ -140,7 +191,15 @@ export default function TeachingAttendancePage() {
     };
 
     fetchData();
-  }, []);
+  }, [schoolsReady, activeSchoolId]);
+
+  const handleSchoolChange = (schoolId: string) => {
+    setActiveSchoolId(schoolId);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('gurupro_school_selected', schoolId);
+      window.dispatchEvent(new Event('gurupro_school_changed'));
+    }
+  };
 
   // Fungsi untuk mendapatkan lokasi
   const getLocation = (): Promise<{ latitude: number; longitude: number; accuracy: number }> => {
@@ -435,6 +494,31 @@ export default function TeachingAttendancePage() {
         </CardHeader>
         
         <CardContent className="space-y-6">
+          {/* Filter sekolah aktif */}
+          {schools.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-3">
+              <span className="text-sm font-medium flex items-center gap-2">
+                <School className="h-4 w-4 text-muted-foreground" />
+                Sekolah
+              </span>
+              <Select value={activeSchoolId} onValueChange={handleSchoolChange}>
+                <SelectTrigger className="w-[280px] h-9 bg-white">
+                  <SelectValue placeholder="Pilih sekolah" />
+                </SelectTrigger>
+                <SelectContent className="bg-white max-h-60">
+                  {schools.map((s) => (
+                    <SelectItem key={s.id} value={String(s.id)}>{s.nama_sekolah}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {activeSchoolId && schools.find((s) => String(s.id) === activeSchoolId) && (
+                <span className="text-xs text-muted-foreground ml-auto">
+                  Menampilkan jadwal untuk sekolah yang dipilih
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Konfirmasi pindah institusi */}
           {confirmingSwitch && (
             <Alert className="border-yellow-200 bg-yellow-50">
@@ -478,8 +562,9 @@ export default function TeachingAttendancePage() {
                 <p>Tidak ada jadwal mengajar hari ini</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                 {schedules.map((schedule) => {
+              <>
+                <div className="space-y-4">
+                 {schedulesPager.pagedItems.map((schedule) => {
                    const institution = schedule.schoolId 
                      ? null 
                      : institutions.find(inst => inst.id === schedule.institutionId);
@@ -569,7 +654,17 @@ export default function TeachingAttendancePage() {
                     </Card>
                   );
                 })}
-              </div>
+                </div>
+
+                <Pagination
+                  page={schedulesPager.page}
+                  pageSize={schedulesPager.pageSize}
+                  total={schedulesPager.total}
+                  totalPages={schedulesPager.totalPages}
+                  onPageChange={(p) => schedulesPager.reset(p)}
+                  onPageSizeChange={(s) => schedulesPager.setPageSize(s)}
+                />
+              </>
             )}
           </div>
         </CardContent>

@@ -256,10 +256,64 @@ Keluarkan HANYA JSON valid tanpa markdown fence atau teks pembuka.
     try {
       const docTitle = `LKPD - ${parsed.identitas.mataPelajaran} (Fase ${parsed.identitas.fase})`;
 
-      const pdfBuf = await generateLkpdPdfBuffer(parsed, docTitle);
+      // Fetch user info for signature
+      const userRes = await query(
+        "SELECT nama_lengkap, nip, signature_url FROM users WHERE id = $1",
+        [userId]
+      );
+      const userInfo = userRes.rows[0] || {};
+
+      // Fetch school info for kop sekolah and kepala signature
+      let schoolData: any = { nama_sekolah: input.school_name || null, alamat: null, npsn: input.school_npsn || null, logo: null, nama_kepala_sekolah: null, nip_kepala_sekolah: null, kepala_signature_url: null };
+      if (input.school_id) {
+        try {
+          const schoolRes = await query(
+            `SELECT s.nama_sekolah, s.alamat, s.npsn, s.logo,
+                    i.nama_kepala_sekolah, i.nip_kepala_sekolah,
+                    ks.signature_url AS kepala_signature_url
+             FROM user_schools us
+             JOIN schools s ON s.id = us.school_id
+             LEFT JOIN institutions i ON i.school_id = s.id
+             LEFT JOIN users ks ON ks.nama_sekolah = s.nama_sekolah AND ks.role = 'kepala_sekolah'
+             WHERE us.user_id = $1 AND s.id = $2`,
+            [userId, input.school_id]
+          );
+          if (schoolRes.rows[0]) {
+            schoolData = schoolRes.rows[0];
+          }
+        } catch (_) {}
+      }
+
+      const pdfBuf = await generateLkpdPdfBuffer(parsed, docTitle, {
+        logoUrl: schoolData.logo,
+        namaSekolah: schoolData.nama_sekolah,
+        alamat: schoolData.alamat,
+        npsn: schoolData.npsn,
+        kepalaNama: schoolData.nama_kepala_sekolah,
+        kepalaNip: schoolData.nip_kepala_sekolah,
+        guruNama: userInfo.nama_lengkap,
+        guruNip: userInfo.nip,
+        guruSignatureUrl: userInfo.signature_url,
+        kepalaSignatureUrl: schoolData.kepala_signature_url,
+        lokasi: schoolData.nama_sekolah,
+        tanggal: new Date(),
+      });
       pdfUrl = await uploadToR2(pdfBuf, `${Date.now()}-lkpd.pdf`, "application/pdf");
 
-      const docBuf = generateLkpdDocBuffer(parsed, docTitle);
+      const docBuf = generateLkpdDocBuffer(parsed, docTitle, {
+        logoUrl: schoolData.logo,
+        namaSekolah: schoolData.nama_sekolah,
+        alamat: schoolData.alamat,
+        npsn: schoolData.npsn,
+        kepalaNama: schoolData.nama_kepala_sekolah,
+        kepalaNip: schoolData.nip_kepala_sekolah,
+        guruNama: userInfo.nama_lengkap,
+        guruNip: userInfo.nip,
+        guruSignatureUrl: userInfo.signature_url,
+        kepalaSignatureUrl: schoolData.kepala_signature_url,
+        lokasi: schoolData.nama_sekolah,
+        tanggal: new Date(),
+      });
       docxUrl = await uploadToR2(docBuf, `${Date.now()}-lkpd.doc`, "application/msword");
     } catch (uploadErr) {
       console.error("Failed to compile or upload LKPD files:", uploadErr);

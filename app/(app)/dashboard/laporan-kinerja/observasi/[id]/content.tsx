@@ -131,7 +131,7 @@ export default function DetailObservasiPage() {
             <span>←</span>
             <span>Kembali</span>
           </Button>
-          <h1 className="text-2xl font-bold">👁️ Detail Observasi</h1>
+          <h1 className="text-2xl font-bold">Detail Observasi</h1>
           <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
             <span>
               {new Date(observasi.tanggal_observasi).toLocaleDateString('id-ID', {
@@ -167,7 +167,6 @@ export default function DetailObservasiPage() {
           </Button>
         )}
         <Button variant="destructive" onClick={handleHapus} className="gap-2">
-          <span>🗑️</span>
           <span>Hapus</span>
         </Button>
       </div>
@@ -192,7 +191,7 @@ export default function DetailObservasiPage() {
 
       {/* Indikator Ratings */}
       <div className="bg-card border rounded-xl p-6 mb-6">
-        <h2 className="font-semibold mb-4">📊 Penilaian Indikator</h2>
+        <h2 className="font-semibold mb-4">Penilaian Indikator</h2>
         <div className="space-y-4">
           {observasi.indikator_ratings?.map((r) => (
             <div key={r.id} className="border rounded-lg p-4">
@@ -229,21 +228,21 @@ export default function DetailObservasiPage() {
       {/* Catatan Observer */}
       {observasi.suasana_pembelajaran && (
         <div className="bg-card border rounded-xl p-6 mb-6">
-          <h2 className="font-semibold mb-2">🏫 Suasana Pembelajaran</h2>
+          <h2 className="font-semibold mb-2">Suasana Pembelajaran</h2>
           <p className="text-muted-foreground whitespace-pre-line">{observasi.suasana_pembelajaran}</p>
         </div>
       )}
 
       {observasi.catatan_observer && (
         <div className="bg-card border rounded-xl p-6 mb-6">
-          <h2 className="font-semibold mb-2">📝 Catatan Observer</h2>
+          <h2 className="font-semibold mb-2">Catatan Observer</h2>
           <p className="text-muted-foreground whitespace-pre-line">{observasi.catatan_observer}</p>
         </div>
       )}
 
       {observasi.rekomendasi && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-6">
-          <h2 className="font-semibold text-amber-800 mb-2">🎯 Rekomendasi Tindak Lanjut</h2>
+          <h2 className="font-semibold text-amber-800 mb-2">Rekomendasi Tindak Lanjut</h2>
           <p className="text-amber-700 whitespace-pre-line">{observasi.rekomendasi}</p>
         </div>
       )}
