@@ -94,7 +94,7 @@ export async function GET(req: Request) {
     const kelasRes = await query(
       `SELECT c.id, c.nama_kelas, c.wali_kelas, s.id as school_id, s.nama_sekolah,
               s.alamat, s.npsn, s.logo,
-              u.nama_lengkap as guru_nama, u.nip, u.signature_url as guru_signature_url
+              u.nama_lengkap as guru_nama, u.signature_url as guru_signature_url
        FROM classes c
        JOIN schools s ON s.id = c.school_id
        LEFT JOIN users u ON u.id = c.wali_kelas_user_id
@@ -105,7 +105,7 @@ export async function GET(req: Request) {
 
     // Get kepala sekolah
     const kepalaRes = await query(
-      `SELECT u.nama_lengkap, u.nip, u.signature_url
+      `SELECT u.nama_lengkap, u.signature_url
        FROM users u
        WHERE u.nama_sekolah = $1 AND u.role = 'kepala_sekolah'
        LIMIT 1`,
@@ -154,7 +154,7 @@ export async function GET(req: Request) {
       kelas: kelasInfo.nama_kelas,
       mapel: params.scheduleId ? (dataRes.rows[0]?.nama_mapel || '-') : null,
       guruPengampu: kelasInfo.guru_nama || kelasInfo.wali_kelas || '-',
-      guruNip: kelasInfo.nip,
+      guruNip: kelasInfo.wali_kelas_nip,
       tanggal: tanggalLabel,
       periodeLabel: `${format(parseISO(startDate), 'd MMM', { locale: id })} - ${format(parseISO(endDate), 'd MMM yyyy', { locale: id })}`,
       records,

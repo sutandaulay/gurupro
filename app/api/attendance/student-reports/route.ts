@@ -134,8 +134,8 @@ export async function GET(req: Request) {
 
     // Get class info
     const kelasInfoRes = await query(
-      `SELECT c.id, c.nama_kelas, c.wali_kelas, s.nama_sekolah, s.alamat, s.npsn, s.logo,
-              u.nama_lengkap as guru_nama, u.nip, u.signature_url as guru_signature_url
+      `SELECT c.id, c.nama_kelas, c.wali_kelas, c.wali_kelas_nip, s.nama_sekolah, s.alamat, s.npsn, s.logo,
+              u.nama_lengkap as guru_nama, u.signature_url as guru_signature_url
        FROM classes c
        JOIN schools s ON s.id = c.school_id
        LEFT JOIN users u ON u.id = c.wali_kelas_user_id
@@ -146,7 +146,7 @@ export async function GET(req: Request) {
 
     // Get kepala sekolah info
     const kepalaRes = await query(
-      `SELECT u.nama_lengkap, u.nip, u.signature_url
+      `SELECT u.nama_lengkap, u.nama_sekolah, u.signature_url
        FROM users u
        WHERE u.nama_sekolah = $1 AND u.role = 'kepala_sekolah'
        LIMIT 1`,
@@ -156,7 +156,7 @@ export async function GET(req: Request) {
 
     // Get guru pengampu for the schedule (if scheduleId provided)
     let guruPengampu = kelasInfo.guru_nama || kelasInfo.wali_kelas || '-';
-    let guruNip = kelasInfo.nip || null;
+    let guruNip = kelasInfo.wali_kelas_nip || null;
     let guruSignatureUrl = kelasInfo.guru_signature_url || null;
     let mapel = null;
 
