@@ -176,101 +176,6 @@ export async function generateSilabusPdfBuffer(
       pertemuan: 45,
       minggu: 40,
     };
-      doc.font('Helvetica').fontSize(8).fillColor('#9CA3AF');
-      doc.text(
-        `Halaman ${pageNum}`,
-        40,
-        pageHeight - 25,
-        { align: 'center', width: contentWidth }
-      );
-      doc.fillColor('#000');
-    };
-    addPageNumber();
-    doc.on('pageAdded', () => {
-      pageNum++;
-      addPageNumber();
-    });
-
-    // Colors
-    const primaryColor = '#1E3A8A';
-    const headerBg = '#E0E7FF';
-    const borderColor = '#334155';
-
-    // Header
-    doc.font('Helvetica-Bold').fontSize(14).fillColor(primaryColor).text(
-      'ALUR TUJUAN PEMBELAJARAN (ATP)',
-      0,
-      30,
-      { align: 'center', width: pageWidth }
-    );
-
-    // Subtitle
-    doc.font('Helvetica').fontSize(10).fillColor('#4B5563').text(
-      `${data.identitas.mataPelajaran} | Fase ${data.identitas.fase} | Semester ${data.identitas.semester === 1 ? 'Ganjil' : 'Genap'}`,
-      0,
-      48,
-      { align: 'center', width: pageWidth }
-    );
-
-    // Identitas Box
-    const identitasY = 65;
-    doc.rect(40, identitasY, contentWidth, 35).stroke(borderColor);
-
-    doc.font('Helvetica-Bold').fontSize(8).fillColor(primaryColor);
-    const identitasLeft = 45;
-    const identitasRight = 400;
-
-    doc.text('Mata Pelajaran:', identitasLeft, identitasY + 5);
-    doc.text('Fase:', identitasLeft, identitasY + 17);
-    doc.text('Kelas:', identitasLeft, identitasY + 29);
-
-    doc.font('Helvetica').fillColor('#1F2937');
-    doc.text(data.identitas.mataPelajaran, identitasLeft + 80, identitasY + 5);
-    doc.text(data.identitas.fase, identitasLeft + 80, identitasY + 17);
-    doc.text(data.identitas.kelas, identitasLeft + 80, identitasY + 29);
-
-    doc.font('Helvetica-Bold').fillColor(primaryColor);
-    doc.text('Semester:', identitasRight, identitasY + 5);
-    doc.text('Tahun Ajaran:', identitasRight, identitasY + 17);
-
-    doc.font('Helvetica').fillColor('#1F2937');
-    doc.text(data.identitas.semester === 1 ? 'Ganjil' : 'Genap', identitasRight + 75, identitasY + 5);
-    doc.text(data.identitas.tahunAjaran || '-', identitasRight + 75, identitasY + 17);
-
-    // Capaian Pembelajaran Section
-    const cpY = 110;
-    doc.font('Helvetica-Bold').fontSize(9).fillColor(primaryColor).text(
-      'CAPAIAN PEMBELAJARAN (CP)',
-      40,
-      cpY
-    );
-
-    doc.font('Helvetica').fontSize(8).fillColor('#374151');
-    const cpText = data.capaianPembelajaran;
-    const cpLines = doc.text(cpText, 40, cpY + 12, {
-      width: contentWidth,
-      lineGap: 2,
-    }) as unknown as number;
-
-    // Table Header
-    const tableY = cpY + 40 + ((cpLines as number) > 1 ? 10 : 0);
-
-    // Table column widths
-    const colWidths = {
-      no: 35,
-      topik: 150,
-      tujuan: 280,
-      dimensi: 100,
-      pertemuan: 55,
-      minggu: 45,
-    };
-
-    // Helper: Calculate text height with word-wrap
-    const calculateTextHeight = (text: string, maxWidth: number, fontSize: number = 7): number => {
-      const charsPerLine = Math.floor(maxWidth / (fontSize * 0.5));
-      const lines = Math.ceil(text.length / charsPerLine);
-      return Math.max(lines * (fontSize + 2), 20);
-    };
 
     // Draw header row
     doc.rect(ML, tableY, CW, 20).fill(headerBg);
@@ -438,7 +343,7 @@ export async function generateSilabusPdfBuffer(
       doc.text("Kepala Sekolah,", ML, rowY, { width: sigColW });
       rowY += 44;
       if (kepalaSignatureUrl) {
-        try { doc.image(kepalaSignatureUrl, ML, rowY - 44, { fit: [100, 44], align: 'left' }); } catch (_) {}
+        try { doc.image(kepalaSignatureUrl, ML, rowY - 44, { fit: [100, 44] }); } catch (_) {}
       }
       doc.font('Helvetica-Bold').fontSize(9).fillColor(BLACK);
       doc.text(kepalaNama || '_____________________', ML, rowY, { width: sigColW });
@@ -455,7 +360,7 @@ export async function generateSilabusPdfBuffer(
       doc.text("Guru,", rx, rowY, { width: sigColW });
       rowY += 44;
       if (guruSignatureUrl) {
-        try { doc.image(guruSignatureUrl, rx, rowY - 44, { fit: [100, 44], align: 'left' }); } catch (_) {}
+        try { doc.image(guruSignatureUrl, rx, rowY - 44, { fit: [100, 44] }); } catch (_) {}
       }
       doc.font('Helvetica-Bold').fontSize(9).fillColor(BLACK);
       doc.text(guruNama || '_____________________', rx, rowY, { width: sigColW });

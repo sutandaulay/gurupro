@@ -120,6 +120,32 @@ export async function GET(
       );
     }
 
+    // Fetch school info for kop sekolah
+    const schoolId = modulAjar?.school_id;
+    let schoolData: any = { nama_sekolah: null, alamat: null, npsn: null, logo: null, nama_kepala_sekolah: null, nip_kepala_sekolah: null, kepala_signature_url: null };
+    if (schoolId) {
+      try {
+        const schoolRes = await query(
+          `SELECT s.nama_sekolah, s.alamat, s.npsn, s.logo,
+                  i.nama_kepala_sekolah, i.nip_kepala_sekolah,
+                  ks.signature_url AS kepala_signature_url
+           FROM schools s
+           LEFT JOIN institutions i ON i.school_id = s.id
+           LEFT JOIN users ks ON ks.nama_sekolah = s.nama_sekolah AND ks.role = 'kepala_sekolah'
+           WHERE s.id = $1`,
+          [schoolId]
+        );
+        if (schoolRes.rows[0]) schoolData = schoolRes.rows[0];
+      } catch (_) {}
+    }
+
+    // Fetch user info for signature
+    let userInfo: any = { nama_lengkap: null, nip: null, signature_url: null };
+    try {
+      const userRes = await query("SELECT nama_lengkap, nip, signature_url FROM users WHERE id = $1", [userId]);
+      if (userRes.rows[0]) userInfo = userRes.rows[0];
+    } catch (_) {}
+
     // Ambil modul ajar untuk metadata
     const modulAjar = bahanAjar.modulAjar as any;
     const modulTitle = modulAjar?.namaModul || "Modul Ajar";
@@ -182,6 +208,8 @@ export async function GET(
         kelas,
         kurikulum,
         contentTitle,
+        schoolData,
+        userInfo,
       });
       filename = `${safeJenis}_${safeTitle}.doc`;
       contentType = "application/vnd.ms-word";
@@ -218,9 +246,11 @@ function generateDocContent(
     kelas: string;
     kurikulum: string;
     contentTitle: string;
+    schoolData?: any;
+    userInfo?: any;
   }
 ): string {
-  const { jenis, title, mapel, jenjang, kelas, kurikulum, contentTitle } = opts;
+  const { jenis, title, mapel, jenjang, kelas, kurikulum, contentTitle, schoolData, userInfo } = opts;
 
   let bodyContent = "";
 
@@ -229,7 +259,6 @@ function generateDocContent(
   } else if (jenis === "handout") {
     bodyContent = generateHandoutHtml(content);
   } else {
-    // Fallback for slide outline
     bodyContent = `<pre>${JSON.stringify(content, null, 2)}</pre>`;
   }
 
@@ -239,11 +268,70 @@ function generateDocContent(
     year: "numeric",
   });
 
+  // Kop sekolah HTML
+  const kopHtml = schoolData?.nama_sekolah ? (() => {
+    const logoSection = schoolData.logo
+      ? `<td style="width:60px;text-align:center;vertical-align:middle;"><img src="${schoolData.logo}" alt="Logo" style="max-height:60px;max-width:60px;object-fit:contain;" /></td>`
+      : `<td style="width:60px;"></td>`;
+    const alamatLine = schoolData.alamat ? `<p style="margin:2px 0;font-size:9pt;color:#555;">${schoolData.alamat}</p>` : '';
+    const npsnLine = schoolData.npsn ? `<p style="margin:2px 0;font-size:9pt;">NPSN: ${schoolData.npsn}</p>` : '';
+    return `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
+      <tr>${logoSection}
+        <td style="text-align:center;vertical-align:middle;">
+          <h1 style="margin:0;font-size:15pt;font-weight:bold;color:#000;text-transform:uppercase;">${schoolData.nama_sekolah}</h1>
+          ${alamatLine}${npsnLine}
+        </td>
+        <td style="width:60px;"></td>
+      </tr>
+    </table>
+    <div style="border-bottom:2px solid #000;margin-bottom:16px;"></div>`;
+  })() : '';
+
+  // Signature block HTML
+  const kepalaSigImg = schoolData?.kepala_signature_url
+    ? `<img src="${schoolData.kepala_signature_url}" alt="Tanda Tangan" style="height:60px;width:auto;object-fit:contain;display:block;margin:0 auto;" />`
+    : `<div style="height:60px;"></div>`;
+  const guruSigImg = userInfo?.signature_url
+    ? `<img src="${userInfo.signature_url}" alt="Tanda Tangan" style="height:60px;width:auto;object-fit:contain;display:block;margin:0 auto;" />`
+    : `<div style="height:60px;"></div>`;
+  const tempatLine = schoolData?.nama_sekolah || '';
+  const signatureHtml = (schoolData?.nama_kepala_sekolah || userInfo?.nama_lengkap) ? `
+  <div style="margin-top:40px;page-break-inside:avoid;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div style="text-align:center;width:45%;">
+        <p style="margin:0 0 4px;font-size:11pt;">${tempatLine}, ${today}</p>
+        <p style="margin:0 0 4px;font-size:11pt;">Kepala Sekolah,</p>
+        <div style="height:8px;"></div>
+        ${kepalaSigImg}
+        <div style="height:4px;"></div>
+        <p style="margin:0;font-size:11pt;text-decoration:underline;font-weight:bold;">${schoolData?.nama_kepala_sekolah || '_____________________'}</p>
+        <p style="margin:4px 0 0;font-size:10pt;">NIP. ${schoolData?.nip_kepala_sekolah || '_____________________'}</p>
+      </div>
+      <div style="text-align:center;width:45%;">
+        <p style="margin:0 0 4px;font-size:11pt;">${tempatLine}, ${today}</p>
+        <p style="margin:0 0 4px;font-size:11pt;">Guru,</p>
+        <div style="height:8px;"></div>
+        ${guruSigImg}
+        <div style="height:4px;"></div>
+        <p style="margin:0;font-size:11pt;text-decoration:underline;font-weight:bold;">${userInfo?.nama_lengkap || '_____________________'}</p>
+        <p style="margin:4px 0 0;font-size:10pt;">NIP. ${userInfo?.nip || '_____________________'}</p>
+      </div>
+    </div>
+  </div>` : '';
+
   return `<!DOCTYPE html>
-<html>
+<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
 <head>
   <meta charset="UTF-8">
   <title>${escapeHtml(title)} - ${contentTitle}</title>
+  <!--[if gte mso 9]>
+  <xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+    </w:WordDocument>
+  </xml>
+  <![endif]-->
   <style>
     @page { margin: 2.5cm 2cm 2cm 3cm; size: A4; }
     * { box-sizing: border-box; }
@@ -273,6 +361,8 @@ function generateDocContent(
   </style>
 </head>
 <body>
+  ${kopHtml}
+
   <div class="header">
     <h1>${escapeHtml(title)}</h1>
     <p><strong>${contentTitle}</strong></p>
@@ -286,6 +376,8 @@ function generateDocContent(
   </table>
 
   ${bodyContent}
+
+  ${signatureHtml}
 
   <div class="footer">
     <p>Dokumen ini dihasilkan oleh <strong>GuruPRO AI</strong></p>

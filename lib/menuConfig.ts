@@ -169,6 +169,7 @@ export const masterMenus: MenuItem[] = [
       { key: "presensi_mengajar", label: "Presensi Mengajar", href: "/dashboard/attendance/teaching" },
       { key: "pengajuan_izin", label: "Pengajuan Izin", href: "/dashboard/attendance/leave" },
       { key: "laporan_presensi", label: "Laporan Presensi", href: "/dashboard/reports/attendance" },
+      { key: "laporan_presensi_siswa", label: "Laporan Presensi Siswa", href: "/dashboard/reports/student-attendance" },
       { key: "rekap_tpg", label: "Rekap TPG", href: "/dashboard/reports/tpg" },
     ],
   },

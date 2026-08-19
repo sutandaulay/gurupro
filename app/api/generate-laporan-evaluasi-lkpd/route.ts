@@ -208,18 +208,12 @@ export async function POST(req: Request) {
       console.error("Failed to fetch LKPD data:", dbErr);
     }
 
-    // Get user profile for guruPengampu
-    let guruPengampu = null;
+    // Get guruPengampu for prompt
+    let guruPengampu: string | null = null;
     try {
-      const userResult = await query(`
-        SELECT name, full_name FROM users WHERE id = $1
-      `, [userId]);
-      if (userResult.rows.length > 0) {
-        guruPengampu = userResult.rows[0].full_name || userResult.rows[0].name || null;
-      }
-    } catch (dbErr) {
-      console.error("Failed to fetch user profile:", dbErr);
-    }
+      const uRes = await query("SELECT nama_lengkap, full_name FROM users WHERE id = $1", [userId]);
+      if (uRes.rows[0]) guruPengampu = uRes.rows[0].nama_lengkap || uRes.rows[0].full_name || null;
+    } catch (_) {}
 
     // Build data context for AI
     let dataContext = "";
@@ -339,6 +333,47 @@ Keluarkan HANYA JSON valid tanpa markdown fence atau teks pembuka.
       );
     }
 
+    // Fetch user info
+    let userInfo: any = {};
+    try {
+      const userResult = await query("SELECT nama_lengkap, nip, signature_url FROM users WHERE id = $1", [userId]);
+      userInfo = userResult.rows[0] || {};
+    } catch (_) {}
+
+    // Fetch school info
+    let schoolData: any = { nama_sekolah: null, alamat: null, npsn: null, logo: null, nama_kepala_sekolah: null, nip_kepala_sekolah: null, kepala_signature_url: null };
+    if (input.school_id) {
+      try {
+        const schoolRes = await query(
+          `SELECT s.nama_sekolah, s.alamat, s.npsn, s.logo,
+                  i.nama_kepala_sekolah, i.nip_kepala_sekolah,
+                  ks.signature_url AS kepala_signature_url
+           FROM user_schools us
+           JOIN schools s ON s.id = us.school_id
+           LEFT JOIN institutions i ON i.school_id = s.id
+           LEFT JOIN users ks ON ks.nama_sekolah = s.nama_sekolah AND ks.role = 'kepala_sekolah'
+           WHERE us.user_id = $1 AND s.id = $2`,
+          [userId, input.school_id]
+        );
+        if (schoolRes.rows[0]) schoolData = schoolRes.rows[0];
+      } catch (_) {}
+    }
+
+    const docOpts = {
+      logoUrl: schoolData.logo,
+      namaSekolah: schoolData.nama_sekolah,
+      alamat: schoolData.alamat,
+      npsn: schoolData.npsn,
+      kepalaNama: schoolData.nama_kepala_sekolah,
+      kepalaNip: schoolData.nip_kepala_sekolah,
+      guruNama: userInfo.nama_lengkap,
+      guruNip: userInfo.nip,
+      guruSignatureUrl: userInfo.signature_url,
+      kepalaSignatureUrl: schoolData.kepala_signature_url,
+      lokasi: schoolData.nama_sekolah,
+      tanggal: new Date(),
+    };
+
     // Compile & Upload files
     let pdfUrl: string | null = null;
     let docxUrl: string | null = null;
@@ -346,10 +381,10 @@ Keluarkan HANYA JSON valid tanpa markdown fence atau teks pembuka.
     try {
       const docTitle = `Laporan Evaluasi LKPD - ${parsed.identitas.mataPelajaran} (${parsed.identitas.periodeEvaluasi})`;
 
-      const pdfBuf = await generateLaporanEvaluasiPdfBuffer(parsed, docTitle);
+      const pdfBuf = await generateLaporanEvaluasiPdfBuffer(parsed, docTitle, docOpts);
       pdfUrl = await uploadToR2(pdfBuf, `${Date.now()}-laporan-evaluasi-lkpd.pdf`, "application/pdf");
 
-      const docBuf = generateLaporanEvaluasiDocBuffer(parsed, docTitle);
+      const docBuf = generateLaporanEvaluasiDocBuffer(parsed, docTitle, docOpts);
       docxUrl = await uploadToR2(docBuf, `${Date.now()}-laporan-evaluasi-lkpd.doc`, "application/msword");
     } catch (uploadErr) {
       console.error("Failed to compile or upload files:", uploadErr);

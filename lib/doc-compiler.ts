@@ -350,7 +350,7 @@ export async function generatePdfBuffer(
       doc.text("Kepala Sekolah,", ML, y, { width: sigColW });
       y += 52;
       if (kepalaSignatureUrl) {
-        try { doc.image(kepalaSignatureUrl, ML, y - 52, { fit: [120, 52], align: 'left' }); } catch (_) {}
+        try { doc.image(kepalaSignatureUrl, ML, y - 52, { fit: [120, 52] }); } catch (_) {}
       }
       doc.font("Helvetica-Bold").fontSize(10).fillColor(BLACK);
       doc.text(kepalaNama || '_____________________', ML, y, { width: sigColW });
@@ -367,7 +367,7 @@ export async function generatePdfBuffer(
       doc.text("Guru,", rx, y, { width: sigColW });
       y += 52;
       if (guruSignatureUrl) {
-        try { doc.image(guruSignatureUrl, rx, y - 52, { fit: [120, 52], align: 'left' }); } catch (_) {}
+        try { doc.image(guruSignatureUrl, rx, y - 52, { fit: [120, 52] }); } catch (_) {}
       }
       doc.font("Helvetica-Bold").fontSize(10).fillColor(BLACK);
       doc.text(guruNama || '_____________________', rx, y, { width: sigColW });
@@ -715,7 +715,7 @@ export async function generateLkpdPdfBuffer(
       doc.text("Kepala Sekolah,", ML, y, { width: sigColW });
       y += 52;
       if (kepalaSignatureUrl) {
-        try { doc.image(kepalaSignatureUrl, ML, y - 52, { fit: [120, 52], align: 'left' }); } catch (_) {}
+        try { doc.image(kepalaSignatureUrl, ML, y - 52, { fit: [120, 52] }); } catch (_) {}
       }
       doc.font("Helvetica-Bold").fontSize(10).fillColor(BLACK);
       doc.text(kepalaNama || '_____________________', ML, y, { width: sigColW });
@@ -732,7 +732,7 @@ export async function generateLkpdPdfBuffer(
       doc.text("Guru,", rx, y, { width: sigColW });
       y += 52;
       if (guruSignatureUrl) {
-        try { doc.image(guruSignatureUrl, rx, y - 52, { fit: [120, 52], align: 'left' }); } catch (_) {}
+        try { doc.image(guruSignatureUrl, rx, y - 52, { fit: [120, 52] }); } catch (_) {}
       }
       doc.font("Helvetica-Bold").fontSize(10).fillColor(BLACK);
       doc.text(guruNama || '_____________________', rx, y, { width: sigColW });
@@ -1076,182 +1076,259 @@ const RED = "#EF4444";
  */
 export async function generateLaporanEvaluasiPdfBuffer(
   data: LaporanEvaluasiLkpdOutput,
-  title: string
+  title: string,
+  options?: {
+    logoUrl?: string | null;
+    namaSekolah?: string;
+    alamat?: string | null;
+    npsn?: string | null;
+    kepalaNama?: string;
+    kepalaNip?: string | null;
+    guruNama?: string;
+    guruNip?: string | null;
+    guruSignatureUrl?: string | null;
+    kepalaSignatureUrl?: string | null;
+    lokasi?: string;
+    tanggal?: Date;
+  }
 ): Promise<Buffer> {
+  const opts = options || {};
+  const {
+    logoUrl, namaSekolah, alamat, npsn,
+    kepalaNama, kepalaNip, guruNama, guruNip,
+    guruSignatureUrl, kepalaSignatureUrl, lokasi, tanggal,
+  } = opts;
+
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: "A4" });
+    const doc = new PDFDocument({ margin: 0, size: "A4" });
     const chunks: Buffer[] = [];
 
     doc.on("data", (chunk) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", (err) => reject(err));
 
+    const PAGE_WIDTH = doc.page.width as number;
+    const PAGE_HEIGHT = doc.page.height as number;
+    const ML = 85;   // 3cm
+    const MR = 57;   // 2cm
+    const MT = 71;   // 2.5cm
+    const MB = 57;   // 2cm
+    const CW = PAGE_WIDTH - ML - MR;
+
+    const BLACK = '#000000';
+    const GRAY = '#6B7280';
+    const BORDER = '#374151';
+
+    let y = MT;
+    let pageNum = 1;
+
+    const checkPageBreak = (needed: number) => {
+      if (y + needed > PAGE_HEIGHT - MB) { doc.addPage(); y = MT; pageNum++; }
+    };
+
+    const addPageNumber = () => {
+      doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+      doc.text(`Halaman ${pageNum}`, ML, PAGE_HEIGHT - MB + 10, { align: "center", width: CW });
+      doc.fillColor(BLACK);
+    };
+    addPageNumber();
+    // @ts-ignore
+    doc.on("pageAdded", () => { pageNum++; addPageNumber(); });
+
+    // === KOP SEKOLAH ===
+    if (namaSekolah) {
+      if (logoUrl) {
+        try { doc.image(logoUrl, ML, y, { fit: [50, 50], align: 'center' }); } catch (_) {}
+      }
+      const nameX = logoUrl ? ML + 65 : ML;
+      doc.font("Helvetica-Bold").fontSize(15).fillColor(BLACK);
+      doc.text(namaSekolah.toUpperCase(), nameX, y + 8, {
+        width: CW - (logoUrl ? 65 : 0), align: 'center',
+      });
+      y += 28;
+      if (alamat) {
+        doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+        doc.text(alamat, ML, y, { width: CW, align: 'center' });
+        y += 13;
+      }
+      if (npsn) {
+        doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+        doc.text(`NPSN: ${npsn}`, ML, y, { width: CW, align: 'center' });
+        y += 13;
+      }
+      y += 6;
+      doc.moveTo(ML, y).lineTo(PAGE_WIDTH - MR, y).lineWidth(2).stroke(BORDER);
+      y += 4;
+      doc.moveTo(ML, y).lineTo(PAGE_WIDTH - MR, y).lineWidth(1).stroke(BORDER);
+      y += 18;
+    }
+
     const { identitas, ringkasanEksekutif, capaianPerKKTP, temuanUtama, siswaPerluPerhatian, rekomendasiTindakLanjut } = data;
 
-    doc.font("Helvetica-Bold").fontSize(16).text("LAPORAN EVALUASI LKPD", { align: "center" });
-    doc.font("Helvetica").fontSize(11).text("Untuk perhatian Bapak/Ibu Kepala Sekolah/Wakasek", { align: "center" });
-    doc.moveDown(1);
+    doc.font("Helvetica-Bold").fontSize(14).fillColor(BLACK);
+    doc.text("LAPORAN EVALUASI LKPD", ML, y, { width: CW, align: "center" });
+    y += 18;
+    doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+    doc.text("Untuk perhatian Bapak/Ibu Kepala Sekolah/Wakasek", ML, y, { width: CW, align: "center" });
+    y += 20;
 
-    // Identitas Table
-    doc.font("Helvetica-Bold").fontSize(10).text("A. IDENTITAS");
-    doc.moveDown(0.3);
+    // Identitas
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(BLACK);
+    doc.text("A. IDENTITAS", ML, y);
+    y += 16;
+    doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+    doc.text(`Mata Pelajaran   : ${identitas.mataPelajaran}`, ML, y);
+    y += 14;
+    doc.text(`Kelas             : ${identitas.kelas}`, ML, y);
+    y += 14;
+    doc.text(`Periode Evaluasi : ${identitas.periodeEvaluasi}`, ML, y);
+    y += 14;
+    doc.text(`Jumlah Siswa     : ${String(identitas.jumlahSiswa)}`, ML, y);
+    y += 14;
+    doc.text(`Guru Pengampu    : ${identitas.guruPengampu || "Tidak diketahui"}`, ML, y);
+    y += 20;
 
-    const identityData = [
-      ["Mata Pelajaran", ":", identitas.mataPelajaran],
-      ["Kelas", ":", identitas.kelas],
-      ["Periode Evaluasi", ":", identitas.periodeEvaluasi],
-      ["Jumlah Siswa", ":", String(identitas.jumlahSiswa)],
-      ["Guru Pengampu", ":", identitas.guruPengampu || "Tidak diketahui"],
-    ];
+    // Ringkasan Eksekutif
+    checkPageBreak(80);
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(AMBER);
+    doc.text("B. RINGKASAN EKSEKUTIF", ML, y);
+    y += 16;
+    doc.fillColor(BLACK);
 
-    doc.font("Helvetica").fontSize(10);
-    identityData.forEach(([label, sep, value]) => {
-      doc.text(`${label} ${sep} ${value}`);
-    });
-
-    doc.moveDown(1);
-
-    // Ringkasan Eksekutif - Highlight Box (Amber) with auto-height
-    doc.font("Helvetica-Bold").fontSize(11).fillColor(AMBER).text("B. RINGKASAN EKSEKUTIF");
-    doc.fillColor("black");
-    doc.moveDown(0.3);
-
-    // Truncate ringkasan to safe length before rendering
     const safeRingkasan = truncateText(ringkasanEksekutif, 480);
+    const boxHeight = Math.max(50, Math.min(90, 30 + (safeRingkasan.length / 3)));
+    doc.rect(ML, y, CW, boxHeight).fill(AMBER_LIGHT);
+    doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+    doc.text(safeRingkasan, ML + 5, y + 5, { width: CW - 10, align: "left" });
+    y += boxHeight + 12;
 
-    // Calculate approximate height needed
-    const boxHeight = Math.max(60, Math.min(100, 40 + (safeRingkasan.length / 3)));
+    // Capaian per KKTP
+    checkPageBreak(80);
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(BLACK);
+    doc.text("C. CAPAIAN PER KKTP", ML, y);
+    y += 16;
 
-    // Draw amber box with auto-height
-    const boxY = doc.y;
-    doc.rect(50, boxY, 510, boxHeight).fill(AMBER_LIGHT);
-    doc.font("Helvetica").fontSize(10).text(safeRingkasan, 55, boxY + 5, {
-      width: 500,
-      height: boxHeight - 10,
-      align: "left",
-    });
-    doc.y = boxY + boxHeight + 10;
-    doc.moveDown(1);
-
-    // Capaian per KKTP Table
-    doc.font("Helvetica-Bold").fontSize(11).text("C. CAPAIAN PER KKTP");
-    doc.moveDown(0.3);
-
-    // Table header
-    const tableTop = doc.y;
-    const colWidths = [250, 100, 160];
+    const colWidths = [CW * 0.5, CW * 0.2, CW * 0.3];
     const rowHeight = 20;
 
-    // Header row
-    doc.rect(50, tableTop, colWidths[0], rowHeight).stroke();
-    doc.rect(50 + colWidths[0], tableTop, colWidths[1], rowHeight).stroke();
-    doc.rect(50 + colWidths[0] + colWidths[1], tableTop, colWidths[2], rowHeight).stroke();
+    doc.rect(ML, y, colWidths[0], rowHeight).fill(BORDER);
+    doc.rect(ML + colWidths[0], y, colWidths[1], rowHeight).fill(BORDER);
+    doc.rect(ML + colWidths[0] + colWidths[1], y, colWidths[2], rowHeight).fill(BORDER);
 
-    doc.font("Helvetica-Bold").fontSize(9).text("KKTP", 52, tableTop + 6);
-    doc.text("% Tuntas", 50 + colWidths[0] + 10, tableTop + 6);
-    doc.text("Kategori", 50 + colWidths[0] + colWidths[1] + 10, tableTop + 6);
+    doc.font("Helvetica-Bold").fontSize(9).fillColor("white");
+    doc.text("KKTP", ML + 4, y + 6, { width: colWidths[0] - 8 });
+    doc.text("% Tuntas", ML + colWidths[0] + 4, y + 6, { width: colWidths[1] - 8 });
+    doc.text("Kategori", ML + colWidths[0] + colWidths[1] + 4, y + 6, { width: colWidths[2] - 8 });
+    y += rowHeight;
 
-    // Data rows with truncation
-    let rowY = tableTop + rowHeight;
+    let rowY = y;
     capaianPerKKTP.forEach((capaian, idx) => {
+      checkPageBreak(rowHeight);
       const bgColor = idx % 2 === 0 ? "#F9FAFB" : "white";
+      doc.rect(ML, rowY, colWidths[0], rowHeight).fill(bgColor).stroke(BORDER);
+      doc.rect(ML + colWidths[0], rowY, colWidths[1], rowHeight).fill(bgColor).stroke(BORDER);
+      doc.rect(ML + colWidths[0] + colWidths[1], rowY, colWidths[2], rowHeight).fill(bgColor).stroke(BORDER);
 
-      doc.rect(50, rowY, colWidths[0], rowHeight).stroke();
-      doc.rect(50 + colWidths[0], rowY, colWidths[1], rowHeight).stroke();
-      doc.rect(50 + colWidths[0] + colWidths[1], rowY, colWidths[2], rowHeight).stroke();
-
-      // Fill row background
-      doc.rect(50, rowY, 510, rowHeight).fill(bgColor);
-
-      // Truncate kktp for display
       const safeKktp = truncateText(capaian.kktp, 45);
-      doc.font("Helvetica").fontSize(9).text(safeKktp, 52, rowY + 6, { width: colWidths[0] - 5, ellipsis: true });
-      doc.text(formatPersentase(capaian.persentaseTuntas), 50 + colWidths[0] + 10, rowY + 6);
+      doc.font("Helvetica").fontSize(9).fillColor(BLACK);
+      doc.text(safeKktp, ML + 4, rowY + 6, { width: colWidths[0] - 8 });
+      doc.text(formatPersentase(capaian.persentaseTuntas), ML + colWidths[0] + 4, rowY + 6);
 
-      // Color-coded category
       const colorMap: Record<string, string> = {
         sangat_baik: GREEN,
         baik: BLUE,
         cukup: YELLOW,
         perlu_perhatian: RED,
       };
-      doc.fillColor(colorMap[capaian.kategoriCapaian] || "black")
-        .text(getKategoriLabel(capaian.kategoriCapaian), 50 + colWidths[0] + colWidths[1] + 10, rowY + 6);
-      doc.fillColor("black");
-
+      doc.fillColor(colorMap[capaian.kategoriCapaian] || BLACK);
+      doc.text(getKategoriLabel(capaian.kategoriCapaian), ML + colWidths[0] + colWidths[1] + 4, rowY + 6);
+      doc.fillColor(BLACK);
       rowY += rowHeight;
     });
-
-    doc.y = rowY + 15;
-    doc.moveDown(0.5);
+    y = rowY + 10;
 
     // Temuan Utama
     if (temuanUtama.length > 0) {
-      doc.font("Helvetica-Bold").fontSize(11).text("D. TEMUAN UTAMA");
-      doc.moveDown(0.3);
-
-      doc.font("Helvetica").fontSize(10);
+      checkPageBreak(60);
+      doc.font("Helvetica-Bold").fontSize(11).fillColor(BLACK);
+      doc.text("D. TEMUAN UTAMA", ML, y);
+      y += 16;
+      doc.font("Helvetica").fontSize(10).fillColor(BLACK);
       temuanUtama.forEach((temuan, idx) => {
-        doc.text(`${idx + 1}. ${temuan}`);
-        doc.moveDown(0.2);
+        checkPageBreak(16);
+        doc.text(`${idx + 1}. ${temuan}`, ML, y);
+        y += 14;
       });
-      doc.moveDown(0.5);
+      y += 8;
     }
 
     // Siswa Perlu Perhatian
     if (siswaPerluPerhatian) {
-      doc.font("Helvetica-Bold").fontSize(11).text("E. SISWA PERLU PERHATIAN");
-      doc.moveDown(0.3);
-
-      doc.font("Helvetica").fontSize(10);
-      doc.text(`Jumlah siswa yang perlu perhatian khusus: ${siswaPerluPerhatian.jumlahSiswaTerdampak} siswa`);
-      doc.text(`Catatan: ${siswaPerluPerhatian.catatan}`);
-      doc.moveDown(0.5);
+      checkPageBreak(50);
+      doc.font("Helvetica-Bold").fontSize(11).fillColor(BLACK);
+      doc.text("E. SISWA PERLU PERHATIAN", ML, y);
+      y += 16;
+      doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+      doc.text(`Jumlah siswa yang perlu perhatian khusus: ${siswaPerluPerhatian.jumlahSiswaTerdampak} siswa`, ML, y);
+      y += 14;
+      doc.text(`Catatan: ${siswaPerluPerhatian.catatan}`, ML, y);
+      y += 20;
     }
 
-    // Rekomendasi Tindak Lanjut
-    doc.font("Helvetica-Bold").fontSize(11).text("F. REKOMENDASI TINDAK LANJUT");
-    doc.moveDown(0.3);
-
-    doc.font("Helvetica").fontSize(10);
+    // Rekomendasi
+    checkPageBreak(60);
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(BLACK);
+    doc.text("F. REKOMENDASI TINDAK LANJUT", ML, y);
+    y += 16;
+    doc.font("Helvetica").fontSize(10).fillColor(BLACK);
     rekomendasiTindakLanjut.forEach((rekomendasi, idx) => {
-      doc.text(`${idx + 1}. ${rekomendasi}`);
-      doc.moveDown(0.2);
+      checkPageBreak(16);
+      doc.text(`${idx + 1}. ${rekomendasi}`, ML, y);
+      y += 14;
     });
 
-    doc.moveDown(1.5);
+    // === SIGNATURE BLOCK ===
+    if (kepalaNama || guruNama) {
+      checkPageBreak(100);
+      y += 8;
+      const sigColW = CW / 2 - 10;
+      const sigDate = tanggal
+        ? new Date(tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+        : new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    // Page counter for numbering
-    let pageNum = 1;
-    // @ts-ignore - PDFKit custom event
-    doc.on('pageAdded', () => { pageNum++; });
+      doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+      doc.text(`${lokasi || ''}, ${sigDate}`, ML, y, { width: sigColW });
+      y += 16;
+      doc.text("Kepala Sekolah,", ML, y, { width: sigColW });
+      y += 52;
+      if (kepalaSignatureUrl) {
+        try { doc.image(kepalaSignatureUrl, ML, y - 52, { fit: [120, 52] }); } catch (_) {}
+      }
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(BLACK);
+      doc.text(kepalaNama || '_____________________', ML, y, { width: sigColW });
+      y += 14;
+      doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+      doc.text(`NIP. ${kepalaNip || '_____________________'}`);
+      y -= 52 + 16 + 14;
 
-    // Footer per page
-    const addFooter = () => {
-      const bottomY = doc.page.height - 30;
-      doc.font("Helvetica").fontSize(8).fillColor("gray");
-      doc.text(`Halaman ${pageNum} | Dokumen ini dihasilkan oleh GuruPRO AI`, 50, bottomY, {
-        width: 510,
-        align: "center",
-      });
-      doc.fillColor("black");
-    };
-    addFooter();
+      const rx = ML + sigColW + 20;
+      doc.font("Helvetica").fontSize(10).fillColor(BLACK);
+      doc.text(`${lokasi || ''}, ${sigDate}`, rx, y, { width: sigColW });
+      y += 16;
+      doc.text("Guru Pengampu,", rx, y, { width: sigColW });
+      y += 52;
+      if (guruSignatureUrl) {
+        try { doc.image(guruSignatureUrl, rx, y - 52, { fit: [120, 52] }); } catch (_) {}
+      }
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(BLACK);
+      doc.text(guruNama || '_____________________', rx, y, { width: sigColW });
+      y += 14;
+      doc.font("Helvetica").fontSize(9).fillColor(GRAY);
+      doc.text(`NIP. ${guruNip || '_____________________'}`);
+    }
 
-    // Signature section
-    const sigY = doc.y;
-    doc.text("_______________________________", 350, sigY);
-    doc.moveDown(0.3);
-    doc.text("Guru Pengampu", 350, sigY + 20);
-
-    doc.text("_______________________________", 50, sigY);
-    doc.moveDown(0.3);
-    doc.text("Kepala Sekolah / Wakasek", 50, sigY + 20);
-
-    // Footer
-    doc.moveDown(2);
-    doc.font("Helvetica").fontSize(8).fillColor("gray");
-    doc.text("Dokumen ini dihasilkan oleh GuruPRO AI", { align: "center" });
+    doc.font("Helvetica").fontSize(8).fillColor(GRAY);
+    doc.text("Dokumen ini dihasilkan oleh GuruPRO AI", ML, PAGE_HEIGHT - MB + 10, { align: "center", width: CW });
 
     doc.end();
   });
@@ -1262,8 +1339,29 @@ export async function generateLaporanEvaluasiPdfBuffer(
  */
 export function generateLaporanEvaluasiDocBuffer(
   data: LaporanEvaluasiLkpdOutput,
-  title: string
+  title: string,
+  options?: {
+    logoUrl?: string | null;
+    namaSekolah?: string;
+    alamat?: string | null;
+    npsn?: string | null;
+    kepalaNama?: string;
+    kepalaNip?: string | null;
+    guruNama?: string;
+    guruNip?: string | null;
+    guruSignatureUrl?: string | null;
+    kepalaSignatureUrl?: string | null;
+    lokasi?: string;
+    tanggal?: Date;
+  }
 ): Buffer {
+  const opts = options || {};
+  const {
+    logoUrl, namaSekolah, alamat, npsn,
+    kepalaNama, kepalaNip, guruNama, guruNip,
+    guruSignatureUrl, kepalaSignatureUrl, lokasi, tanggal,
+  } = opts;
+
   const { identitas, ringkasanEksekutif, capaianPerKKTP, temuanUtama, siswaPerluPerhatian, rekomendasiTindakLanjut } = data;
 
   // Build table rows with truncation
@@ -1278,6 +1376,40 @@ export function generateLaporanEvaluasiDocBuffer(
       </tr>
     `;
   }).join('');
+
+  const sigDate = tanggal
+    ? new Date(tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+    : new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  const kopHtml = namaSekolah ? (() => {
+    const logoImg = logoUrl ? `<img src="${logoUrl}" width="50" height="50" style="vertical-align: middle; margin-right: 8px;" />` : '';
+    const nameBlock = `<div style="font-size: 15pt; font-weight: bold; text-align: center;">${namaSekolah.toUpperCase()}</div>`;
+    const addrBlock = alamat ? `<div style="font-size: 9pt; color: #666; text-align: center;">${alamat}</div>` : '';
+    const npsnBlock = npsn ? `<div style="font-size: 9pt; color: #666; text-align: center;">NPSN: ${npsn}</div>` : '';
+    return `<div style="text-align: center; margin-bottom: 4pt;">${logoImg}${nameBlock}${addrBlock}${npsnBlock}</div><div style="border-top: 2px solid #374151; border-bottom: 1px solid #374151; margin-bottom: 12pt;">&nbsp;</div>`;
+  })() : '';
+
+  const signatureHtml = (kepalaNama || guruNama) ? (() => {
+    const left = kepalaNama ? `
+      <div style="text-align: center; width: 45%; float: left;">
+        <p style="margin: 0; font-size: 10pt;">${lokasi || ''}, ${sigDate}</p>
+        <p style="margin: 0; font-size: 10pt;">Kepala Sekolah,</p>
+        <p style="margin: 0; height: 52pt;">${kepalaSignatureUrl ? `<img src="${kepalaSignatureUrl}" width="120" height="52" />` : ''}</p>
+        <p style="margin: 0; font-weight: bold; font-size: 10pt;">${kepalaNama}</p>
+        <p style="margin: 0; font-size: 9pt; color: #666;">NIP. ${kepalaNip || '_____________________'}</p>
+      </div>
+    ` : '';
+    const right = guruNama ? `
+      <div style="text-align: center; width: 45%; float: right;">
+        <p style="margin: 0; font-size: 10pt;">${lokasi || ''}, ${sigDate}</p>
+        <p style="margin: 0; font-size: 10pt;">Guru Pengampu,</p>
+        <p style="margin: 0; height: 52pt;">${guruSignatureUrl ? `<img src="${guruSignatureUrl}" width="120" height="52" />` : ''}</p>
+        <p style="margin: 0; font-weight: bold; font-size: 10pt;">${guruNama}</p>
+        <p style="margin: 0; font-size: 9pt; color: #666;">NIP. ${guruNip || '_____________________'}</p>
+      </div>
+    ` : '';
+    return `<div style="margin-top: 40pt; overflow: hidden;">${left}${right}</div>`;
+  })() : '';
 
   const html = `
     <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -1295,9 +1427,6 @@ export function generateLaporanEvaluasiDocBuffer(
         td { border: 1px solid #333; padding: 8pt; font-size: 9pt; word-wrap: break-word; overflow-wrap: break-word; }
         td.kategori { word-wrap: break-word; }
         p { word-wrap: break-word; overflow-wrap: break-word; }
-        .signature-section { margin-top: 40pt; }
-        .sig-left { float: left; width: 45%; }
-        .sig-right { float: right; width: 45%; text-align: center; }
         .footer { text-align: center; font-size: 8pt; color: #666; margin-top: 40pt; clear: both; }
         .category-sangat-baik { color: #22C55E; font-weight: bold; }
         .category-baik { color: #3B82F6; font-weight: bold; }
@@ -1306,6 +1435,7 @@ export function generateLaporanEvaluasiDocBuffer(
       </style>
     </head>
     <body>
+      ${kopHtml}
       <h1>LAPORAN EVALUASI LKPD</h1>
       <p style="text-align: center; color: #666; font-size: 10pt;">Untuk perhatian Bapak/Ibu Kepala Sekolah/Wakasek</p>
 
@@ -1351,17 +1481,7 @@ export function generateLaporanEvaluasiDocBuffer(
         ${rekomendasiTindakLanjut.map(r => `<li style="margin-bottom: 6pt; word-wrap: break-word; overflow-wrap: break-word;">${truncateText(r, 240)}</li>`).join('')}
       </ol>
 
-      <div class="signature-section">
-        <div class="sig-left">
-          <p>&nbsp;</p>
-          <p>___________________________</p>
-          <p>Kepala Sekolah / Wakasek</p>
-        </div>
-        <div class="sig-right">
-          <p>___________________________</p>
-          <p>Guru Pengampu</p>
-        </div>
-      </div>
+      ${signatureHtml}
 
       <div class="footer">
         <p>Dokumen ini dihasilkan oleh GuruPRO AI</p>
