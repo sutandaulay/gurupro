@@ -50,6 +50,7 @@ const routes: RouteEntry[] = [
   { pattern: ["attendance", "teaching"], component: dynamic(() => import("../attendance/teaching/content")), paramKeys: [] },
   { pattern: ["attendance", "leave"], component: dynamic(() => import("../attendance/leave/content")), paramKeys: [] },
   { pattern: ["reports", "attendance"], component: dynamic(() => import("../reports/attendance/content")), paramKeys: [] },
+  { pattern: ["reports", "student-attendance"], component: dynamic(() => import("../reports/student-attendance/content")), paramKeys: [] },
   { pattern: ["reports", "tpg"], component: dynamic(() => import("../reports/tpg/content")), paramKeys: [] },
   { pattern: ["perpustakaan"], component: dynamic(() => import("../perpustakaan/content")), paramKeys: [] },
 ];
