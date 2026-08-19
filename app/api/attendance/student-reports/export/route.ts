@@ -189,78 +189,93 @@ export async function GET(req: Request) {
 
       const ws = wb.addWorksheet('Presensi Harian Siswa');
       ws.columns = [
-        { width: 6 }, { width: 10 }, { width: 28 }, { width: 14 },
-        { width: 10 }, { width: 30 },
+        { width: 5 },   // No
+        { width: 8 },   // No. Absen
+        { width: 26 },  // Nama Siswa
+        { width: 14 },  // NISN
+        { width: 14 },  // Tanggal
+        { width: 22 },  // Mapel
+        { width: 10 }, // Status
+        { width: 28 }, // Catatan
       ];
 
-      // Title
-      ws.mergeCells('A1:F1');
-      const titleCell = ws.getCell('A1');
-      titleCell.value = `Laporan Presensi Harian Siswa — ${kelasInfo.nama_kelas}`;
-      titleCell.font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-      titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E40AF' } };
-      titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-      ws.getRow(1).height = 28;
+      // Title row
+      ws.mergeCells('A1:H1');
+      const t = ws.getCell('A1');
+      t.value = `Laporan Presensi Harian Siswa — ${kelasInfo.nama_kelas}`;
+      t.font = { size: 13, bold: true, color: { argb: 'FFFFFFFF' } };
+      t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+      t.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(1).height = 26;
 
-      ws.mergeCells('A2:F2');
-      const metaCell = ws.getCell('A2');
-      metaCell.value = `${kelasInfo.nama_sekolah}  |  ${tanggalLabel}`;
-      metaCell.font = { size: 10, italic: true };
-      metaCell.alignment = { horizontal: 'center' };
-      ws.getRow(2).height = 16;
+      // Meta row
+      ws.mergeCells('A2:H2');
+      const m = ws.getCell('A2');
+      m.value = `${kelasInfo.nama_sekolah}  |  ${tanggalLabel}  |  Guru: ${kelasInfo.guru_nama || kelasInfo.wali_kelas || '-'}`;
+      m.font = { size: 9, italic: true };
+      m.alignment = { horizontal: 'center' };
+      ws.getRow(2).height = 14;
 
-      // Summary
-      ws.mergeCells('A3:F3');
-      const sumCell = ws.getCell('A3');
-      sumCell.value = `Ringkasan: Total=${sum.total} | Hadir=${sum.hadir} | Sakit=${sum.sakit} | Izin=${sum.izin} | Alpa=${sum.alpa} | Tingkat Kehadiran=${tingkatKehadiran}%`;
-      sumCell.font = { size: 9 };
-      sumCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+      // Summary row
+      ws.mergeCells('A3:H3');
+      const s = ws.getCell('A3');
+      s.value = `Ringkasan: Total=${sum.total}  |  Hadir=${sum.hadir}  |  Sakit=${sum.sakit}  |  Izin=${sum.izin}  |  Alpa=${sum.alpa}  |  Tingkat Kehadiran=${tingkatKehadiran}%`;
+      s.font = { size: 9, bold: true };
+      const sColor = tingkatKehadiran >= 90 ? 'FFDCEFCB' : tingkatKehadiran >= 75 ? 'FFFFF3CD' : 'FFFEE2E2';
+      s.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: sColor } };
+      s.alignment = { horizontal: 'center' };
       ws.getRow(3).height = 14;
 
       // Headers
-      const headers = ['No', 'No.\nAbsen', 'Nama Siswa', 'NISN', 'Status', 'Catatan'];
-      const headerRow = ws.addRow(headers);
-      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
-      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
-      headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      headerRow.height = 24;
+      const headers = ['No', 'No.\nAbsen', 'Nama Siswa', 'NISN', 'Tanggal', 'Mapel', 'Status', 'Catatan'];
+      const hRow = ws.addRow(headers);
+      hRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+      hRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+      hRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      hRow.height = 22;
+
+      const STATUS_FILL: Record<string, { fg: string; font: string }> = {
+        hadir: { fg: 'FFDCEFCB', font: 'FF10B981' },
+        sakit: { fg: 'FFDBEAFE', font: 'FF0EA5E9' },
+        izin: { fg: 'FFEDE9FE', font: 'FF7C3AED' },
+        alpa: { fg: 'FFFEE2E2', font: 'FFF43F5E' },
+      };
 
       dataRes.rows.forEach((row: any, idx: number) => {
+        const st = STATUS_FILL[row.status] || { fg: 'FFFFFFFF', font: 'FF1F2937' };
         const bg = idx % 2 === 0 ? 'FFFFFFFF' : 'FFF9FAFB';
         const r = ws.addRow([
           idx + 1,
           row.nomor_absen ?? '-',
           row.nama_siswa,
           row.nisn || '-',
+          row.tanggal ? format(new Date(row.tanggal), 'd MMM yyyy', { locale: id }) : '-',
+          row.nama_mapel || '-',
           STATUS_LABELS[row.status] || row.status,
           row.catatan || '-',
         ]);
-        r.height = 14;
-        r.eachCell({ includeEmpty: false }, (cell) => {
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
-          cell.font = { size: 10 };
+        r.height = 15;
+        r.eachCell({ includeEmpty: false }, (cell, colNum) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colNum === 7 ? st.fg : bg } };
+          cell.font = {
+            size: 9,
+            color: { argb: colNum === 7 ? st.font : 'FF1F2937' },
+            bold: colNum === 7,
+          };
           cell.border = {
             top: { style: 'thin' }, left: { style: 'thin' },
             bottom: { style: 'thin' }, right: { style: 'thin' },
           };
+          if (colNum === 1 || colNum === 2 || colNum === 4 || colNum === 7) {
+            cell.alignment = { horizontal: 'center' };
+          }
         });
-      });
-
-      ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
-        if (rowNum > 3) {
-          row.eachCell({ includeEmpty: false }, (cell) => {
-            cell.border = {
-              top: { style: 'thin' }, left: { style: 'thin' },
-              bottom: { style: 'thin' }, right: { style: 'thin' },
-            };
-          });
-        }
       });
 
       ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 4, activeCell: 'A5' }];
 
       const buf = await wb.xlsx.writeBuffer();
-      return new NextResponse(buf, {
+      return new NextResponse(buf as Buffer, {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           'Content-Disposition': `attachment; filename="laporan-presensi-siswa-${kelasInfo.nama_kelas.replace(/\s+/g, '_')}-${startDate}.xlsx"`,
