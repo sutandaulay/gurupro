@@ -44,7 +44,24 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const userId = await getUserId();
-    await requireActiveTahunAjaran();
+    // Skip requireActiveTahunAjaran when creating the FIRST school for a user
+    // (new individual teachers have no tahun ajaran yet — we create one below).
+    // Subsequent school creations still require active tahun ajaran.
+    const existingSchool = await query(
+      "SELECT id FROM schools WHERE user_id = $1 LIMIT 1",
+      [userId]
+    );
+    if (existingSchool.rows.length > 0 || id) {
+      // Has existing school or updating — require active tahun ajaran
+      try {
+        await requireActiveTahunAjaran();
+      } catch {
+        return NextResponse.json(
+          { error: 'Tidak ada tahun ajaran aktif. Silakan buat dan aktifkan tahun ajaran di menu Pengaturan.' },
+          { status: 400 }
+        );
+      }
+    }
     const { 
       id, 
       nama_sekolah, 
@@ -144,6 +161,19 @@ export async function POST(req: Request) {
           VALUES ($1, $2, NULL, true)
           ON CONFLICT DO NOTHING
         `, [userId, newSchool.id]);
+
+        // Auto-create and activate a default tahun ajaran for this school
+        const tahunSekarang = new Date().getFullYear();
+        await query(`
+          INSERT INTO tahun_ajaran (nama, tanggal_mulai, tanggal_selesai, semester_type, semester, sekolah_id, is_active, created_by)
+          VALUES ($1, $2, $3, 'full', 'ganjil', $4, true, $5)
+        `, [
+          `${tahunSekarang}/${tahunSekarang + 1}`,
+          `${tahunSekarang}-07-15`,
+          `${tahunSekarang + 1}-06-30`,
+          newSchool.id,
+          userId
+        ]);
       }
       return NextResponse.json(res.rows[0]);
     }

@@ -265,6 +265,7 @@ export const PenilaianSikapQuerySchema = z.object({
 export const EkstrakurikulerQuerySchema = z.object({
   kelasId: z.string().uuid().optional(),
   pembinaMemberId: z.string().uuid().optional(),
+  pembinaUserId: z.string().uuid().optional(),   // individual mode: filter by users.id via pembina_user_id
   schoolId: z.string().uuid().optional(),
 });
 

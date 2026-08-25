@@ -65,10 +65,9 @@ export async function POST(req: Request) {
       limit: 1,
     });
 
-    if (!memberResult.docs.length) {
-      return NextResponse.json({ error: 'Member tidak ditemukan atau tidak aktif' }, { status: 403 });
-    }
-    const actorMemberId = String(memberResult.docs[0].appUserId || memberResult.docs[0].id);
+    const actorMemberId = memberResult.docs.length > 0
+      ? String(memberResult.docs[0].appUserId || memberResult.docs[0].id)
+      : session.id;
 
     const body = await req.json();
     const input = PenilaianSikapCreateSchema.parse(body);
@@ -104,10 +103,9 @@ export async function PUT(req: Request) {
       limit: 1,
     });
 
-    if (!memberResult.docs.length) {
-      return NextResponse.json({ error: 'Member tidak ditemukan atau tidak aktif' }, { status: 403 });
-    }
-    const actorMemberId = String(memberResult.docs[0].appUserId || memberResult.docs[0].id);
+    const actorMemberId = memberResult.docs.length > 0
+      ? String(memberResult.docs[0].appUserId || memberResult.docs[0].id)
+      : session.id;
 
     const body = await req.json();
     const input = PenilaianSikapUpdateSchema.parse(body);

@@ -40,7 +40,6 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    await requireActiveTahunAjaran();
     const { id, class_id, nama_siswa, nisn, nomor_absen } = await req.json();
 
     if (!class_id || !nama_siswa) {
@@ -51,7 +50,31 @@ export async function POST(req: Request) {
     if (!classCheck.rows[0]) {
       return NextResponse.json({ error: "Kelas tidak ditemukan" }, { status: 404 });
     }
-    await requireSchoolAccess(classCheck.rows[0].school_id);
+    const schoolId = classCheck.rows[0].school_id;
+    await requireSchoolAccess(schoolId);
+
+    // Check if this is the first student in THIS school (per-school_id scope).
+    // Each school bootstraps independently — if Sekolah #2 has no siswa yet,
+    // the first one can be added even if the guru already has an active TA
+    // from a different school. Schools are isolated; guru can activate TA
+    // for each school separately via Pengaturan. This is intentional.
+    const existingStudent = await query(
+      `SELECT 1 FROM students s JOIN classes c ON c.id = s.class_id
+       WHERE c.school_id = $1 LIMIT 1`,
+      [schoolId]
+    );
+    if (existingStudent.rows.length === 0 && !id) {
+      // First student in school — skip requireActiveTahunAjaran (school was just created)
+    } else {
+      try {
+        await requireActiveTahunAjaran();
+      } catch {
+        return NextResponse.json(
+          { error: 'Tidak ada tahun ajaran aktif. Silakan buat dan aktifkan tahun ajaran di menu Pengaturan.' },
+          { status: 400 }
+        );
+      }
+    }
 
     if (id) {
       // Edit student

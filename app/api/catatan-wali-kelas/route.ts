@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { requireSchoolAccess } from '@/lib/school-access';
 import { getPayload } from '@/lib/payload';
 import {
   upsertCatatanWaliKelas,
@@ -65,16 +64,20 @@ export async function POST(req: Request) {
       limit: 1,
     });
 
-    if (!memberResult.docs.length) {
-      return NextResponse.json({ error: 'Member tidak ditemukan atau tidak aktif' }, { status: 403 });
-    }
-    // institution-members.id is an integer PK (Payload); the app-side "member
-    // id" columns (ditulis_oleh, wali_kelas_member_id, app_user_id coupling)
-    // actually store users.id — so use appUserId, not the integer id.
-    const actorMemberId = String(memberResult.docs[0].appUserId || memberResult.docs[0].id);
-
     const body = await req.json();
     const input = CatatanWaliKelasCreateSchema.parse(body);
+
+    // Resolve actorMemberId (users UUID):
+    // - Institution mode: memberResult.docs[0].appUserId = users UUID from institution_members
+    // - Individual mode: session.id (users UUID) directly
+    let actorMemberId: string;
+    if (memberResult.docs.length > 0) {
+      // appUserId is the users UUID stored in institution_members — matches session.id
+      actorMemberId = String(memberResult.docs[0].appUserId || memberResult.docs[0].id);
+    } else {
+      // Individual mode: session.id is the users UUID
+      actorMemberId = session.id;
+    }
 
     const result = await upsertCatatanWaliKelas(input, actorMemberId);
 
@@ -111,10 +114,9 @@ export async function PUT(req: Request) {
       limit: 1,
     });
 
-    if (!memberResult.docs.length) {
-      return NextResponse.json({ error: 'Member tidak ditemukan atau tidak aktif' }, { status: 403 });
-    }
-    const actorMemberId = String(memberResult.docs[0].appUserId || memberResult.docs[0].id);
+    const actorMemberId = memberResult.docs.length > 0
+      ? String(memberResult.docs[0].appUserId || memberResult.docs[0].id)
+      : session.id;
 
     const body = await req.json();
     const { id, catatan } = body;

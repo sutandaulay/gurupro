@@ -143,11 +143,32 @@ export async function insertPenilaianSikap(
   const [, tahunAjar, , semester] = tahunAjaranMatch;
   const semesterEnum = semester as 'ganjil' | 'genap';
 
-  // RBAC: Validate actor is active homeroom teacher for this class
+  // RBAC: Validate actor is active homeroom teacher for this class.
+  //
+  // Two paths exist for storing the wali kelas relationship:
+  // 1. institution path: wali_kelas_assignments.wali_kelas_member_id (Payload UUID)
+  //    joined with institution_members. WaliKelasMemberId = institution_members Payload ID.
+  // 2. Master Data path: classes.wali_kelas_user_id = users.id (direct FK).
+  //
+  // actorMemberId from institution_members lookup = users UUID (appUserId field).
+  // For Master Data path, actorMemberId (users UUID) should equal classes.wali_kelas_user_id.
+  // For institution path, if institution_members.id (Payload UUID) is stored in
+  // wali_kelas_assignments, compare against institution_members.id separately.
   const waliKelas = await getWaliKelasForKelas(input.kelasId, tahunAjar, semesterEnum);
-  const isWaliKelasValid = waliKelas && waliKelas.waliKelasMemberId === actorMemberId;
+
+  // Primary check — Master Data path ( WaliKelasMemberId may be users UUID stored in
+  // institution_members, compare with actorMemberId = users UUID from appUserId).
+  let isWaliKelasValid = false;
+  if (waliKelas) {
+    // Compare against institution_members.app_user_id (users UUID) if stored.
+    if (String(waliKelas.waliKelasMemberId) === actorMemberId) {
+      isWaliKelasValid = true;
+    }
+  }
+
   if (!isWaliKelasValid) {
-    // Fallback: check classes.wali_kelas_user_id (legacy system from Master Data checkbox)
+    // Fallback: check classes.wali_kelas_user_id (Master Data path) = users.id.
+    // actorMemberId = users UUID from appUserId field, matches users.id directly.
     const fallback = await query(
       `SELECT 1 FROM classes c
        WHERE c.id = $1 AND c.wali_kelas_user_id = $2::uuid
@@ -155,8 +176,32 @@ export async function insertPenilaianSikap(
       [input.kelasId, actorMemberId]
     );
     if (fallback.rows.length === 0) {
-      throw new Error('Hanya wali kelas aktif kelas ini yang bisa mengisi sikap siswa');
+      // Also try: if institution_members.id (Payload UUID) is stored in
+      // wali_kelas_assignments, look it up and compare.
+      const memberIdFallback = await query(
+        `SELECT im.id
+         FROM public.institution_members im
+         WHERE im.app_user_id = $1 AND im.status = 'active'
+         LIMIT 1`,
+        [actorMemberId]
+      );
+      if (memberIdFallback.rows.length > 0) {
+        const memberId = String(memberIdFallback.rows[0].id);
+        const byMemberRes = await query(
+          `SELECT 1 FROM wali_kelas_assignments
+           WHERE kelas_id = $1 AND wali_kelas_member_id = $2 AND status = 'aktif'
+           LIMIT 1`,
+          [input.kelasId, memberId]
+        );
+        if (byMemberRes.rows.length > 0) isWaliKelasValid = true;
+      }
+    } else {
+      isWaliKelasValid = true;
     }
+  }
+
+  if (!isWaliKelasValid) {
+    throw new Error('Hanya wali kelas aktif kelas ini yang bisa mengisi sikap siswa');
   }
 
   // Validate siswa belongs to this kelas
@@ -412,6 +457,12 @@ export async function getEkstrakurikuler(
     params.push(filters.pembinaMemberId);
     idx++;
   }
+  if (filters.pembinaUserId) {
+    // Individual mode: directly filter by users.id via pembina_user_id column.
+    // This avoids returning ALL rows when pembinaMemberId is absent.
+    conditions.push(`e.pembina_user_id = $${idx++}`);
+    params.push(filters.pembinaUserId);
+  }
   if (filters.schoolId) {
     conditions.push(`c.school_id = $${idx++}`);
     params.push(filters.schoolId);
@@ -663,11 +714,19 @@ export async function upsertCatatanWaliKelas(
   const [, tahunAjar, , semester] = tahunAjaranMatch;
   const semesterEnum = semester as 'ganjil' | 'genap';
 
-  // RBAC: Validate actor is active homeroom teacher for this class
+  // RBAC: Validate actor is active homeroom teacher for this class.
+  // See insertPenilaianSikap for detailed explanation of the dual-path check.
   const waliKelas = await getWaliKelasForKelas(input.kelasId, tahunAjar, semesterEnum);
-  const isWaliKelasValid = waliKelas && waliKelas.waliKelasMemberId === actorMemberId;
+
+  let isWaliKelasValid = false;
+  if (waliKelas) {
+    if (String(waliKelas.waliKelasMemberId) === actorMemberId) {
+      isWaliKelasValid = true;
+    }
+  }
+
   if (!isWaliKelasValid) {
-    // Fallback: check classes.wali_kelas_user_id (legacy system from Master Data checkbox)
+    // Fallback: check classes.wali_kelas_user_id (Master Data path) = users.id.
     const fallback = await query(
       `SELECT 1 FROM classes c
        WHERE c.id = $1 AND c.wali_kelas_user_id = $2::uuid
@@ -675,8 +734,32 @@ export async function upsertCatatanWaliKelas(
       [input.kelasId, actorMemberId]
     );
     if (fallback.rows.length === 0) {
-      throw new Error('Hanya wali kelas aktif kelas ini yang bisa menulis catatan');
+      // Also try: if institution_members.id (Payload UUID) is stored in
+      // wali_kelas_assignments, look it up and compare.
+      const memberIdFallback = await query(
+        `SELECT im.id
+         FROM public.institution_members im
+         WHERE im.app_user_id = $1 AND im.status = 'active'
+         LIMIT 1`,
+        [actorMemberId]
+      );
+      if (memberIdFallback.rows.length > 0) {
+        const memberId = String(memberIdFallback.rows[0].id);
+        const byMemberRes = await query(
+          `SELECT 1 FROM wali_kelas_assignments
+           WHERE kelas_id = $1 AND wali_kelas_member_id = $2 AND status = 'aktif'
+           LIMIT 1`,
+          [input.kelasId, memberId]
+        );
+        if (byMemberRes.rows.length > 0) isWaliKelasValid = true;
+      }
+    } else {
+      isWaliKelasValid = true;
     }
+  }
+
+  if (!isWaliKelasValid) {
+    throw new Error('Hanya wali kelas aktif kelas ini yang bisa menulis catatan');
   }
 
   // Validate siswa belongs to this kelas

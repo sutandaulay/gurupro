@@ -38,10 +38,9 @@ export async function POST(request: NextRequest) {
       limit: 1,
     });
 
-    if (!memberResult.docs.length) {
-      return NextResponse.json({ error: 'Member tidak ditemukan atau tidak aktif' }, { status: 403 });
-    }
-    const actorMemberId = String(memberResult.docs[0].id);
+    const actorMemberId = memberResult.docs.length > 0
+      ? String(memberResult.docs[0].appUserId || memberResult.docs[0].id)
+      : session.id;
 
     // Verify the user has ownership of the data being shared
     // For raport

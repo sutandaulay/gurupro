@@ -23,6 +23,7 @@ const routes: RouteEntry[] = [
   { pattern: ["laporan-harian"], component: dynamic(() => import("../laporan-harian/content")), paramKeys: [] },
   { pattern: ["laporan-harian", ":tanggal"], component: dynamic(() => import("../laporan-harian/[tanggal]/content")), paramKeys: ["tanggal"] },
   { pattern: ["laporan-mengajar"], component: dynamic(() => import("../laporan-mengajar/content")), paramKeys: [] },
+  { pattern: ["master-data"], component: dynamic(() => import("../master-data/content")), paramKeys: [] },
   { pattern: ["laporan-mengajar", ":id"], component: dynamic(() => import("../laporan-mengajar/[id]/content")), paramKeys: ["id"] },
   { pattern: ["laporan-kinerja"], component: dynamic(() => import("../laporan-kinerja/content")), paramKeys: [] },
   { pattern: ["laporan-kinerja", ":id"], component: dynamic(() => import("../laporan-kinerja/[id]/content")), paramKeys: ["id"] },

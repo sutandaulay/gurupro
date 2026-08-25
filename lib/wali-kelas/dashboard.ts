@@ -94,19 +94,48 @@ export interface WaliKelasDashboardData {
 /**
  * Classes owned by the user as homeroom teacher.
  * Covers BOTH the Master Data path (classes.wali_kelas_user_id = users.id)
- * AND the assignment path (wali_kelas_assignments.wali_kelas_member_id = users.id).
- * This avoids repeating the "empty assignments vs institution_members" bug.
+ * AND the assignment path (wali_kelas_assignments.wali_kelas_member_id =
+ * institution_members.id Payload UUID, resolved via Payload lookup using
+ * appUserId = userId).
+ *
+ * Previously this compared session userId directly against
+ * wali_kelas_member_id which stores institution_members.id (Payload UUID) —
+ * two different UUID spaces, so the assignment path never matched.
  */
 export async function getOwnedWaliKelasClassIds(userId: string): Promise<string[]> {
-  const [classesRes, assignRes] = await Promise.all([
-    query('SELECT id FROM classes WHERE wali_kelas_user_id = $1', [userId]),
-    query(
-      `SELECT DISTINCT kelas_id
-       FROM wali_kelas_assignments
-       WHERE wali_kelas_member_id = $1 AND status = 'aktif'`,
-      [userId]
-    ),
-  ]);
+  // Path A — Always: classes.wali_kelas_user_id = users.id (direct FK).
+  const classesRes = await query(
+    'SELECT id FROM classes WHERE wali_kelas_user_id = $1',
+    [userId]
+  );
+
+  // Path B — Institution mode: resolve institution_members.id (Payload UUID)
+  // via Payload lookup, then filter by wali_kelas_assignments.
+  let assignRes = { rows: [] as any[] };
+  try {
+    const { getPayload } = await import('@/lib/payload');
+    const payload = await getPayload();
+    const memberResult = await payload.find({
+      collection: 'institution-members',
+      where: {
+        appUserId: { equals: userId },
+        status: { equals: 'active' },
+      },
+      limit: 1,
+    });
+
+    if (memberResult.docs.length > 0) {
+      const memberId = String(memberResult.docs[0].id);
+      assignRes = await query(
+        `SELECT DISTINCT kelas_id
+         FROM wali_kelas_assignments
+         WHERE wali_kelas_member_id = $1 AND status = 'aktif'`,
+        [memberId]
+      );
+    }
+  } catch {
+    // No institution membership or Payload lookup failed — skip assignment path.
+  }
 
   const ids = new Set<string>();
   for (const row of classesRes.rows) if (row.id) ids.add(String(row.id));
