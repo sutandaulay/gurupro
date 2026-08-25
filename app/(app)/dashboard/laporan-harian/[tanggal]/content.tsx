@@ -62,14 +62,16 @@ function PrintHeader({ report }: { report: ReportDetail }) {
   return (
     <div className="print-only print-header">
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12pt' }}>
-        <tr>
-          <td style={{ width: '50px', verticalAlign: 'middle' }}></td>
-          <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
-            <h1 style={{ margin: 0, fontSize: '16pt', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>{sekolah}</h1>
-            <p style={{ margin: '2pt 0', fontSize: '9pt', color: '#555' }}>Laporan Harian Guru — {report.tanggal_formatted}</p>
-          </td>
-          <td style={{ width: '50px', verticalAlign: 'middle' }}></td>
-        </tr>
+        <tbody>
+          <tr>
+            <td style={{ width: '50px', verticalAlign: 'middle' }}></td>
+            <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+              <h1 style={{ margin: 0, fontSize: '16pt', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>{sekolah}</h1>
+              <p style={{ margin: '2pt 0', fontSize: '9pt', color: '#555' }}>Laporan Harian Guru — {report.tanggal_formatted}</p>
+            </td>
+            <td style={{ width: '50px', verticalAlign: 'middle' }}></td>
+          </tr>
+        </tbody>
       </table>
       <hr style={{ border: '1.5px solid #000', margin: '0 0 12pt' }} />
     </div>

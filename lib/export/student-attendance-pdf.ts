@@ -10,21 +10,40 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export interface StudentAttendanceRecord {
-  id: string; namaSiswa: string; nisn?: string | null; nomorAbsen?: number | null;
+  id: string; studentId?: string;
+  namaSiswa: string; nisn?: string | null; nomorAbsen?: number | null;
   status: string; catatan?: string | null; tanggal: string | Date;
+}
+export interface MatrixStudent {
+  studentId: string; namaSiswa: string; nisn?: string | null; nomorAbsen?: number | null;
+  perDate: Record<string, { status: string; catatan: string } | null>;
+  totals?: { hadir: number; sakit: number; izin: number; alpa: number; pct?: number };
 }
 export interface StudentAttendanceReportData {
   schoolName: string; schoolAddress?: string | null; schoolNpsn?: string | null; schoolLogo?: string | null;
-  kelas: string; mapel?: string; guruPengampu: string; guruNip?: string | null;
-  tanggal: string; periodeLabel: string; records: StudentAttendanceRecord[];
+  kelas: string; mapel?: string | null; guruPengampu: string; guruNip?: string | null;
+  tanggal: string; periodeLabel: string;
+  records: StudentAttendanceRecord[];
+  matrix?: MatrixStudent[];
+  dateStrs?: string[];
+  dateLabels?: string[];
   summary: { total: number; hadir: number; sakit: number; izin: number; alpa: number; tingkatKehadiran: number };
   kepalaNama?: string | null; kepalaNip?: string | null; kepalaSignatureUrl?: string | null;
   guruSignatureUrl?: string | null;
 }
 
+const STATUS_SHORT: Record<string, string> = { hadir: 'H', sakit: 'S', izin: 'I', alpa: 'A' };
+
 export async function generateStudentAttendancePdfBuffer(data: StudentAttendanceReportData): Promise<Buffer> {
+  const useMatrix = !!(data.matrix && data.dateStrs && data.dateStrs.length > 0);
+  const numDates = data.dateStrs?.length || 0;
+  const isLandscape = useMatrix && numDates > 5;
+
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 0, size: 'A4' });
+    const doc = new PDFDocument({
+      margin: 0, size: 'A4',
+      layout: isLandscape ? 'landscape' : 'portrait',
+    });
     const chunks: Buffer[] = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -32,25 +51,18 @@ export async function generateStudentAttendancePdfBuffer(data: StudentAttendance
 
     const PW = doc.page.width as number;
     const PH = doc.page.height as number;
-    const ML = 57, MR = 57, MT = 71, MB = 57;
+    const ML = 45, MR = 45, MT = 60, MB = 50;
     const CW = PW - ML - MR;
-    const W = 595.28, H = 841.89;
 
-    const NAVY = '#1E3A8A';
-    const DARK = '#1F2937';
-    const GRAY = '#6B7280';
-    const LIGHT = '#F3F4F6';
-    const WHITE = '#FFFFFF';
-    const BORDER = '#D1D5DB';
-
+    const NAVY = '#1E3A8A', DARK = '#1F2937', GRAY = '#6B7280', WHITE = '#FFFFFF', BORDER = '#D1D5DB';
     let y = MT, pageNum = 1;
 
     const checkBreak = (n: number) => {
-      if (y + n > PH - MB) { doc.addPage(); y = MT; pageNum++; }
+      if (y + n > PH - MB) { doc.addPage({ layout: isLandscape ? 'landscape' : 'portrait' }); y = MT; pageNum++; }
     };
     const pgNum = () => {
-      doc.font('Helvetica').fontSize(8).fillColor(GRAY);
-      doc.text(`Halaman ${pageNum}`, ML, PH - MB + 8, { align: 'center', width: CW });
+      doc.font('Helvetica').fontSize(7.5).fillColor(GRAY);
+      doc.text(`Halaman ${pageNum}`, ML, PH - MB + 6, { align: 'center', width: CW });
       doc.fillColor(DARK);
     };
     pgNum();
@@ -59,111 +71,201 @@ export async function generateStudentAttendancePdfBuffer(data: StudentAttendance
 
     // ---- KOP SEKOLAH ----
     if (data.schoolLogo) {
-      try { doc.image(data.schoolLogo, ML, y, { fit: [48, 48] }); } catch (_) {}
+      try { doc.image(data.schoolLogo, ML, y, { fit: [44, 44] }); } catch (_) {}
     }
-    doc.font('Helvetica-Bold').fontSize(14).fillColor(NAVY);
-    doc.text(data.schoolName.toUpperCase(), ML + (data.schoolLogo ? 56 : 0), y + 6, {
-      width: CW - (data.schoolLogo ? 56 : 0), align: 'center',
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(NAVY);
+    doc.text((data.schoolName || '').toUpperCase(), ML + (data.schoolLogo ? 52 : 0), y + 5, {
+      width: CW - (data.schoolLogo ? 52 : 0), align: 'center',
     });
-    y += 24;
+    y += 22;
     if (data.schoolAddress) {
-      doc.font('Helvetica').fontSize(8).fillColor(GRAY);
-      doc.text(data.schoolAddress, ML, y, { width: CW, align: 'center' });
-      y += 12;
+      doc.font('Helvetica').fontSize(7.5).fillColor(GRAY);
+      doc.text(data.schoolAddress, ML, y, { width: CW, align: 'center' }); y += 10;
     }
     if (data.schoolNpsn) {
-      doc.font('Helvetica').fontSize(8).fillColor(GRAY);
-      doc.text(`NPSN: ${data.schoolNpsn}`, ML, y, { width: CW, align: 'center' });
-      y += 12;
+      doc.font('Helvetica').fontSize(7.5).fillColor(GRAY);
+      doc.text(`NPSN: ${data.schoolNpsn}`, ML, y, { width: CW, align: 'center' }); y += 10;
     }
-    y += 4;
+    y += 3;
     doc.moveTo(ML, y).lineTo(PW - MR, y).lineWidth(2).stroke(NAVY);
-    y += 4;
+    y += 3;
     doc.moveTo(ML, y).lineTo(PW - MR, y).lineWidth(0.5).stroke(BORDER);
-    y += 14;
+    y += 12;
 
     // ---- JUDUL ----
-    doc.font('Helvetica-Bold').fontSize(13).fillColor(DARK);
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(DARK);
     doc.text('LAPORAN PRESENSI HARIAN SISWA', ML, y, { width: CW, align: 'center' });
-    y += 20;
+    y += 18;
 
     // ---- INFO ----
-    const info = [
-      ['Kelas', data.kelas, 'Mata Pelajaran', data.mapel || '-'],
-      ['Tanggal', data.tanggal, 'Guru Pengampu', `${data.guruPengampu}${data.guruNip ? `, NIP. ${data.guruNip}` : ''}`],
+    const infoLine = [
+      ['Kelas', data.kelas],
+      ['Wali Kelas', `${data.guruPengampu}${data.guruNip ? `, NIP. ${data.guruNip}` : ''}`],
+      ['Periode', data.tanggal],
     ];
-    const lw = 110, vw = CW / 2 - lw - 6;
-    for (const [l1, v1, l2, v2] of info) {
-      doc.font('Helvetica-Bold').fontSize(9).fillColor(DARK);
-      doc.text(l1, ML, y, { width: lw });
-      doc.font('Helvetica').fontSize(9).fillColor(DARK);
-      doc.text(v1, ML + lw, y, { width: vw });
-      doc.font('Helvetica-Bold').fontSize(9).fillColor(DARK);
-      doc.text(l2, ML + CW / 2, y, { width: lw });
-      doc.font('Helvetica').fontSize(9).fillColor(DARK);
-      doc.text(v2, ML + CW / 2 + lw, y, { width: vw });
+    if (useMatrix) infoLine.push(['Jumlah Siswa', String(data.matrix?.length || 0)]);
+
+    if (!useMatrix) {
+      const lw = 80, vw = CW / 2 - lw - 4;
+      for (const [l1, v1] of infoLine.slice(0, 2)) {
+        doc.font('Helvetica-Bold').fontSize(8).fillColor(DARK);
+        doc.text(l1, ML, y, { width: lw });
+        doc.font('Helvetica').fontSize(8).fillColor(DARK);
+        doc.text(v1, ML + lw, y, { width: vw });
+        y += 13;
+      }
+    } else {
+      const infoText = infoLine.map(([l, v]) => `${l}: ${v}`).join('   |   ');
+      doc.font('Helvetica').fontSize(8).fillColor(GRAY);
+      doc.text(infoText, ML, y, { width: CW, align: 'center' });
       y += 14;
     }
-    y += 6;
+    y += 4;
 
     // ---- RINGKASAN ----
-    checkBreak(36);
+    checkBreak(30);
     const items = [
       { label: 'Total', value: data.summary.total },
       { label: 'Hadir', value: data.summary.hadir, color: '#10b981' },
       { label: 'Sakit', value: data.summary.sakit, color: '#0ea5e9' },
-      { label: 'Izin', value: data.summary.izin, color: '#7c3aed' },
+      { label: 'Izin', value: data.summary.izin, color: '#f59e0b' },
       { label: 'Alpa', value: data.summary.alpa, color: '#f43f5e' },
-      { label: 'Tingkat Kehadiran', value: `${data.summary.tingkatKehadiran}%`, color: data.summary.tingkatKehadiran >= 90 ? '#10b981' : data.summary.tingkatKehadiran >= 75 ? '#f59e0b' : '#f43f5e' },
+      { label: 'Tingkat', value: `${data.summary.tingkatKehadiran}%`, color: data.summary.tingkatKehadiran >= 90 ? '#10b981' : data.summary.tingkatKehadiran >= 75 ? '#f59e0b' : '#f43f5e' },
     ];
     const boxW = CW / items.length;
-    doc.rect(ML, y, CW, 28).fill(NAVY);
+    doc.rect(ML, y, CW, 24).fill(NAVY);
     items.forEach((item, i) => {
       const x = ML + i * boxW;
-      doc.font('Helvetica').fontSize(7).fillColor('#E5E7EB').text(item.label, x + 4, y + 4, { width: boxW - 8, align: 'center' });
-      doc.font('Helvetica-Bold').fontSize(12).fillColor(item.color || WHITE).text(String(item.value), x + 4, y + 14, { width: boxW - 8, align: 'center' });
+      doc.font('Helvetica').fontSize(6.5).fillColor('#E5E7EB').text(item.label, x + 3, y + 3, { width: boxW - 6, align: 'center' });
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(item.color || WHITE).text(String(item.value), x + 3, y + 13, { width: boxW - 6, align: 'center' });
     });
-    y += 36;
+    y += 32;
 
-    // ---- TABEL ----
-    const cols = [
-      { label: 'No', w: 28 },
-      { label: 'No.\nAbsen', w: 38 },
-      { label: 'Nama Siswa', w: 130 },
-      { label: 'NISN', w: 58 },
-      { label: 'Tanggal', w: 72 },
-      { label: 'Status', w: 46 },
-      { label: 'Catatan', w: 68 },
-    ];
-    const rowH = 18;
-    const totalW = cols.reduce((s, c) => s + c.w, 0);
-    // scale cols to fit CW
-    const scale = CW / totalW;
-    const scaled = cols.map(c => ({ ...c, w: c.w * scale }));
+    // ---- MATRIX TABLE ----
+    if (useMatrix && data.matrix && data.dateStrs) {
+      const students = data.matrix;
+      const dateStrs = data.dateStrs;
+      const dateLabels = data.dateLabels || dateStrs.map(d => format(new Date(d), 'EEE, d', { locale: id }));
 
-    checkBreak(rowH + 10);
-    // header
-    let x = ML;
-    scaled.forEach(c => {
-      doc.rect(x, y, c.w, rowH).fill(NAVY);
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor(WHITE);
-      doc.text(c.label, x + 2, y + 3, { width: c.w - 4, align: 'center' });
-      x += c.w;
-    });
-    y += rowH;
+      // Column widths: sticky left cols + date cols + total cols
+      const stickyW = isLandscape ? 130 : 110;
+      const totalColsW = 5 * (isLandscape ? 22 : 22) + (isLandscape ? 8 : 8);
+      const dateCols = isLandscape ? numDates : Math.min(numDates, Math.floor((CW - stickyW - totalColsW) / (isLandscape ? 22 : 18)));
+      const dateColW = Math.floor((CW - stickyW - totalColsW) / dateCols);
+      const scaleDateW = CW - stickyW - totalColsW - dateColW * dateCols; // remainder
 
-    // rows
-    if (data.records.length === 0) {
-      checkBreak(rowH);
-      x = ML;
+      const rowH = 16;
+
+      // Table header
+      checkBreak(rowH + 4);
+      let x = ML;
+      // Sticky cols
+      doc.rect(x, y, stickyW, rowH).fill('#374151');
+      doc.font('Helvetica-Bold').fontSize(7).fillColor(WHITE);
+      doc.text('Nama Siswa', x + 2, y + 4, { width: stickyW - 4, align: 'left' });
+      x += stickyW;
+      // Date cols (header) — match actual rendered columns
+      for (let di = 0; di < dateCols; di++) {
+        const dw = di === dateCols - 1 ? dateColW + scaleDateW : dateColW;
+        doc.rect(x, y, dw, rowH).fill('#374151');
+        doc.font('Helvetica-Bold').fontSize(6).fillColor(WHITE);
+        doc.text(dateLabels[di], x + 1, y + 2, { width: dw - 2, align: 'center' });
+        doc.font('Helvetica').fontSize(5.5).fillColor('#E5E7EB');
+        doc.text(format(new Date(dateStrs[di]), 'd MMM', { locale: id }), x + 1, y + 9, { width: dw - 2, align: 'center' });
+        x += dw;
+      }
+      // Total cols
+      const totalHdrs = [['H', '#10b981'], ['S', '#0ea5e9'], ['I', '#f59e0b'], ['A', '#f43f5e']];
+      for (const [lbl, clr] of totalHdrs) {
+        doc.rect(x, y, 22, rowH).fill('#1F2937');
+        doc.font('Helvetica-Bold').fontSize(8).fillColor(clr).text(lbl, x + 2, y + 4, { width: 18, align: 'center' });
+        x += 22;
+      }
+      // % Hadir header
+      doc.rect(x, y, 30, rowH).fill('#059669');
+      doc.font('Helvetica-Bold').fontSize(7).fillColor(WHITE).text('% Hadir', x + 2, y + 4, { width: 26, align: 'center' });
+      y += rowH;
+
+      // Data rows
+      for (let si = 0; si < students.length; si++) {
+        const s = students[si];
+        checkBreak(rowH);
+        const bg = si % 2 === 0 ? WHITE : '#F9FAFB';
+        x = ML;
+
+        // Sticky: No + Name
+        doc.rect(x, y, stickyW, rowH).fill(bg);
+        doc.font('Helvetica').fontSize(7.5).fillColor(DARK);
+        doc.text(`${s.nomorAbsen != null ? String(s.nomorAbsen).padStart(2, ' ') : '--'}  ${s.namaSiswa}`, x + 2, y + 4, { width: stickyW - 4 });
+        x += stickyW;
+
+        // Date cells
+        for (let di = 0; di < dateCols; di++) {
+          const dw = di === dateCols - 1 ? dateColW + scaleDateW : dateColW;
+          const v = s.perDate[dateStrs[di]];
+          let fill = bg, txt = '—', color = GRAY;
+          if (v?.status) {
+            const st = STATUS_COLORS[v.status] || '#6B7280';
+            fill = st + '22';
+            txt = STATUS_SHORT[v.status] || v.status.charAt(0).toUpperCase();
+            color = st;
+          }
+          doc.rect(x, y, dw, rowH).fill(fill).stroke(BORDER);
+          doc.font('Helvetica-Bold').fontSize(7.5).fillColor(color).text(txt, x + 1, y + 4, { width: dw - 2, align: 'center' });
+          x += dw;
+        }
+
+        // Total cells
+        if (s.totals) {
+          const tvals = [s.totals.hadir, s.totals.sakit, s.totals.izin, s.totals.alpa];
+          const tcolors = ['#10b981', '#0ea5e9', '#f59e0b', '#f43f5e'];
+          for (let ti = 0; ti < 4; ti++) {
+            doc.rect(x, y, 22, rowH).fill(bg).stroke(BORDER);
+            if (tvals[ti] > 0) {
+              doc.rect(x, y, 22, rowH).fill(tcolors[ti] + '22');
+              doc.font('Helvetica-Bold').fontSize(8).fillColor(tcolors[ti]).text(String(tvals[ti]), x + 2, y + 4, { width: 18, align: 'center' });
+            }
+            x += 22;
+          }
+          // % Hadir cell
+          const pct = s.totals.pct || 0;
+          const pctColor = pct >= 90 ? '#10b981' : pct >= 75 ? '#f59e0b' : pct > 0 ? '#f43f5e' : GRAY;
+          doc.rect(x, y, 30, rowH).fill(bg).stroke(BORDER);
+          doc.font('Helvetica-Bold').fontSize(8).fillColor(pctColor).text(`${pct}%`, x + 2, y + 4, { width: 26, align: 'center' });
+        } else {
+          x += 118;
+        }
+        y += rowH;
+      }
+      y += 12;
+    }
+
+    // ---- DETAIL TABLE (when no matrix) ----
+    if (!useMatrix && data.records.length > 0) {
+      const cols = [
+        { label: 'No', w: 24 },
+        { label: 'No.\nAbsen', w: 36 },
+        { label: 'Nama Siswa', w: 120 },
+        { label: 'NISN', w: 52 },
+        { label: 'Tanggal', w: 68 },
+        { label: 'Status', w: 44 },
+        { label: 'Catatan', w: 96 },
+      ];
+      const rowH = 16;
+      const totalW = cols.reduce((s, c) => s + c.w, 0);
+      const scale = CW / totalW;
+      const scaled = cols.map(c => ({ ...c, w: c.w * scale }));
+
+      checkBreak(rowH + 4);
+      let x = ML;
       scaled.forEach(c => {
-        doc.rect(x, y, c.w, rowH).fill(WHITE).stroke(BORDER);
+        doc.rect(x, y, c.w, rowH).fill(NAVY);
+        doc.font('Helvetica-Bold').fontSize(7).fillColor(WHITE);
+        doc.text(c.label, x + 2, y + 2, { width: c.w - 4, align: 'center' });
         x += c.w;
       });
-      doc.font('Helvetica').fontSize(8).fillColor(GRAY);
-      doc.text('Tidak ada data presensi untuk periode ini.', ML + 4, y + 5, { width: CW - 8, align: 'center' });
       y += rowH;
-    } else {
+
       data.records.forEach((rec, idx) => {
         checkBreak(rowH);
         const bg = idx % 2 === 0 ? WHITE : '#F9FAFB';
@@ -181,57 +283,54 @@ export async function generateStudentAttendancePdfBuffer(data: StudentAttendance
         scaled.forEach((c, ci) => {
           doc.rect(x, y, c.w, rowH).fill(bg).stroke(BORDER);
           const isStatus = ci === 5;
-          doc.font(isStatus ? 'Helvetica-Bold' : 'Helvetica').fontSize(7.5).fillColor(isStatus ? stColor : DARK);
-          doc.text(cells[ci], x + 2, y + 5, { width: c.w - 4, align: ci === 0 || ci === 1 || ci === 3 || ci === 5 ? 'center' : 'left' });
+          doc.font(isStatus ? 'Helvetica-Bold' : 'Helvetica').fontSize(7).fillColor(isStatus ? stColor : DARK);
+          doc.text(cells[ci], x + 2, y + 4, { width: c.w - 4, align: ci === 0 || ci === 1 || ci === 3 || ci === 5 ? 'center' : 'left' });
           x += c.w;
         });
         y += rowH;
       });
+      y += 12;
     }
-    y += 16;
 
     // ---- TANDA TANGAN ----
     if (data.kepalaNama || data.guruPengampu) {
-      checkBreak(100);
+      checkBreak(90);
       const colW = (CW - 20) / 2;
-      const city = data.tanggal;
 
-      // left: kepala sekolah
       doc.font('Helvetica').fontSize(9).fillColor(DARK);
-      doc.text(city, ML, y, { width: colW, align: 'center' });
-      y += 12;
+      doc.text(data.tanggal, ML, y, { width: colW, align: 'center' });
+      y += 11;
       doc.text('Kepala Sekolah,', ML, y, { width: colW, align: 'center' });
-      y += 50;
+      y += 46;
       if (data.kepalaSignatureUrl) {
-        try { doc.image(data.kepalaSignatureUrl, ML, y - 50, { fit: [120, 50] }); } catch (_) {}
+        try { doc.image(data.kepalaSignatureUrl, ML, y - 46, { fit: [110, 46] }); } catch (_) {}
       }
       doc.font('Helvetica-Bold').fontSize(9).fillColor(DARK);
       doc.text(data.kepalaNama || '_____________________', ML, y, { width: colW, align: 'center' });
-      y += 12;
+      y += 11;
       doc.font('Helvetica').fontSize(8).fillColor(GRAY);
       doc.text(`NIP. ${data.kepalaNip || '____________________'}`, ML, y, { width: colW, align: 'center' });
 
-      // right: guru pengampu
       const rx = ML + colW + 20;
-      let ry = y - 62;
+      let ry = y - 57;
       doc.font('Helvetica').fontSize(9).fillColor(DARK);
-      doc.text(city, rx, ry, { width: colW, align: 'center' });
-      ry += 12;
-      doc.text('Guru Pengampu / Wali Kelas,', rx, ry, { width: colW, align: 'center' });
-      ry += 50;
+      doc.text(data.tanggal, rx, ry, { width: colW, align: 'center' });
+      ry += 11;
+      doc.text('Wali Kelas,', rx, ry, { width: colW, align: 'center' });
+      ry += 46;
       if (data.guruSignatureUrl) {
-        try { doc.image(data.guruSignatureUrl, rx, ry - 50, { fit: [120, 50] }); } catch (_) {}
+        try { doc.image(data.guruSignatureUrl, rx, ry - 46, { fit: [110, 46] }); } catch (_) {}
       }
       doc.font('Helvetica-Bold').fontSize(9).fillColor(DARK);
       doc.text(data.guruPengampu, rx, ry, { width: colW, align: 'center' });
-      ry += 12;
+      ry += 11;
       doc.font('Helvetica').fontSize(8).fillColor(GRAY);
       doc.text(`NIP. ${data.guruNip || '____________________'}`, rx, ry, { width: colW, align: 'center' });
     }
 
     // footer
     doc.font('Helvetica').fontSize(7).fillColor(GRAY);
-    doc.text('Dokumen ini dihasilkan oleh GuruPRO AI', ML, PH - MB + 8, { align: 'center', width: CW });
+    doc.text('Dokumen ini dihasilkan oleh GuruPRO AI', ML, PH - MB + 6, { align: 'center', width: CW });
 
     doc.end();
   });

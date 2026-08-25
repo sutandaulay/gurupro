@@ -94,39 +94,66 @@ export async function GET(req: Request) {
       paramIdx++;
     }
 
-    // Count total
+    // Count total DISTINCT student-days (deduplicated by student_id + tanggal)
     const countRes = await query(
       `SELECT COUNT(*)::int as total
-       FROM student_attendance sa
-       JOIN students s ON s.id = sa.student_id
-       JOIN schedules sch ON sch.id = sa.schedule_id
-       ${sqlWhere}`,
+       FROM (
+         SELECT DISTINCT sa.student_id, sa.tanggal
+         FROM student_attendance sa
+         JOIN students s ON s.id = sa.student_id
+         JOIN schedules sch ON sch.id = sa.schedule_id
+         ${sqlWhere}
+       ) AS dd`,
       sqlParams
     );
     const total = countRes.rows[0].total;
 
-    // Fetch records
+    // Fetch records: deduplicate to 1 row per (student, date)
+    // Use status priority: alpa > izin > sakit > hadir (case-insensitive)
     const offset = (pag.page - 1) * pag.limit;
     const dataRes = await query(
-      `SELECT
-         sa.id,
+      `WITH ranked AS (
+         SELECT
+           sa.student_id,
+           sa.tanggal,
+           LOWER(sa.status) AS status,
+           ROW_NUMBER() OVER (
+             PARTITION BY sa.student_id, sa.tanggal
+             ORDER BY
+               CASE LOWER(sa.status) WHEN 'alpa' THEN 1 WHEN 'izin' THEN 2 WHEN 'sakit' THEN 3 WHEN 'hadir' THEN 4 ELSE 5 END,
+               sch.jam_mulai ASC NULLS LAST,
+               sa.schedule_id ASC
+           ) AS rn
+         FROM student_attendance sa
+         JOIN students s ON s.id = sa.student_id
+         JOIN schedules sch ON sch.id = sa.schedule_id
+         ${sqlWhere}
+       )
+       SELECT
          s.id as student_id,
          s.nama_siswa,
          s.nisn,
          s.nomor_absen,
-         sa.status,
+         r.status,
          sa.catatan,
-         sa.tanggal,
-         sch.id as schedule_id,
-         sch.hari as hari,
-         sch.jam_mulai,
-         sch.jam_selesai,
-         sub.nama_mapel
-       FROM student_attendance sa
-       JOIN students s ON s.id = sa.student_id
-       JOIN schedules sch ON sch.id = sa.schedule_id
-       JOIN subjects sub ON sub.id = sch.subject_id
-       ${sqlWhere}
+         sa.tanggal
+       FROM ranked r
+       JOIN students s ON s.id = r.student_id
+       JOIN student_attendance sa ON sa.student_id = r.student_id
+         AND sa.tanggal = r.tanggal
+         AND LOWER(sa.status) = r.status
+         AND sa.schedule_id = (
+           SELECT sa2.schedule_id
+           FROM student_attendance sa2
+           JOIN schedules sch2 ON sch2.id = sa2.schedule_id
+           WHERE sa2.student_id = r.student_id AND sa2.tanggal = r.tanggal
+           ORDER BY
+             CASE LOWER(sa2.status) WHEN 'alpa' THEN 1 WHEN 'izin' THEN 2 WHEN 'sakit' THEN 3 WHEN 'hadir' THEN 4 ELSE 5 END,
+             sch2.jam_mulai ASC NULLS LAST,
+             sa2.schedule_id ASC
+           LIMIT 1
+         )
+       WHERE r.rn = 1
        ORDER BY sa.tanggal DESC, s.nomor_absen ASC NULLS LAST
        LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
       [...sqlParams, pag.limit, offset]
@@ -173,27 +200,52 @@ export async function GET(req: Request) {
       }
     }
 
-    // Summary
+    // Summary — aggregate per distinct student-day (case-insensitive)
     const summaryRes = await query(
       `SELECT
          COUNT(*)::int as total,
-         COUNT(*) FILTER (WHERE sa.status = 'hadir')::int as hadir,
-         COUNT(*) FILTER (WHERE sa.status = 'sakit')::int as sakit,
-         COUNT(*) FILTER (WHERE sa.status = 'izin')::int as izin,
-         COUNT(*) FILTER (WHERE sa.status = 'alpa')::int as alpa
-       FROM student_attendance sa
-       JOIN students s ON s.id = sa.student_id
-       ${sqlWhere}`,
+         COUNT(*) FILTER (WHERE r.status = 'hadir')::int as hadir,
+         COUNT(*) FILTER (WHERE r.status = 'sakit')::int as sakit,
+         COUNT(*) FILTER (WHERE r.status = 'izin')::int as izin,
+         COUNT(*) FILTER (WHERE r.status = 'alpa')::int as alpa
+       FROM (
+         SELECT
+           sa.student_id,
+           sa.tanggal,
+           LOWER(FIRST_VALUE(sa.status) OVER (
+             PARTITION BY sa.student_id, sa.tanggal
+             ORDER BY
+               CASE LOWER(sa.status) WHEN 'alpa' THEN 1 WHEN 'izin' THEN 2 WHEN 'sakit' THEN 3 WHEN 'hadir' THEN 4 ELSE 5 END,
+               sch.jam_mulai ASC NULLS LAST,
+               sa.schedule_id ASC
+           )) AS status
+         FROM student_attendance sa
+         JOIN students s ON s.id = sa.student_id
+         JOIN schedules sch ON sch.id = sa.schedule_id
+         ${sqlWhere}
+       ) r`,
       sqlParams
     );
     const sum = summaryRes.rows[0];
-    const tingkatKehadiran = sum.total > 0
-      ? Math.round(((sum.hadir || 0) / (sum.total - (sum.alpa || 0) - (sum.izin || 0) - (sum.sakit || 0) + (sum.hadir || 0))) * 100) || 0
+
+    // Validate consistency: sum of status counts should equal total
+    const sumStatus = (sum.hadir || 0) + (sum.sakit || 0) + (sum.izin || 0) + (sum.alpa || 0);
+    if (sumStatus !== sum.total) {
+      console.warn(
+        `[student-reports] Data inconsistency detected: ` +
+        `total=${sum.total} but H(${sum.hadir})+S(${sum.sakit})+I(${sum.izin})+A(${sum.alpa})=${sumStatus}. ` +
+        `kelasId=${params.kelasId} range=${startDate}..${endDate}`
+      );
+    }
+
+    const tingkatKehadiran = sumStatus > 0
+      ? Math.round(((sum.hadir || 0) / sumStatus) * 100)
       : 0;
 
-    // Format records for response
+    // Format records for response — 1 row per student per day (no mapel)
     const records = dataRes.rows.map((row: any) => ({
       id: row.id,
+      studentId: row.student_id,
       namaSiswa: row.nama_siswa,
       nisn: row.nisn,
       nomorAbsen: row.nomor_absen,
@@ -202,11 +254,6 @@ export async function GET(req: Request) {
       catatan: row.catatan,
       tanggal: format(new Date(row.tanggal), 'yyyy-MM-dd'),
       tanggalLabel: format(new Date(row.tanggal), 'EEE, d MMM yyyy', { locale: id }),
-      scheduleId: row.schedule_id,
-      hari: row.hari,
-      jamMulai: row.jam_mulai,
-      jamSelesai: row.jam_selesai,
-      mapel: row.nama_mapel,
     }));
 
     return NextResponse.json({
@@ -225,6 +272,7 @@ export async function GET(req: Request) {
           izin: sum.izin || 0,
           alpa: sum.alpa || 0,
           tingkatKehadiran,
+          dataConsistent: sumStatus === sum.total,
         },
         filters: {
           startDate,
