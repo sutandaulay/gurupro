@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { query } from "@/lib/db";
 import { getTokensPerPoin } from "@/src/config/ratio-cache";
+import { captureError, errorResponse } from "@/lib/api-error";
 
 export async function GET() {
   try {
@@ -35,10 +36,7 @@ export async function GET() {
       },
     });
   } catch (error: any) {
-    console.error("Get user error:", error);
-    return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
-      { status: 500 }
-    );
+    captureError(error, { route: '/api/me' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengambil data user'));
   }
 }

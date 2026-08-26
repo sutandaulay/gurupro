@@ -4,11 +4,10 @@
  */
 
 import { NextResponse } from 'next/server';
-import {
-  updateWaliKelasStatus,
-} from '@/lib/wali-kelas';
+import { updateWaliKelasStatus } from '@/lib/wali-kelas';
 import { query } from '@/lib/db';
 import { requireSchoolAccess } from '@/lib/school-access';
+import { captureError, errorResponse } from '@/lib/api-error';
 
 // PUT /api/wali-kelas/[id]
 // Body: { status }
@@ -48,14 +47,8 @@ export async function PUT(
     const result = await updateWaliKelasStatus(id, status);
     return NextResponse.json(result);
   } catch (error: any) {
-    console.error('Wali Kelas PUT error:', error);
-    const status =
-      error.message === 'Unauthorized'
-        ? 401
-        : error.message === 'Forbidden'
-          ? 403
-          : 500;
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status });
+    captureError(error, { route: '/api/wali-kelas/[id]', method: 'PUT' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengupdate wali kelas'));
   }
 }
 
@@ -99,13 +92,7 @@ export async function DELETE(
     await query('DELETE FROM wali_kelas_assignments WHERE id = $1', [id]);
     return NextResponse.json({ success: true, message: 'Assignment berhasil dihapus' });
   } catch (error: any) {
-    console.error('Wali Kelas DELETE error:', error);
-    const status =
-      error.message === 'Unauthorized'
-        ? 401
-        : error.message === 'Forbidden'
-          ? 403
-          : 500;
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status });
+    captureError(error, { route: '/api/wali-kelas/[id]', method: 'DELETE' });
+    return NextResponse.json(errorResponse(error, 'Gagal menghapus wali kelas'));
   }
 }

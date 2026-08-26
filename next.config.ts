@@ -1,5 +1,6 @@
-import { withPayload } from "@payloadcms/next/withPayload";
-import type { NextConfig } from "next";
+import { withSentryConfig } from '@sentry/nextjs';
+import { withPayload } from '@payloadcms/next/withPayload';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   typescript: {
@@ -7,4 +8,11 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPayload(nextConfig);
+const configWithSentry = withSentryConfig(
+  withPayload(nextConfig),
+  {
+    silent: true,
+  }
+);
+
+export default configWithSentry;

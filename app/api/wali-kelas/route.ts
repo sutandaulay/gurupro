@@ -8,13 +8,12 @@ import {
   getWaliKelasAssignmentsWithDetails,
   getWaliKelasAssignments,
   assignWaliKelas,
-  updateWaliKelasStatus,
   reassignWaliKelas,
-  getKelasForWaliKelas,
 } from '@/lib/wali-kelas';
-import { getGuruOptionsForSchool } from '@/lib/wali-kelas';
 import { query } from '@/lib/db';
 import { requireSchoolAccess } from '@/lib/school-access';
+import { getSession } from '@/lib/session';
+import { captureError, errorResponse } from '@/lib/api-error';
 
 // GET /api/wali-kelas
 // Query params: kelas_id, tahun_ajaran, semester, status, school_id, guru_options
@@ -61,14 +60,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json(assignments);
   } catch (error: any) {
-    console.error('Wali Kelas GET error:', error);
-    const status =
-      error.message === 'Unauthorized'
-        ? 401
-        : error.message === 'Forbidden'
-          ? 403
-          : 500;
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status });
+    captureError(error, { route: '/api/wali-kelas', method: 'GET' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengambil data wali kelas'));
   }
 }
 
@@ -76,6 +69,11 @@ export async function GET(req: Request) {
 // Body: { kelas_id, wali_kelas_member_id, tahun_ajaran, semester, reassign? }
 export async function POST(req: Request) {
   try {
+    const session = await getSession();
+    if (!session?.id) {
+      return NextResponse.json({ error: 'Sesi tidak aktif' }, { status: 401 });
+    }
+
     const body = await req.json();
 
     const {
@@ -105,13 +103,12 @@ export async function POST(req: Request) {
 
     let result;
     if (reassign) {
-      // Deactivate existing and create new
       result = await reassignWaliKelas(
         kelas_id,
         wali_kelas_member_id,
         tahun_ajaran,
         semester,
-        userId
+        session.id
       );
     } else {
       result = await assignWaliKelas({
@@ -119,21 +116,13 @@ export async function POST(req: Request) {
         waliKelasMemberId: wali_kelas_member_id,
         tahunAjaran: tahun_ajaran,
         semester,
-        ditugaskanOleh: userId,
+        ditugaskanOleh: session.id,
       });
     }
 
     return NextResponse.json(result, { status: 201 });
   } catch (error: any) {
-    console.error('Wali Kelas POST error:', error);
-    const status =
-      error.message === 'Unauthorized'
-        ? 401
-        : error.message === 'Forbidden'
-          ? 403
-          : error.message?.includes('tidak ditemukan') || error.message?.includes('sudah punya')
-            ? 400
-            : 500;
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status });
+    captureError(error, { route: '/api/wali-kelas', method: 'POST' });
+    return NextResponse.json(errorResponse(error, 'Gagal menyimpan wali kelas'));
   }
 }

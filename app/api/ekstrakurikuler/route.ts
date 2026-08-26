@@ -2,17 +2,14 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
 import { requireSchoolAccess } from '@/lib/school-access';
-import {
-  createEkstrakurikuler,
-  updateEkstrakurikuler,
-  getEkstrakurikuler,
-} from '@/lib/sikap-ekskul';
+import { createEkstrakurikuler, updateEkstrakurikuler, getEkstrakurikuler } from '@/lib/sikap-ekskul';
 import {
   EkstrakurikulerCreateSchema,
   EkstrakurikulerUpdateSchema,
   EkstrakurikulerQuerySchema,
 } from '@/lib/schemas/sikap-ekskul';
 import { parsePagination, wrapResponse } from '@/lib/pagination';
+import { captureError, errorResponse } from '@/lib/api-error';
 
 /**
  * GET /api/ekstrakurikuler
@@ -35,8 +32,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json(wrapResponse(data, total, pagination));
   } catch (error: any) {
-    console.error('GET /api/ekstrakurikuler error:', error);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    captureError(error, { route: '/api/ekstrakurikuler', method: 'GET' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengambil data ekstrakurikuler'));
   }
 }
 
@@ -71,8 +68,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error: any) {
-    console.error('POST /api/ekstrakurikuler error:', error);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    captureError(error, { route: '/api/ekstrakurikuler', method: 'POST' });
+    return NextResponse.json(errorResponse(error, 'Gagal membuat ekstrakurikuler'));
   }
 }
 
@@ -110,8 +107,8 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ data: result });
   } catch (error: any) {
-    console.error('PUT /api/ekstrakurikuler error:', error);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    captureError(error, { route: '/api/ekstrakurikuler', method: 'PUT' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengupdate ekstrakurikuler'));
   }
 }
 
@@ -157,8 +154,7 @@ export async function DELETE(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    const status = error.message === "Forbidden" ? 403 : error.message === "Unauthorized" ? 401 : 400;
-    console.error('DELETE /api/ekstrakurikuler error:', error);
-    return NextResponse.json({ error: error.message }, { status });
+    captureError(error, { route: '/api/ekstrakurikuler', method: 'DELETE' });
+    return NextResponse.json(errorResponse(error, 'Gagal menghapus ekstrakurikuler'));
   }
 }

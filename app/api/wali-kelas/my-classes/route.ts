@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
 import { getPayload } from '@/lib/payload';
 import { parseSessionCookie } from '@/lib/session-sign';
+import { captureError, errorResponse } from '@/lib/api-error';
 
 /**
  * GET /api/wali-kelas/my-classes
@@ -91,7 +92,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ data: merged });
   } catch (error: any) {
-    console.error('GET /api/wali-kelas/my-classes error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    captureError(error, { route: '/api/wali-kelas/my-classes' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengambil data kelas'));
   }
 }

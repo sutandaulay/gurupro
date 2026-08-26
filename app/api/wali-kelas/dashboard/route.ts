@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireSession } from '@/lib/session';
+import { captureError, errorResponse } from '@/lib/api-error';
 import {
   getOwnedWaliKelasClassIds,
   getWaliKelasDashboardData,
@@ -43,7 +44,7 @@ export async function GET(req: Request) {
     if (error?.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    console.error('GET /api/wali-kelas/dashboard error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    captureError(error, { route: '/api/wali-kelas/dashboard' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengambil dashboard wali kelas'));
   }
 }

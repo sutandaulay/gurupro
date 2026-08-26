@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { getPayload } from '@/lib/payload';
 import { getEkstrakurikuler } from '@/lib/sikap-ekskul';
 import { parseSessionCookie } from '@/lib/session-sign';
+import { captureError, errorResponse } from '@/lib/api-error';
 
 /**
  * GET /api/ekstrakurikuler/my-ekskul
@@ -74,7 +75,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ data });
   } catch (error: any) {
-    console.error('GET /api/ekstrakurikuler/my-ekskul error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    captureError(error, { route: '/api/ekstrakurikuler/my-ekskul' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengambil data ekstrakurikuler'));
   }
 }

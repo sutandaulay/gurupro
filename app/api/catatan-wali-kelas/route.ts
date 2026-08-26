@@ -12,6 +12,7 @@ import {
 } from '@/lib/schemas/sikap-ekskul';
 import { parsePagination, wrapResponse } from '@/lib/pagination';
 import { parseSessionCookie } from '@/lib/session-sign';
+import { captureError, errorResponse } from '@/lib/api-error';
 
 /**
  * GET /api/catatan-wali-kelas
@@ -33,8 +34,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json(wrapResponse(data, total, pagination));
   } catch (error: any) {
-    console.error('GET /api/catatan-wali-kelas error:', error);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    captureError(error, { route: '/api/catatan-wali-kelas', method: 'GET' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengambil data catatan'));
   }
 }
 
@@ -83,8 +84,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error: any) {
-    console.error('POST /api/catatan-wali-kelas error:', error);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    captureError(error, { route: '/api/catatan-wali-kelas', method: 'POST' });
+    return NextResponse.json(errorResponse(error, 'Gagal menyimpan catatan'));
   }
 }
 
@@ -162,7 +163,7 @@ export async function PUT(req: Request) {
       }
     });
   } catch (error: any) {
-    console.error('PUT /api/catatan-wali-kelas error:', error);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    captureError(error, { route: '/api/catatan-wali-kelas', method: 'PUT' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengupdate catatan'));
   }
 }

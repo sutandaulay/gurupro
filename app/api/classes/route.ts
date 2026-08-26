@@ -2,6 +2,7 @@ import { query, requireActiveTahunAjaran } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getContextFilters } from "@/lib/session";
 import { requireSchoolAccess } from "@/lib/school-access";
+import { captureError, errorResponse } from "@/lib/api-error";
 
 export async function GET(req: Request) {
   try {
@@ -31,9 +32,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json(rows);
   } catch (error: any) {
-    console.error("Classes GET error:", error);
-    const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+    captureError(error, { route: '/api/classes', method: 'GET' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengambil data kelas'));
   }
 }
 
@@ -83,10 +83,9 @@ export async function POST(req: Request) {
       return NextResponse.json(res.rows[0]);
     }
   } catch (error: any) {
-    console.error("Classes POST error:", error);
+    captureError(error, { route: '/api/classes', method: 'POST' });
     const isTaError = error.message?.includes?.('tahun ajaran');
-    const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : isTaError ? 400 : 500;
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+    return NextResponse.json(errorResponse(error, isTaError ? error.message : 'Gagal menyimpan kelas'));
   }
 }
 
@@ -109,8 +108,7 @@ export async function DELETE(req: Request) {
     await query("DELETE FROM classes WHERE id = $1", [id]);
     return NextResponse.json({ success: true, message: "Kelas berhasil dihapus" });
   } catch (error: any) {
-    console.error("Classes DELETE error:", error);
-    const status = error.message === "Unauthorized" ? 401 : 500;
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+    captureError(error, { route: '/api/classes', method: 'DELETE' });
+    return NextResponse.json(errorResponse(error, 'Gagal menghapus kelas'));
   }
 }

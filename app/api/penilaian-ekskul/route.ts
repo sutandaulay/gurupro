@@ -14,6 +14,7 @@ import {
 } from '@/lib/schemas/sikap-ekskul';
 import { parsePagination, wrapResponse } from '@/lib/pagination';
 import { parseSessionCookie } from '@/lib/session-sign';
+import { captureError, errorResponse } from '@/lib/api-error';
 
 /**
  * GET /api/penilaian-ekskul
@@ -35,8 +36,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json(wrapResponse(data, total, pagination));
   } catch (error: any) {
-    console.error('GET /api/penilaian-ekskul error:', error);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    captureError(error, { route: '/api/penilaian-ekskul', method: 'GET' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengambil data penilaian ekskul'));
   }
 }
 
@@ -73,8 +74,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error: any) {
-    console.error('POST /api/penilaian-ekskul error:', error);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    captureError(error, { route: '/api/penilaian-ekskul', method: 'POST' });
+    return NextResponse.json(errorResponse(error, 'Gagal menyimpan penilaian ekskul'));
   }
 }
 
@@ -111,7 +112,7 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ data: result });
   } catch (error: any) {
-    console.error('PUT /api/penilaian-ekskul error:', error);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    captureError(error, { route: '/api/penilaian-ekskul', method: 'PUT' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengupdate penilaian ekskul'));
   }
 }

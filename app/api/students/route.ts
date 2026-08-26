@@ -2,6 +2,9 @@ import { query, requireActiveTahunAjaran } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireSchoolAccess } from "@/lib/school-access";
 import { parsePagination, offset, wrapResponse } from "@/lib/pagination";
+import { logger } from "@/lib/logger";
+import { captureError, errorResponse } from "@/lib/api-error";
+import { globalRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 
 export async function GET(req: Request) {
   try {
@@ -32,9 +35,8 @@ export async function GET(req: Request) {
     );
     return NextResponse.json(wrapResponse(students.rows, total, pag));
   } catch (error: any) {
-    console.error("Students GET error:", error);
-    const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+    captureError(error, { route: '/api/students', method: 'GET' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengambil data siswa'));
   }
 }
 
@@ -100,10 +102,9 @@ export async function POST(req: Request) {
       return NextResponse.json(res.rows[0]);
     }
   } catch (error: any) {
-    console.error("Students POST error:", error);
+    captureError(error, { route: '/api/students', method: 'POST' });
     const isTaError = error.message?.includes?.('tahun ajaran');
-    const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : isTaError ? 400 : 500;
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+    return NextResponse.json(errorResponse(error, isTaError ? error.message : 'Gagal menyimpan siswa'));
   }
 }
 
@@ -128,8 +129,7 @@ export async function DELETE(req: Request) {
     await query("DELETE FROM students WHERE id = $1", [id]);
     return NextResponse.json({ success: true, message: "Siswa berhasil dihapus" });
   } catch (error: any) {
-    console.error("Students DELETE error:", error);
-    const status = error.message === "Unauthorized" ? 401 : 500;
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+    captureError(error, { route: '/api/students', method: 'DELETE' });
+    return NextResponse.json(errorResponse(error, 'Gagal menghapus siswa'));
   }
 }

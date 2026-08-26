@@ -2,6 +2,7 @@ import { query } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireSchoolAccess } from "@/lib/school-access";
 import { parsePagination, offset, wrapResponse } from "@/lib/pagination";
+import { captureError, errorResponse } from "@/lib/api-error";
 
 export async function GET(req: Request) {
   try {
@@ -67,9 +68,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ error: "Invalid type parameter" }, { status: 400 });
   } catch (error: any) {
-    console.error("Attendance GET error:", error);
-    const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+    captureError(error, { route: '/api/attendance', method: 'GET' });
+    return NextResponse.json(errorResponse(error, 'Gagal mengambil data absensi'));
   }
 }
 
@@ -173,8 +173,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ error: "Invalid type parameter" }, { status: 400 });
   } catch (error: any) {
-    console.error("Attendance POST error:", error);
-    const status = error.message === "Unauthorized" ? 401 : error.message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status });
+    captureError(error, { route: '/api/attendance', method: 'POST' });
+    return NextResponse.json(errorResponse(error, 'Gagal menyimpan absensi'));
   }
 }
