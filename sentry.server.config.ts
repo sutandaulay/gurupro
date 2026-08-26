@@ -1,35 +1,34 @@
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from "@sentry/nextjs";
 
 Sentry.init({
-  dsn: process.env.SENTRY_DSN || '',
+  dsn: process.env.SENTRY_DSN ?? "",
+  enabled: true,
 
-  // Only enable in production
-  enabled: process.env.NODE_ENV === 'production',
+  dataCollection: {
+    userInfo: false,
+  },
 
-  // Performance monitoring
-  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 0,
+  // 100% in dev, 10% in production
+  tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
 
-  // Session replay in production
-  replaysSessionSampleRate: process.env.NODE_ENV === 'production' ? 0.05 : 0,
-  replaysOnErrorSampleRate: 1.0,
+  // Attach local variable values to stack frames
+  includeLocalVariables: true,
 
   // Environment
-  environment: process.env.NODE_ENV || 'development',
+  environment: process.env.NODE_ENV || "development",
+
+  enableLogs: true,
 
   // Ignore common noise
   ignoreErrors: [
-    // Network errors
-    'TypeError: Failed to fetch',
-    'TypeError: Network request failed',
-    // Auth redirects
-    'NEXT_REDIRECT',
-    // Payload CMS
-    'PayloadError',
+    "TypeError: Failed to fetch",
+    "TypeError: Network request failed",
+    "NEXT_REDIRECT",
+    "PayloadError",
   ],
 
-  // Filter breadcrumbs
+  // Filter PII from user data
   beforeSend(event) {
-    // Remove PII from user data
     if (event.user) {
       delete event.user.email;
       delete event.user.username;
