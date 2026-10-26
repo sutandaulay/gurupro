@@ -25,6 +25,7 @@
 # agent tool worktrees (never part of the app)
 .kilo/
 .worktrees/
+.agents/
 
 # misc
 .DS_Store
@@ -66,5 +67,6 @@ cookies.txt
 playwright-results.json
 playwright-report/
 playwright-traces/
+test-results/
 build.log
 dev-server.log
