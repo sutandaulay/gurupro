@@ -1,0 +1,3029 @@
+openapi: 3.0.3
+info:
+  title: GuruPro API
+  description: |
+    REST API for the GuruPro educational platform. GuruPro helps Indonesian teachers
+    automate administrative tasks and generate assessment questions using AI.
+
+    ## Authentication
+
+    Most endpoints require Bearer token authentication via NextAuth session cookies
+    or Authorization headers. Admin endpoints require additional role-based checks.
+
+    ## Rate Limiting
+
+    Public endpoints are rate-limited. The response will include `X-RateLimit-*`
+    headers indicating remaining quota.
+
+    ## Error Format
+
+    All errors return a consistent JSON structure:
+
+    ```json
+    {
+      "error": "Error message description",
+      "code": "ERROR_CODE",
+      "details": {}
+    }
+    ```
+  version: 1.0.0
+  contact:
+    name: GuruPro Support
+    email: support@gurupro.id
+  license:
+    name: Proprietary
+    url: https://gurupro.id/terms
+
+servers:
+  - url: https://api.gurupro.id
+    description: Production
+  - url: https://staging.gurupro.id
+    description: Staging
+  - url: http://localhost:3000
+    description: Local development
+
+security:
+  - BearerAuth: []
+  - SessionAuth: []
+
+tags:
+  - name: Authentication
+    description: Login, logout, OTP, and session management
+  - name: Health
+    description: System health and readiness checks
+  - name: Admin - Users
+    description: Admin-only user management endpoints
+  - name: Admin - Transactions
+    description: Admin-only payment transaction management
+  - name: Admin - Institutions
+    description: Admin-only institution management
+  - name: Payments
+    description: Checkout, payment initiation, and webhook handlers
+  - name: Storage
+    description: File upload and management via Cloudflare R2
+  - name: Attendance
+    description: Teacher attendance check-in, check-out, and reporting
+  - name: Journals
+    description: Teaching journal management
+  - name: Reports
+    description: Analytics, reporting, and dashboard data
+  - name: AI
+    description: AI-powered features (question generation, alerts, monitoring)
+  - name: Performance Share
+    description: Teacher performance document sharing
+  - name: Raport
+    description: Student report card management
+  - name: Storage
+    description: File storage and management
+
+# ============================================================
+# Paths
+# ============================================================
+paths:
+
+  # ============================================================
+  # Health
+  # ============================================================
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns service health status with individual component checks. Returns 200 if all healthy, 503 if degraded.
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [UP, DEGRADED]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  checks:
+                    type: object
+                    properties:
+                      database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            enum: [UP, DOWN, CONFIGURED_OFF]
+                          latency_ms:
+                            type: number
+                          error:
+                            type: string
+                      storage:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            enum: [UP, DOWN, CONFIGURED_OFF]
+                          latency_ms:
+                            type: number
+                          error:
+                            type: string
+                      ai:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            enum: [UP, DOWN, UNCONFIGURED]
+                          error:
+                            type: string
+        '503':
+          description: Service degraded — one or more checks failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: DEGRADED
+                  checks:
+                    type: object
+
+  # ============================================================
+  # Authentication
+  # ============================================================
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login with credentials
+      description: |
+        Authenticates a user with email/phone and password.
+        Returns a NextAuth session token set as an HTTP-only cookie.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User email or phone number
+                  example: guru@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 6
+                  example: secretpassword123
+                institutionId:
+                  type: integer
+                  description: Institution ID to set as active context
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                description: HTTP-only session cookie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  session:
+                    $ref: '#/components/schemas/Session'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many login attempts (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout
+      description: Destroys the current session and clears the session cookie.
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register new account
+      description: Creates a new user account with optional referral code.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, nama_lengkap]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: guru@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 6
+                nama_lengkap:
+                  type: string
+                  example: Budi Santoso
+                phone:
+                  type: string
+                  example: "+6281234567890"
+                referral_code:
+                  type: string
+                  description: Referral code for bonus rewards
+                  example: GPRO-ABC12
+                institutionId:
+                  type: integer
+                  description: Optional institution to join immediately
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  referralCode:
+                    type: string
+        '400':
+          description: Validation error or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/otp/request:
+    post:
+      tags: [Authentication]
+      summary: Request OTP
+      description: |
+        Sends a one-time password (OTP) to the user's email or phone for
+        password reset, login verification, or phone verification.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: guru@example.com
+                purpose:
+                  type: string
+                  enum: [password_reset, phone_verification, login_2fa, payment_otp]
+                  default: password_reset
+      responses:
+        '200':
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  expiresIn:
+                    type: integer
+                    description: OTP validity in seconds
+                    example: 600
+                  message:
+                    type: string
+                    example: OTP sent to guru@example.com
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many OTP requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/otp/verify:
+    post:
+      tags: [Authentication]
+      summary: Verify OTP
+      description: Verifies the OTP code and performs the associated action.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp_code]
+              properties:
+                email:
+                  type: string
+                  format: email
+                otp_code:
+                  type: string
+                  minLength: 4
+                  maxLength: 10
+                  example: "123456"
+                purpose:
+                  type: string
+                  enum: [password_reset, phone_verification, login_2fa, payment_otp]
+      responses:
+        '200':
+          description: OTP verified
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  verified:
+                    type: boolean
+                  token:
+                    type: string
+                    description: Temp token for password reset flow
+        '400':
+          description: Invalid or expired OTP
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================
+  # Admin - Users
+  # ============================================================
+  /api/admin/users:
+    get:
+      tags: [Admin - Users]
+      summary: List all users
+      description: Admin-only endpoint to list and search users with pagination.
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search by name, email, username, or WhatsApp
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [all, blocked, active, free, pro]
+            default: all
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Paginated list of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden — admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Admin - Users]
+      summary: Update user account
+      description: |
+        Updates user account details. Supports updating quota, role, subscription dates,
+        password reset, and account status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                username:
+                  type: string
+                  pattern: '^[a-z0-9._-]{3,80}$'
+                  description: Must be lowercase
+                quota_poin_total:
+                  type: integer
+                addon_poin:
+                  type: integer
+                role:
+                  type: string
+                  enum: [guru, admin, operator, kepala_sekolah, pengawas]
+                subscription_start:
+                  type: string
+                  format: date-time
+                subscription_end:
+                  type: string
+                  format: date-time
+                status_langgunan:
+                  type: string
+                is_active:
+                  type: boolean
+                new_password:
+                  type: string
+                  minLength: 6
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Username already taken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Admin - Users]
+      summary: Block or unblock user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, userId]
+              properties:
+                action:
+                  type: string
+                  enum: [block, unblock]
+                userId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: User status updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          description: Invalid action
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/users/{id}:
+    get:
+      tags: [Admin - Users]
+      summary: Get user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags: [Admin - Users]
+      summary: Update user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nama_lengkap:
+                  type: string
+                phone:
+                  type: string
+                role:
+                  type: string
+                is_active:
+                  type: boolean
+                subscription_status:
+                  type: string
+                status_langganan:
+                  type: string
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+    delete:
+      tags: [Admin - Users]
+      summary: Delete user
+      description: Soft-deletes or deactivates a user account.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  # ============================================================
+  # Admin - Transactions
+  # ============================================================
+  /api/admin/transactions:
+    get:
+      tags: [Admin - Transactions]
+      summary: List all transactions
+      description: Admin-only endpoint to list payment transactions with filtering.
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search by email, name, transaction ID, external ID, or WhatsApp
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, PAID, ACTIVATED, EXPIRED, DENIED, REFUNDED, CANCELLED]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [created_at, amount, status, email, nama_lengkap]
+            default: created_at
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: includeStats
+          in: query
+          schema:
+            type: string
+            enum: [true, false]
+            default: false
+      responses:
+        '200':
+          description: Paginated transactions with optional statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                  stats:
+                    type: object
+                    nullable: true
+                    properties:
+                      total_transactions:
+                        type: integer
+                      pending_count:
+                        type: integer
+                      paid_count:
+                        type: integer
+                      activated_count:
+                        type: integer
+                      gross_revenue:
+                        type: number
+                        format: float
+                      net_revenue:
+                        type: number
+                        format: float
+                      average_transaction_value:
+                        type: number
+                        format: float
+                      conversion_rate:
+                        type: number
+                        format: float
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Admin - Transactions]
+      summary: Perform transaction action
+      description: |
+        Performs administrative actions on a transaction. Action is determined by
+        the `action` field in the request body.
+
+        Supported actions:
+        - `activate` — Verifies and activates a pending transaction
+        - `follow_up` — Sends payment reminder via email/WhatsApp
+        - `expire` — Marks a PENDING transaction as EXPIRED
+        - `cancel` — Marks a PENDING transaction as CANCELLED
+        - `resend_invoice` — Re-generates and re-sends the Xendit invoice
+        - (default) `refund` — Marks as REFUNDED, deducts user points, sends notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transactionId]
+              properties:
+                transactionId:
+                  type: string
+                  format: uuid
+                action:
+                  type: string
+                  enum: [activate, follow_up, expire, cancel, resend_invoice]
+                  description: Omit for default refund action
+                notes:
+                  type: string
+                  description: Optional notes (used for follow_up or refund)
+      responses:
+        '200':
+          description: Action performed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  transaction:
+                    $ref: '#/components/schemas/Transaction'
+        '400':
+          description: Invalid action or transaction already processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Transaction not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/transactions/stats:
+    get:
+      tags: [Admin - Transactions]
+      summary: Transaction statistics
+      description: Returns aggregated transaction statistics for admin dashboard.
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [today, week, month, year]
+            default: month
+      responses:
+        '200':
+          description: Transaction statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalRevenue:
+                    type: number
+                    format: float
+                  totalTransactions:
+                    type: integer
+                  successfulPayments:
+                    type: integer
+                  failedPayments:
+                    type: integer
+                  pendingPayments:
+                    type: integer
+                  revenueByGateway:
+                    type: object
+                    additionalProperties:
+                      type: number
+                      format: float
+                  revenueByDay:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        revenue:
+                          type: number
+                          format: float
+                        count:
+                          type: integer
+
+  /api/admin/transactions/verify:
+    post:
+      tags: [Admin - Transactions]
+      summary: Manually verify a transaction
+      description: Admin manually confirms and activates a payment transaction.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transactionId]
+              properties:
+                transactionId:
+                  type: string
+                  format: uuid
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Transaction activated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  transaction:
+                    $ref: '#/components/schemas/Transaction'
+        '400':
+          description: Transaction already processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================
+  # Admin - Institutions
+  # ============================================================
+  /api/admin/institutions:
+    get:
+      tags: [Admin - Institutions]
+      summary: List institutions
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated institutions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  institutions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Institution'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags: [Admin - Institutions]
+      summary: Create institution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nama, jalur_regulasi, jenjang]
+              properties:
+                nama:
+                  type: string
+                  example: SD Negeri 1 Jakarta
+                jalur_regulasi:
+                  type: string
+                  enum: [kemendikdasmen, kemenag]
+                jenjang:
+                  type: string
+                  enum: [paud, sd_mi, smp_mts, sma_ma, smk_mak]
+                kurikulum:
+                  type: string
+                  enum: [kurikulum_merdeka, k13, kbc, hybrid]
+                alamat:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                  format: email
+      responses:
+        '201':
+          description: Institution created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Institution'
+
+  /api/admin/institutions/{institutionId}:
+    get:
+      tags: [Admin - Institutions]
+      summary: Get institution
+      parameters:
+        - name: institutionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Institution details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Institution'
+
+    put:
+      tags: [Admin - Institutions]
+      summary: Update institution
+      parameters:
+        - name: institutionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nama:
+                  type: string
+                alamat:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                kurikulum:
+                  type: string
+      responses:
+        '200':
+          description: Institution updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Institution'
+
+  # ============================================================
+  # Admin - Settings
+  # ============================================================
+  /api/admin/settings:
+    get:
+      tags: [Admin - Settings]
+      summary: Get system settings
+      description: Returns all system settings (payment gateways, email, WhatsApp, etc.)
+      responses:
+        '200':
+          description: System settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment_gateway:
+                    $ref: '#/components/schemas/PaymentGatewayConfig'
+                  email_sender:
+                    $ref: '#/components/schemas/EmailSenderConfig'
+                  wa_sender:
+                    $ref: '#/components/schemas/WaSenderConfig'
+                  notification_templates:
+                    type: object
+                  ai_config:
+                    $ref: '#/components/schemas/AiConfig'
+
+    put:
+      tags: [Admin - Settings]
+      summary: Update system settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: string
+                  description: Setting key (e.g. "payment_gateway", "email_sender")
+                value:
+                  type: object
+                  description: JSON value for the setting
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  # ============================================================
+  # Admin - Referrals
+  # ============================================================
+  /api/admin/referrals:
+    get:
+      tags: [Admin - Referrals]
+      summary: List referrals
+      description: Admin list of all referral records with payouts status.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected, paid]
+      responses:
+        '200':
+          description: Paginated referrals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  referrals:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        referrer:
+                          $ref: '#/components/schemas/User'
+                        referee:
+                          $ref: '#/components/schemas/User'
+                        reward_tokens:
+                          type: integer
+                        cashback_amount:
+                          type: number
+                          format: float
+                        created_at:
+                          type: string
+                          format: date-time
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /api/admin/referrals/payouts:
+    get:
+      tags: [Admin - Referrals]
+      summary: List payout requests
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED, PAID]
+      responses:
+        '200':
+          description: Paginated payout requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payouts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PayoutRequest'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags: [Admin - Referrals]
+      summary: Approve or reject payout request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payoutId, action]
+              properties:
+                payoutId:
+                  type: string
+                  format: uuid
+                action:
+                  type: string
+                  enum: [approve, reject]
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Payout processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: string
+
+  # ============================================================
+  # Payments / Checkout
+  # ============================================================
+  /api/checkout:
+    post:
+      tags: [Payments]
+      summary: Initiate payment
+      description: |
+        Creates a payment transaction and returns payment URL/method details
+        from the selected gateway (Xendit, Midtrans, or Duitku).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan]
+              properties:
+                plan:
+                  type: string
+                  description: Plan key, UUID from pricing_plans, or "addon" for addon packages
+                  oneOf:
+                    - type: string
+                      enum: [free, three_month, six_month, one_year, pro_monthly, pro_yearly]
+                    - type: string
+                      format: uuid
+                      description: pricing_plans UUID
+                    - type: string
+                      enum: [addon]
+                userId:
+                  type: string
+                  format: uuid
+                  description: Required if no session cookie
+                packageId:
+                  type: string
+                  format: uuid
+                  description: Required if plan is "addon"
+      responses:
+        '200':
+          description: Payment initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactionId:
+                    type: string
+                    format: uuid
+                  externalId:
+                    type: string
+                    description: External reference ID for the payment gateway
+                  amount:
+                    type: number
+                    format: float
+                  currency:
+                    type: string
+                    example: IDR
+                  paymentUrl:
+                    type: string
+                    format: uri
+                    description: URL to redirect user for payment
+                  gateway:
+                    type: string
+                    example: XENDIT
+                  expiresAt:
+                    type: string
+                    format: date-time
+        '400':
+          description: Invalid plan or amount
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '402':
+          description: Payment creation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/checkout/verify:
+    post:
+      tags: [Payments]
+      summary: Verify payment status
+      description: |
+        Client-side verification of payment completion.
+        Checks transaction status and returns updated state.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [externalId]
+              properties:
+                externalId:
+                  type: string
+      responses:
+        '200':
+          description: Payment status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [PENDING, PAID, ACTIVATED, EXPIRED, DENIED]
+                  transactionId:
+                    type: string
+                    format: uuid
+                  activated:
+                    type: boolean
+
+  # ============================================================
+  # Webhooks
+  # ============================================================
+  /api/webhook/payment:
+    post:
+      tags: [Payments]
+      summary: Unified payment webhook handler
+      description: |
+        Handles callbacks from Xendit, Midtrans, and Duitku payment gateways.
+        Signature verification is applied per gateway. Idempotent — safe to retry.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Gateway-specific payload (auto-detected)
+      parameters:
+        - name: x-callback-token
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Xendit callback token
+        - name: x-xendit-idempotency-key
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Xendit idempotency key
+      responses:
+        '200':
+          description: Webhook processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  idempotent:
+                    type: boolean
+                    description: True if the callback was already processed
+        '401':
+          description: Signature verification failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Unknown gateway or malformed payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/webhook/xendit:
+    post:
+      tags: [Payments]
+      summary: Xendit webhook (delegates to /api/webhook/payment)
+      description: |
+        Legacy endpoint — delegates to the unified /api/webhook/payment handler.
+        Prefer calling /api/webhook/payment directly.
+      security: []
+      responses:
+        '200':
+          description: Delegated
+        '401':
+          description: Signature verification failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/webhook/midtrans:
+    post:
+      tags: [Payments]
+      summary: Midtrans webhook (delegates to /api/webhook/payment)
+      description: |
+        Legacy endpoint — delegates to the unified /api/webhook/payment handler.
+        Prefer calling /api/webhook/payment directly.
+      security: []
+      responses:
+        '200':
+          description: Delegated
+        '401':
+          description: Signature verification failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================
+  # Storage
+  # ============================================================
+  /api/storage/files:
+    get:
+      tags: [Storage]
+      summary: List user files
+      description: Lists files for the authenticated user, optionally filtered by folder.
+      parameters:
+        - name: folder_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by folder ID (null/empty for root level)
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: created_at
+      responses:
+        '200':
+          description: Paginated file list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserFile'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Storage]
+      summary: Upload file
+      description: |
+        Accepts a file upload and stores it in Cloudflare R2.
+        Returns the public URL of the uploaded file.
+        Max size: 50MB. MIME whitelist enforced.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                folder_id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                  description: Optional custom file name
+      responses:
+        '201':
+          description: File uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  file:
+                    $ref: '#/components/schemas/UserFile'
+                  url:
+                    type: string
+                    format: uri
+        '400':
+          description: Invalid file type, size limit exceeded, or MIME mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags: [Storage]
+      summary: Rename file
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+      responses:
+        '200':
+          description: File renamed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserFile'
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Storage]
+      summary: Delete file
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: File deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: File berhasil dihapus
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags: [Storage]
+      summary: Download file
+      description: Returns a presigned URL or streams the file content.
+      parameters:
+        - name: fileId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: File stream or presigned URL
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/storage/files/download:
+    get:
+      tags: [Storage]
+      summary: Get file download URL
+      description: Returns a presigned or direct download URL for a file.
+      parameters:
+        - name: fileId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: File download URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+                  expiresIn:
+                    type: integer
+                    description: URL validity in seconds
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/storage/folders:
+    get:
+      tags: [Storage]
+      summary: List folders
+      parameters:
+        - name: parentId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of folders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserFolder'
+
+    post:
+      tags: [Storage]
+      summary: Create folder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                parentId:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Folder created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserFolder'
+
+  # ============================================================
+  # Attendance
+  # ============================================================
+  /api/attendance/check-in:
+    post:
+      tags: [Attendance]
+      summary: Check in
+      description: |
+        Records teacher attendance check-in. Supports GPS location,
+        face verification, and QR code scanning.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                institutionId:
+                  type: integer
+                latitude:
+                  type: number
+                  format: double
+                longitude:
+                  type: number
+                  format: double
+                accuracy:
+                  type: number
+                  format: double
+                faceData:
+                  type: string
+                  description: Base64 encoded face image or descriptor
+                qrCode:
+                  type: string
+                  description: Scanned QR code data
+                fingerprint:
+                  type: string
+                  description: Browser/device fingerprint
+                classSessionId:
+                  type: string
+                  format: uuid
+                subjectId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Check-in recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  attendanceId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    example: valid
+                  checkInTime:
+                    type: string
+                    format: date-time
+        '400':
+          description: Check-in not allowed (e.g., outside geofence)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Already checked in today
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/attendance/check-out:
+    post:
+      tags: [Attendance]
+      summary: Check out
+      description: Records teacher attendance check-out and teaching sessions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                attendanceId:
+                  type: string
+                  format: uuid
+                latitude:
+                  type: number
+                  format: double
+                longitude:
+                  type: number
+                  format: double
+                sessionsCompleted:
+                  type: integer
+                  description: Number of teaching sessions completed
+      responses:
+        '200':
+          description: Check-out recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  checkOutTime:
+                    type: string
+                    format: date-time
+                  totalMinutes:
+                    type: integer
+
+  /api/attendance/reports:
+    get:
+      tags: [Attendance]
+      summary: Attendance reports
+      description: Returns attendance data with filtering by teacher, institution, and date range.
+      parameters:
+        - name: teacherId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: institutionId
+          in: query
+          schema:
+            type: integer
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Attendance report data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  records:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AttendanceRecord'
+                  summary:
+                    type: object
+                    properties:
+                      totalDays:
+                        type: integer
+                      present:
+                        type: integer
+                      absent:
+                        type: integer
+                      late:
+                        type: integer
+                      totalTeachingMinutes:
+                        type: integer
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /api/attendance/reports/export:
+    get:
+      tags: [Attendance]
+      summary: Export attendance report
+      description: Exports attendance report as PDF or Excel.
+      parameters:
+        - name: teacherId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: institutionId
+          in: query
+          schema:
+            type: integer
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [pdf, excel]
+            default: pdf
+      responses:
+        '200':
+          description: File download
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+
+  /api/attendance/insight:
+    get:
+      tags: [Attendance]
+      summary: Attendance insights
+      description: Returns aggregated attendance insights for a teacher or institution.
+      parameters:
+        - name: teacherId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: institutionId
+          in: query
+          schema:
+            type: integer
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [week, month, semester, year]
+            default: month
+      responses:
+        '200':
+          description: Attendance insights
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  attendanceRate:
+                    type: number
+                    format: float
+                  averageTeachingMinutes:
+                    type: integer
+                  streak:
+                    type: integer
+                  daysPresent:
+                    type: integer
+                  daysAbsent:
+                    type: integer
+                  daysLate:
+                    type: integer
+                  teachingSessionsCompleted:
+                    type: integer
+
+  # ============================================================
+  # Journals
+  # ============================================================
+  /api/journals:
+    get:
+      tags: [Journals]
+      summary: List teaching journals
+      parameters:
+        - name: schoolId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: classId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: subjectId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Paginated journals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  journals:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TeachingJournal'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags: [Journals]
+      summary: Create teaching journal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeachingJournalInput'
+      responses:
+        '201':
+          description: Journal created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeachingJournal'
+
+  /api/journals/schemas:
+    get:
+      tags: [Journals]
+      summary: List journal schemas
+      description: Returns available journal form schemas for a school.
+      parameters:
+        - name: schoolId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Journal schemas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JournalSchema'
+
+  # ============================================================
+  # Reports & Analytics
+  # ============================================================
+  /api/analytics:
+    get:
+      tags: [Reports]
+      summary: School analytics
+      description: Returns aggregated analytics for a school including users, journals, grades, and activity.
+      parameters:
+        - name: school_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary:
+                    type: object
+                    properties:
+                      total_classes:
+                        type: integer
+                      total_subjects:
+                        type: integer
+                      total_schedules:
+                        type: integer
+                      total_students:
+                        type: integer
+                      active_teachers:
+                        type: integer
+                      rpp_this_month:
+                        type: integer
+                      avg_grade:
+                        type: number
+                        format: float
+                      ungraded_tasks:
+                        type: integer
+                  journals:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        status:
+                          type: string
+                        count:
+                          type: integer
+                  grades:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        status_remedial:
+                          type: string
+                        count:
+                          type: integer
+                  average_grades:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        tipe_asesmen:
+                          type: string
+                        avg_nilai:
+                          type: number
+                          format: float
+                        total_murid:
+                          type: integer
+                  recent_activity:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        nama_guru:
+                          type: string
+                        nama_kelas:
+                          type: string
+                        nama_mapel:
+                          type: string
+                        tanggal:
+                          type: string
+                          format: date
+                        status:
+                          type: string
+                        materi_pembelajaran:
+                          type: string
+        '400':
+          description: Missing school_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags: [Reports]
+      summary: Generate report
+      description: Generates various administrative and teaching reports.
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [journal_summary, teaching_hours, attendance_summary, token_usage]
+        - name: institutionId
+          in: query
+          schema:
+            type: integer
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, pdf, excel]
+            default: json
+      responses:
+        '200':
+          description: Report data
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # ============================================================
+  # Performance Share
+  # ============================================================
+  /api/performance-share:
+    get:
+      tags: [Performance Share]
+      summary: List performance share documents
+      parameters:
+        - name: institutionId
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Performance share documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PerformanceShareDocument'
+
+    post:
+      tags: [Performance Share]
+      summary: Create performance share document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                documents:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                visibility:
+                  type: string
+                  enum: [public, institution, private]
+                institutionId:
+                  type: integer
+      responses:
+        '201':
+          description: Document shared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerformanceShareDocument'
+
+  # ============================================================
+  # AI
+  # ============================================================
+  /api/ai-monitoring:
+    get:
+      tags: [AI]
+      summary: AI usage monitoring
+      description: Returns AI feature usage statistics and token consumption.
+      responses:
+        '200':
+          description: AI monitoring data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalRequests:
+                    type: integer
+                  totalTokens:
+                    type: integer
+                  requestsByModel:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                  requestsByFeature:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                  costs:
+                    type: object
+                    properties:
+                      totalUsd:
+                        type: number
+                        format: float
+                      byModel:
+                        type: object
+                        additionalProperties:
+                          type: number
+                          format: float
+
+  /api/ai-alerts:
+    get:
+      tags: [AI]
+      summary: List AI alerts
+      description: Returns AI system alerts and anomalies.
+      parameters:
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [info, warning, critical]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: AI alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alerts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AiAlert'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  # ============================================================
+  # Raport
+  # ============================================================
+  /api/raport:
+    get:
+      tags: [Raport]
+      summary: List raport data
+      parameters:
+        - name: studentId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: kelasId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: periode
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Raport records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Raport'
+
+  /api/template-raport:
+    get:
+      tags: [Raport]
+      summary: List raport templates
+      parameters:
+        - name: sekolahId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: jenjang
+          in: query
+          schema:
+            type: string
+        - name: kurikulum
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Raport templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RaportTemplate'
+
+# ============================================================
+# Components
+# ============================================================
+components:
+
+  # ============================================================
+  # Security Schemes
+  # ============================================================
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from NextAuth session
+
+    SessionAuth:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token
+      description: NextAuth session cookie
+
+  # ============================================================
+  # Schemas
+  # ============================================================
+  schemas:
+
+    # ---- Common ----
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: Machine-readable error code
+          example: UNAUTHORIZED
+        details:
+          type: object
+          additionalProperties: true
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 150
+        totalPages:
+          type: integer
+          example: 8
+
+    # ---- Auth ----
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        nama_lengkap:
+          type: string
+          example: Budi Santoso
+        phone:
+          type: string
+          example: "+6281234567890"
+        role:
+          type: string
+          enum: [user, admin, superadmin]
+        status_langganan:
+          type: string
+          example: plan_premium_annual
+        subscription_status:
+          type: string
+          enum: [active, inactive, grace_period]
+        subscription_end:
+          type: string
+          format: date-time
+        quota_poin_total:
+          type: integer
+        quota_poin_used:
+          type: integer
+        referral_code:
+          type: string
+          example: GPRO-ABC12
+        is_active:
+          type: boolean
+        account_type:
+          type: string
+          enum: [individual, institution]
+        institution_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        expiresAt:
+          type: string
+          format: date-time
+        institutionId:
+          type: integer
+          nullable: true
+
+    # ---- Financial ----
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        external_id:
+          type: string
+        amount:
+          type: number
+          format: float
+          example: 299000
+        currency:
+          type: string
+          example: IDR
+        status:
+          type: string
+          enum: [PENDING, PAID, ACTIVATED, EXPIRED, DENIED, REFUNDED]
+        payment_method:
+          type: string
+          example: XENDIT
+        plan_id:
+          type: string
+          example: plan_premium_annual
+        notes:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PayoutRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        tipe:
+          type: string
+          enum: [cashback, reward]
+        jumlah:
+          type: integer
+          description: Amount in IDR
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED, PAID]
+        bank_name:
+          type: string
+        bank_account_number:
+          type: string
+        bank_account_name:
+          type: string
+        catatan:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    # ---- Institutions ----
+    Institution:
+      type: object
+      properties:
+        id:
+          type: integer
+        nama:
+          type: string
+          example: SD Negeri 1 Jakarta
+        jalur_regulasi:
+          type: string
+          enum: [kemendikdasmen, kemenag]
+        jenjang:
+          type: string
+          enum: [paud, sd_mi, smp_mts, sma_ma, smk_mak]
+        kurikulum:
+          type: string
+          enum: [kurikulum_merdeka, k13, kbc, hybrid]
+        alamat:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    # ---- Settings ----
+    PaymentGatewayConfig:
+      type: object
+      properties:
+        default_gateway:
+          type: string
+          enum: [xendit, midtrans, duitku, mock]
+        xendit:
+          type: object
+          properties:
+            api_key:
+              type: string
+            verification_token:
+              type: string
+            is_sandbox:
+              type: boolean
+        midtrans:
+          type: object
+          properties:
+            merchant_id:
+              type: string
+            client_key:
+              type: string
+            server_key:
+              type: string
+            is_sandbox:
+              type: boolean
+        duitku:
+          type: object
+          properties:
+            merchant_code:
+              type: string
+            api_key:
+              type: string
+            is_sandbox:
+              type: boolean
+
+    EmailSenderConfig:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum: [smtp, resend, sendgrid]
+        active:
+          type: boolean
+        smtp:
+          type: object
+          properties:
+            host:
+              type: string
+            port:
+              type: integer
+            secure:
+              type: boolean
+            user:
+              type: string
+            pass:
+              type: string
+        sender_name:
+          type: string
+        sender_email:
+          type: string
+
+    WaSenderConfig:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum: [fonnte, ruangwa]
+        active:
+          type: boolean
+        fonnte:
+          type: object
+          properties:
+            token:
+              type: string
+            sender_number:
+              type: string
+        ruangwa:
+          type: object
+          properties:
+            token:
+              type: string
+            sender_number:
+              type: string
+
+    AiConfig:
+      type: object
+      properties:
+        default_vendor:
+          type: string
+          enum: [gemini, openai, claude, deepseek, mock]
+        gemini:
+          type: object
+          properties:
+            api_key:
+              type: string
+            model_name:
+              type: string
+              example: gemini-2.5-flash
+        openai:
+          type: object
+          properties:
+            api_key:
+              type: string
+            model_name:
+              type: string
+        claude:
+          type: object
+          properties:
+            api_key:
+              type: string
+            model_name:
+              type: string
+        deepseek:
+          type: object
+          properties:
+            api_key:
+              type: string
+            model_name:
+              type: string
+
+    # ---- Storage ----
+    UserFile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: document.pdf
+        r2_key:
+          type: string
+        r2_url:
+          type: string
+          format: uri
+        size:
+          type: integer
+          format: int64
+        mime_type:
+          type: string
+          example: application/pdf
+        folder_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    UserFolder:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    # ---- Attendance ----
+    AttendanceRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        teacher_id:
+          type: string
+          format: uuid
+        institution_id:
+          type: integer
+        date:
+          type: string
+          format: date
+        check_in_time:
+          type: string
+          format: date-time
+          nullable: true
+        check_out_time:
+          type: string
+          format: date-time
+          nullable: true
+        attendance_status:
+          type: string
+          enum: [present, absent, late, permit]
+        late_minutes:
+          type: integer
+          nullable: true
+        teaching_sessions_completed:
+          type: integer
+        teaching_minutes_total:
+          type: integer
+
+    # ---- Journals ----
+    TeachingJournal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        teacher_id:
+          type: string
+          format: uuid
+        school_id:
+          type: string
+          format: uuid
+        class_id:
+          type: string
+          format: uuid
+        subject_id:
+          type: string
+          format: uuid
+        tanggal:
+          type: string
+          format: date
+        materi_pembelajaran:
+          type: string
+        tujuan_pembelajaran:
+          type: string
+        aktivitas_pembelajaran:
+          type: string
+        media_pembelajaran:
+          type: string
+          nullable: true
+        asesmen_pembelajaran:
+          type: string
+          nullable: true
+        refleksi_guru:
+          type: string
+          nullable: true
+        tindak_lanjut:
+          type: string
+          nullable: true
+        evidensi:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [Draft, Submitted, Approved, Revision]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TeachingJournalInput:
+      type: object
+      required: [class_id, subject_id, tanggal, materi_pembelajaran, tujuan_pembelajaran, aktivitas_pembelajaran]
+      properties:
+        class_id:
+          type: string
+          format: uuid
+        subject_id:
+          type: string
+          format: uuid
+        schedule_id:
+          type: string
+          format: uuid
+        tanggal:
+          type: string
+          format: date
+        materi_pembelajaran:
+          type: string
+        tujuan_pembelajaran:
+          type: string
+        aktivitas_pembelajaran:
+          type: string
+        media_pembelajaran:
+          type: string
+        asesmen_pembelajaran:
+          type: string
+        refleksi_guru:
+          type: string
+        tindak_lanjut:
+          type: string
+        evidensi:
+          type: array
+          items:
+            type: string
+        custom_values:
+          type: object
+        status:
+          type: string
+          enum: [Draft, Submitted]
+
+    JournalSchema:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        school_id:
+          type: string
+          format: uuid
+        nama_skema:
+          type: string
+          example: Jurnal Mengajar Harian
+        fields:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              label:
+                type: string
+              type:
+                type: string
+                enum: [text, textarea, date, select, file, number]
+              required:
+                type: boolean
+              options:
+                type: array
+                items:
+                  type: string
+
+    # ---- Performance Share ----
+    PerformanceShareDocument:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        teacher_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        visibility:
+          type: string
+          enum: [public, institution, private]
+        documents:
+          type: array
+          items:
+            type: object
+            properties:
+              file_id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              url:
+                type: string
+                format: uri
+        access_grants:
+          type: array
+          items:
+            type: object
+            properties:
+              user_id:
+                type: string
+                format: uuid
+              granted_at:
+                type: string
+                format: date-time
+        token:
+          type: string
+          description: Public share token
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    # ---- AI ----
+    AiAlert:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        message:
+          type: string
+        feature:
+          type: string
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+
+    # ---- Raport ----
+    Raport:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        siswa_id:
+          type: string
+          format: uuid
+        kelas_id:
+          type: string
+          format: uuid
+        template_raport_id:
+          type: string
+          format: uuid
+        periode:
+          type: string
+          example: "2025/2026 Ganjil"
+        jenis_laporan:
+          type: string
+          enum: [tengah_semester, akhir_semester, kokurikuler_p5, kokurikuler_p2ra]
+        status:
+          type: string
+          enum: [draft, dikirim_ke_wali_kelas, dikonfirmasi, difinalisasi, siap_print]
+        created_at:
+          type: string
+          format: date-time
+
+    RaportTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sekolah_id:
+          type: string
+          format: uuid
+        nama_template:
+          type: string
+        jalur_regulasi:
+          type: string
+          enum: [kemendikdasmen, kemenag]
+        jenjang:
+          type: string
+          enum: [paud, sd_mi, smp_mts, sma_ma, smk_mak]
+        kurikulum:
+          type: string
+          enum: [kurikulum_merdeka, k13, kbc, hybrid]
+        jenis_laporan:
+          type: string
+        sections:
+          type: array
+        is_default:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
