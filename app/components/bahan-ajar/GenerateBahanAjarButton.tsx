@@ -104,8 +104,8 @@ export default function GenerateBahanAjarButton({
       {showModal && (
         <GenerateConfirmationModal
           modulAjarId={modulAjarId}
-          modulAjarName={modulAjarName}
-          modulAjarData={modulAjarData}
+          modulAjarName={modulAjarName ?? null}
+          modulAjarData={modulAjarData ?? null}
           jumlahPertemuan={jumlahPertemuan}
           onClose={() => setShowModal(false)}
           onSuccess={(bahanAjarId) => {

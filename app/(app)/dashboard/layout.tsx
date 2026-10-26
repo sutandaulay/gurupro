@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect } from "react";
@@ -98,12 +99,12 @@ export default function DashboardLayout({
                   Masa aktif langganan Anda telah berakhir. Akun Anda saat ini berada dalam <strong>Masa Tenggang</strong> dan akan dinonaktifkan pada <strong>{new Date(tokenStatus.grace_period_ends_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</strong>.
                 </span>
               </div>
-              <a
+              <Link
                 href="/dashboard/billing"
                 className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap shrink-0 text-center"
               >
                 Perpanjang Sekarang
-              </a>
+              </Link>
             </div>
           )}
 

@@ -47,6 +47,7 @@ interface AttendanceInsight {
 
 interface AttendanceDataResponse {
   success: boolean;
+  error?: string;
   data: {
     teacherName: string;
     weekStart: string;

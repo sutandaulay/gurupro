@@ -101,7 +101,7 @@ export default function InstitutionLaporanMengajarDetailPage() {
         </div>
         <div className="flex gap-2">
           {report.pdf_url && (
-            <Button variant="outline" size="sm" onClick={() => window.open(`/api/institution/${institutionId}/laporan-mengajar/${id}/download?format=pdf`, '_blank')}>
+            <Button variant="secondary" size="sm" onClick={() => window.open(`/api/institution/${institutionId}/laporan-mengajar/${id}/download?format=pdf`, '_blank')}>
               Download PDF
             </Button>
           )}

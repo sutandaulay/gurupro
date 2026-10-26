@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { query } from "@/lib/db";
 
 async function getInstitutionInfo(institutionId: number) {
@@ -51,12 +52,12 @@ export default async function SubscriptionInactivePage({
           memiliki langganan aktif. Silakan hubungi administrator untuk
           melakukan perpanjangan.
         </p>
-        <a
+        <Link
           href="/dashboard"
           className="inline-block bg-violet-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-violet-700 transition-colors"
         >
           Kembali ke Dashboard
-        </a>
+        </Link>
       </div>
     </div>
   );

@@ -21,6 +21,21 @@ interface AnalyticsStats {
   truncationRate: number;
 }
 
+function StatCard({ title, value, color }: { title: string; value: string; color: string }) {
+  const colors: Record<string, string> = {
+    blue: 'bg-blue-50 text-blue-600 border-blue-200',
+    amber: 'bg-amber-50 text-amber-600 border-amber-200',
+    red: 'bg-red-50 text-red-600 border-red-200',
+    green: 'bg-green-50 text-green-600 border-green-200',
+  };
+  return (
+    <div className={`rounded-lg border p-4 ${colors[color] || colors.blue}`}>
+      <div className="text-2xl font-bold">{value}</div>
+      <div className="text-sm opacity-75">{title}</div>
+    </div>
+  );
+}
+
 export default function AIMonitoringDashboard() {
   const [events, setEvents] = useState<AnalyticsEvent[]>([]);
   const [stats, setStats] = useState<AnalyticsStats | null>(null);
@@ -50,21 +65,6 @@ export default function AIMonitoringDashboard() {
 
   function formatTime(ts: string) {
     return new Date(ts).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  }
-
-  function StatCard({ title, value, color }: { title: string; value: string; color: string }) {
-    const colors: Record<string, string> = {
-      blue: 'bg-blue-50 text-blue-600 border-blue-200',
-      amber: 'bg-amber-50 text-amber-600 border-amber-200',
-      red: 'bg-red-50 text-red-600 border-red-200',
-      green: 'bg-green-50 text-green-600 border-green-200',
-    };
-    return (
-      <div className={`rounded-lg border p-4 ${colors[color] || colors.blue}`}>
-        <div className="text-2xl font-bold">{value}</div>
-        <div className="text-sm opacity-75">{title}</div>
-      </div>
-    );
   }
 
   if (loading) {

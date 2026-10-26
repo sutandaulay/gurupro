@@ -1,4 +1,5 @@
 'use client';
+import Link from "next/link";
 import { useState, Fragment } from 'react';
 import { apiFetch } from "@/lib/api-client";
 import { Pagination, usePagedItems } from '@/components/ui/pagination';
@@ -253,12 +254,12 @@ export default function LaporanTab({ data, loading, error, kelasId, periode, onR
               mengelola raport di sini: konfirmasi, finalisasi, hingga siap print/bagikan.
             </p>
           </div>
-          <a
+          <Link
             href="/dashboard/raport-status"
             className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
           >
             Kelola Status Raport
-          </a>
+          </Link>
         </div>
 
         {actionError && (

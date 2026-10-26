@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Camera, RefreshCw, CheckCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useFaceRecognition, type LivenessResult } from '@/app/hooks/useFaceRecognition';
+import { useFaceRecognition, type LivenessResult, type FaceDetectionResult } from '@/app/hooks/useFaceRecognition';
 import * as faceapi from 'face-api.js';
 
 interface FaceCaptureData {
@@ -33,7 +33,7 @@ export const FaceCaptureWidget = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const detectFaceRef = useRef<(input: HTMLVideoElement) => Promise<ReturnType<typeof detectFace>>>();
+  const detectFaceRef = useRef<((input: HTMLVideoElement) => Promise<FaceDetectionResult>) | undefined>(undefined);
   const runDetectionRef = useRef<() => void>(() => {});
 
   const [stream, setStream] = useState<MediaStream | null>(null);

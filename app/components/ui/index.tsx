@@ -104,9 +104,11 @@ export function Card({ children, className = "", onClick }: CardProps) {
 /* ─── Badge ─── */
 
 type BadgeVariant = "default" | "success" | "warning" | "error" | "info";
+type BadgeSize = "sm" | "md";
 
 interface BadgeProps {
   variant?: BadgeVariant;
+  size?: BadgeSize;
   children: React.ReactNode;
   className?: string;
 }
@@ -119,14 +121,20 @@ const badgeVariants: Record<BadgeVariant, string> = {
   info: "bg-info-100 text-info-700",
 };
 
+const badgeSizes: Record<BadgeSize, string> = {
+  sm: "px-2 py-0.5 text-[10px]",
+  md: "px-2.5 py-0.5 text-xs",
+};
+
 export function Badge({
   variant = "default",
+  size = "md",
   children,
   className = "",
 }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeVariants[variant]} ${className}`}
+      className={`inline-flex items-center rounded-full font-medium ${badgeVariants[variant]} ${badgeSizes[size]} ${className}`}
     >
       {children}
     </span>
@@ -189,7 +197,7 @@ export function Divider({ text, className = "" }: DividerProps) {
 }
 
 /* re-export form components */
-export { Label, Input, TextInput, PasswordInput, Select, Textarea, Checkbox, PasswordStrength } from "./form";
+export { Label, Input, PasswordInput, Select, Textarea, Checkbox, PasswordStrength } from "./form";
 export type { LabelProps, InputProps, PasswordInputProps, SelectProps, TextareaProps, CheckboxProps } from "./form";
 
 export { Modal } from "./form";

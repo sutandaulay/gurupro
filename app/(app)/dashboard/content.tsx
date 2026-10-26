@@ -31,6 +31,7 @@ import { useMenuVisibility } from "@/hooks/useMenuVisibility";
 import { Pagination, usePagedItems } from "@/components/ui/pagination";
 import ApprovalStatusBadge, { SubmitApprovalButton } from "@/components/approval/ApprovalStatusBadge";
 import { buildKopSekolahHTML } from "@/lib/export/document-shared";
+import type { ScheduleInfo } from "@/lib/selesai-mengajar/types";
 
 // Safe JSON fetch - always returns an object or array, never throws
 async function safeJson(url: string): Promise<any> {
@@ -2995,8 +2996,8 @@ function DashboardContent() {
   const fetchSavedDocs = async () => {
     try {
       const res = await safeJson(`/api/administrasi${selectedSchoolId ? `?school_id=${selectedSchoolId}` : ''}`);
-      const list = res?.data ?? (Array.isArray(res) ? res : []);
-      const filtered = list.filter((d) =>
+      const list: any[] = res?.data ?? (Array.isArray(res) ? res : []);
+      const filtered = list.filter((d: any) =>
         ["rpp", "modul", "silabus", "lkpd", "laporan_lkpd", "bahan_ajar"].includes(d.tipe_dokumen)
       );
       setSavedDocs(filtered);
@@ -4395,7 +4396,7 @@ try {
       const html2pdf = await loadHtml2Pdf();
       const data = enrichExportMeta();
       const content = document.createElement('div');
-      content.innerHTML = htmlContent;
+      content.innerHTML = generatePrintLayout(title, markdown, { showPageNumber: true });
 
       const opt = {
         margin: [25, 20, 20, 30],

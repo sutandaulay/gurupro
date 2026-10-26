@@ -510,7 +510,7 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
                     <span className={isZero ? "text-red-650" : "text-amber-750"}>
                       {isZero ? "Poin habis!" : "Poin hampir habis!"}
                     </span>
-                    <a
+                    <Link
                       href="/dashboard/billing?tab=token"
                       className={`px-1.5 py-0.5 rounded transition-colors ${
                         isZero
@@ -519,7 +519,7 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
                       }`}
                     >
                       Top-Up
-                    </a>
+                    </Link>
                   </div>
                 )}
               </div>

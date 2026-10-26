@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -940,12 +941,12 @@ function AdminPageContent() {
             }}
           />
 
-          <a
+          <Link
             href="/dashboard"
             className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-2xl transition cursor-pointer"
           >
             Buka Dashboard Guru
-          </a>
+          </Link>
           <button
             type="button"
             onClick={handleLogout}

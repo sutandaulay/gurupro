@@ -1,2 +1,2 @@
-import LaporanMengajarDetailContent from './laporan-mengajar/[id]/content'
+import LaporanMengajarDetailContent from './content'
 export default LaporanMengajarDetailContent

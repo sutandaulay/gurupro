@@ -14,7 +14,7 @@ import {
   IconSend,
 } from "@tabler/icons-react";
 import { Label } from "@/app/components/ui/form";
-import LeaderContactForm from "./LeaderContactForm";
+import LeaderContactForm, { type LeaderContact as LeaderContactFormData } from "./LeaderContactForm";
 import DocumentAccessToggle from "./DocumentAccessToggle";
 
 interface LeaderContact {
@@ -155,7 +155,7 @@ export default function PerformanceSharePanel({
     }
   }, [shareLinks, fetchDocumentGrants]);
 
-  const handleSaveContact = async (data: LeaderContact) => {
+  const handleSaveContact = async (data: LeaderContactFormData) => {
     setLoading(true);
     setError(null);
     try {

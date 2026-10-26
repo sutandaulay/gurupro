@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -454,9 +455,9 @@ export default function RaportEksternalPage() {
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
           <p className="text-xs text-gray-500 text-center">
             Halaman ini dibagikan oleh guru terkait melalui{" "}
-            <a href="/" className="text-emerald-600 hover:text-emerald-700">
+            <Link href="/" className="text-emerald-600 hover:text-emerald-700">
               GuruPRO AI
-            </a>
+            </Link>
             . Link berlaku hingga{" "}
             {new Date(data.otpExpiredAt).toLocaleDateString("id-ID", {
               day: "numeric",

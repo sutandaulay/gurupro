@@ -5,7 +5,7 @@ import { IconEye, IconEyeOff, IconChevronDown } from "@tabler/icons-react";
 
 /* ─── Label ─── */
 
-interface LabelProps extends React.LabelHTMLAttributes<HTMLLabelElement> {
+export interface LabelProps extends React.LabelHTMLAttributes<HTMLLabelElement> {
   required?: boolean;
 }
 
@@ -23,7 +23,7 @@ export function Label({ children, required, className = "", ...props }: LabelPro
 
 /* ─── Input ─── */
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string | null;
   helperText?: string;
@@ -88,7 +88,7 @@ export function Input({
 
 /* ─── PasswordInput ─── */
 
-interface PasswordInputProps extends Omit<InputProps, "type" | "icon"> {
+export interface PasswordInputProps extends Omit<InputProps, "type" | "icon"> {
   icon?: React.ComponentType<{ size?: number; stroke?: number; className?: string }>;
 }
 
@@ -115,7 +115,7 @@ export function PasswordInput(props: PasswordInputProps) {
 
 /* ─── Select ─── */
 
-interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   options: { value: string; label: string }[];
   error?: string | null;
@@ -169,7 +169,7 @@ export function Select({
 
 /* ─── Textarea ─── */
 
-interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string | null;
   helperText?: string;
@@ -214,7 +214,7 @@ export function Textarea({
 
 /* ─── Checkbox ─── */
 
-interface CheckboxProps {
+export interface CheckboxProps {
   label?: string | React.ReactNode;
   checked?: boolean;
   onChange?: (checked: boolean) => void;

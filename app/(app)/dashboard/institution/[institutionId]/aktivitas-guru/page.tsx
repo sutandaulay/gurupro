@@ -1,2 +1,2 @@
-import AktivitasGuruContent from './aktivitas-guru/content'
+import AktivitasGuruContent from './content'
 export default AktivitasGuruContent

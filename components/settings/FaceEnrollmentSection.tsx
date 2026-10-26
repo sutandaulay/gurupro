@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Camera, RotateCcw, CheckCircle, AlertCircle, Check, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useFaceRecognition } from '@/app/hooks/useFaceRecognition';
+import { useFaceRecognition, type FaceDetectionResult } from '@/app/hooks/useFaceRecognition';
 
 interface FaceCapture {
   id: number;
@@ -52,7 +52,7 @@ export default function FaceEnrollmentSection({ onEnrollmentChange }: FaceEnroll
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const detectFaceRef = useRef<(input: HTMLVideoElement) => Promise<ReturnType<typeof detectFace>>>();
+  const detectFaceRef = useRef<((input: HTMLVideoElement) => Promise<FaceDetectionResult>) | undefined>(undefined);
   const isModelLoadedRef = useRef(false);
   const runDetectionRef = useRef<() => void>(() => {});
 

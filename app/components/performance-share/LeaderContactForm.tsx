@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Input, Select, Label } from "@/app/components/ui/form";
 import { IconUser, IconMail, IconPhone, IconSchool } from "@tabler/icons-react";
 
-interface LeaderContact {
+export interface LeaderContact {
   id?: string;
   leaderName: string;
   leaderRole: string;

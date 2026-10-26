@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 
 import { useState, Suspense } from "react";
@@ -146,9 +147,9 @@ function OptOutContent() {
           </div>
 
           <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 text-center">
-            <a href="/" className="text-sm text-violet-600 hover:text-violet-700">
+            <Link href="/" className="text-sm text-violet-600 hover:text-violet-700">
               Kembali ke GuruPRO AI
-            </a>
+            </Link>
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -103,7 +104,7 @@ export default function LeaderViewPage() {
 
       setData(result);
       if (result.level2?.grants) {
-        const verified = new Set(
+        const verified = new Set<string>(
           result.level2.grants
             .filter((g: { documentCategory: string; otpVerified: boolean }) => g.otpVerified)
             .map((g: { documentCategory: string }) => g.documentCategory)
@@ -468,9 +469,9 @@ export default function LeaderViewPage() {
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
           <p className="text-xs text-gray-500 text-center">
             Halaman ini dibagikan oleh guru terkait melalui{" "}
-            <a href="/" className="text-violet-600 hover:text-violet-700">
+            <Link href="/" className="text-violet-600 hover:text-violet-700">
               GuruPRO AI
-            </a>
+            </Link>
             .{" "}
             <button className="text-gray-500 hover:text-gray-700 underline">
               Berhenti menerima link seperti ini

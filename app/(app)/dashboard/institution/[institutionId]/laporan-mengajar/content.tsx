@@ -199,7 +199,7 @@ export default function InstitutionLaporanMengajarPage() {
                       </Button>
                       {report.pdf_url && (
                         <Button
-                          variant="outline"
+                          variant="secondary"
                           size="sm"
                           onClick={() => window.open(`/api/institution/${institutionId}/laporan-mengajar/${report.id}/download?format=pdf`, '_blank')}
                         >

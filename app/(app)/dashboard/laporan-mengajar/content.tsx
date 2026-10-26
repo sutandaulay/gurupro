@@ -131,7 +131,7 @@ export default function LaporanMengajarPage() {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2 flex-wrap">
-                    <Badge variant={report.status === 'Final' ? 'green' : 'yellow'}>
+                    <Badge variant={report.status === 'Final' ? 'success' : 'warning'}>
                       {report.status}
                     </Badge>
                     <span className="text-xs text-slate-400">
@@ -179,14 +179,14 @@ export default function LaporanMengajarPage() {
                     Detail
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => downloadPdf(report.id, report.tanggal)}
                   >
                     PDF
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => downloadDoc(report.id)}
                   >

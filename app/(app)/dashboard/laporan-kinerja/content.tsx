@@ -197,7 +197,7 @@ export default function LaporanKinerjaListPage() {
                 <SelectItem value="final">Final</SelectItem>
               </SelectContent>
             </Select>
-            <Button size="sm" variant="outline" onClick={() => setPage(1)} className="text-xs">
+            <Button size="sm" variant="secondary" onClick={() => setPage(1)} className="text-xs">
               <RefreshCw className="h-3 w-3 mr-1" />
               Refresh
             </Button>

@@ -9,7 +9,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api-client";
 
 interface Props {
-  fileUrl: string;
+  fileUrl: string | null;
   itemId: string;
   coverUrl: string | null;
   initialPosition: number;
@@ -33,10 +33,11 @@ export default function AudioPlayer({ fileUrl, itemId, coverUrl, initialPosition
   const [playbackRate, setPlaybackRate] = useState(1);
   const [volume, setVolume] = useState(1);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [currentUrl, setCurrentUrl] = useState(fileUrl);
+  const [currentUrl, setCurrentUrl] = useState<string | null>(fileUrl);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastReportRef = useRef(0);
   const reportIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const retryCountRef = useRef(0);
 
   const progressPercent = totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0;
@@ -67,11 +68,13 @@ export default function AudioPlayer({ fileUrl, itemId, coverUrl, initialPosition
     setCurrentUrl(fileUrl);
     setLoadError(null);
     retryCountRef.current = 0;
+    setRetryCount(0);
   }, [fileUrl]);
 
   const handleRetry = async () => {
     if (!onRefreshUrl || retryCountRef.current >= 2) return;
     retryCountRef.current++;
+    setRetryCount(retryCountRef.current);
     const fresh = await onRefreshUrl();
     if (fresh) {
       setCurrentUrl(fresh);
@@ -80,6 +83,7 @@ export default function AudioPlayer({ fileUrl, itemId, coverUrl, initialPosition
   };
 
   useEffect(() => {
+    if (!currentUrl) return;
     const audio = new Audio(currentUrl);
     audioRef.current = audio;
 
@@ -166,7 +170,7 @@ export default function AudioPlayer({ fileUrl, itemId, coverUrl, initialPosition
           <p className="text-slate-400">{loadError}</p>
           <button
             onClick={handleRetry}
-            disabled={retryCountRef.current >= 2}
+            disabled={retryCount >= 2}
             className="px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-600 disabled:opacity-40"
           >
             Coba Lagi

@@ -287,7 +287,7 @@ export default function ProsemPage() {
                           .replace(/^(\d+)\. (.+)$/gm, '<li style="font-family:Times New Roman,serif;font-size:11pt;color:#334155;margin-left:20pt;margin-bottom:4pt;line-height:1.6;list-style:decimal;">$2</li>')
                           .replace(/\n\n/g, "</p><p style='font-family:Times New Roman,serif;font-size:11pt;color:#334155;line-height:1.6;text-align:justify;margin:6pt 0;'>")
                           .replace(/\n/g, "<br>");
-                        bodyHtml = bodyHtml.replace(/(<li[^>]*>.*?<\/li>\n?)+/g, (m) => `<ul style='margin:6pt 0;padding-left:20pt;'>${m}</ul>`);
+                        bodyHtml = bodyHtml.replace(/(<li[^>]*>.*?<\/li>\n?)+/g, (m: string) => `<ul style='margin:6pt 0;padding-left:20pt;'>${m}</ul>`);
                         bodyHtml = bodyHtml.replace(/\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g, (match: string, header: string, body: string) => {
                           const headerCells = header.split('|').filter((c: string) => c.trim()).map((c: string) => `<th style="border:1px solid #000;padding:4pt 6pt;background:#f3f4f6;font-weight:bold;text-align:center;font-size:10pt;">${c.trim()}</th>`).join('');
                           const bodyRows = body.trim().split('\n').map((row: string) => {

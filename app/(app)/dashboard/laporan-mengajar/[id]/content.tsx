@@ -121,10 +121,10 @@ export default function LaporanMengajarDetailPage() {
           >
             Laporan Harian
           </Button>
-          <Button variant="outline" size="sm" onClick={downloadPdf}>
+          <Button variant="secondary" size="sm" onClick={downloadPdf}>
             Download PDF
           </Button>
-          <Button variant="outline" size="sm" onClick={downloadDoc}>
+          <Button variant="secondary" size="sm" onClick={downloadDoc}>
             Download DOCX
           </Button>
         </div>
@@ -147,7 +147,7 @@ export default function LaporanMengajarDetailPage() {
           </div>
           <div>
             <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Status</p>
-            <Badge variant={report.status === 'Final' ? 'green' : 'yellow'}>{report.status}</Badge>
+            <Badge variant={report.status === 'Final' ? 'success' : 'warning'}>{report.status}</Badge>
           </div>
         </div>
       </Card>
@@ -202,9 +202,9 @@ export default function LaporanMengajarDetailPage() {
                           <td className="py-2 px-3">
                             <Badge
                               variant={
-                                s.status === 'Hadir' ? 'green' :
-                                s.status === 'Izin' ? 'yellow' :
-                                s.status === 'Sakit' ? 'blue' : 'red'
+                                s.status === 'Hadir' ? 'success' :
+                                s.status === 'Izin' ? 'warning' :
+                                s.status === 'Sakit' ? 'info' : 'error'
                               }
                               size="sm"
                             >

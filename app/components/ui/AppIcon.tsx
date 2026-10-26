@@ -9,7 +9,7 @@ export interface AppIconProps {
   iconSize?: number;
   className?: string;
   active?: boolean;
-  category?: MenuCategory;
+  category?: MenuCategory | null;
   icon?: React.ReactNode;
   fallbackGradient?: [string, string];
 }

@@ -170,6 +170,7 @@ export default function BookReader({ itemId, initialPage, pageCount, fallbackFil
     : "";
 
   return (
+    <>
     <style>{`
       @keyframes slideLeft {
         from { transform: translateX(8px); opacity: 0.6; }
@@ -184,7 +185,7 @@ export default function BookReader({ itemId, initialPage, pageCount, fallbackFil
         50% { transform: translateX(-50%) translateY(0) scaleY(1); }
         100% { transform: translateX(-50%) translateY(0) scaleY(1); }
       }
-    `}</style>,
+    `}</style>
     <div className={`flex flex-col h-full ${bg}`}>
       {/* Toolbar */}
       <div className={`flex items-center justify-between px-4 py-3 ${toolbarBg} border-b ${toolbarBorder}`}>
@@ -370,5 +371,6 @@ export default function BookReader({ itemId, initialPage, pageCount, fallbackFil
         />
       </div>
     </div>
+    </>
   );
 }
