@@ -613,22 +613,15 @@ describe('Share-to-Principal - Link Delivery', () => {
 
   describe('WhatsApp Notification', () => {
     it('should send WhatsApp message with share link', async () => {
-      const messageData = {
-        to: '+6281234567890',
-        template: 'share_link',
-        data: {
-          teacherName: 'Guru Matematika',
-          documentType: 'RPP Modul Ajar',
-          shareLink: 'https://gurupro.id/share/abc123',
-        },
-      };
+      const to = '+6281234567890';
+      const message = 'Dokumen RPP Modul Ajar: https://gurupro.id/share/abc123';
 
       mockSendWhatsApp.mockResolvedValueOnce({ success: true, messageId: 'msg-123' });
 
-      const result = await sendWhatsAppNotification(messageData);
+      const result = await sendWhatsAppNotification(to, message);
 
       expect(result.success).toBe(true);
-      expect(mockSendWhatsApp).toHaveBeenCalledWith(messageData);
+      expect(mockSendWhatsApp).toHaveBeenCalledWith(to, message);
     });
 
     it('should include preview text for rich link', () => {
@@ -648,21 +641,13 @@ https://gurupro.id/share/abc123
 
   describe('Email Notification', () => {
     it('should send email with share link', async () => {
-      const emailData = {
-        to: 'kepala@school.sch.id',
-        subject: 'Dokumen dari Guru Matematika',
-        template: 'share_link',
-        data: {
-          teacherName: 'Guru Matematika',
-          documentType: 'Jurnal Harian',
-          shareLink: 'https://gurupro.id/share/def456',
-          expiryDays: 30,
-        },
-      };
+      const to = 'kepala@school.sch.id';
+      const subject = 'Dokumen dari Guru Matematika';
+      const htmlContent = '<p>Jurnal Harian: https://gurupro.id/share/def456</p>';
 
       mockSendEmail.mockResolvedValueOnce({ success: true, messageId: 'email-456' });
 
-      const result = await sendEmailNotification(emailData);
+      const result = await sendEmailNotification(to, subject, htmlContent);
 
       expect(result.success).toBe(true);
     });

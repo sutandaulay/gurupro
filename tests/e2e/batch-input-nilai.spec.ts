@@ -235,7 +235,7 @@ test.describe('MV-03: Batch Input Nilai (Full E2E)', () => {
 
   test('should verify nilai saved correctly to database', async ({ page }) => {
     if (!testClassId || testStudents.length === 0) {
-      test.skip('Test data not available for database verification');
+      test.skip(true, 'Test data not available for database verification');
       return;
     }
     
@@ -325,7 +325,7 @@ test.describe('MV-03: Batch Input Nilai (Full E2E)', () => {
 
   test('should prevent duplicate data from double-submit', async ({ page }) => {
     if (!testClassId || testStudents.length === 0) {
-      test.skip('Test data not available for duplicate check');
+      test.skip(true, 'Test data not available for duplicate check');
       return;
     }
     

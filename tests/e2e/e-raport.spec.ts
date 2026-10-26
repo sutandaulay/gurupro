@@ -657,7 +657,7 @@ test.describe('e-Raport - Edge Cases', () => {
     await page.goto(`${BASE_URL}/dashboard/rapor-review`);
 
     // Should show message about no students
-    await expect(page.locator(/tidak ada|siswa/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/tidak ada|siswa/i).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should handle no nilai entered yet', async ({ page }) => {

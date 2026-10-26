@@ -208,7 +208,7 @@ describe('getCurrentAcademicYear', () => {
         if (args.length === 0) {
           super(2025, 6, 15) // July 2025
         } else {
-          super(...args)
+          super(...(args as [number]))
         }
       }
     } as any
@@ -225,7 +225,7 @@ describe('getCurrentAcademicYear', () => {
         if (args.length === 0) {
           super(2025, 0, 15) // January 2025
         } else {
-          super(...args)
+          super(...(args as [number]))
         }
       }
     } as any

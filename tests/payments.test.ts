@@ -4,23 +4,16 @@ vi.mock('@/lib/db')
 vi.mock('@/lib/notifications', () => ({
   sendEventNotification: vi.fn().mockResolvedValue({ success: true }),
 }))
-vi.mock('@/lib/settings', () => ({
-  getPricingConfig: vi.fn(),
-}))
 
 import { query } from '@/lib/db'
 import { activateTransaction, processSuccessPayment } from '../lib/payments'
 import { sendEventNotification } from '@/lib/notifications'
-import { getPricingConfig } from '@/lib/settings'
 
 const mockQuery = query as ReturnType<typeof vi.fn>
 
-const mockPricingConfig = {
-  free: { tokens: 10, duration_days: 30, price: 0 },
-  three_month: { tokens: 500, duration_days: 90, price: 120000 },
-  six_month: { tokens: 1100, duration_days: 180, price: 220000 },
-  one_year: { tokens: 2500, duration_days: 365, price: 400000 },
-}
+beforeEach(() => {
+  vi.resetAllMocks()
+})
 
 function createTransaction(overrides: Record<string, any> = {}) {
   return {
@@ -53,25 +46,20 @@ function createUser(overrides: Record<string, any> = {}) {
   }
 }
 
-beforeEach(() => {
-  vi.resetAllMocks()
-  vi.mocked(getPricingConfig).mockResolvedValue(mockPricingConfig as any)
-})
-
 describe('activateTransaction', () => {
-  it('melempar error jika transaksi tidak ditemukan', async () => {
+  it('mengembalikan error jika transaksi tidak ditemukan', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] })
     mockQuery.mockResolvedValueOnce({ rows: [] })
 
-    await expect(activateTransaction('nonexistent-id')).rejects.toThrow(
-      'Transaksi ID nonexistent-id tidak ditemukan'
-    )
-    expect(mockQuery).toHaveBeenCalledTimes(1)
+    const result = await activateTransaction('nonexistent-id')
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('tidak ditemukan')
+    expect(mockQuery).toHaveBeenCalledTimes(2)
   })
 
   it('mengembalikan sukses jika transaksi sudah ACTIVATED (idempotent)', async () => {
-    mockQuery.mockResolvedValueOnce({
-      rows: [createTransaction({ status: 'ACTIVATED' })],
-    })
+    mockQuery.mockResolvedValueOnce({ rows: [] })
+    mockQuery.mockResolvedValueOnce({ rows: [createTransaction({ status: 'ACTIVATED' })] })
 
     const result = await activateTransaction('some-id')
     expect(result.success).toBe(true)

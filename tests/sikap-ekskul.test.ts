@@ -153,7 +153,7 @@ describe('insertPenilaianSikap', () => {
     vi.mocked(getWaliKelasForKelas).mockResolvedValueOnce({
       waliKelasMemberId: 'wali-lain',
     } as any)
-    mockQuery.mockResolvedValueOnce({ rows: [] })
+    mockQuery.mockResolvedValue({ rows: [] })
 
     await expect(insertPenilaianSikap(validInput, 'bukan-wali')).rejects.toThrow(
       'Hanya wali kelas aktif'
@@ -162,7 +162,7 @@ describe('insertPenilaianSikap', () => {
 
   it('melempar error jika tidak ada wali kelas untuk kelas ini', async () => {
     vi.mocked(getWaliKelasForKelas).mockResolvedValueOnce(null)
-    mockQuery.mockResolvedValueOnce({ rows: [] })
+    mockQuery.mockResolvedValue({ rows: [] })
 
     await expect(insertPenilaianSikap(validInput, 'wali-1')).rejects.toThrow(
       'Hanya wali kelas aktif'
@@ -436,7 +436,7 @@ describe('upsertCatatanWaliKelas', () => {
     vi.mocked(getWaliKelasForKelas).mockResolvedValueOnce({
       waliKelasMemberId: 'wali-asli',
     } as any)
-    mockQuery.mockResolvedValueOnce({ rows: [] })
+    mockQuery.mockResolvedValue({ rows: [] })
 
     await expect(
       upsertCatatanWaliKelas(validInput, 'bukan-wali')

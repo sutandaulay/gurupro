@@ -266,7 +266,7 @@ describe("Phase 0 - Regression Tests", () => {
       const expiredEnd = new Date(Date.now() - 86400000).toISOString(); // Kedaluwarsa 1 hari lalu
       const accessExpired = evaluateTokenAccess({
         role: "guru",
-        tokenLimit: 10,
+        totalPoinAvailable: 10,
         subscriptionEnd: expiredEnd,
       });
       expect(accessExpired.allowed).toBe(false);

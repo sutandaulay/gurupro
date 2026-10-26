@@ -139,7 +139,7 @@ describe('Wali Kelas - Dashboard API', () => {
     it('should return null if user is not wali kelas', async () => {
       mockGetWaliKelasForKelas.mockImplementation(() => Promise.resolve(null));
 
-      const result = await getWaliKelasForKelas(VALID_UUID);
+      const result = await getWaliKelasForKelas(VALID_UUID, '2025/2026', 'ganjil');
 
       expect(result).toBeNull();
     });
@@ -433,7 +433,9 @@ describe('Wali Kelas - Catatan API', () => {
         }],
       });
 
-      const isOwner = 'catatan-1' && true; // Simulate ownership check
+      const row = { id: 'catatan-1', ditulis_oleh: VALID_UUID };
+      const currentUserId = VALID_UUID;
+      const isOwner = row.id !== '' && row.ditulis_oleh === currentUserId;
       expect(isOwner).toBe(true);
     });
   });
@@ -653,7 +655,7 @@ describe('Wali Kelas - RBAC Verification', () => {
         waliKelasMemberId: VALID_UUID2,
       }));
 
-      const result = await getWaliKelasForKelas(VALID_UUID);
+      const result = await getWaliKelasForKelas(VALID_UUID, '2025/2026', 'ganjil');
 
       expect(result).not.toBeNull();
       expect(result?.waliKelasMemberId).toBe(VALID_UUID2);
@@ -662,7 +664,7 @@ describe('Wali Kelas - RBAC Verification', () => {
     it('should deny access for non-wali kelas', async () => {
       mockGetWaliKelasForKelas.mockImplementation(() => Promise.resolve(null));
 
-      const result = await getWaliKelasForKelas(VALID_UUID);
+      const result = await getWaliKelasForKelas(VALID_UUID, '2025/2026', 'ganjil');
 
       expect(result).toBeNull();
     });

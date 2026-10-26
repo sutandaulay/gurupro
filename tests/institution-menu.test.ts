@@ -150,7 +150,7 @@ describe('Menu Institusi — ikon & kategori', () => {
   })
 
   it('MenuItem type kompatibel untuk renderer submenu', () => {
-    const menu: MenuItem = { label: 'Institusi', submenu: institutionSubmenus }
+    const menu: MenuItem = { key: 'institution', label: 'Institusi', submenu: institutionSubmenus }
     expect(menu.submenu?.length).toBe(7)
   })
 })

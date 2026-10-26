@@ -89,10 +89,10 @@ beforeEach(() => {
   vi.mocked(cookies).mockImplementation(async () => ({
     get: (name: string) =>
       name === 'gurupro_session' && sessionUserId
-        ? { value: buildSignedSessionCookie({ id: sessionUserId, role: 'guru', activeContext: 'institution' }) }
+        ? { value: buildSignedSessionCookie({ id: sessionUserId, role: 'guru', activeContext: { institutionId: 1 } }) }
         : undefined,
     set: () => {},
-  }));
+  } as any));
 });
 
 describe('Fitur Share Nilai ke Wali Kelas', () => {

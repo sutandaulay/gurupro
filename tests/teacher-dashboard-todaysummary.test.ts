@@ -56,7 +56,6 @@ describe('teacher-dashboard: todaySummary fix', () => {
       const payloadInstitutionId: string = 'uuid-string-here'; // uuid from payload
 
       const wouldMatch =
-        attendanceSummaryInstitutionId === payloadInstitutionId ||
         String(attendanceSummaryInstitutionId) === payloadInstitutionId ||
         attendanceSummaryInstitutionId === Number(payloadInstitutionId);
 
