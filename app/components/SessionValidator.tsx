@@ -1,86 +1,151 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useProfileStore, useTeacherStore } from "@/lib/stores";
 
 /**
  * SessionValidator
- * Runs on app mount to validate that cached data matches current session.
- * Prevents showing stale data from a different user's session.
  *
- * Only validates if there's existing cached data - avoids clearing fresh sessions.
+ * Checks session revocation status via the server-side session store on mount
+ * and on every route change. This complements the Edge-layer HMAC verification
+ * in middleware.ts — the Edge layer is STATELESS (cannot query user_sessions DB),
+ * so we add a lightweight DB check here for immediate revocation detection.
+ *
+ * If the session is revoked/expired in user_sessions, we clear all cached data
+ * and the client should redirect to /login.
+ *
+ * Only validates if there's existing cached data — avoids unnecessary calls for
+ * fresh sessions with no prior local state.
  */
 export default function SessionValidator() {
-  const validateSession = useProfileStore(s => s.validateSession);
+  const router = useRouter();
   const clearProfile = useProfileStore(s => s.clearProfile);
   const resetContext = useTeacherStore(s => s.resetContext);
   const profile = useProfileStore(s => s.profile);
   const cachedUserId = useProfileStore(s => s.cachedUserId);
   const initialized = useRef(false);
 
-  useEffect(() => {
-    // Skip validation on first render - just mark as initialized
-    // Only validate if there's existing cached data from a previous session
-    if (!initialized.current) {
-      initialized.current = true;
-      // Don't validate on first load - just mark as initialized
+  /**
+   * Perform the revocation check. Reads sid from the gurupro_session cookie
+   * and sends it to /api/auth/session-status for DB verification.
+   */
+  const checkSessionStatus = useCallback(async () => {
+    // Only check if we have cached data that needs to be validated
+    if (!profile && !cachedUserId) {
       return;
     }
 
-    async function validate() {
-      // Only validate if we have cached data that needs to be checked
-      if (!profile && !cachedUserId) {
-        console.log('[SessionValidator] No cached data, skipping validation');
+    try {
+      // Extract sid from the gurupro_session cookie
+      const cookieString = document.cookie;
+      const match = cookieString
+        .split(";")
+        .map((c) => c.trim())
+        .find((c) => c.startsWith("gurupro_session="));
+
+      if (!match) {
+        // No session cookie at all — clear cached data
+        console.log("[SessionValidator] No session cookie, clearing caches");
+        triggerLogout();
         return;
       }
 
+      const cookieValue = match.slice("gurupro_session=".length);
+      let sid: string | undefined;
+      let sessionId: string | undefined;
+
       try {
-        const isValid = await validateSession();
+        const decoded = decodeURIComponent(cookieValue);
+        const parsed = JSON.parse(decoded);
+        sid = parsed?.sid;
+        sessionId = parsed?.id;
+      } catch {
+        // Malformed cookie — clear caches
+        triggerLogout();
+        return;
+      }
 
-        if (!isValid) {
-          // Session is invalid or changed - clear all cached data
-          console.log('[SessionValidator] Session invalid or changed - clearing caches');
+      if (!sid) {
+        // No server-side session id in cookie (legacy session or OAuth-only).
+        // Cannot check revocation — skip and let the normal validateSession handle it.
+        console.log("[SessionValidator] No sid in cookie, skipping revocation check");
+        return;
+      }
 
-          // Clear all localStorage that might contain stale user data
-          if (typeof window !== 'undefined') {
-            const keysToRemove: string[] = [];
+      const res = await fetch("/api/auth/session-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ sid, sessionId }),
+      });
 
-            // Find and clear profile-related keys
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i);
-              if (key && (key.includes('profile') || key.includes('session') || key.includes('auth'))) {
-                keysToRemove.push(key);
-              }
-            }
+      if (!res.ok) {
+        console.warn("[SessionValidator] session-status returned non-OK:", res.status);
+        return;
+      }
 
-            keysToRemove.forEach(key => {
-              try {
-                localStorage.removeItem(key);
-              } catch (e) {
-                console.error(`Failed to remove ${key}:`, e);
-              }
-            });
+      const data = await res.json();
+      if (!data.valid) {
+        console.log(
+          "[SessionValidator] Session revoked or expired:",
+          data.reason ?? "no reason"
+        );
+        triggerLogout();
+      }
+    } catch (err) {
+      // Network or parse errors — log and remain silent rather than clearing
+      // valid sessions due to a transient error.
+      console.error("[SessionValidator] session-status check error:", err);
+    }
+  }, [profile, cachedUserId]);
 
-            // Clear sessionStorage
-            sessionStorage.clear();
-          }
-
-          // Clear stores
-          clearProfile();
-          resetContext();
-        }
-      } catch (err) {
-        console.error('[SessionValidator] Validation error:', err);
-        // On error, be safe but only clear if we have cached data
-        if (profile || cachedUserId) {
-          clearProfile();
-          resetContext();
+  function triggerLogout() {
+    // Clear all localStorage that might contain stale user data
+    if (typeof window !== "undefined") {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes("profile") || key.includes("session") || key.includes("auth"))) {
+          keysToRemove.push(key);
         }
       }
+      keysToRemove.forEach((key) => {
+        try {
+          localStorage.removeItem(key);
+        } catch (e) {
+          console.error(`Failed to remove ${key}:`, e);
+        }
+      });
+      sessionStorage.clear();
     }
 
-    validate();
-  }, [profile, cachedUserId]);
+    // Clear stores
+    clearProfile();
+    resetContext();
+
+    // Redirect to login
+    const loginUrl = new URL("/login", window.location.origin);
+    loginUrl.searchParams.set("redirect", window.location.pathname);
+    window.location.href = loginUrl.toString();
+  }
+
+  useEffect(() => {
+    // Skip on first render — wait for hydration
+    if (!initialized.current) {
+      initialized.current = true;
+      return;
+    }
+    checkSessionStatus();
+  }, [checkSessionStatus]);
+
+  // Check on mount (after initial hydration)
+  useEffect(() => {
+    if (initialized.current) return; // already handled by the other effect
+    initialized.current = true;
+    checkSessionStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return null;
 }
