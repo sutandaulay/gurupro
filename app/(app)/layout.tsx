@@ -6,6 +6,7 @@ import PWARegister from "@/app/components/PWARegister";
 import PWAInstallPrompt from "@/app/components/PWAInstallPrompt";
 import SessionValidator from "@/app/components/SessionValidator";
 import ProvidersWrapper from "./providers-wrapper";
+import ThemeProvider from "./components/ThemeProvider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -23,7 +24,11 @@ const jakartaSans = Plus_Jakarta_Sans({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#7C3AED",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#1e293b" },
+    { media: "(prefers-color-scheme: light)", color: "#7C3AED" },
+    { color: "#7C3AED" },
+  ],
 };
 
 export const metadata: Metadata = {
@@ -80,11 +85,14 @@ export default async function AppLayout({
   const cookieStore = await cookies();
   const session = cookieStore.get("gurupro_session")?.value;
   const school = cookieStore.get("gurupro_school_selected")?.value;
+  const themeCookie = cookieStore.get("theme")?.value;
+  const isDark = themeCookie === "dark";
 
   return (
     <html
       lang="id"
       data-scroll-behavior="smooth"
+      data-theme={isDark ? "dark" : "light"}
       className={`${inter.variable} ${jakartaSans.variable} h-full antialiased`}
     >
       <head>
@@ -100,13 +108,15 @@ export default async function AppLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="GuruPRO AI" />
       </head>
-      <body className="font-sans min-h-full flex flex-col bg-neutral-50 text-neutral-900 selection:bg-primary-600 selection:text-white">
+      <body className="font-sans min-h-full flex flex-col bg-[var(--color-background)] text-[var(--color-foreground)] selection:bg-primary-600 selection:text-white">
         <PWARegister />
         <PWAInstallPrompt />
         <SessionValidator />
-        <ProvidersWrapper gurupro_session={session} gurupro_school_selected={school}>
-          {children}
-        </ProvidersWrapper>
+        <ThemeProvider initialTheme={isDark ? "dark" : "light"}>
+          <ProvidersWrapper gurupro_session={session} gurupro_school_selected={school}>
+            {children}
+          </ProvidersWrapper>
+        </ThemeProvider>
       </body>
     </html>
   );
