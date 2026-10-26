@@ -120,7 +120,7 @@ src/
 ├── lib/
 │   ├── payload.ts        # Payload client cache + data helpers
 │   └── fallback-data.ts  # Default data + icon mapping
-├── middleware.ts          # Route protection for /admin
+├── proxy.ts               # Route protection for /admin
 ├── payload.config.ts     # Payload CMS configuration
 └── payload-types.ts      # Auto-generated Payload types
 ```
@@ -156,7 +156,7 @@ src/
 2. On request, it fetches data from Payload via `lib/payload.ts` helpers
 3. Data is transformed and passed to section components in `components/landing/`
 4. If Payload fetch fails, `lib/fallback-data.ts` provides default content
-5. `middleware.ts` protects `/admin/*` routes, redirecting to `/login` if unauth
+5. `proxy.ts` protects `/admin/*` routes, redirecting to `/login` if unauth
 
 ## Customization
 
