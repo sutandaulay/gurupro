@@ -15,7 +15,12 @@
     "dev:cron": "npx tsx scripts/dev-cron.ts",
     "dev:cron:once": "npx tsx scripts/dev-cron.ts once",
     "dev:cron:scenario": "npx tsx scripts/dev-cron.ts scenario",
-    "dev:cron:help": "npx tsx scripts/dev-cron.ts --help"
+    "dev:cron:help": "npx tsx scripts/dev-cron.ts --help",
+    "openapi": "npx tsx scripts/generate-openapi.ts",
+    "prisma:sync": "npx tsx scripts/sync-prisma-schema.ts",
+    "backup:db": "npx tsx scripts/backup/db-backup.ts",
+    "backup:r2": "npx tsx scripts/backup/r2-backup.ts",
+    "backup:restore": "npx tsx scripts/backup/restore.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.12",
