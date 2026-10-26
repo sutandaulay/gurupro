@@ -158,7 +158,7 @@ function generateDocHtml(
     if (j.tindak_lanjut) lines.push({ label: 'Tindak Lanjut', value: escapeHtml(j.tindak_lanjut) });
 
     const metaRows = lines
-      .map(([label, value]) =>
+      .map(({ label, value }) =>
         `<tr><td style="width:160px;padding:3px 8px 3px 0;font-size:11pt;font-weight:bold;vertical-align:top;">${escapeHtml(label)}</td><td style="padding:3px 0;font-size:11pt;vertical-align:top;">: ${value}</td></tr>`
       )
       .join('\n');

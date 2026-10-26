@@ -120,6 +120,9 @@ export async function GET(
       );
     }
 
+    // Ambil modul ajar untuk metadata
+    const modulAjar = bahanAjar.modulAjar as any;
+
     // Fetch school info for kop sekolah
     const schoolId = modulAjar?.school_id;
     let schoolData: any = { nama_sekolah: null, alamat: null, npsn: null, logo: null, nama_kepala_sekolah: null, nip_kepala_sekolah: null, kepala_signature_url: null };
@@ -147,7 +150,6 @@ export async function GET(
     } catch (_) {}
 
     // Ambil modul ajar untuk metadata
-    const modulAjar = bahanAjar.modulAjar as any;
     const modulTitle = modulAjar?.namaModul || "Modul Ajar";
     const mapel = modulAjar?.mapel || "Mata Pelajaran";
     const jenjang = modulAjar?.jenjang || "";

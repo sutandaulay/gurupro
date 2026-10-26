@@ -6,6 +6,7 @@ import { getUserPoinAccess, logFailedPoinUsage } from '@/src/services/poin-servi
 import { deductPoinFromAIResult } from '@/src/lib/ai-usage';
 import { enforceOutputLimits } from '@/lib/ai/limits';
 import { parseSessionCookie } from '@/lib/session-sign';
+import { AIChatBodySchema, AIChatListQuerySchema } from '@/lib/validation/schemas';
 
 const prisma = new PrismaClient();
 
@@ -48,14 +49,8 @@ export async function POST(request: NextRequest) {
       }, { status: 403 });
     }
 
-    const { message, session_id } = body;
-
-    if (!message || message.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Message is required' },
-        { status: 400 }
-      );
-    }
+    // Zod-validated body
+    const { message, session_id } = AIChatBodySchema.parse(body);
 
     // Get user context
     const userData = await prisma.users.findUnique({
@@ -195,7 +190,11 @@ export async function GET(request: NextRequest) {
 
     const userId = user.id;
     const { searchParams } = new URL(request.url);
-    const session_id = searchParams.get('session_id');
+
+    // Zod-validated query params
+    const { session_id } = AIChatListQuerySchema.parse(
+      Object.fromEntries(searchParams.entries())
+    );
 
     const whereClause: any = { user_id: userId };
     if (session_id) {
@@ -238,7 +237,11 @@ export async function DELETE(request: NextRequest) {
 
     const userId = user.id;
     const { searchParams } = new URL(request.url);
-    const session_id = searchParams.get('session_id');
+
+    // Zod-validated query params
+    const { session_id } = AIChatListQuerySchema.parse(
+      Object.fromEntries(searchParams.entries())
+    );
 
     if (session_id) {
       await prisma.ai_chat_logs.deleteMany({

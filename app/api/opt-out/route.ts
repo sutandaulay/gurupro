@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Where } from "payload";
 import { getPayload } from "@/lib/payload";
 import { COLLECTIONS } from "@/collections/config";
 import { normalizePhoneNumber, normalizeEmail } from "@/lib/performance-share";
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
     const normalizedPhone = phoneNumber ? normalizePhoneNumber(phoneNumber) : null;
     const normalizedEmail = email ? normalizeEmail(email) : null;
 
-    const orConditions: Record<string, unknown>[] = [];
+    const orConditions: Where[] = [];
     if (normalizedPhone) {
       orConditions.push({ phoneNumber: { equals: normalizedPhone } });
     }

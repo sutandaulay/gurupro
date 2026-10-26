@@ -129,7 +129,7 @@ Pesan otomatis dari Sistem GuruPRO`;
           `Masa aktif langganan Anda akan berakhir pada ${expiryDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}. Segera perpanjang di menu Billing.`,
           urgencyLevel === "critical" ? "subscription_expiry_critical" : "subscription_expiry_warning",
           "subscription",
-          null
+          undefined
         );
 
         // Update last_expiry_warning_sent
@@ -242,7 +242,7 @@ Pesan otomatis dari Sistem GuruPRO`;
           `Masa tenggang Anda akan berakhir pada ${graceEndDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}. Segera perpanjang atau akun akan dinonaktifkan!`,
           "grace_period_critical",
           "subscription",
-          null
+          undefined
         );
 
         await query(
@@ -323,7 +323,7 @@ Pesan otomatis dari Sistem GuruPRO`;
           `Sisa poin Anda: ${totalPoin}. ${isCritical ? 'Segera top-up untuk melanjutkan aktivitas.' : 'Pertimbangkan untuk top-up.'}`,
           isCritical ? "token_critical" : "token_low",
           "token_balance",
-          null
+          undefined
         );
 
         await query(

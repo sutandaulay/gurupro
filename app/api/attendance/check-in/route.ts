@@ -140,14 +140,18 @@ export async function POST(req: Request) {
 
       const rawInstitution = instResult.rows[0];
       const institution = formatInstitution(rawInstitution)!;
-      institutionLocation = institution.location;
+      const instLocation: { latitude: number; longitude: number } | null = institution.location;
+      if (!instLocation) {
+        return NextResponse.json({ error: 'Lokasi institusi tidak ditemukan' }, { status: 400 });
+      }
+      institutionLocation = instLocation;
       attendanceSettings = institution.attendanceSettings;
 
       distance = calculateDistance(
         latitude,
         longitude,
-        institutionLocation.latitude,
-        institutionLocation.longitude
+        instLocation.latitude,
+        instLocation.longitude
       );
       refId = validatedData.assignmentId || institutionId;
     } else {

@@ -6,13 +6,9 @@ export async function GET(req: NextRequest) {
   try {
     const payload = await getPayloadClient({ config });
     
-    // Ambil token dari header Authorization
-    const authHeader = req.headers.get('authorization');
-    const token = authHeader?.split(' ')[1]; // Bearer TOKEN
-    
     // Verifikasi session
-    const user = await payload.auth({ token });
-    
+    const { user } = await payload.auth({ headers: req.headers });
+
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }

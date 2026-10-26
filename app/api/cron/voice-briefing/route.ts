@@ -142,8 +142,14 @@ export async function GET(req: Request) {
   }
 }
 
+// web-push ships no TypeScript declarations, so the module shape is described here.
+interface WebPushClient {
+  setVapidDetails(subject: string, publicKey: string, privateKey: string): void;
+  sendNotification(subscription: unknown, payload?: string): Promise<unknown>;
+}
+
 async function sendPushNotification(subscription: any, payload: { title: string; body: string; data?: any }) {
-  const webpush = await import("web-push");
+  const webpush = (await import("web-push" as string)) as { default: WebPushClient };
   const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
   const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
   const vapidSubject = process.env.VAPID_SUBJECT || "mailto:admin@gurupro.id";

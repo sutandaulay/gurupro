@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Where } from "payload";
 import { getSession } from "@/lib/session";
 import { getPayload } from "@/lib/payload";
 import { COLLECTIONS } from "@/collections/config";
@@ -15,7 +16,7 @@ export async function GET(req: Request) {
 
     const payload = await getPayload();
 
-    const where: Record<string, unknown> = {
+    const where: Where = {
       teacherId: { equals: session.id },
     };
 

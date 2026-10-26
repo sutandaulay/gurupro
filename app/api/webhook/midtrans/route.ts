@@ -1,40 +1,49 @@
+/**
+ * Midtrans Webhook Handler
+ *
+ * Verifies the Midtrans SHA512 signature and delegates to the shared
+ * webhook processor in @/lib/webhook-utils.
+ *
+ * NOTE: This endpoint is a legacy path. The canonical endpoint is
+ * /api/webhook/payment which auto-detects the gateway. Prefer calling
+ * /api/webhook/payment directly.
+ *
+ * Signature verification:
+ *   - Computes SHA512(order_id + status_code + gross_amount + server_key)
+ *   - Compares against signature_key from payload or x-server-key header
+ *   - Server key source: MIDTRANS_SERVER_KEY env -> system_settings
+ *   - Also accepts direct x-server-key header match (no signature_key in payload)
+ */
+
 import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
-import { grantAddonPoin } from "@/src/services/poin-service";
-import { processSuccessPayment } from "@/lib/payments";
+import { verifyMidtransSignature, handleMidtransCallback } from "@/lib/webhook-utils";
+import { corsHeaders, handleCorsPreflight } from "@/lib/cors";
 
 export async function POST(req: Request) {
+  // --- CORS preflight ---
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+
+  const origin = req.headers.get("origin");
+
   try {
     const payload = await req.json().catch(() => ({}));
+    console.log("[MidtransWebhook] Received payload:", JSON.stringify(payload));
 
-    const orderId = payload?.order_id || payload?.transaction_details?.order_id || payload?.orderId;
-    const transactionStatus = payload?.transaction_status || payload?.transactionStatus || payload?.status;
-
-    if (!orderId) return NextResponse.json({ ok: true });
-
-    const txRes = await query("SELECT id, user_id, plan_id, status, amount FROM transactions WHERE external_id = $1", [orderId]);
-    if (txRes.rows.length === 0) return NextResponse.json({ ok: true });
-    const tx = txRes.rows[0];
-
-    if (tx.status === "PAID" || tx.status === "ACTIVATED") return NextResponse.json({ ok: true });
-
-    if (String(transactionStatus).toLowerCase() === "settlement" || String(transactionStatus).toLowerCase() === "capture" || String(transactionStatus).toLowerCase() === "success") {
-      if (tx.plan_id && tx.plan_id.startsWith("addon:")) {
-        await query("UPDATE transactions SET status = $1, updated_at = NOW() WHERE id = $2", ["PAID", tx.id]);
-        const addonId = tx.plan_id.split(":")[1];
-        const pkgRes = await query("SELECT poin_amount FROM addon_token_packages WHERE id = $1", [addonId]);
-        if (pkgRes.rows.length) {
-          const poinAmount = Number(pkgRes.rows[0].poin_amount || 0);
-          await grantAddonPoin(tx.user_id, poinAmount);
-        }
-      } else {
-        await processSuccessPayment(orderId, "MIDTRANS", Number(tx.amount), false);
-      }
+    // --- Signature verification ---
+    const sigError = await verifyMidtransSignature(req, payload);
+    if (sigError) {
+      const headers = { ...sigError.headers, ...corsHeaders(origin) };
+      return new NextResponse(sigError.body, { status: sigError.status, headers });
     }
 
-    return NextResponse.json({ ok: true });
+    // --- Delegate to shared handler ---
+    const response = await handleMidtransCallback(req);
+    const headers = { ...response.headers, ...corsHeaders(origin) };
+    return new NextResponse(response.body, { status: response.status, headers });
   } catch (err: any) {
-    console.error("Midtrans webhook error:", err);
-    return NextResponse.json({ error: err.message || "webhook error" }, { status: 500 });
+    console.error("[MidtransWebhook] Unexpected error:", err);
+    const headers = { ...corsHeaders(origin), "Content-Type": "application/json" };
+    return new NextResponse(JSON.stringify({ error: err.message || "webhook error" }), { status: 500, headers });
   }
 }

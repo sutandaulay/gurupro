@@ -273,7 +273,7 @@ export async function POST(req: Request) {
 async function performAntiFraudChecks(
   validatedData: any,
   ipAddress: string,
-  institutionId: string,
+  institutionId: string | undefined,
   distance: number,
   attendanceSettings: any
 ): Promise<{ trustScore: number, flagReasons: string[] }> {

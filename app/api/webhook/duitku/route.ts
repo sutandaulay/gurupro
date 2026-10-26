@@ -2,8 +2,14 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { getPaymentGatewayConfig } from "@/lib/settings";
 import { processSuccessPayment } from "@/lib/payments";
+import { corsHeaders, handleCorsPreflight } from "@/lib/cors";
 
 export async function POST(req: Request) {
+  // --- CORS preflight ---
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+  // --- End CORS preflight ---
+
   try {
     let body: any = {};
     const contentType = req.headers.get("content-type") || "";
@@ -29,7 +35,9 @@ export async function POST(req: Request) {
     } = body;
 
     if (!merchantCode || !amount || !merchantOrderId || !resultCode || !signature) {
-      return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
+      const origin = req.headers.get("origin");
+      const headers = { ...corsHeaders(origin), "Content-Type": "application/json" };
+      return new NextResponse(JSON.stringify({ error: "Invalid webhook payload" }), { status: 400, headers });
     }
 
     // 1. Get Duitku config to verify signature
@@ -46,7 +54,9 @@ export async function POST(req: Request) {
 
       if (calculatedSignature.toLowerCase() !== signature.toLowerCase()) {
         console.warn("[DUITKU WEBHOOK] Signature mismatch. Calculated:", calculatedSignature, "Received:", signature);
-        return NextResponse.json({ error: "Signature key mismatch" }, { status: 403 });
+        const origin = req.headers.get("origin");
+        const headers = { ...corsHeaders(origin), "Content-Type": "application/json" };
+        return new NextResponse(JSON.stringify({ error: "Signature key mismatch" }), { status: 403, headers });
       }
     }
 
@@ -54,16 +64,31 @@ export async function POST(req: Request) {
     if (resultCode === "00") {
       const result = await processSuccessPayment(merchantOrderId, `DUITKU-${paymentCode.toUpperCase()}`, Number(amount));
       if (!result.success) {
-        return NextResponse.json({ error: result.error }, { status: 500 });
+        const origin = req.headers.get("origin");
+        const headers = { ...corsHeaders(origin), "Content-Type": "application/json" };
+        return new NextResponse(JSON.stringify({ error: result.error }), { status: 500, headers });
       }
-      
-      // Duitku expects a plain response of "OK" or similar. We can return it directly or with headers.
-      return new NextResponse("OK", { status: 200, headers: { "Content-Type": "text/plain" } });
+
+      // Duitku typically expects a plain "OK" response.
+      // Attach CORS headers so browser-based testing works.
+      const origin = req.headers.get("origin");
+      const headers = {
+        ...corsHeaders(origin),
+        "Content-Type": "text/plain",
+      };
+      return new NextResponse("OK", { status: 200, headers });
     }
 
-    return new NextResponse("NOT_OK", { status: 200, headers: { "Content-Type": "text/plain" } });
+    const origin = req.headers.get("origin");
+    const headers = {
+      ...corsHeaders(origin),
+      "Content-Type": "text/plain",
+    };
+    return new NextResponse("NOT_OK", { status: 200, headers });
   } catch (error: any) {
     console.error("Duitku webhook error:", error);
-    return NextResponse.json({ error: error.message || "Webhook processing error" }, { status: 500 });
+    const origin = req.headers.get("origin");
+    const headers = { ...corsHeaders(origin), "Content-Type": "application/json" };
+    return new NextResponse(JSON.stringify({ error: error.message || "Webhook processing error" }), { status: 500, headers });
   }
 }

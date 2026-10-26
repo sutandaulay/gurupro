@@ -32,7 +32,7 @@ const LeaveRequestSchema = z.object({
   reason: z.string().min(10, { message: 'Alasan harus diisi minimal 10 karakter' }),
   attachmentUrl: z.string().url().optional().nullable(),
   school_id: z.string().uuid().optional().nullable(),
-  institution_id: z.string().uuid().optional().nullable(),
+  institution_id: z.coerce.number().int().positive().optional().nullable(),
 });
 
 export async function POST(req: Request) {
@@ -65,8 +65,8 @@ export async function POST(req: Request) {
 
     // Cek konflik tanggal
     for (const req of conflictingRequests) {
-      const reqStart = parseISO(req.startDate);
-      const reqEnd = parseISO(req.endDate);
+      const reqStart = new Date(req.startDate);
+      const reqEnd = new Date(req.endDate);
       
       // Cek apakah rentang tanggal tumpang tindih
       if (
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
     let teacherSchoolId = null;
     
     if (validatedData.institution_id) {
-      teacherInstitutionId = parseInt(validatedData.institution_id, 10);
+      teacherInstitutionId = validatedData.institution_id;
     } else if (validatedData.school_id) {
       // Untuk guru mandiri, gunakan school_id
       teacherSchoolId = validatedData.school_id;
@@ -115,8 +115,8 @@ export async function POST(req: Request) {
           LIMIT 1
         `, [session.id]);
         
-        if (assignmentResult.length > 0) {
-          teacherInstitutionId = assignmentResult[0].institutionId;
+        if (assignmentResult.rows.length > 0) {
+          teacherInstitutionId = assignmentResult.rows[0].institutionId;
         }
       }
     }
@@ -154,7 +154,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { 
           error: 'Validasi input gagal', 
-          details: error.errors 
+          details: error.issues 
         }, 
         { status: 400 }
       );

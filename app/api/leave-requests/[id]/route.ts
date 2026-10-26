@@ -10,7 +10,7 @@ import {
 } from '@/lib/schemas/attendance';
 import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
-import { parseISO, eachDayOfInterval, format, startOfDay } from 'date-fns';
+import { eachDayOfInterval, format, startOfDay } from 'date-fns';
 import { suggestSubstitutes } from '@/lib/substitute-suggestion';
 import { sendWhatsAppNotification } from '@/lib/notifications';
 import { getSessionFromCookieHeader } from '@/lib/session-sign';
@@ -118,8 +118,8 @@ export async function PATCH(
           const suggestions = await suggestSubstitutes(
             Number(existingRequest.institutionId),
             existingRequest.teacherId,
-            existingRequest.startDate,
-            existingRequest.endDate
+            format(existingRequest.startDate, 'yyyy-MM-dd'),
+            format(existingRequest.endDate, 'yyyy-MM-dd')
           );
 
           // Cari RPP/Modul Ajar terbaru guru yang izin untuk di-share ke pengganti
@@ -164,7 +164,7 @@ export async function PATCH(
       return NextResponse.json(
         { 
           error: 'Validasi input gagal', 
-          details: error.errors 
+          details: error.issues 
         }, 
         { status: 400 }
       );
@@ -180,13 +180,13 @@ export async function PATCH(
 // Fungsi untuk update attendance summary ketika izin disetujui
 async function updateAttendanceSummaryForApprovedLeave(
   teacherId: string,
-  institutionId: string,
-  startDate: string,
-  endDate: string,
+  institutionId: number,
+  startDate: Date,
+  endDate: Date,
   leaveType: string
 ) {
-  const start = parseISO(startDate);
-  const end = parseISO(endDate);
+  const start = startOfDay(new Date(startDate));
+  const end = startOfDay(new Date(endDate));
   
   // Dapatkan semua tanggal dalam rentang izin
   const dates = eachDayOfInterval({ start, end });
@@ -279,7 +279,7 @@ export async function GET(
       return NextResponse.json(
         { 
           error: 'Validasi input gagal', 
-          details: error.errors 
+          details: error.issues 
         }, 
         { status: 400 }
       );

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { performLogin } from '@/lib/auth-login';
+import { LoginBodySchema } from '@/lib/validation/schemas';
 
 const REDIRECT_STATUS = 303;
 
@@ -25,16 +26,15 @@ export async function POST(request: Request) {
 
   loginId = loginId.trim().toLowerCase();
 
-  if (!loginId || !password) {
-    const errorMsg = 'Email/Username dan Password wajib diisi!';
-    if (isAjax) {
-      return NextResponse.json({ success: false, error: errorMsg }, { status: 400 });
-    }
-    return NextResponse.redirect(new URL('/login?error=' + encodeURIComponent(errorMsg), request.url), REDIRECT_STATUS);
-  }
+  // Zod-validated input
+  const { identifier, password: validatedPassword, checkout_plan } = LoginBodySchema.parse({
+    identifier: loginId,
+    password,
+    checkout_plan: checkoutPlan,
+  });
 
   try {
-    const result = await performLogin({ loginId, password, checkoutPlan });
+    const result = await performLogin({ loginId: identifier, password: validatedPassword, checkoutPlan: checkout_plan });
 
     if (result.requiresOtp && result.userId) {
       if (isAjax) {

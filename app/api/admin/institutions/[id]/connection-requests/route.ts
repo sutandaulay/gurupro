@@ -1,7 +1,11 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getPendingConnectionRequestsByInstitution } from '@/lib/institution-members';
+import {
+  getPendingConnectionRequestsByInstitution,
+  approveConnectionRequest,
+  rejectConnectionRequest,
+} from '@/lib/institution-members';
 import { sendInAppNotification } from '@/lib/institution-members';
 import { sendWhatsAppNotification, sendEmailNotification } from '@/lib/notifications';
 import { parseSessionCookie } from '@/lib/session-sign';

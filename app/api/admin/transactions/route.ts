@@ -433,6 +433,15 @@ export async function POST(req: Request) {
       );
       const pgConfig = pgConfigRes.rows[0]?.value || {};
       const gateway = pgConfig.default_gateway || "mock";
+
+      // Fail-fast: mock mode in production means payments won't process
+      if (process.env.NODE_ENV === "production" && gateway === "mock") {
+        return NextResponse.json(
+          { error: "Konfigurasi pembayaran belum lengkap. Hubungi administrator." },
+          { status: 503 }
+        );
+      }
+
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
       let invoiceUrl = `${appUrl}/api/checkout/mock?invoice_id=${transaction.id}&amount=${transaction.amount}&userId=${transaction.user_id}&plan=${transaction.plan_id}`;

@@ -161,8 +161,8 @@ export async function GET(req: Request) {
       .where(and(
         eq(teacherAttendance.userId, targetTeacherId),
         inArray(teacherAttendance.schoolId, schoolIds),
-        gte(teacherAttendance.tanggal, startDate),
-        lte(teacherAttendance.tanggal, endDate),
+        gte(teacherAttendance.tanggal, format(startDate, 'yyyy-MM-dd')),
+        lte(teacherAttendance.tanggal, format(endDate, 'yyyy-MM-dd')),
         eq(teacherAttendance.status, 'hadir')
       ));
     }

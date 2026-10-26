@@ -118,7 +118,7 @@ export async function POST(req: Request) {
       `SELECT nama_lengkap FROM users WHERE id = $1`,
       [session.id]
     );
-    const ksNama = ksRes.rows[0]?.nama_lengkap || session.nama || 'KS';
+    const ksNama = ksRes.rows[0]?.nama_lengkap || 'KS';
 
     // Get guru nama
     let finalGuruNama = guruNama || 'Guru';

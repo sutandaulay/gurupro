@@ -38,7 +38,7 @@ export async function GET(req: Request) {
       headers: {
         'Content-Type': file.mime_type || 'application/octet-stream',
         'Content-Disposition': `attachment; filename="${file.name}"`,
-        'Content-Length': String(body.length),
+        'Content-Length': String(bytes.length),
       },
     })
   } catch (err: any) {

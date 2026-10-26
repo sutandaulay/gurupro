@@ -1,7 +1,7 @@
 import { generateAIContentWithUsage } from "@/lib/ai";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { getUserPoinAccess } from "@/src/services/poin-service";
+import { getUserPoinAccess, logFailedPoinUsage } from "@/src/services/poin-service";
 import { deductPoinFromAIResult } from "@/src/lib/ai-usage";
 import { enforceMarkdownLimits } from "@/lib/ai/limits";
 

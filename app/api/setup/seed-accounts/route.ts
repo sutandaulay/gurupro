@@ -1,4 +1,4 @@
-import { NextResponse } from 'next-response'
+import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 
 // =====================================================
@@ -126,10 +126,10 @@ export async function POST(req: Request) {
       }
 
       results.push({
+        ...result,
         email: acc.email,
         password: acc.password,
         role: acc.role,
-        ...result,
       })
     }
 

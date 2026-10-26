@@ -1,44 +1,38 @@
+/**
+ * Xendit Webhook Handler
+ *
+ * Verifies the Xendit callback token and delegates to the shared
+ * webhook processor in @/lib/webhook-utils.
+ *
+ * NOTE: This endpoint is a legacy path. The canonical endpoint is
+ * /api/webhook/payment which auto-detects the gateway. Prefer calling
+ * /api/webhook/payment directly.
+ *
+ * Signature verification:
+ *   Priority: XENDIT_WEBHOOK_TOKEN env var -> system_settings payment_gateway.xendit.verification_token
+ *   Uses timing-safe comparison to prevent timing attacks.
+ */
+
 import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
-import { grantAddonPoin } from "@/src/services/poin-service";
-import { processSuccessPayment } from "@/lib/payments";
+import { verifyXenditSignature, handleXenditCallback } from "@/lib/webhook-utils";
+import { corsHeaders, handleCorsPreflight } from "@/lib/cors";
 
 export async function POST(req: Request) {
-  try {
-    const body = await req.text();
-    let payload: any = {};
-    try { payload = JSON.parse(body); } catch (e) { payload = {}; }
+  // --- CORS preflight ---
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
 
-    const status = payload?.status || payload?.data?.status;
-    const externalId = payload?.external_id || payload?.data?.external_id || payload?.data?.id;
+  const origin = req.headers.get("origin");
 
-    if (!externalId) {
-      return NextResponse.json({ ok: true });
-    }
-
-    const txRes = await query("SELECT id, user_id, plan_id, status, amount FROM transactions WHERE external_id = $1", [externalId]);
-    if (txRes.rows.length === 0) return NextResponse.json({ ok: true });
-    const tx = txRes.rows[0];
-
-    if (tx.status === "PAID" || tx.status === "ACTIVATED") return NextResponse.json({ ok: true });
-
-    if (String(status).toLowerCase() === "paid" || String(status).toLowerCase() === "settled") {
-      if (tx.plan_id && tx.plan_id.startsWith("addon:")) {
-        await query("UPDATE transactions SET status = $1, updated_at = NOW() WHERE id = $2", ["PAID", tx.id]);
-        const addonId = tx.plan_id.split(":")[1];
-        const pkgRes = await query("SELECT poin_amount FROM addon_token_packages WHERE id = $1", [addonId]);
-        if (pkgRes.rows.length) {
-          const poinAmount = Number(pkgRes.rows[0].poin_amount || 0);
-          await grantAddonPoin(tx.user_id, poinAmount);
-        }
-      } else {
-        await processSuccessPayment(externalId, "XENDIT", Number(tx.amount), false);
-      }
-    }
-
-    return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    console.error("Xendit webhook error:", err);
-    return NextResponse.json({ error: err.message || "webhook error" }, { status: 500 });
+  // --- Signature verification ---
+  const sigError = await verifyXenditSignature(req);
+  if (sigError) {
+    const headers = { ...sigError.headers, ...corsHeaders(origin) };
+    return new NextResponse(sigError.body, { status: sigError.status, headers });
   }
+
+  // --- Delegate to shared handler ---
+  const response = await handleXenditCallback(req);
+  const headers = { ...response.headers, ...corsHeaders(origin) };
+  return new NextResponse(response.body, { status: response.status, headers });
 }

@@ -16,6 +16,8 @@ import {
 } from '@/lib/export/document-shared';
 
 interface SiswaData {
+  id: string;
+  kelas_id: string;
   nama_siswa: string;
   nisn?: string;
   nis_lokal?: string;

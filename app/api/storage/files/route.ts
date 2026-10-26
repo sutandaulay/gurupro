@@ -3,24 +3,99 @@ import { query } from '@/lib/db'
 import { requireSession } from '@/lib/session'
 import { uploadToR2WithKey, deleteFromR2 } from '@/lib/r2'
 import { parsePagination, wrapResponse } from '@/lib/pagination'
+import { StorageListQuerySchema, StorageRenameBodySchema, StorageRenameQuerySchema, StorageDeleteQuerySchema } from '@/lib/validation/schemas'
 
-const MAX_SIZE = 2 * 1024 * 1024
+const MAX_SIZE = 50 * 1024 * 1024 // 50MB
+
+// Allowed MIME types for upload
+const ALLOWED_MIME_TYPES = [
+  // Documents
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/zip',
+  'application/x-zip-compressed',
+  // Images
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/svg+xml',
+  // Text
+  'text/plain',
+  'text/csv',
+  // Audio/Video
+  'audio/mpeg',
+  'audio/wav',
+  'video/mp4',
+  'video/quicktime',
+]
+
+// MIME types that are always blocked regardless of extension
+const BLOCKED_MIME_TYPES = [
+  'text/html',
+  'application/javascript',
+  'application/x-javascript',
+  'text/javascript',
+  'application/x-msdownload',
+  'application/x-sh',
+  'application/x-shockwave-flash',
+]
+
+// Extension-to-MIME mapping for cross-validation
+const EXT_TO_MIME: Record<string, string> = {
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  zip: 'application/zip',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+}
+
+// Extensions that are always blocked
+const DANGEROUS_EXTENSIONS = [
+  'html', 'htm', 'js', 'jsx', 'ts', 'tsx', 'php', 'asp', 'aspx',
+  'exe', 'sh', 'bat', 'cmd', 'jar', 'msi', 'dll', 'so',
+  'svg', // svg allowed only via content-scan later; blocked by default here
+]
 
 export async function GET(req: Request) {
   try {
     const session = await requireSession()
     const { searchParams } = new URL(req.url)
-    const folderId = searchParams.get('folder_id')
+
+    // Zod-validated query params
+    const { folder_id } = StorageListQuerySchema.parse(
+      Object.fromEntries(searchParams.entries())
+    )
 
     let whereClause = 'user_id = $1'
     const params: (string | null)[] = [session.id]
     let paramIndex = 2
 
-    if (folderId === 'null' || folderId === '') {
+    if (folder_id === 'null' || folder_id === '') {
       whereClause += ` AND folder_id IS NULL`
-    } else if (folderId) {
+    } else if (folder_id) {
       whereClause += ` AND folder_id = $${paramIndex}`
-      params.push(folderId)
+      params.push(folder_id)
       paramIndex++
     }
 
@@ -62,6 +137,31 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'File wajib diupload' }, { status: 400 })
     }
 
+    // --- Server-side MIME type & extension validation ---
+    const ext = file.name.split('.').pop()?.toLowerCase() || ''
+
+    // 1. Block dangerous extensions first (these are never allowed)
+    if (DANGEROUS_EXTENSIONS.includes(ext)) {
+      return NextResponse.json({ error: 'Tipe file tidak diizinkan' }, { status: 400 })
+    }
+
+    // 2. Block blocked MIME types (regardless of extension)
+    if (BLOCKED_MIME_TYPES.includes(file.type)) {
+      return NextResponse.json({ error: 'Tipe file tidak diizinkan' }, { status: 400 })
+    }
+
+    // 3. Whitelist MIME type check
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      return NextResponse.json({ error: 'Tipe file tidak diizinkan' }, { status: 400 })
+    }
+
+    // 4. Cross-validate extension against MIME type (defense in depth)
+    const expectedMime = EXT_TO_MIME[ext]
+    if (expectedMime && expectedMime !== file.type) {
+      return NextResponse.json({ error: 'Ekstensi file tidak cocok dengan tipe file' }, { status: 400 })
+    }
+    // --- End validation ---
+
     if (file.size > MAX_SIZE) {
       return NextResponse.json({ error: 'Ukuran file maksimal 50MB' }, { status: 400 })
     }
@@ -99,16 +199,13 @@ export async function PUT(req: Request) {
   try {
     const session = await requireSession()
     const { searchParams } = new URL(req.url)
-    const id = searchParams.get('id')
     const body = await req.json()
-    const { name } = body
 
-    if (!id) {
-      return NextResponse.json({ error: 'ID file wajib diisi' }, { status: 400 })
-    }
-    if (!name || !name.trim()) {
-      return NextResponse.json({ error: 'Nama file wajib diisi' }, { status: 400 })
-    }
+    // Zod-validated params and body
+    const { id } = StorageRenameQuerySchema.parse(
+      Object.fromEntries(searchParams.entries())
+    )
+    const { name } = StorageRenameBodySchema.parse(body)
 
     const result = await query(
       `UPDATE user_files SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND user_id = $3 RETURNING *`,
@@ -133,11 +230,11 @@ export async function DELETE(req: Request) {
   try {
     const session = await requireSession()
     const { searchParams } = new URL(req.url)
-    const id = searchParams.get('id')
 
-    if (!id) {
-      return NextResponse.json({ error: 'ID file wajib diisi' }, { status: 400 })
-    }
+    // Zod-validated query param
+    const { id } = StorageDeleteQuerySchema.parse(
+      Object.fromEntries(searchParams.entries())
+    )
 
     const file = await query(
       `SELECT * FROM user_files WHERE id = $1 AND user_id = $2`,
@@ -149,12 +246,13 @@ export async function DELETE(req: Request) {
     }
 
     const fileData = file.rows[0]
-    await deleteFromR2(fileData.r2_key)
-
+    // Delete DB record first, then remove R2 file
     await query(
       `DELETE FROM user_files WHERE id = $1 AND user_id = $2`,
       [id, session.id]
     )
+
+    await deleteFromR2(fileData.r2_key)
 
     return NextResponse.json({ message: 'File berhasil dihapus' })
   } catch (err: any) {

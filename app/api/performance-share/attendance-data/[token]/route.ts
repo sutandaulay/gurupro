@@ -6,8 +6,9 @@ import {
   attendanceSummary,
   institutions as institutionsTable,
 } from '@/lib/schemas/attendance';
-import { eq, and, gte, lte, inArray } from 'drizzle-orm';
+import { eq, and, gte, lte, inArray, desc } from 'drizzle-orm';
 import { parseISO, startOfWeek, endOfWeek, format, eachDayOfInterval } from 'date-fns';
+import { id as localeID } from 'date-fns/locale';
 import { attendanceInsights } from '@/lib/schemas/attendance-insight';
 
 export async function GET(
@@ -159,7 +160,7 @@ export async function GET(
         eq(attendanceInsights.periodStart, startDate),
         eq(attendanceInsights.periodEnd, endDate)
       ))
-      .orderBy(attendanceInsights.createdAt.desc())
+      .orderBy(desc(attendanceInsights.createdAt))
       .limit(1);
 
     // Format nama institusi
@@ -185,7 +186,7 @@ export async function GET(
       if (dayRecords.length === 0) {
         return {
           date: day.toISOString(),
-          dayName: format(day, 'EEEE', { locale: { code: 'id' } }),
+          dayName: format(day, 'EEEE', { locale: localeID }),
           attendanceStatus: 'libur',
           teachingMinutes: 0,
           sessions: 0,
@@ -196,7 +197,7 @@ export async function GET(
       const dayRecord = dayRecords[0]; // Ambil record pertama untuk hari itu
       return {
         date: day.toISOString(),
-        dayName: format(day, 'EEEE', { locale: { code: 'id' } }),
+        dayName: format(day, 'EEEE', { locale: localeID }),
         attendanceStatus: dayRecord.attendanceStatus,
         teachingMinutes: Number(dayRecord.teachingMinutesTotal),
         sessions: Number(dayRecord.teachingSessionsCompleted),

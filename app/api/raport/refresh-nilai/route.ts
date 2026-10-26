@@ -76,7 +76,7 @@ export async function POST(req: Request) {
       paramsPeriode
     ) : { rows: [] };
 
-    const asesmenByMapel = new Map();
+    const asesmenByMapel = new Map<string, any[]>();
     for (const row of assessmentsRes.rows) {
       const list = asesmenByMapel.get(row.subject_id);
       if (list) { list.push(row); } else { asesmenByMapel.set(row.subject_id, [row]); }

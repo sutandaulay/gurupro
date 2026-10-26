@@ -92,7 +92,7 @@ export async function POST(
     const newOtpHash = hashOtp(newOtp);
     const expiresAt = getOtpExpiryDate();
 
-    await payload.updateMany({
+    await payload.update({
       collection: COLLECTIONS.OTP_VERIFICATIONS,
       where: {
         performanceShareLinkId: { equals: linkId },

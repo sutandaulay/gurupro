@@ -44,6 +44,22 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const userId = await getUserId();
+    const {
+      id,
+      nama_sekolah,
+      logo,
+      alamat,
+      npsn,
+      nama_kepala_sekolah,
+      nama_pengawas,
+      nip_kepala_sekolah,
+      nip_pengawas,
+      nama_wali_kelas,
+      nip_wali_kelas,
+      show_ttd_kepala,
+      show_ttd_pengawas,
+      show_ttd_wali
+    } = await req.json();
     // Skip requireActiveTahunAjaran when creating the FIRST school for a user
     // (new individual teachers have no tahun ajaran yet — we create one below).
     // Subsequent school creations still require active tahun ajaran.
@@ -62,22 +78,6 @@ export async function POST(req: Request) {
         );
       }
     }
-    const { 
-      id, 
-      nama_sekolah, 
-      logo, 
-      alamat, 
-      npsn, 
-      nama_kepala_sekolah, 
-      nama_pengawas,
-      nip_kepala_sekolah,
-      nip_pengawas,
-      nama_wali_kelas,
-      nip_wali_kelas,
-      show_ttd_kepala,
-      show_ttd_pengawas,
-      show_ttd_wali
-    } = await req.json();
 
     if (!nama_sekolah) {
       return NextResponse.json({ error: "Nama sekolah wajib diisi" }, { status: 400 });

@@ -93,6 +93,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const semester = getSemesterDariTanggal(downloadDate)
     const semesterLabel = semester === 'ganjil' ? 'Ganjil' : 'Genap'
     const guruSignatureUrl = laporan.guru_signature_url || null
+    const guruNama = content?.identitas?.nama || laporan.nama_lengkap || '-'
+    const guruNip = content?.identitas?.nip || laporan.nip || ''
 
     const html = generateHTMLContent(laporan, content, sekolah, schoolInfo, guruId, tahunAjaran, semesterLabel, downloadDate, guruSignatureUrl)
 
@@ -127,7 +129,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
       const filename = `LaporanKinerja_${(laporan.nama_lengkap || 'Guru').replace(/\s+/g, '_')}_${semesterLabel}_${tahunAjaran.replace('/', '-')}.pdf`
 
-      return new Response(pdfBuffer, {
+      return new Response(new Uint8Array(pdfBuffer), {
         headers: {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `attachment; filename="${filename}"`,

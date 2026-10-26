@@ -165,7 +165,7 @@ export async function GET() {
         return NextResponse.json({ error: "Sesi tidak aktif. Silakan login." }, { status: 401 });
       }
 
-      const profileData = await fetchProfileData(newSession.id, oauthImage);
+      const profileData = await fetchProfileData(newSession.id, oauthImage ?? null);
       if (!profileData) {
         return NextResponse.json({ error: "Sesi tidak aktif. Silakan login." }, { status: 401 });
       }
@@ -263,7 +263,7 @@ export async function PUT(req: Request) {
     const { nama_lengkap, username, bank_name, bank_account_number, bank_account_name, whatsapp, nip, notification_tone, morning_briefing_enabled, weekly_recap_enabled, timezone } = profileData;
 
     const sets: string[] = [];
-    const values: (string | null)[] = [];
+    const values: (string | null | boolean)[] = [];
     let idx = 1;
 
     if (nama_lengkap !== undefined) {

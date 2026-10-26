@@ -5,9 +5,10 @@ import { getPaymentGatewayConfig } from "@/lib/settings";
 import { grantUserPoin } from "@/src/services/poin-service";
 import { cookies } from "next/headers";
 import { parseSessionCookie } from "@/lib/session-sign";
+import { CheckoutBodySchema, UUID_REGEX } from "@/lib/validation/schemas";
 
 function isUUID(str: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+  return UUID_REGEX.test(str);
 }
 
 function parsePrice(val: any): number {
@@ -17,20 +18,17 @@ function parsePrice(val: any): number {
 
 export async function POST(req: Request) {
   try {
-    let { plan, userId, packageId } = await req.json();
-
-    if (!userId) {
-      // Fallback: try to resolve userId from active cookie session
+    let body = await req.json();
+    // Resolve userId from session cookie when not provided in body
+    if (!body.userId) {
       const session = parseSessionCookie((await cookies()).get("gurupro_session")?.value);
-      if (session) {
-        userId = session.id;
-      }
+      if (session) body = { ...body, userId: session.id };
     }
-
-    if (!userId || !plan) {
-      return NextResponse.json({ error: "Data user dan paket wajib diisi!" }, { status: 400 });
+    // Zod validation — plan is required, userId required after cookie resolution
+    const { plan, userId, packageId } = CheckoutBodySchema.parse(body);
+    if (!userId) {
+      return NextResponse.json({ error: "User tidak ditemukan!" }, { status: 404 });
     }
-
     // 1. Get user data
     const userRes = await query("SELECT id, email, whatsapp, nama_lengkap, status_langganan, subscription_end FROM users WHERE id = $1", [userId]);
     if (userRes.rows.length === 0) {
@@ -49,6 +47,9 @@ export async function POST(req: Request) {
 
     if (plan === "addon") {
       isAddonPackage = true;
+      if (!packageId || !isUUID(packageId)) {
+        return NextResponse.json({ error: "ID paket tidak valid!" }, { status: 400 });
+      }
       const packageRes = await query("SELECT * FROM addon_token_packages WHERE id = $1 AND is_active = true", [packageId]);
       if (packageRes.rows.length === 0) {
         return NextResponse.json({ error: "Paket token tambahan tidak ditemukan atau tidak aktif!" }, { status: 404 });
@@ -109,6 +110,14 @@ export async function POST(req: Request) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
       const pgConfig = await getPaymentGatewayConfig();
       const gateway = pgConfig.default_gateway || "mock";
+
+      // Fail-fast: mock mode in production means payments won't process
+      if (process.env.NODE_ENV === "production" && gateway === "mock") {
+        return NextResponse.json(
+          { error: "Konfigurasi pembayaran belum lengkap. Hubungi administrator." },
+          { status: 503 }
+        );
+      }
 
       let checkoutUrl = "";
       let processedGateway = "MOCK";
@@ -220,6 +229,14 @@ export async function POST(req: Request) {
 
     const pgConfig = await getPaymentGatewayConfig();
     const gateway = pgConfig.default_gateway || "mock";
+
+    // Fail-fast: mock mode in production means payments won't process
+    if (process.env.NODE_ENV === "production" && gateway === "mock") {
+      return NextResponse.json(
+        { error: "Konfigurasi pembayaran belum lengkap. Hubungi administrator." },
+        { status: 503 }
+      );
+    }
 
     let checkoutUrl = "";
     let processedGateway = "MOCK";
