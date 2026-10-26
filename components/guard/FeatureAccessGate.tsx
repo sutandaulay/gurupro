@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { useMenuVisibility } from "@/hooks/useMenuVisibility";
 import { getHiddenFeatureHrefs, normalizeCurrentPath } from "@/lib/menuConfig";
 
@@ -17,13 +17,19 @@ export default function FeatureAccessGate({
 }) {
   const { hiddenSet, isLoading } = useMenuVisibility();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+
+  // useSearchParams() memaksa halaman keluar dari static prerender, jadi query
+  // string diambil dari window.location agar guard tetap client-side.
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    setSearch(window.location.search);
+  }, [pathname]);
 
   const blocked = useMemo(() => {
     if (isLoading || hiddenSet.size === 0) return false;
     const hiddenRoutes = getHiddenFeatureHrefs(Array.from(hiddenSet));
-    return hiddenRoutes.has(normalizeCurrentPath(pathname, searchParams));
-  }, [hiddenSet, isLoading, pathname, searchParams]);
+    return hiddenRoutes.has(normalizeCurrentPath(pathname, new URLSearchParams(search)));
+  }, [hiddenSet, isLoading, pathname, search]);
 
   if (blocked) {
     return (
