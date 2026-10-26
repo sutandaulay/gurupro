@@ -5,6 +5,7 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   {
+    files: ["**/*.{js,jsx,mjs,ts,tsx,mts,cts}"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "react-hooks/set-state-in-effect": "warn",
@@ -20,9 +21,14 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".next_*/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Stale build output and agent worktrees — not app source.
+    ".kilo/**",
+    ".worktrees/**",
+    "node_modules/**",
   ]),
 ]);
 

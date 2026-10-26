@@ -1,0 +1,295 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Job 1: Lint + Type Check
+  # ──────────────────────────────────────────────
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+  # ──────────────────────────────────────────────
+  # Job 2: Unit Tests (Vitest)
+  # ──────────────────────────────────────────────
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: gurupro_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_USER: testuser
+      DB_PASSWORD: testpass
+      DB_HOST: localhost
+      DB_NAME: gurupro_test
+      DB_PORT: 5432
+      NODE_ENV: test
+      SESSION_SECRET: test-session-secret-for-ci-only
+      # Mock external services
+      MIDTRANS_SERVER_KEY: test_key
+      XENDIT_WEBHOOK_TOKEN: test_token
+      CLOUDFLARE_R2_ACCOUNT_ID: test_r2
+      CLOUDFLARE_R2_ACCESS_KEY_ID: test_key
+      CLOUDFLARE_R2_SECRET_ACCESS_KEY: test_secret
+      CLOUDFLARE_R2_BUCKET_NAME: test-bucket
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Vitest unit tests
+        run: npm run test -- --reporter=verbose
+        timeout-minutes: 10
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-results
+          path: playwright-results.json
+          retention-days: 7
+
+  # ──────────────────────────────────────────────
+  # Job 3: Build
+  # ──────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: lint
+    env:
+      NODE_ENV: production
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build Next.js
+        run: npm run build
+        timeout-minutes: 15
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextjs-build
+          path: .next
+          retention-days: 1
+
+  # ──────────────────────────────────────────────
+  # Job 4: E2E Tests (Playwright) — triggered on PR to main/develop
+  # ──────────────────────────────────────────────
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: gurupro_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_USER: testuser
+      DB_PASSWORD: testpass
+      DB_HOST: localhost
+      DB_NAME: gurupro_test
+      DB_PORT: 5432
+      NODE_ENV: test
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+      BASE_URL: http://localhost:3000
+      TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+      MIDTRANS_SERVER_KEY: test_key
+      MIDTRANS_CLIENT_KEY: test_client_key
+      XENDIT_WEBHOOK_TOKEN: test_token
+      CLOUDFLARE_R2_ACCOUNT_ID: test_r2
+      CLOUDFLARE_R2_ACCESS_KEY_ID: test_key
+      CLOUDFLARE_R2_SECRET_ACCESS_KEY: test_secret
+      CLOUDFLARE_R2_BUCKET_NAME: test-bucket
+      AI_VENDOR: mock
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build
+          path: .next
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        run: npx playwright test
+        timeout-minutes: 30
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload Playwright trace
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-trace
+          path: playwright-traces/
+          retention-days: 14
+
+  # ──────────────────────────────────────────────
+  # Job 5: Security Audit
+  # ──────────────────────────────────────────────
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    needs: lint
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Check for exposed secrets
+        run: npx detect-secrets scan --baseline .secrets.baseline
+        continue-on-error: true
+
+  # ──────────────────────────────────────────────
+  # Job 6: Deploy to Vercel (Preview) — on PR
+  # ──────────────────────────────────────────────
+  deploy-preview:
+    name: Deploy Preview
+    runs-on: ubuntu-latest
+    needs: [build, test-unit]
+    if: github.event_name == 'pull_request'
+    environment:
+      name: preview
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel (Preview)
+        id: deploy
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod=false'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # ──────────────────────────────────────────────
+  # Job 7: Deploy to Vercel (Production) — on push to main
+  # ──────────────────────────────────────────────
+  deploy-production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs: [build, test-unit, e2e]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://gurupro.id
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel (Production)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          github-token: ${{ secrets.GITHUB_TOKEN }}

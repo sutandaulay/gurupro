@@ -2,15 +2,7 @@ import { withSentryConfig } from '@sentry/nextjs';
 import { withPayload } from '@payloadcms/next/withPayload';
 import type { NextConfig } from 'next';
 
-const nextConfig: NextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  // Enable client-side instrumentation
-  experimental: {
-    instrumentClientUpgrades: true,
-  },
-};
+const nextConfig: NextConfig = {};
 
 const configWithSentry = withSentryConfig(
   withPayload(nextConfig),

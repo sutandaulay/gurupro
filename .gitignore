@@ -17,9 +17,14 @@
 /.next/
 /.next_old/
 /out/
+/.next_*/
 
 # production
 /build
+
+# agent tool worktrees (never part of the app)
+.kilo/
+.worktrees/
 
 # misc
 .DS_Store
@@ -55,3 +60,11 @@ nul
 
 # scratch / temp debug scripts
 scratch/
+
+# local artifacts from tooling / manual debugging
+cookies.txt
+playwright-results.json
+playwright-report/
+playwright-traces/
+build.log
+dev-server.log
