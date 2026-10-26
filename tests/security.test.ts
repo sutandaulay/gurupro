@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { interpolate } from '@/lib/notifications'
 
 // The Sentry SDK is heavy to import and irrelevant here — stub it so the
 // module registry reset below does not pay for loading the whole SDK.
@@ -175,18 +176,16 @@ describe('errorResponse sanitization (lib/api-error)', () => {
 })
 
 // ─── ReDoS-safe interpolation ──────────────────────────────────
+// Imported statically: a dynamic import here re-runs the module graph on
+// every call and can blow past the test timeout under parallel load.
 describe('interpolate ReDoS prevention (lib/notifications)', () => {
-  it('replaces placeholders with variable values', async () => {
-    const { interpolate } = await import('@/lib/notifications')
-
+  it('replaces placeholders with variable values', () => {
     const template = 'Halo {nama}, paket Anda adalah {paket}.'
     const result = interpolate(template, { nama: 'Budi', paket: 'Pro' })
     expect(result).toBe('Halo Budi, paket Anda adalah Pro.')
   })
 
-  it('escapes regex metacharacters in variable values without ReDoS', async () => {
-    const { interpolate } = await import('@/lib/notifications')
-
+  it('escapes regex metacharacters in variable values without ReDoS', () => {
     const dangerous = '.*+?^${}()|[]\\'
     const template = 'Nama: {name}'
     // Must complete quickly and escape the value
@@ -198,24 +197,19 @@ describe('interpolate ReDoS prevention (lib/notifications)', () => {
     expect(result).toBe('Nama: \\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\')
   })
 
-  it('replaces multiple occurrences of the same placeholder', async () => {
-    const { interpolate } = await import('@/lib/notifications')
-
+  it('replaces multiple occurrences of the same placeholder', () => {
     const template = '{x} said hi to {x}'
     const result = interpolate(template, { x: 'Alice' })
     expect(result).toBe('Alice said hi to Alice')
   })
 
-  it('skips undefined/null values gracefully', async () => {
-    const { interpolate } = await import('@/lib/notifications')
-
+  it('skips undefined/null values gracefully', () => {
     const template = 'User: {name}, Email: {email}'
     const result = interpolate(template, { name: 'Bob', email: undefined })
     expect(result).toBe('User: Bob, Email: ')
   })
 
-  it('handles empty template and empty variables', async () => {
-    const { interpolate } = await import('@/lib/notifications')
+  it('handles empty template and empty variables', () => {
 
     expect(interpolate('', {})).toBe('')
     expect(interpolate('no vars', {})).toBe('no vars')
