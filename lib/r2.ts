@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 
 const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID;
 const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY;
@@ -6,7 +6,7 @@ const endpoint = process.env.CLOUDFLARE_R2_ENDPOINT;
 const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME;
 const publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL;
 
-const isR2Configured = !!(accessKeyId && secretAccessKey && endpoint && bucketName && publicUrl);
+export const isR2Configured = !!(accessKeyId && secretAccessKey && endpoint && bucketName && publicUrl);
 
 const s3Client = isR2Configured
   ? new S3Client({
@@ -172,4 +172,48 @@ export function extractKeyFromUrl(url: string): string | null {
     return url.substring(prefix.length);
   }
   return null;
+}
+
+export interface R2Object {
+  Key: string;
+  Size: number;
+  LastModified?: Date;
+}
+
+export async function listR2Objects(prefix = ''): Promise<R2Object[]> {
+  if (!s3Client || !bucketName) {
+    return [];
+  }
+
+  const objects: R2Object[] = []
+  let continuationToken: string | undefined
+
+  try {
+    do {
+      const command = new ListObjectsV2Command({
+        Bucket: bucketName,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+      const response = await s3Client.send(command)
+
+      if (response.Contents) {
+        for (const obj of response.Contents) {
+          if (obj.Key) {
+            objects.push({
+              Key: obj.Key,
+              Size: obj.Size || 0,
+              LastModified: obj.LastModified,
+            })
+          }
+        }
+      }
+
+      continuationToken = response.NextContinuationToken
+    } while (continuationToken)
+  } catch (error) {
+    console.error('Failed to list R2 objects:', error)
+  }
+
+  return objects
 }

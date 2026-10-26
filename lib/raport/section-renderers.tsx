@@ -2,6 +2,8 @@
 // The actual document export uses lib/export/teaching-report.ts and app/api/raport/download/route.ts
 // which generate proper print-ready DOCX with kop sekolah, signature blocks, and page numbers.
 
+import type { LayoutSection, VarianTampilan } from './schemas';
+
 // =============================================
 // DUMMY DATA — only for preview in builder
 // NEVER linked to real student data

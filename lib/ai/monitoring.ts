@@ -70,7 +70,11 @@ export function trackAIMultiple(
   fields: Record<string, { length: number; maxAllowed: number }>
 ): void {
   for (const [field, data] of Object.entries(fields)) {
-    trackAIOutput(feature, { field, ...data });
+    trackAIOutput(feature, {
+      field,
+      originalLength: data.length,
+      maxAllowed: data.maxAllowed,
+    });
   }
 }
 

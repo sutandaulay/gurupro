@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { randomUUID } from 'crypto';
-import { query } from '@/lib/db';
+import { query, pool } from '@/lib/db';
 import { getUserActiveMemberships } from '@/lib/institution-members';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
@@ -205,6 +205,31 @@ export async function attachServerSessionId(
 ): Promise<{ data: SessionData; sid: string }> {
   const sid = await createServerSession(data.id);
   return { data: { ...data, sid }, sid };
+}
+
+/* ---------------------------------------------------------------------------
+ * isSessionRevoked — server-side helper for API routes.
+ *
+ * Checks whether a session identified by `sid` has been revoked (or expired)
+ * in the user_sessions table. Use this before granting sensitive access
+ * (e.g. financial data, admin actions) where you want to bypass the normal
+ * requireSession() flow.
+ *
+ * Uses pool.query (non-async) for Edge compatibility where applicable.
+ * In Node.js runtime, pool.query returns a Promise so this function is async.
+ *
+ * @param sid     — the server-side session id from the cookie's `sid` field
+ * @param userId  — the user id from the cookie's `id` field (for cross-check)
+ * @returns true if the session has been revoked or expired, false if still valid
+ * ------------------------------------------------------------------------- */
+export async function isSessionRevoked(sid: string, userId: string): Promise<boolean> {
+  if (!sid) return true;
+  const result = await pool.query(
+    `SELECT 1 FROM user_sessions
+     WHERE sid = $1 AND user_id = $2 AND revoked_at IS NULL AND expires_at > NOW()`,
+    [sid, userId]
+  );
+  return result.rows.length === 0;
 }
 
 export async function getContextFilters(userId: string): Promise<ContextFilter> {

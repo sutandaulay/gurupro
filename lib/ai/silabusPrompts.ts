@@ -297,18 +297,20 @@ export function enforceSilabusLimits(output: unknown): SilabusOutput {
   }
 
   const data = output as Record<string, unknown>;
+  const identitas = (data.identitas ?? {}) as Record<string, unknown>;
+  const totalEstimasi = (data.totalEstimasi ?? {}) as Record<string, unknown>;
 
   // Truncate fields
   const processed = {
     identitas: {
-      mataPelajaran: String(data.identitas?.mataPelajaran || ''),
-      fase: String(data.identitas?.fase || ''),
-      kelas: String(data.identitas?.kelas || ''),
-      semester: Number(data.identitas?.semester || 1),
-      tahunAjaran: data.identitas?.tahunAjaran ?? null,
+      mataPelajaran: String(identitas.mataPelajaran || ''),
+      fase: String(identitas.fase || ''),
+      kelas: String(identitas.kelas || ''),
+      semester: Number(identitas.semester || 1),
+      tahunAjaran: identitas.tahunAjaran ?? null,
     },
     capaianPembelajaran: truncateText(
-      data.capaianPembelajaran,
+      data.capaianPembelajaran as string | null | undefined,
       2000,
       '... [catatan:超出了 batas maksimum 2000 karakter]'
     ) || 'Data capaian pembelajaran tidak tersedia',
@@ -337,8 +339,8 @@ export function enforceSilabusLimits(output: unknown): SilabusOutput {
         }))
       : [],
     totalEstimasi: {
-      totalPertemuan: Number(data.totalEstimasi?.totalPertemuan ?? 0),
-      totalMinggu: Number(data.totalEstimasi?.totalMinggu ?? 0),
+      totalPertemuan: Number(totalEstimasi.totalPertemuan ?? 0),
+      totalMinggu: Number(totalEstimasi.totalMinggu ?? 0),
     },
   };
 

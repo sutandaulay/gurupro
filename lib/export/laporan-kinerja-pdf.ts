@@ -4,7 +4,6 @@
  */
 
 import PDFDocument from 'pdfkit';
-import type { LaporanKinerjaContent } from '@/app/api/laporan-kinerja/[id]/download/route';
 
 // Re-export escape for use here
 function escapeHtml(str: string | null | undefined): string {
@@ -315,7 +314,7 @@ export async function generateLaporanKinerjaPdfBuffer(
 
     if (kepalaSignatureUrl) {
       try {
-        doc.image(kepalaSignatureUrl, MARGIN_LEFT, y - 56, { fit: [120, 56], align: 'left' });
+        doc.image(kepalaSignatureUrl, MARGIN_LEFT, y - 56, { fit: [120, 56] });
       } catch (_) { /* unavailable */ }
     }
 
@@ -351,7 +350,7 @@ export async function generateLaporanKinerjaPdfBuffer(
 
     if (guruSignatureUrl) {
       try {
-        doc.image(guruSignatureUrl, rightX, y - 56, { fit: [120, 56], align: 'left' });
+        doc.image(guruSignatureUrl, rightX, y - 56, { fit: [120, 56] });
       } catch (_) { /* unavailable */ }
     }
 

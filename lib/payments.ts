@@ -24,16 +24,33 @@ async function getPlanDetails(planKey: string) {
  * Upgrades user subscription, adds tokens, writes audit logs, and sends alert notifications.
  */
 export async function activateTransaction(transactionId: string): Promise<{ success: boolean; message?: string; error?: string }> {
-  const txRes = await query("SELECT * FROM transactions WHERE id = $1", [transactionId]);
-  if (txRes.rows.length === 0) {
-    throw new Error(`Transaksi ID ${transactionId} tidak ditemukan`);
-  }
-  const transaction = txRes.rows[0];
+  // Atomic: only update if status is NOT yet ACTIVATED — prevents double-activation race condition
+  const txRes = await query(
+    `UPDATE transactions
+     SET status = 'ACTIVATED', updated_at = NOW()
+     WHERE id = $1 AND status != 'ACTIVATED'
+     RETURNING *`,
+    [transactionId]
+  );
 
-  if (transaction.status === "ACTIVATED") {
+  if (txRes.rows.length === 0) {
+    // The UPDATE matched no row: either the transaction is already ACTIVATED
+    // (idempotent replay) or it does not exist at all. The two must not be
+    // conflated — a missing transaction means the caller referenced garbage.
+    const existing = await query(
+      `SELECT id, status FROM transactions WHERE id = $1`,
+      [transactionId]
+    );
+    if (existing.rows.length === 0) {
+      return {
+        success: false,
+        error: `Transaksi ID ${transactionId} tidak ditemukan`,
+      };
+    }
     return { success: true, message: "Transaksi sudah aktif." };
   }
 
+  const transaction = txRes.rows[0];
   const userId = transaction.user_id;
   const planKey = transaction.plan_id || "three_month";
 
@@ -95,9 +112,6 @@ export async function activateTransaction(transactionId: string): Promise<{ succ
      WHERE id = $5`,
     [poinToAdd, newPlanKey, currentStart, newEnd, userId]
   );
-
-  // Update transaction status to ACTIVATED
-  await query("UPDATE transactions SET status = $1, updated_at = NOW() WHERE id = $2", ["ACTIVATED", transactionId]);
 
   // Log audit trail
   await query(

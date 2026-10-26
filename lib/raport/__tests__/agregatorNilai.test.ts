@@ -328,8 +328,6 @@ describe('refreshDataRaportFromBukuNilai', () => {
       ],
     });
 
-    if (mockQuery.mockResolvedValueOnce) {
-    }
     mockQuery.mockResolvedValueOnce({ rows: [] });
 
     const result = await refreshDataRaportFromBukuNilai('raport-1');

@@ -1,4 +1,5 @@
 import type { CollectionConfig } from "payload";
+import { ValidationError } from "payload";
 
 const LeaderContacts: CollectionConfig = {
   slug: "leader-contacts",
@@ -77,17 +78,18 @@ const LeaderContacts: CollectionConfig = {
             return normalizePhoneToE164(value);
           },
         ],
-        validate: [
-          (_, { value }) => {
-            if (!value) return true;
-            const normalized = normalizePhoneToE164(value);
+        beforeValidate: [
+          ({ value }) => {
+            if (!value) return undefined;
+            const normalized = normalizePhoneToE164(value as string);
             if (!normalized || !/^\+[1-9]\d{7,14}$/.test(normalized)) {
-              return "Format nomor WhatsApp tidak valid";
+              throw new ValidationError({
+                errors: [{ message: "Format nomor WhatsApp tidak valid", path: "phoneNumber" }],
+              });
             }
-            return true;
+            return undefined;
           },
-        ],
-      },
+        ],      },
     },
     {
       name: "email",
@@ -103,18 +105,27 @@ const LeaderContacts: CollectionConfig = {
             return value.toLowerCase().trim();
           },
         ],
-        validate: [
-          (_, { value, siblingData }) => {
+        beforeValidate: [
+          ({ value, siblingData }) => {
             if (!value && !siblingData?.phoneNumber) {
-              return "Minimal salah satu dari WhatsApp atau Email wajib diisi";
+              throw new ValidationError({
+                errors: [
+                  {
+                    message: "Minimal salah satu dari WhatsApp atau Email wajib diisi",
+                    path: "email",
+                  },
+                ],
+              });
             }
             if (value) {
               const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-              if (!emailRegex.test(value)) {
-                return "Format email tidak valid";
+              if (!emailRegex.test(value as string)) {
+                throw new ValidationError({
+                  errors: [{ message: "Format email tidak valid", path: "email" }],
+                });
               }
             }
-            return true;
+            return undefined;
           },
         ],
       },

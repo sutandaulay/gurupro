@@ -159,14 +159,17 @@ ${message}
 }
 
 /**
- * Interpolates variables inside a template string
+ * Interpolates variables inside a template string.
+ * Values are escaped to prevent ReDoS via injected regex metacharacters.
  */
 export function interpolate(template: string, variables: Record<string, any>): string {
   let result = template;
   for (const [key, value] of Object.entries(variables)) {
-    const placeholder = new RegExp(`{${key}}`, "g");
+    const placeholder = `{${key}}`;
     const valString = value !== undefined && value !== null ? String(value) : "";
-    result = result.replace(placeholder, valString);
+    // Escape regex special chars in value to prevent ReDoS
+    const escaped = valString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    result = result.split(placeholder).join(escaped);
   }
   return result;
 }

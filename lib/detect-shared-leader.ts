@@ -1,6 +1,7 @@
 import { getPayload } from "./payload";
 import { normalizePhoneNumber, normalizeEmail } from "./performance-share";
 import { COLLECTIONS } from "@/collections/config";
+import type { Where } from "payload";
 
 export interface TeacherGroup {
   teacherId: string;
@@ -39,7 +40,7 @@ export async function detectSharedLeader(
   const normalizedPhone = phoneNumber ? normalizePhoneNumber(phoneNumber) : null;
   const normalizedEmail = email ? normalizeEmail(email) : null;
 
-  const orConditions: Record<string, unknown>[] = [];
+  const orConditions: Where[] = [];
   if (normalizedPhone) {
     orConditions.push({ phoneNumber: { equals: normalizedPhone } });
   }

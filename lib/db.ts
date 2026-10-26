@@ -29,7 +29,7 @@ export const pool = globalForPool.pool ?? new Pool({
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
-  port: parseInt(process.env.DB_PORT, 10),
+  port: parseInt(process.env.DB_PORT ?? '5432', 10),
   options: '-c search_path=public,payload',
   max: 50,
   connectionTimeoutMillis: 10000,
@@ -70,6 +70,22 @@ export const queryWithTimeout = async (text: string, params?: any[], timeoutMs: 
 export const query = async (text: string, params?: any[]) => {
   await ensureDbInitialized();
   return pool.query(text, params);
+};
+
+// Transaction wrapper with automatic client management
+export const withTransaction = async <T>(callback: (client: Pool) => Promise<T>): Promise<T> => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await callback(client as unknown as Pool);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 // Skrip Migrasi Otomatis untuk Tabel Operasional Sekolah & Presensi
@@ -449,6 +465,9 @@ const initDb = async () => {
     `);
     await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS plan_id VARCHAR(50)');
     await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT');
+    await pool.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_external_id ON transactions (external_id) WHERE external_id IS NOT NULL`
+    );
 
     // 21. Create addon poin package table
     await pool.query(`
@@ -1324,6 +1343,71 @@ const initDb = async () => {
       await pool.query('CREATE INDEX IF NOT EXISTS idx_student_grades_lookup ON student_grades(assessment_id, student_id)');
     } catch (err) {
       console.error('Failed to create performance indexes:', err);
+    }
+
+    // 34b. Migration 11 + 16: Poin Ledger & Token Accumulation
+    // poin_transactions table (ledger for Poin)
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS poin_transactions (
+          id VARCHAR(50) PRIMARY KEY,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          feature VARCHAR(100) NOT NULL DEFAULT 'unknown',
+          raw_tokens INTEGER NOT NULL DEFAULT 0,
+          poin_deducted INTEGER NOT NULL DEFAULT 0,
+          source VARCHAR(20) NOT NULL CHECK (source IN ('main', 'addon', 'failed')),
+          model VARCHAR(100) DEFAULT 'gemini-2.5-flash-lite',
+          provider VARCHAR(50) DEFAULT 'gemini',
+          mapel VARCHAR(100) DEFAULT '-',
+          jenjang VARCHAR(50) DEFAULT '-',
+          jumlah_soal INTEGER DEFAULT 0,
+          success BOOLEAN NOT NULL DEFAULT true,
+          error_message TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_poin_transactions_user_id ON poin_transactions(user_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_poin_transactions_feature ON poin_transactions(feature)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_poin_transactions_created_at ON poin_transactions(created_at DESC)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_poin_transactions_source ON poin_transactions(source)`);
+    } catch (err) {
+      console.error('Failed to create poin_transactions table:', err);
+    }
+
+    // Poin columns on users table (migration 11)
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS quota_poin_total INTEGER`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS quota_poin_used INTEGER DEFAULT 0`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS addon_poin INTEGER DEFAULT 0`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS addon_poin_used INTEGER DEFAULT 0`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS addon_poin_grace_period_ends TIMESTAMP`);
+    } catch (err) {
+      console.error('Failed to add poin columns to users:', err);
+    }
+
+    // Token accumulation columns on users table (migration 16)
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS token_accumulated INTEGER DEFAULT 0`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS token_accumulated_month DATE`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_token_accumulated ON users(id) WHERE token_accumulated > 0`);
+    } catch (err) {
+      console.error('Failed to add token accumulation columns to users:', err);
+    }
+
+    // addon_token_packages columns (migration 11)
+    try {
+      await pool.query(`ALTER TABLE addon_token_packages ADD COLUMN IF NOT EXISTS poin_amount INTEGER`);
+      await pool.query(`ALTER TABLE addon_token_packages ADD COLUMN IF NOT EXISTS token_amount_old INTEGER`);
+    } catch (err) {
+      console.error('Failed to add columns to addon_token_packages:', err);
+    }
+
+    // pricing_plans columns (migration 11)
+    try {
+      await pool.query(`ALTER TABLE pricing_plans ADD COLUMN IF NOT EXISTS poin INTEGER`);
+      await pool.query(`ALTER TABLE pricing_plans ADD COLUMN IF NOT EXISTS tokens_old INTEGER`);
+    } catch (err) {
+      console.error('Failed to add columns to pricing_plans:', err);
     }
 
     // 35. Create user_face_enrollment table

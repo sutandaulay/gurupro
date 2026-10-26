@@ -145,7 +145,7 @@ export function stripMarkdown(text: string | null | undefined): string {
  *
  * @example enforceMaxItems([1,2,3,4,5], 3) → [1,2,3]
  */
-export function enforceMaxItems<T>(items: T[], maxItems: number): T[] {
+export function enforceMaxItems<T>(items: T[] | null | undefined, maxItems: number): T[] {
   if (!Array.isArray(items)) return [];
   return items.slice(0, maxItems);
 }

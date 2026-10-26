@@ -1,8 +1,8 @@
 /**
  * Rate limiting middleware for API routes.
  *
- * Uses in-memory store for development, PostgreSQL for production.
- * Limits: configurable per-route or global defaults.
+ * Uses in-memory store for development / Edge functions,
+ * PostgreSQL-backed store for production Node.js server routes.
  *
  * Usage in API route:
  *   const rl = getRateLimiter({ windowMs: 60_000, max: 100 });
@@ -18,6 +18,8 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { parseSessionCookie } from './session-sign';
+import { query } from './db';
+import { isEdge } from './env';
 
 export interface RateLimitConfig {
   windowMs?: number;
@@ -37,8 +39,9 @@ interface RateLimitEntry {
   resetAt: number;
 }
 
-// In-memory store (single-instance, resets on server restart)
-// Production should use Redis or PostgreSQL-backed store.
+// ─────────────────────────────────────────────────────────────
+// In-memory store (Edge / development fallback)
+// ─────────────────────────────────────────────────────────────
 const memoryStore = new Map<string, RateLimitEntry>();
 
 function cleanup() {
@@ -50,6 +53,70 @@ function cleanup() {
 
 // Cleanup every 5 minutes
 setInterval(cleanup, 5 * 60 * 1000);
+
+// ─────────────────────────────────────────────────────────────
+// PostgreSQL-backed store (production)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Ensures the rate_limits table exists.
+ * Called lazily on first use.
+ */
+async function ensureRateLimitsTable(): Promise<void> {
+  await query(`
+    CREATE TABLE IF NOT EXISTS rate_limits (
+      key          VARCHAR(255) PRIMARY KEY,
+      count        INTEGER NOT NULL DEFAULT 0,
+      reset_at     BIGINT NOT NULL
+    )
+  `);
+}
+
+/**
+ * PostgreSQL-backed check. Returns result synchronously from DB query.
+ * Uses UPSERT to handle concurrent requests atomically.
+ */
+async function pgCheck(
+  key: string,
+  windowMs: number,
+  max: number
+): Promise<RateLimitResult> {
+  await ensureRateLimitsTable();
+
+  const now = Date.now();
+  const resetAt = now + windowMs;
+
+  // Upsert atomically: increment count, reset window if expired
+  const res = await query(`
+    INSERT INTO rate_limits (key, count, reset_at)
+    VALUES ($1, 1, $2)
+    ON CONFLICT (key) DO UPDATE SET
+      count = CASE
+        WHEN rate_limits.reset_at <= $2 THEN 1
+        ELSE rate_limits.count + 1
+      END,
+      reset_at = CASE
+        WHEN rate_limits.reset_at <= $2 THEN $2
+        ELSE rate_limits.reset_at
+      END
+    WHERE rate_limits.key = $1
+    RETURNING count, reset_at
+  `, [key, resetAt]);
+
+  const row = res.rows[0];
+  const count = row?.count ?? 0;
+  const rowResetAt = row?.reset_at ?? resetAt;
+
+  const remaining = Math.max(0, max - count);
+  const limitExceeded = count > max;
+  const retryAfter = limitExceeded ? Math.ceil((rowResetAt - now) / 1000) : undefined;
+
+  return { limitExceeded, remaining, retryAfter, limit: max };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
 
 function getClientIp(req: Request): string {
   return (
@@ -67,11 +134,16 @@ async function getIdentifier(req: Request): Promise<string> {
       const session = parseSessionCookie(sessionCookie);
       if (session?.id) return `user:${session.id}`;
     }
-  } catch {}
+  } catch {
+    // cookies() may throw in Edge runtime — fall through
+  }
 
-  // Fallback to IP
   return `ip:${getClientIp(req)}`;
 }
+
+// ─────────────────────────────────────────────────────────────
+// Factory
+// ─────────────────────────────────────────────────────────────
 
 export function createRateLimiter(config: RateLimitConfig = {}) {
   const {
@@ -86,24 +158,25 @@ export function createRateLimiter(config: RateLimitConfig = {}) {
       const key = `${keyPrefix}:${identifier}`;
       const now = Date.now();
 
-      let entry = memoryStore.get(key);
+      // Edge runtime or NODE_ENV=test → in-memory fallback
+      if (isEdge() || process.env.NODE_ENV === 'test') {
+        let entry = memoryStore.get(key);
 
-      if (!entry || entry.resetAt < now) {
-        entry = { count: 0, resetAt: now + windowMs };
-        memoryStore.set(key, entry);
+        if (!entry || entry.resetAt < now) {
+          entry = { count: 0, resetAt: now + windowMs };
+          memoryStore.set(key, entry);
+        }
+
+        entry.count++;
+        const remaining = Math.max(0, max - entry.count);
+        const limitExceeded = entry.count > max;
+        const retryAfter = limitExceeded ? Math.ceil((entry.resetAt - now) / 1000) : undefined;
+
+        return { limitExceeded, remaining, retryAfter, limit: max };
       }
 
-      entry.count++;
-      const remaining = Math.max(0, max - entry.count);
-      const limitExceeded = entry.count > max;
-      const retryAfter = limitExceeded ? Math.ceil((entry.resetAt - now) / 1000) : undefined;
-
-      return {
-        limitExceeded,
-        remaining,
-        retryAfter,
-        limit: max,
-      };
+      // Production Node.js → PostgreSQL
+      return pgCheck(key, windowMs, max);
     },
   };
 }
@@ -126,6 +199,16 @@ export const strictRateLimiter = createRateLimiter({
   windowMs: 60_000,
   max: 10,
   keyPrefix: 'strict',
+});
+
+/**
+ * AI feature rate limiter — more permissive but still controlled.
+ * 60 requests per minute per user (AI features are expensive).
+ */
+export const aiRateLimiter = createRateLimiter({
+  windowMs: 60_000,
+  max: 60,
+  keyPrefix: 'ai',
 });
 
 /**

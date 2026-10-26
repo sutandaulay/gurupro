@@ -43,12 +43,10 @@ export function applyTema(tema: TemaPreference) {
   const root = document.documentElement;
   const dark =
     tema === "dark" || (tema === "system" && isSystemDark());
-  root.classList.remove("dark", "light");
+  root.setAttribute("data-theme", dark ? "dark" : "light");
   if (dark) {
-    root.classList.add("dark");
     document.body.classList.add("dark");
   } else {
-    root.classList.add("light");
     document.body.classList.remove("dark");
   }
 }

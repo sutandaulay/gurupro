@@ -1,4 +1,5 @@
 import type { CollectionConfig } from "payload";
+import { ValidationError } from "payload";
 import { ALLOWED_DOCUMENT_CATEGORIES } from "./config";
 
 const DocumentAccessGrants: CollectionConfig = {
@@ -67,14 +68,25 @@ const DocumentAccessGrants: CollectionConfig = {
         description: "Kategori yang diizinkan untuk dilihat pimpinan",
       },
       hooks: {
-        validate: [
-          (_, { value }) => {
-            if (!value) return "Kategori dokumen wajib dipilih";
+        beforeValidate: [
+          ({ value }) => {
+            if (!value) {
+              throw new ValidationError({
+                errors: [{ message: "Kategori dokumen wajib dipilih", path: "documentCategory" }],
+              });
+            }
             const allowedValues = ALLOWED_DOCUMENT_CATEGORIES.map((c) => c.value);
             if (!allowedValues.includes(value)) {
-              return "Kategori tidak valid - hanya kategori mengajar yang diizinkan";
+              throw new ValidationError({
+                errors: [
+                  {
+                    message: "Kategori tidak valid - hanya kategori mengajar yang diizinkan",
+                    path: "documentCategory",
+                  },
+                ],
+              });
             }
-            return true;
+            return undefined;
           },
         ],
       },

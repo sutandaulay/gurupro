@@ -1,6 +1,4 @@
-import { CollectionConfig } from 'payload/types';
-import { Users } from './Users';
-import { Institutions } from './Institutions';
+import type { CollectionConfig } from 'payload';
 
 // Konfigurasi untuk Teacher Institution Assignments
 export const TeacherInstitutionAssignments: CollectionConfig = {
@@ -362,7 +360,6 @@ export const AttendanceSummary: CollectionConfig = {
   ],
   indexes: [
     {
-      name: 'idx_teacher_institution_date',
       fields: ['teacherId', 'institutionId', 'date'],
     },
   ],

@@ -215,6 +215,7 @@ export const leaveRequests = pgTable(
     status: varchar('status', { length: 20 }).notNull().default('pending'), // 'pending', 'approved', 'rejected'
     approvedBy: uuid('approved_by').references(() => users.id),
     approvedAt: timestamp('approved_at'),
+    notes: varchar('notes'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },

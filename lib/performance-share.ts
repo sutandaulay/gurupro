@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import crypto, { randomInt } from "crypto";
 import {
   ALLOWED_DOCUMENT_CATEGORIES,
   OTP_VALIDITY_MINUTES,
@@ -91,7 +91,7 @@ export function generateShareToken(): string {
  * Generate 6-digit OTP
  */
 export function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100000, 999999).toString();
 }
 
 /**

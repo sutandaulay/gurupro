@@ -179,6 +179,13 @@ export async function getNotificationTemplates(): Promise<NotificationTemplates>
       email_body: "",
       wa_message: ""
     },
+    refund: {
+      email_enabled: true,
+      wa_enabled: true,
+      email_subject: "Refund Pembayaran GuruPRO",
+      email_body: "",
+      wa_message: ""
+    },
     teaching_report_completed: {
       email_enabled: true,
       wa_enabled: true,

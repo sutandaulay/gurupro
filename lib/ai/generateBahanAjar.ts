@@ -7,7 +7,7 @@
  */
 
 import { generateAIContent } from "./generators";
-import { consumeUserPoinFromUsage } from "@/src/services/poin-service";
+import { consumeUserPoinFromUsage, getUserPoinAccess } from "@/src/services/poin-service";
 import { adaptGeminiUsage } from "@/src/lib/ai-usage-result";
 import {
   buildSlidePrompt,
@@ -268,18 +268,18 @@ async function prepareTokenDeduction(
   remainingTokens: number;
   error?: string;
 }> {
-  // Check user token access
-  const { access, user } = await getUserTokenAccess(userId);
+  // Check user poin access
+  const { access, user } = await getUserPoinAccess(userId);
 
   if (!access.allowed) {
     return {
       allowed: false,
       remainingTokens: 0,
-      error: `Poin tidak tersedia: ${access.reason === "token_habis" ? "Kuota habis" : access.reason === "subscription_expired" ? "Langganan expired" : "Akses ditolak"}`,
+      error: `Poin tidak tersedia: ${access.reason === "poin_habis" ? "Kuota habis" : access.reason === "subscription_expired" ? "Langganan expired" : "Akses ditolak"}`,
     };
   }
 
-  const remaining = access.remainingTokens || 0;
+  const remaining = access.remainingPoin ?? 0;
 
   // Grace period check: user dengan subscription aktif tapi token habis
   // tetap boleh generate (akan di-track untuk top-up reminder)
