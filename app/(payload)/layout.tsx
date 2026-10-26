@@ -1,6 +1,6 @@
 import { RootLayout } from "@payloadcms/next/layouts";
 import config from "@payload-config";
-import { importMap } from "./importMap";
+import { importMap } from "./cms/importMap";
 import { payloadServerFunction } from "./serverFunction";
 import "@payloadcms/next/css";
 
