@@ -45,6 +45,11 @@ const REQUIRED_PAYLOAD_DB_ENV_VARS = [
   'DB_PORT',
 ] as const;
 
+function allowedOrigins(): string[] {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  return siteUrl ? [siteUrl] : [];
+}
+
 const hasDirectUrl = !!process.env.DATABASE_URL;
 const hasComponentVars = REQUIRED_PAYLOAD_DB_ENV_VARS.every((key) => !!process.env[key]);
 
@@ -77,7 +82,10 @@ export default buildConfig({
   },
 
   routes: {
-    admin: "/admin",
+    // Must match the app/(payload)/<adminRoute> folder — Payload generates
+    // the import map into app/(payload)/cms/importMap.js and builds admin
+    // links from this value.
+    admin: "/cms",
   },
 
   collections: [
@@ -132,19 +140,23 @@ export default buildConfig({
     outputFile: path.resolve(dirname, "payload-types.ts"),
   },
 
-  cors: [
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:3002",
-    "http://localhost:3003",
-  ],
+  cors: process.env.NODE_ENV === "production"
+    ? allowedOrigins()
+    : [
+        process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:3003",
+      ],
 
-  csrf: [
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:3002",
-    "http://localhost:3003",
-  ],
+  csrf: process.env.NODE_ENV === "production"
+    ? allowedOrigins()
+    : [
+        process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:3003",
+      ],
 
   upload: {
     limits: {

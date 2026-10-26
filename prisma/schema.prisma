@@ -1,3 +1,9 @@
+// ⚠️ WARNING: This schema is GENERATED from actual DB via `prisma db pull`.
+// DO NOT edit manually. DO NOT run `prisma db push` or `prisma migrate`.
+// To update: npx prisma db pull --schema=prisma/schema.prisma
+// Then: npx prisma generate
+// Last synced: 2026-08-26
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -374,6 +380,23 @@ model users {
   login_attempts                                         Int?                   @default(0)
   lock_until                                             DateTime?              @db.Timestamp(6)
   pending_invitation_token                               String?                @db.VarChar(255)
+  nip                                                    String?                @db.VarChar(255)
+  signature_url                                          String?
+  quota_poin_total                                       Int?
+  quota_poin_used                                        Int?                   @default(0)
+  addon_poin                                             Int?                   @default(0)
+  addon_poin_used                                        Int?                   @default(0)
+  addon_poin_grace_period_ends                           DateTime?              @db.Timestamp(6)
+  token_accumulated                                      Int?                   @default(0)
+  token_accumulated_month                                DateTime?              @db.Date
+  is_seed_data                                           Boolean                @default(false)
+  seed_batch                                             String?                @db.VarChar(50)
+  last_institution_id                                    Int?
+  notification_tone                                      String?                @default("hangat") @db.VarChar(20)
+  morning_briefing_enabled                                Boolean                @default(true)
+  weekly_recap_enabled                                   Boolean                @default(true)
+  timezone                                               String?                @default("Asia/Jakarta")
+  gender                                                 String?                @db.VarChar(10)
   absent_alerts                                          absent_alerts[]
   admin_tasks                                            admin_tasks[]
   ai_chat_logs                                           ai_chat_logs[]
