@@ -11,7 +11,8 @@
 import { Pool } from 'pg';
 import axios from 'axios';
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:nus4nt4r4@localhost:5432/gurupro_db';
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) throw new Error('DATABASE_URL env var is required');
 const pool = new Pool({ connectionString: DATABASE_URL });
 
 async function measureQueryTime(query: string, params: any[] = []): Promise<number> {

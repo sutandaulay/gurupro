@@ -29,7 +29,7 @@ const dbConfig = {
     process.env.DATABASE_URL.split('/').pop() : 
     process.env.DB_NAME || 'gurupro_db',
   user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'nus4nt4r4',
+  password: process.env.DB_PASSWORD || '',
 };
 
 // Helper functions

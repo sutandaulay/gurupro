@@ -70,3 +70,6 @@ playwright-traces/
 test-results/
 build.log
 dev-server.log
+
+# Claude Code local settings (may contain machine-specific credentials)
+.claude/settings.json
